@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDecimal } from '../src/engine/frac';
-import { parseNumericResponse } from '../src/engine/grade';
+import { isAnswered, parseNumericResponse } from '../src/engine/grade';
 
 describe('parseDecimal commas', () => {
   it('rejects a comma that is not a thousands separator', () => {
@@ -34,5 +34,22 @@ describe('long input', () => {
     expect(parseNumericResponse({ format: 'ne', value: long })).toBeNull();
     expect(parseNumericResponse({ format: 'ne', num: long, den: '7' })).toBeNull();
     expect(parseNumericResponse({ format: 'ne', value: '99999999.99999999' })).toBeNull();
+  });
+});
+
+describe('isAnswered numeric entry', () => {
+  it('is false for responses that do not parse', () => {
+    expect(isAnswered({ format: 'ne', value: '' })).toBe(false);
+    expect(isAnswered({ format: 'ne', value: '1/2' })).toBe(false);
+    expect(isAnswered({ format: 'ne', value: '1,5' })).toBe(false);
+    expect(isAnswered({ format: 'ne', num: '3', den: '' })).toBe(false);
+    expect(isAnswered({ format: 'ne', num: '', den: '4' })).toBe(false);
+    expect(isAnswered({ format: 'ne', num: '3', den: '0' })).toBe(false);
+  });
+
+  it('is true for valid decimals and fractions', () => {
+    expect(isAnswered({ format: 'ne', value: '-0.5' })).toBe(true);
+    expect(isAnswered({ format: 'ne', value: '1,500' })).toBe(true);
+    expect(isAnswered({ format: 'ne', num: '3', den: '4' })).toBe(true);
   });
 });

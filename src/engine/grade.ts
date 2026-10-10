@@ -39,7 +39,7 @@ export function isAnswered(r: Response | undefined): boolean {
     case 'mcm':
       return r.choices.length > 0;
     case 'ne':
-      return 'value' in r ? r.value.trim() !== '' : r.num.trim() !== '' || r.den.trim() !== '';
+      return parseNumericResponse(r) !== null;
   }
 }
 
