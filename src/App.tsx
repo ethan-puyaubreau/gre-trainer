@@ -63,7 +63,7 @@ export function App() {
           </a>
           <nav className="nav">
             {NAV.map(([p, label]) => (
-              <a key={p} href={p ? href(p) : href()} className={page === p ? 'active' : undefined}>
+              <a key={p} href={p ? href(p) : href()} className={page === p ? 'active' : undefined} aria-current={page === p ? 'page' : undefined}>
                 {label}
               </a>
             ))}
