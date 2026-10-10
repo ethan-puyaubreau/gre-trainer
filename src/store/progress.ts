@@ -73,6 +73,7 @@ interface Actions {
 }
 
 const MAX_HISTORY = 4000;
+export const PROGRESS_KEY = 'gre-trainer-progress';
 
 export function initialData(now = Date.now()): ProgressData {
   return {
@@ -175,7 +176,7 @@ export const useProgress = create<ProgressData & Actions>()(
       },
     }),
     {
-      name: 'gre-trainer-progress',
+      name: PROGRESS_KEY,
       version: 2,
       migrate: (persisted, version) => (version < 2 ? dropWeakFlags(persisted as ProgressData) : persisted) as ProgressData & Actions,
       storage: createJSONStorage(() => localStorage),
