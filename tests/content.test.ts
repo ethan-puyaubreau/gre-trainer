@@ -9,7 +9,7 @@ import { probTraps } from '../src/content/data/prob';
 import { statsTraps } from '../src/content/data/stats';
 import { measureTraps } from '../src/content/geometry/measure';
 import { shapesTraps } from '../src/content/geometry/shapes';
-import { generateBody, rngFor } from '../src/engine/generate';
+import { generateBody, rngFor, SEED_POOL } from '../src/engine/generate';
 import type { Difficulty } from '../src/engine/types';
 import { qKey, questionErrors, richErrors } from './validate';
 
@@ -95,6 +95,28 @@ for (const t of TEMPLATES.filter((t) => !ONLY || t.id.includes(ONLY))) {
         }
       }
       expect([...errors].slice(0, 20)).toEqual([]);
+    });
+
+    it(`has a verified answer key for every question the app can serve (seeds 1-${SEED_POOL})`, () => {
+      // The full validation above covers the first SEEDS seeds; here every remaining seed of the
+      // pool is generated and checked (answer key + basic structure, without KaTeX rendering).
+      const errors: string[] = [];
+      for (const d of DIFFS)
+        for (let seed = SEEDS + 1; seed <= SEED_POOL && errors.length < 10; seed++) {
+          try {
+            const { q, params } = generateBody(t, seed, d);
+            if (q.format !== t.format) errors.push(`seed ${seed} d${d}: format`);
+            if (q.format === 'mcs' && !(q.answer >= 0 && q.answer < q.choices.length && q.choices.length === 5))
+              errors.push(`seed ${seed} d${d}: bad choices`);
+            if ((q.format === 'mcs' || q.format === 'mcm') && new Set(q.choices.map((c) => c.text)).size !== q.choices.length)
+              errors.push(`seed ${seed} d${d}: duplicate choices`);
+            const verdict = t.check(q, params, rngFor(t.id + ':check', seed, d));
+            if (verdict) errors.push(`seed ${seed} d${d}: WRONG ANSWER KEY: ${verdict}`);
+          } catch (e) {
+            errors.push(`seed ${seed} d${d}: threw ${(e as Error).message}`);
+          }
+        }
+      expect(errors).toEqual([]);
     });
 
     it('is deterministic for a given seed', () => {

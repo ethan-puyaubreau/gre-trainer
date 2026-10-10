@@ -481,6 +481,7 @@ Moving by the count ${m} itself, instead of the percent it represents, confuses 
         traps,
         fillers: [ans / 2, ans * 2, ans + N / 10].filter((v) => Number.isInteger(v)),
         format: (v) => `$${fTex(v)}$`,
+        step: Math.max(1, Math.round(N / 20)),
       });
       return {
         params: { mode, N, p: p1, m: 0, dir: 'below', p2, options: [] },

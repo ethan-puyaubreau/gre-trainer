@@ -727,6 +727,7 @@ So $${num(v)}$ is about ${Math.abs(z) === 1 ? 'one standard deviation' : 'two st
           traps: trapList.map((t) => ({ value: (t.value * N) / 100, trap: t.trap })).concat([{ value: pct, trap: 'stat-normal-percent-only' }]),
           fillers: rng.shuffle(set.filter((p) => p !== pct)).map((p) => (p * N) / 100),
           format: (v) => `$${fTex(v)}$`,
+          step: (5 * N) / 100,
         });
         return {
           params: { ...none, mode, mu, sigma, z1, z2, N, options: choices.map((c) => Number(c.text.replace(/[${}]/g, '').replace(/,/g, ''))) },
@@ -749,6 +750,7 @@ $${pct}\\%$ of $${num(N)}$ is $${num(ans)}$.`,
         traps: trapList,
         fillers: rng.shuffle(set.filter((p) => p !== pct)),
         format: (v) => `$${v.toNumber()}\\%$`,
+        step: 5,
       });
       return {
         params: { ...none, mode, mu, sigma, z1, z2, options: choices.map((c) => Number(c.text.replace(/[$\\%]/g, ''))) },

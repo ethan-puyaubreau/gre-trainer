@@ -1,8 +1,8 @@
 // Builds GRE-like timed sections: official sizes, QC first, one data interpretation set.
 
 import { skillById, TEMPLATES } from '../content';
-import { generateQuestion } from '../engine/generate';
-import { randomSeed, type Rng } from '../engine/rng';
+import { generateQuestion, poolSeed } from '../engine/generate';
+import type { Rng } from '../engine/rng';
 import type { Area, Difficulty, Format, Question, Template } from '../engine/types';
 
 export type Level = 'easy' | 'medium' | 'hard';
@@ -54,7 +54,7 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
   if (famList.length) {
     const fam = rng.pick(famList);
     setFamily = fam[0].set;
-    const seed = randomSeed();
+    const seed = poolSeed();
     const d = pickDifficulty(rng, level);
     setQuestions = rng.sample(fam, Math.min(spec.setSize ?? 3, fam.length)).map((t) => generateQuestion(t, seed, d));
   }
@@ -86,7 +86,7 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
     const t = rng.pick(tier);
     usedSkills.add(t.skill);
     usedTemplates.add(t.id);
-    out.push(generateQuestion(t, randomSeed(), pickDifficulty(rng, level)));
+    out.push(generateQuestion(t, poolSeed(), pickDifficulty(rng, level)));
   });
   // QC first like the official sections, then the other formats, then the data interpretation set.
   const qc = out.filter((q) => q.format === 'qc');
