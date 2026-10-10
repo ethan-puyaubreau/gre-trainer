@@ -1,5 +1,5 @@
 :root {
-  /* Motion: short by default, springy for rewards; all cut by prefers-reduced-motion at the end of this file. */
+  /* Motion: short by default, springy for rewards; cut at the end of this file by prefers-reduced-motion or the Animations setting. */
   --dur-fast: 160ms;
   --dur: 240ms;
   --dur-slow: 600ms;
@@ -919,13 +919,22 @@ details summary {
 }
 
 /* ---------------------------------------------------------------- motion off */
+/* The system preference applies unless the in-app setting forces motion on (data-motion on <html>). */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion='on']) *,
+  :root:not([data-motion='on']) *::before,
+  :root:not([data-motion='on']) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+:root[data-motion='off'] *,
+:root[data-motion='off'] *::before,
+:root[data-motion='off'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

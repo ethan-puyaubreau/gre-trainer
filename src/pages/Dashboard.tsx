@@ -5,6 +5,7 @@ import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '.
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, progressToNext, type Level } from '../mastery/model';
+import { reducedMotion } from '../motion';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-dashboard.css';
@@ -21,7 +22,6 @@ interface Seen {
   levels: Record<string, number>;
 }
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 function readSeen(): Seen | null {
   try {

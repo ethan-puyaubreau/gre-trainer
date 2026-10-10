@@ -70,6 +70,29 @@ export function Settings() {
             </button>
           ))}
         </div>
+
+        <h3>Animations</h3>
+        <div className="tabs">
+          {(
+            [
+              ['system', 'Follow system'],
+              ['on', 'On'],
+              ['off', 'Off'],
+            ] as const
+          ).map(([m, label]) => {
+            const on = (settings.motion ?? 'system') === m;
+            return (
+              <button key={m} className={on ? 'on' : ''} aria-pressed={on} onClick={() => updateSettings({ motion: m })}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {(settings.motion ?? 'system') === 'system' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && (
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Your system asks for reduced motion, so animations are off. Choose On to see them anyway.
+          </p>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

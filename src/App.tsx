@@ -22,12 +22,19 @@ const NAV: [string, string][] = [
 export function App() {
   const route = useRoute();
   const theme = useProgress((s) => s.settings.theme);
+  const motion = useProgress((s) => s.settings.motion ?? 'system');
 
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (motion === 'system') root.removeAttribute('data-motion');
+    else root.setAttribute('data-motion', motion);
+  }, [motion]);
 
   const page = route[0] ?? '';
   let body;

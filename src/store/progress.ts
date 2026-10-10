@@ -42,6 +42,8 @@ export interface Settings {
   /** Show the running clock (the real GRE lets you hide it). */
   showTimer: boolean;
   theme: 'system' | 'light' | 'dark';
+  /** Animations: follow the system's reduced-motion preference, or force them on or off. */
+  motion?: 'system' | 'on' | 'off';
   /** When the user last downloaded an export (drives the backup reminder). */
   lastExportAt?: number;
 }
