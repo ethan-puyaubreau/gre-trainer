@@ -42,6 +42,8 @@ export interface Settings {
   /** Show the running clock (the real GRE lets you hide it). */
   showTimer: boolean;
   theme: 'system' | 'light' | 'dark';
+  /** When the user last downloaded an export (drives the backup reminder). */
+  lastExportAt?: number;
 }
 
 export interface ProgressData {

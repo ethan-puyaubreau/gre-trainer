@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { ExportReminder } from './components/ExportReminder';
 import { Dashboard } from './pages/Dashboard';
 import { History } from './pages/History';
 import { Practice } from './pages/Practice';
@@ -69,6 +70,7 @@ export function App() {
           </nav>
         </div>
       </header>
+      <ExportReminder />
       <main>{body}</main>
     </div>
   );

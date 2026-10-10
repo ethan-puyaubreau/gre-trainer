@@ -11,6 +11,7 @@ export function Settings() {
   const file = useRef<HTMLInputElement>(null);
 
   const download = () => {
+    updateSettings({ lastExportAt: Date.now() });
     const blob = new Blob([exportProgress()], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
