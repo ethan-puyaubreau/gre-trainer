@@ -127,7 +127,10 @@ export function Practice({ route }: { route: string[] }) {
       const target = e.target as HTMLElement;
       const typing = target.tagName === 'INPUT' || target.closest('.calc');
       if (e.key === 'Enter') {
-        if (target.closest('.calc')) return;
+        if (target.closest('.calc, a, summary, textarea')) return;
+        // Enter activates any focused button except an answer choice (those still check / advance).
+        const btn = target.closest('button');
+        if (btn && !btn.closest('.choices')) return;
         e.preventDefault();
         if (result) next();
         else submit();
