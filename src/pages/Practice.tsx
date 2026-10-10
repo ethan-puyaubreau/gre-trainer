@@ -205,7 +205,7 @@ export function Practice({ route }: { route: string[] }) {
           )}
         </div>
 
-        <QuestionView q={question} response={response} onChange={setResponse} locked={!!result} reveal={!!result} autoFocus />
+        <QuestionView key={question.id} q={question} response={response} onChange={setResponse} locked={!!result} reveal={!!result} autoFocus />
 
         {!result && (
           <div className="row" style={{ marginTop: 18 }}>
