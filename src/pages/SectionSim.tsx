@@ -73,6 +73,8 @@ export function SectionSim() {
       const correct = sec.questions.map((q, i) => grade(q, sec.responses[i]).correct);
       const usedSec = Math.min(sec.spec.minutes * 60, Math.round((Date.now() - sec.startedAt) / 1000));
       sec.questions.forEach((q, i) => {
+        // A blank is not evidence about the skill: it would cost a level and queue a repair for a question never attempted.
+        if (!isAnswered(sec.responses[i])) return;
         const g = grade(q, sec.responses[i]);
         store.recordAttempt({
           question: q,
