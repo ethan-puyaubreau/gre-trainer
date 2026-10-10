@@ -196,8 +196,9 @@ function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: n
   const finished = useRef(false);
 
   const commitTime = useCallback(() => {
-    const t = Date.now();
-    const spent = t - enteredAt.current;
+    // Time stops at the deadline: a tab that slept past it must not bill hours to the current question.
+    const t = Math.min(Date.now(), initial.endsAt);
+    const spent = Math.max(0, t - enteredAt.current);
     enteredAt.current = t;
     setSec((s) => {
       if (review) return s;
@@ -205,7 +206,7 @@ function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: n
       timeSpent[idx] += spent;
       return { ...s, timeSpent };
     });
-  }, [idx, review]);
+  }, [idx, review, initial.endsAt]);
 
   const goTo = (i: number) => {
     commitTime();
@@ -220,8 +221,8 @@ function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: n
   const end = useCallback(() => {
     if (finished.current) return;
     finished.current = true;
-    const t = Date.now();
-    const spent = review ? 0 : t - enteredAt.current;
+    const t = Math.min(Date.now(), sec.endsAt);
+    const spent = review ? 0 : Math.max(0, t - enteredAt.current);
     const timeSpent = [...sec.timeSpent];
     timeSpent[idx] += spent;
     onFinish({ ...sec, timeSpent });
