@@ -3,6 +3,7 @@ import { Calculator } from '../components/Calculator';
 import { LevelChange } from '../components/LevelChange';
 import { QuestionView } from '../components/QuestionView';
 import { Rich, RichInline } from '../components/Rich';
+import { SessionRecap } from '../components/SessionRecap';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
 import { AREA_NAMES, SKILLS, skillById, templateById, templatesBySkill, TRAPS } from '../content';
 import { generateQuestion, poolSeed } from '../engine/generate';
@@ -11,7 +12,7 @@ import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
 import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
-import { dodgedTraps } from '../mastery/session';
+import { dodgedTraps, summarize, type SessionOutcome } from '../mastery/session';
 import { go, href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -67,12 +68,14 @@ export function Practice({ route }: { route: string[] }) {
   const [showHint, setShowHint] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [session, setSession] = useState({ answered: 0, correct: 0, streak: 0 });
+  const [outcomes, setOutcomes] = useState<SessionOutcome[]>([]);
+  const [recap, setRecap] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const [empty, setEmpty] = useState(false);
   const recent = useRef<string[]>([]);
   const lastSkill = useRef<string | undefined>(undefined);
 
-  const elapsed = useStopwatch(!!current && !result, current?.question.id);
+  const elapsed = useStopwatch(!!current && !result && !recap, current?.question.id);
 
   const next = useCallback(() => {
     const s = useProgress.getState();
@@ -112,6 +115,8 @@ export function Practice({ route }: { route: string[] }) {
   useEffect(() => {
     next();
     setSession({ answered: 0, correct: 0, streak: 0 });
+    setOutcomes([]);
+    setRecap(false);
   }, [next]);
 
   const submit = useCallback(() => {
@@ -127,14 +132,16 @@ export function Practice({ route }: { route: string[] }) {
       mode: 'practice',
       response,
     });
-    setResult({ grade: g, outcome, timeMs, dodged: dodgedTraps(current.question, response) });
+    const dodged = dodgedTraps(current.question, response);
+    setResult({ grade: g, outcome, timeMs, dodged });
+    setOutcomes((o) => [...o, { skillId: current.question.skillId, from: outcome.from, to: outcome.to, correct: g.correct, dodged: dodged.length }]);
     setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: g.correct ? s.streak + 1 : 0 }));
   }, [current, result, response, elapsed, hinted, store]);
 
   // Keyboard: letters / digits pick a choice, Enter submits or goes to the next question.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!current) return;
+      if (!current || recap) return;
       const target = e.target as HTMLElement;
       const typing = target.tagName === 'INPUT' || target.closest('.calc');
       if (e.key === 'Enter') {
@@ -161,9 +168,25 @@ export function Practice({ route }: { route: string[] }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, result, response, next, submit]);
+  }, [current, recap, result, response, next, submit]);
+
+  const summary = useMemo(() => summarize(outcomes), [outcomes]);
+  const keepPracticing = () => {
+    setSession({ answered: 0, correct: 0, streak: 0 });
+    setOutcomes([]);
+    setRecap(false);
+    if (result) next();
+  };
 
   if (empty) {
+    if (outcomes.length > 0) {
+      return (
+        <div className="practice-fx">
+          <h1>{scopeTitle(scope)}</h1>
+          <SessionRecap summary={summary} onKeep={keepPracticing} exhausted />
+        </div>
+      );
+    }
     return (
       <div className="card empty">
         <h2>Nothing to practice here right now</h2>
@@ -175,6 +198,14 @@ export function Practice({ route }: { route: string[] }) {
     );
   }
   if (!current) return null;
+  if (recap) {
+    return (
+      <div className="practice-fx">
+        <h1>{scopeTitle(scope)}</h1>
+        <SessionRecap summary={summary} onKeep={keepPracticing} />
+      </div>
+    );
+  }
 
   const { question, pick } = current;
   const skill = skillById.get(question.skillId)!;
@@ -194,6 +225,9 @@ export function Practice({ route }: { route: string[] }) {
           Session: {session.correct}/{session.answered}
         </span>
         <Streak n={session.streak} />
+        <button className="btn btn-ghost" onClick={() => setRecap(true)} disabled={outcomes.length === 0} title="See how this session went">
+          End session
+        </button>
         <button className={`btn ${calcOpen ? 'btn-primary' : ''}`} onClick={() => setCalcOpen((v) => !v)}>
           Calculator
         </button>

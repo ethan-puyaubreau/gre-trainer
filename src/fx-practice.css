@@ -221,3 +221,73 @@
     transform: scaleX(0);
   }
 }
+
+/* ---------------------------------------------------------------- session recap */
+.practice-fx .session-recap {
+  animation: fx-rise var(--dur) var(--ease-out) backwards;
+}
+.practice-fx .session-recap h2 {
+  margin-top: 0;
+}
+.practice-fx .session-recap h3 {
+  margin: 20px 0 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.practice-fx .recap-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+.practice-fx .recap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.practice-fx .recap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  animation: fx-rise var(--dur) var(--ease-out) backwards;
+}
+.practice-fx .recap-row:last-child {
+  border-bottom: none;
+}
+.practice-fx .recap-name {
+  flex: 1;
+  min-width: 0;
+}
+.practice-fx .recap-levels {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.practice-fx .recap-levels .level-dot {
+  width: 16px;
+  height: 16px;
+}
+.practice-fx .recap-arrow {
+  animation: fx-fade var(--dur) var(--ease-out) backwards;
+}
+.practice-fx .recap-to {
+  animation: fx-pop var(--dur) var(--ease-spring) backwards;
+}
+@keyframes fx-fade {
+  from {
+    opacity: 0;
+  }
+}
+.practice-fx .recap-names {
+  min-width: 160px;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .practice-fx .recap-names {
+    display: none;
+  }
+}
