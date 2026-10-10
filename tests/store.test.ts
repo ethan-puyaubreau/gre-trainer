@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodeSegment } from '../src/router';
 import { dropWeakFlags } from '../src/store/migrate';
-import { initialData, isProgressData } from '../src/store/progress';
+import { initialData, isProgressData, MAX_ATTEMPT_MS, useProgress } from '../src/store/progress';
 
 describe('router', () => {
   it('keeps a malformed escape instead of throwing', () => {
@@ -31,5 +31,16 @@ describe('import validation', () => {
   it('dropWeakFlags never throws on bad input', () => {
     expect(() => dropWeakFlags({ ...initialData(), skills: null } as never)).not.toThrow();
     expect(dropWeakFlags({ ...initialData(), skills: { a: 5 } } as never).skills).toEqual({});
+  });
+});
+
+describe('recordAttempt', () => {
+  it('caps a recorded time at 10 minutes', () => {
+    useProgress.setState(initialData());
+    const question = { id: 'arith.x#1#1', templateId: 'arith.x', skillId: 'arith.s' } as never;
+    const base = { question, correct: true, hinted: false, traps: [] as string[], mode: 'practice' as const };
+    useProgress.getState().recordAttempt({ ...base, timeMs: 5 * 60 * 60 * 1000 });
+    useProgress.getState().recordAttempt({ ...base, timeMs: 30_000 });
+    expect(useProgress.getState().history.map((h) => h.timeMs)).toEqual([MAX_ATTEMPT_MS, 30_000]);
   });
 });

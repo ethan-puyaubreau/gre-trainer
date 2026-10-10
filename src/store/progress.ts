@@ -73,6 +73,8 @@ interface Actions {
 }
 
 const MAX_HISTORY = 4000;
+/** ponytail: one flat 10 min cap on a recorded answer time (a tab left open overnight); make it per-skill if long untimed sessions matter. */
+export const MAX_ATTEMPT_MS = 10 * 60 * 1000;
 export const PROGRESS_KEY = 'gre-trainer-progress';
 
 export function initialData(now = Date.now()): ProgressData {
@@ -121,7 +123,8 @@ export const useProgress = create<ProgressData & Actions>()(
     (set, get) => ({
       ...initialData(),
 
-      recordAttempt({ question, correct, timeMs, hinted, traps, mode, response }) {
+      recordAttempt({ question, correct, timeMs: rawMs, hinted, traps, mode, response }) {
+        const timeMs = Math.min(rawMs, MAX_ATTEMPT_MS);
         const s = get();
         const prev = s.skills[question.skillId] ?? newSkillState();
         const at = Date.now();
