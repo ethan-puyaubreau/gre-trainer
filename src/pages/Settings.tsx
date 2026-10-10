@@ -1,0 +1,99 @@
+import { useRef, useState } from 'react';
+import { formatClock } from '../components/Timer';
+import { DEFAULT_PACE_SEC } from '../mastery/model';
+import { exportProgress, useProgress } from '../store/progress';
+
+export function Settings() {
+  const { settings, updateSettings, importData, reset, history } = useProgress();
+  const [msg, setMsg] = useState<string | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+
+  const download = () => {
+    const blob = new Blob([exportProgress()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `gre-trainer-progress-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const upload = async (f: File) => {
+    try {
+      importData(JSON.parse(await f.text()));
+      setMsg('Progress imported.');
+    } catch (e) {
+      setMsg(`Import failed: ${(e as Error).message}`);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Settings</h1>
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Pace</h3>
+        <p className="muted small">
+          A correct answer counts toward mastery only if it is within this time. The GRE gives about 1:45 per question (21 min for 12, 26 min for 15).
+        </p>
+        <div className="row">
+          <input
+            type="range"
+            min={60}
+            max={180}
+            step={5}
+            value={settings.paceSec}
+            onChange={(e) => updateSettings({ paceSec: Number(e.target.value) })}
+            aria-label="Pace per question"
+          />
+          <strong>{formatClock(settings.paceSec * 1000)}</strong>
+          {settings.paceSec !== DEFAULT_PACE_SEC && (
+            <button className="btn btn-ghost" onClick={() => updateSettings({ paceSec: DEFAULT_PACE_SEC })}>
+              Reset to GRE pace
+            </button>
+          )}
+        </div>
+        <label className="row" style={{ marginTop: 12 }}>
+          <input type="checkbox" checked={settings.showTimer} onChange={(e) => updateSettings({ showTimer: e.target.checked })} />
+          Show the timer while answering
+        </label>
+
+        <h3>Theme</h3>
+        <div className="tabs">
+          {(['system', 'light', 'dark'] as const).map((t) => (
+            <button key={t} className={settings.theme === t ? 'on' : ''} onClick={() => updateSettings({ theme: t })}>
+              {t[0].toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Your data</h3>
+        <p className="muted small">
+          Progress is stored in this browser only ({history.length} answers so far). Export it to keep a backup or to continue on another device.
+        </p>
+        <div className="row">
+          <button className="btn" onClick={download}>
+            Export progress
+          </button>
+          <button className="btn" onClick={() => file.current?.click()}>
+            Import progress
+          </button>
+          <input ref={file} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          <span className="spacer" />
+          <button
+            className="btn btn-danger"
+            onClick={() => {
+              if (window.confirm('Erase all progress in this browser? Export it first if you want a backup.')) {
+                reset();
+                setMsg('Progress reset.');
+              }
+            }}
+          >
+            Reset progress
+          </button>
+        </div>
+        {msg && <p>{msg}</p>}
+      </div>
+    </div>
+  );
+}

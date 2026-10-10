@@ -240,6 +240,8 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 .btn {
+  display: inline-block;
+  text-decoration: none;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -272,6 +274,7 @@ h3 {
   border-color: var(--bad);
 }
 .chip {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;

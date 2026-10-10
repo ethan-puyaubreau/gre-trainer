@@ -48,7 +48,7 @@ interface Current {
 }
 
 export function Practice({ route }: { route: string[] }) {
-  const scope = useMemo(() => scopeFromRoute(route), [route.join('/')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const scope = useMemo(() => scopeFromRoute(route), [route.join('/')]);
   const store = useProgress();
   const [current, setCurrent] = useState<Current | null>(null);
   const [response, setResponse] = useState<Response | undefined>();
