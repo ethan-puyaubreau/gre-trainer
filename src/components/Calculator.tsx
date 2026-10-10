@@ -135,6 +135,9 @@ export function Calculator({ onClose, onTransfer }: { onClose: () => void; onTra
     [entry, fresh, tokens, mem, digit, op, equals],
   );
 
+  // Take focus on open so physical-keyboard entry works without a click.
+  useEffect(() => ref.current?.focus({ preventScroll: true }), []);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
