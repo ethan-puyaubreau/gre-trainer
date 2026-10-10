@@ -3,6 +3,12 @@ import { AREAS, SKILLS, TEMPLATES, TRAPS } from '../src/content';
 import { arithmeticTraps } from '../src/content/arithmetic/traps';
 import { integersTraps } from '../src/content/arithmetic/integers';
 import { numbersTraps } from '../src/content/arithmetic/numbers';
+import { appliedTraps } from '../src/content/algebra/applied';
+import { coreTraps } from '../src/content/algebra/core';
+import { probTraps } from '../src/content/data/prob';
+import { statsTraps } from '../src/content/data/stats';
+import { measureTraps } from '../src/content/geometry/measure';
+import { shapesTraps } from '../src/content/geometry/shapes';
 import { generateBody, rngFor } from '../src/engine/generate';
 import type { Difficulty } from '../src/engine/types';
 import { qKey, questionErrors, richErrors } from './validate';
@@ -39,7 +45,7 @@ describe('registry', () => {
   });
 
   it('has no trap id defined twice', () => {
-    const maps = [arithmeticTraps, integersTraps, numbersTraps, ...AREAS.filter((a) => a.area !== 'arithmetic').map((a) => a.traps)];
+    const maps = [arithmeticTraps, integersTraps, numbersTraps, coreTraps, appliedTraps, shapesTraps, measureTraps, statsTraps, probTraps];
     const seen = new Map<string, number>();
     for (const m of maps) for (const id of Object.keys(m)) seen.set(id, (seen.get(id) ?? 0) + 1);
     expect([...seen].filter(([, n]) => n > 1).map(([id]) => id)).toEqual([]);
