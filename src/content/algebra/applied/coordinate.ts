@@ -2,7 +2,7 @@ import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build'
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
-import { num, paren } from '../../../engine/tex';
+import { num, paren, poly } from '../../../engine/tex';
 import type { GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { choiceValuesMatch, dots, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
 
@@ -196,6 +196,8 @@ function sidePoint(rng: Rng, m: number, side: 1 | -1 | 0, w: (typeof SIDE_WINDOW
       if (side * dist < 1.1) continue;
     }
     if (Math.hypot(p[0], p[1]) < 1.5) continue;
+    // keep points (and their labels) off the axes
+    if (side !== 0 && (Math.abs(p[0]) < 1 || Math.abs(p[1]) < 1)) continue;
     if (avoid.some((a) => Math.hypot(a[0] - p[0], a[1] - p[1]) < 2)) continue;
     return p;
   }
@@ -688,7 +690,9 @@ const pointsOnLine: Template<OnLineParams> = {
     const checks = items
       .map((it) => {
         const y = m.mul(it.p[0]).add(b);
-        return `- $${ptTex(it.p[0], it.p[1])}$: $${num(m)}(${num(it.p[0])}) ${b.sign() < 0 ? '-' : '+'} ${num(b.abs())} = ${num(y)}$, ${
+        const coef = m.eq(1) ? '' : m.eq(-1) ? '-' : num(m);
+        const tail = b.n === 0 ? '' : ` ${b.sign() < 0 ? '-' : '+'} ${num(b.abs())}`;
+        return `- $${ptTex(it.p[0], it.p[1])}$: $${coef}(${num(it.p[0])})${tail} = ${num(y)}$, ${
           it.correct ? 'on $\\ell$' : `not $${num(it.p[1])}$, so not on $\\ell$`
         }`;
       })
@@ -704,7 +708,7 @@ const pointsOnLine: Template<OnLineParams> = {
         answer,
         explanation: `The marked points of $\\ell$ are $${ptTex(A0[0], A0[1])}$ and $${ptTex(A1[0], A1[1])}$, so the slope is $\\frac{\\text{rise}}{\\text{run}} = \\frac{${rise}}{${run}}${m.isInt() || rise < 0 ? ` = ${num(m)}` : ''}$ and the equation of $\\ell$ is $${lineTex(m, b)}$.
 
-A point lies on $\\ell$ when its $y$-coordinate equals $${num(m)}x ${b.sign() < 0 ? '-' : '+'} ${num(b.abs())}$:
+A point lies on $\\ell$ when its $y$-coordinate equals $${poly([m, b])}$:
 ${checks}
 
 Swapping the coordinates of a point on $\\ell$, or using run over rise for the slope, produces points that are not on $\\ell$.`,

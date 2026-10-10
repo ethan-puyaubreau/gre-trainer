@@ -3,8 +3,8 @@
 
 import type { Rng } from '../../../engine/rng';
 import { num, usd } from '../../../engine/tex';
-import type { Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { nearestIndex, WORDS } from './util';
+import type { Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
+import { countWordChoices, mcsCheck, nearestIndex, spacedChoices, WORDS } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.decades-table';
@@ -91,24 +91,25 @@ const perYear: Template<PerYearParams> = {
     const exact = (v[to] - v[from]) / span;
     const step = exact < 400 ? 25 : exact < 1500 ? 100 : 500;
     const R = Math.round(exact / step) * step;
-    const items: { v: number; trap?: string }[] = [{ v: R }];
-    const add = (x: number, trap?: string) => {
-      const g = Math.round(x / step) * step;
-      if (g > 0 && items.every((it) => Math.abs(it.v - g) >= 2 * step)) items.push({ v: g, ...(trap ? { trap } : {}) });
-    };
-    add((v[to] - v[from]) / (to - from), 'prob-di-wrong-divisor');
-    add((v[to] - v[from]) / (to - from + 1), 'prob-di-wrong-divisor');
-    for (const k of rng.shuffle([2, -2, 4, -4, 6, 8])) if (items.length < 5) add(R + k * step);
-    const sorted = items.slice(0, 5).sort((x, y) => x.v - y.v);
+    const g = (x: number) => Math.round(x / step) * step;
+    const sc = spacedChoices(
+      rng,
+      R,
+      [
+        { v: g((v[to] - v[from]) / (to - from)), trap: 'prob-di-wrong-divisor' },
+        { v: g((v[to] - v[from]) / (to - from + 1)), trap: 'prob-di-wrong-divisor' },
+      ],
+      { step: 2 * step, minGap: 2 * step, min: step, format: (x) => usd(x) },
+    );
     const name = col === 'a' ? D.ctx.a : D.ctx.b;
     return {
-      params: { col, from, to, values: sorted.map((it) => it.v) },
+      params: { col, from, to, values: sc.values },
       q: {
         format: 'mcs',
         figure: D.figure,
         stem: `From ${D.years[from]} to ${D.years[to]}, the ${name} increased by approximately how much per year, on average?`,
-        choices: sorted.map((it) => ({ text: usd(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
-        answer: sorted.findIndex((it) => it.v === R),
+        choices: sc.choices,
+        answer: sc.answer,
         explanation: `Total increase: $${num(v[to])} - ${num(v[from])} = ${num(v[to] - v[from])}$ dollars over $${D.years[to]} - ${D.years[from]} = ${span}$ years, so about $\\frac{${num(v[to] - v[from])}}{${span}} \\approx ${num(Math.round(exact))}$ dollars per year, closest to ${usd(R)}.
 
 The rows are ${to - from} decades apart, not ${to - from} years: dividing by the number of intervals (or of rows) gives the increase per decade.`,
@@ -143,23 +144,23 @@ const percentOfOther: Template<PctParams> = {
       const exact = (D.a[row] / D.b[row]) * 100;
       const R = Math.round(exact);
       if (Math.abs(exact - R) > 0.3 && t < 50) continue;
-      const items: { v: number; trap?: string }[] = [{ v: R }];
-      const add = (x: number, trap?: string) => {
-        const g = Math.round(x);
-        if (g > 0 && items.every((it) => Math.abs(it.v - g) >= 4)) items.push({ v: g, ...(trap ? { trap } : {}) });
-      };
-      add((D.b[row] / D.a[row]) * 100, 'prob-percent-wrong-base');
-      add(((D.b[row] - D.a[row]) / D.b[row]) * 100, 'prob-wrong-event');
-      for (const k of rng.shuffle([5, -5, 10, -10, 15])) if (items.length < 5) add(R + k);
-      const sorted = items.slice(0, 5).sort((x, y) => x.v - y.v);
+      const sc = spacedChoices(
+        rng,
+        R,
+        [
+          { v: Math.round((D.b[row] / D.a[row]) * 100), trap: 'prob-percent-wrong-base' },
+          { v: Math.round(((D.b[row] - D.a[row]) / D.b[row]) * 100), trap: 'prob-wrong-event' },
+        ],
+        { step: 5, minGap: 4, min: 1, format: (x) => `${x}%` },
+      );
       return {
-        params: { row, values: sorted.map((it) => it.v) },
+        params: { row, values: sc.values },
         q: {
           format: 'mcs',
           figure: D.figure,
           stem: `In ${D.years[row]}, the ${D.ctx.a} was approximately what percent of the ${D.ctx.b}?`,
-          choices: sorted.map((it): Choice => ({ text: `${it.v}%`, ...(it.trap ? { trap: it.trap } : {}) })),
-          answer: sorted.findIndex((it) => it.v === R),
+          choices: sc.choices,
+          answer: sc.answer,
           explanation: `$\\frac{${num(D.a[row])}}{${num(D.b[row])}} \\times 100 \\approx ${num(Math.round(exact * 10) / 10)}$, so about ${R}%.
 
 The base is the ${D.ctx.b} (the "of" quantity); $\\frac{${num(D.b[row])}}{${num(D.a[row])}}$ answers the reverse question.`,
@@ -193,7 +194,8 @@ const howManyRows: Template<HowManyParams> = {
     const house = D.ctx.a.startsWith('average household');
     const [n0, d0] = house ? [1, 5] : [1, 1];
     const count = D.a.filter((x, k) => x * d0 < n0 * D.b[k]).length;
-    const words = WORDS.slice(1, 6).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+    const words = WORDS.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+    const cw = countWordChoices(rng, count, 7);
     const frText = house ? '$\\frac{1}{5}$ of' : '';
     const lines = D.years.map((y, k) => `- ${y}: $${num(D.a[k])}$ vs ${house ? `$\\frac{${num(D.b[k])}}{5} = ${num(D.b[k] / 5)}$` : `$${num(D.b[k])}$`} (${D.a[k] * d0 < n0 * D.b[k] ? 'less' : 'not less'})`).join('\n');
     return {
@@ -202,20 +204,20 @@ const howManyRows: Template<HowManyParams> = {
         format: 'mcs',
         figure: D.figure,
         stem: `For how many of the years shown in the table was the ${D.ctx.a} less than ${frText ? `${frText} ` : ''}the ${D.ctx.b}?`,
-        choices: words.map((w) => ({ text: w })),
-        answer: count - 1,
+        choices: cw.choices,
+        answer: cw.answer,
         explanation: `${house ? 'Divide each home price by 5 (or multiply each income by 5) and compare:' : 'Compare the two columns row by row:'}
 
 ${lines}
 
-So the answer is ${words[count - 1].toLowerCase()}.${house ? ' A quick estimate is enough for rows far from the boundary: 5 × income versus price.' : ''}`,
+So the answer is ${words[count].toLowerCase()}.${house ? ' A quick estimate is enough for rows far from the boundary: 5 × income versus price.' : ''}`,
       },
     };
   },
   check(q, { num: n0, den: d0 }) {
     const t = readTable(q);
     const count = t.a.filter((x, k) => x * d0 < n0 * t.b[k]).length;
-    return q.format === 'mcs' && q.answer === count - 1 ? null : `expected ${count}`;
+    return mcsCheck(q, ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][count]);
   },
 };
 

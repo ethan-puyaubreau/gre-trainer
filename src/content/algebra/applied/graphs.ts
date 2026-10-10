@@ -528,7 +528,8 @@ function makeKnots(rng: { int(a: number, b: number): number; pick<T>(x: readonly
       const prev = pts[pts.length - 1][1];
       const slopes = [-2, -1, 1, 2, 0].filter((s) => {
         const y = prev + s * dx;
-        return y >= -3 && y <= 4 && !(s === 0 && rng.chance(0.6));
+        // no flat pieces lying on the x-axis, where the graph would hide behind the axis
+        return y >= -3 && y <= 4 && !(s === 0 && (prev === 0 || rng.chance(0.6)));
       });
       if (!slopes.length) break;
       const s = rng.pick(slopes);

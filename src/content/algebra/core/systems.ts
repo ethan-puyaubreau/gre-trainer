@@ -2,7 +2,7 @@ import { numericChoices, qcCompare } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { close, intExcept, qcEnd, qcSamples, sideFill, someTraps } from './util';
+import { close, intExcept, qcEnd, qcSamples, sideFill, someTraps, times } from './util';
 
 /** a x + b y = c */
 type Eq = [number, number, number];
@@ -322,7 +322,7 @@ For example, ${ex1} and ${ex2} both satisfy the equations, and they compare $x$ 
         qb = [0, 0, B];
         answer = qcCompare(t * c, B);
         traps.D = 'alg-dependent-system';
-        explanation = `The second equation is just the first multiplied by $${m}$, so $x$ and $y$ cannot be found. But Quantity A is a multiple of the left side: $${vecTex(qa)} = ${t}(${lin([[p, 'x'], [q, 'y']])}) = ${t}(${num(c)}) = ${num(t * c)}$.
+        explanation = `The second equation is just the first multiplied by $${m}$, so $x$ and $y$ cannot be found. But Quantity A is a multiple of the left side: $${vecTex(qa)} = ${times(t, lin([[p, 'x'], [q, 'y']]))} = ${times(t, num(c))} = ${num(t * c)}$.
 
 Compare $${num(t * c)}$ with $${num(B)}$. ${qcEnd(answer)}`;
       }
@@ -366,8 +366,8 @@ Compare $${num(t * c)}$ with $${num(B)}$. ${qcEnd(answer)}`;
         samples.push([val(qa, x, y), val(qb, x, y)]);
       }
     } else {
-      for (let i = 0; i < 60; i++) {
-        const x = rng.next() * 40 - 20;
+      for (let i = 0; i < 200; i++) {
+        const x = (rng.next() * 2 - 1) * rng.pick([5, 50, 500]);
         const y = (e1[2] - e1[0] * x) / e1[1];
         if (Math.abs(e2[0] * x + e2[1] * y - e2[2]) > 1e-6) return 'second equation not satisfied';
         samples.push([val(qa, x, y), val(qb, x, y)]);

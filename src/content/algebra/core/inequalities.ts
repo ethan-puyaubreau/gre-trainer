@@ -229,7 +229,7 @@ The integers strictly between $${num(a)}$ and $${num(b)}$ number $${b} - ${paren
     }
     const { choices, answer: idx } = numericChoices(rng, {
       correct: answer!,
-      traps: someTraps(rng, traps.filter((t) => t.value !== answer && t.value >= 0)).slice(0, 2),
+      traps: someTraps(rng, traps.filter((t) => t.value !== answer && t.value >= 0)),
       fillers: [...sideFill(rng, answer!).filter((v) => v.sign() >= 0), frac(answer! + 1), frac(answer! + 2), frac(answer! * 2)],
       format: (v) => countWord(v.toNumber()),
     });

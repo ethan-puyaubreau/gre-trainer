@@ -506,11 +506,13 @@ const sideAngleQC: Template<SAParams> = {
       const u: Pt = [c, dd];
       let n: Pt = [-u[1], u[0]];
       if (n[0] * axisPt[0] + n[1] * axisPt[1] > 0) n = mul(n, -1);
-      const fb = new FigBuilder().pt('O', [0, 0], [-sx, sy]).pt('(c, d)', P, add(mul(n, 1), mul(u, 0.35)));
+      // the point is drawn with an empty name; its "(c, d)" label goes farther out than a vertex letter
+      const PT = '\\phantom{P}';
+      const fb = new FigBuilder().pt('O', [0, 0], [-sx, sy]).pt(PT, P).text(add(P, add(mul(n, 0.95), mul(u, 0.25))), '$(c, d)$');
       const ax = fb.helper(axisPt);
       const far = fb.helper(mul(P, 1.22));
       const back = fb.helper(mul(P, -0.25));
-      fb.seg(back, far).arc(ax, 'O', '(c, d)', `$${theta}^\\circ$`);
+      fb.seg(back, far).arc(ax, 'O', PT, `$${theta}^\\circ$`);
       const fig = fb.build();
       fig.axes = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 };
       const axisName = `${(axis === 'x' ? sx : sy) > 0 ? 'positive' : 'negative'} $${axis}$-axis`;

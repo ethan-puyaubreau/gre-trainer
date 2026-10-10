@@ -125,9 +125,19 @@ export interface NumChoices {
   values: Frac[];
 }
 
+/** Step for made-up distractors: 1 for small integers, 10 for hundreds, 1/d for fractions (as in engine/build). */
+function syntheticStep(correct: Frac): Frac {
+  if (!correct.isInt()) return new Frac(1, correct.d);
+  const a = Math.abs(correct.n);
+  if (a < 20) return new Frac(1);
+  return new Frac(10 ** Math.max(0, Math.floor(Math.log10(a)) - 1));
+}
+
 /**
- * Numeric choices like engine/build numericChoices, but also returns the ordered values (checks
- * need them). Traps are kept first, then fillers, then nearby values.
+ * Numeric choices with the same placement rule as engine/build numericChoices (the answer lands at a
+ * uniform random position of the ascending list; traps are kept in priority order when they fit on
+ * their side; fillers, then made-up neighbors, fill each side), but it also returns the ordered values
+ * that the checks need.
  */
 export function numChoices(
   rng: Rng,
@@ -136,39 +146,72 @@ export function numChoices(
     traps?: { value: Frac; trap: string }[];
     fillers?: Frac[];
     format: (v: Frac) => Rich;
-    order?: 'asc' | 'keep';
     count?: number;
-    /** Allow negative or zero filler values (default: only if the correct value is not positive). */
+    /** Allow negative or zero distractors (default: only if the correct value is not positive). */
     allowNonPositive?: boolean;
   },
 ): NumChoices {
   const count = opts.count ?? 5;
-  const items: { v: Frac; trap?: string; ok?: boolean }[] = [{ v: opts.correct, ok: true }];
-  const okSign = (v: Frac) => opts.allowNonPositive || opts.correct.sign() <= 0 || v.sign() > 0;
-  const has = (v: Frac) => items.some((it) => it.v.eq(v));
-  const texts = new Set<string>([opts.format(opts.correct)]);
-  const tryAdd = (v: Frac, trap?: string) => {
-    if (items.length >= count || has(v) || !okSign(v)) return;
+  const correct = opts.correct;
+  type Item = { v: Frac; trap?: string; ok?: boolean };
+  const okSign = (v: Frac) => opts.allowNonPositive || correct.sign() <= 0 || v.sign() > 0;
+  const used: Frac[] = [correct];
+  const texts = new Set<string>([opts.format(correct)]);
+  const usable = (v: Frac) => {
+    if (!okSign(v) || used.some((u) => u.eq(v))) return false;
     const t = opts.format(v);
-    if (texts.has(t)) return;
-    texts.add(t);
-    items.push(trap ? { v, trap } : { v });
+    if (texts.has(t)) return false;
+    return true;
   };
-  for (const t of opts.traps ?? []) tryAdd(t.value, t.trap);
-  for (const f of opts.fillers ?? []) tryAdd(f);
-  const c = opts.correct;
-  const base = c.isInt() ? new Frac(Math.max(1, Math.round(Math.abs(c.toNumber()) / 10))) : new Frac(1, c.d);
-  let step = 1;
-  while (items.length < count) {
-    tryAdd(c.add(base.mul(step * (rng.chance(0.5) ? 1 : -1))));
-    step++;
-    if (step > 80) throw new Error('numChoices: could not fill choices');
+  const accept = (v: Frac) => {
+    used.push(v);
+    texts.add(opts.format(v));
+  };
+  const below: Item[] = [];
+  const above: Item[] = [];
+  let target = rng.int(0, count - 1);
+  for (const t of opts.traps ?? []) {
+    if (!usable(t.value)) continue;
+    const lower = t.value.lt(correct);
+    const side = lower ? below : above;
+    const cap = lower ? target : count - 1 - target;
+    if (side.length < cap) {
+      accept(t.value);
+      side.push({ v: t.value, trap: t.trap });
+    }
   }
-  const ordered = opts.order === 'keep' ? items : [...items].sort((a, b) => a.v.cmp(b.v));
+  const fillers = opts.fillers ?? [];
+  const step = syntheticStep(correct);
+  const take = (lower: boolean, need: number): number => {
+    const list = lower ? below : above;
+    for (const v of fillers) {
+      if (need <= 0) break;
+      if ((lower ? v.lt(correct) : v.gt(correct)) && usable(v)) {
+        accept(v);
+        list.push({ v });
+        need--;
+      }
+    }
+    for (let k = 1; need > 0 && k <= 80; k++) {
+      const v = lower ? correct.sub(step.mul(k)) : correct.add(step.mul(k));
+      if (usable(v)) {
+        accept(v);
+        list.push({ v });
+        need--;
+      }
+    }
+    return need;
+  };
+  const shortBelow = take(true, target - below.length);
+  if (shortBelow > 0) target -= shortBelow;
+  const shortAbove = take(false, count - 1 - target - above.length);
+  if (shortAbove > 0) take(true, shortAbove);
+  const items: Item[] = [...below, { v: correct, ok: true }, ...above].sort((a, b) => a.v.cmp(b.v));
+  if (items.length !== count) throw new Error('numChoices: could not fill choices');
   return {
-    choices: ordered.map((it) => ({ text: opts.format(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
-    answer: ordered.findIndex((it) => it.ok),
-    values: ordered.map((it) => it.v),
+    choices: items.map((it) => ({ text: opts.format(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
+    answer: items.findIndex((it) => it.ok),
+    values: items.map((it) => it.v),
   };
 }
 

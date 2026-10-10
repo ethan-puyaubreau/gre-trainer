@@ -185,7 +185,7 @@ const farthestClosest: Template<FarParams> = {
   generate(rng, d) {
     const style = d === 3 ? 'fraction' : 'decimal';
     for (;;) {
-      const mode: FarParams['mode'] = rng.chance(d === 1 ? 0.6 : 0.45) ? 'far' : 'close';
+      const mode: FarParams['mode'] = rng.chance(d === 1 ? 0.5 : 0.4) ? 'far' : 'close';
       let c: Frac;
       let vals: Frac[];
       if (d === 1 && mode === 'far') {

@@ -390,14 +390,20 @@ The ${mode} is $${F(ap, aq).toTex()}$.${
       // A wrong choice whose numerator and denominator each lie between the given ones (parts trap).
       const between = (x: number, u: number, v: number) => x > Math.min(u, v) && x < Math.max(u, v);
       const partsTrap = outside.filter(([p, q]) => between(p, lo[0], hi[0]) || between(q, lo[1], hi[1]));
-      const wrong: [number, number][] = [];
-      if (partsTrap.length) wrong.push(rng.pick(partsTrap));
-      for (const f of rng.shuffle(outside)) {
-        if (wrong.length >= 4) break;
-        if (!wrong.some((w) => w[0] === f[0] && w[1] === f[1])) wrong.push(f);
-      }
+      // Uniform rank for the answer: `rank` wrong choices below the interval, the rest above it.
+      const rank = rng.int(0, 4);
+      const lower = rng.shuffle(outside.filter(([p, q]) => F(p, q).lt(F(...lo))));
+      const upper = rng.shuffle(outside.filter(([p, q]) => F(p, q).gt(F(...hi))));
+      if (lower.length < rank || upper.length < 4 - rank) continue;
+      const trapPick = partsTrap.filter(([p, q]) => (F(p, q).lt(F(...lo)) ? rank > 0 : rank < 4));
+      const wrong: [number, number][] = trapPick.length ? [rng.pick(trapPick)] : [];
+      const firstLow = wrong.length && F(...wrong[0]).lt(F(...lo)) ? 1 : 0;
+      const firstHigh = wrong.length - firstLow;
+      const same = (a: [number, number], b: [number, number]) => a[0] === b[0] && a[1] === b[1];
+      wrong.push(...lower.filter((f) => !wrong.some((w) => same(w, f))).slice(0, rank - firstLow));
+      wrong.push(...upper.filter((f) => !wrong.some((w) => same(w, f))).slice(0, 4 - rank - firstHigh));
       if (wrong.length < 4) continue;
-      const all = [{ f: good, ok: true, trap: false }, ...wrong.map((f, i) => ({ f, ok: false, trap: i === 0 && partsTrap.length > 0 }))].sort(
+      const all = [{ f: good, ok: true, trap: false }, ...wrong.map((f, i) => ({ f, ok: false, trap: i === 0 && trapPick.length > 0 }))].sort(
         (x, y) => x.f[0] / x.f[1] - y.f[0] / y.f[1],
       );
       const choices = all.map((c) => ({ text: `$${F(...c.f).toTex()}$`, ...(c.trap ? { trap: 'num-compare-parts' } : {}) }));
@@ -416,7 +422,7 @@ The ${mode} is $${F(ap, aq).toTex()}$.${
             .join(', ')}.
 
 Only $${F(...good).toTex()}$ lies strictly between them.${
-            partsTrap.length
+            trapPick.length
               ? ` Having a numerator or a denominator between those of the two fractions proves nothing: compare the values.`
               : ''
           }`,

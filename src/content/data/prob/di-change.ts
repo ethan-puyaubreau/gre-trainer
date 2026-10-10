@@ -5,7 +5,7 @@ import { frac, Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { decimal, num, usd } from '../../../engine/tex';
 import type { Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { mcmCheck, mcsCheck, neCheckNum, roundFrac, tieDistance, WORDS } from './util';
+import { countWordChoices, mcmCheck, mcsCheck, neCheckNum, roundFrac, tieDistance, WORDS } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.percent-change-table';
@@ -424,8 +424,9 @@ const countEntities: Template<CountParams> = {
     const net = D.ch.map(([a, b]) => (100 + a) * (100 + b) - 10000);
     const count = net.filter((x) => (up ? x > 0 : x < 0)).length;
     const naive = D.ch.filter(([a, b]) => (up ? a + b > 0 : a + b < 0)).length;
-    const words = WORDS.slice(1, 6).map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-    const choices: Choice[] = words.map((w, k) => ({ text: w, ...(k + 1 === naive && naive !== count ? { trap: 'prob-add-percents' } : {}) }));
+    const words = WORDS.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+    const cw = countWordChoices(rng, count, 5);
+    const choices: Choice[] = cw.choices.map((c) => ({ text: c.text, ...(c.text === (naive === 0 ? 'None' : words[naive]) && naive !== count ? { trap: 'prob-add-percents' } : {}) }));
     const lines = D.ch
       .map(([a, b], k) => `- ${NAMES[k]}: $${mult(a)} \\times ${mult(b)} = ${decimal(frac((100 + a) * (100 + b), 10000))}$ (${net[k] > 0 ? 'higher' : 'lower'})`)
       .join('\n');
@@ -436,14 +437,14 @@ const countEntities: Template<CountParams> = {
         figure: D.figure,
         stem: `For how many of the five ${D.ctx.entities} was the ${D.ctx.measure} in ${y[2]} ${up ? 'greater' : 'less'} than the ${D.ctx.measure} in ${y[0]}?`,
         choices,
-        answer: count - 1,
+        answer: cw.answer,
         explanation: `Multiply the two growth factors for each ${D.ctx.entity}: a product above 1 means the ${y[2]} amount was higher than the ${y[0]} amount.
 
 ${lines}
 
-So the answer is ${words[count - 1].toLowerCase()}.${
+So the answer is ${words[count].toLowerCase()}.${
           naive !== count
-            ? ` Adding the percents instead gives ${words[naive - 1]?.toLowerCase() ?? naive}: a change of $+k\\%$ followed by $-k\\%$ (or by a slightly smaller decrease) is still a net loss.`
+            ? ` Adding the percents instead gives ${naive === 0 ? 'none' : words[naive].toLowerCase()}: a change of $+k\\%$ followed by $-k\\%$ (or by a slightly smaller decrease) is still a net loss.`
             : ''
         }`,
       },
@@ -456,7 +457,7 @@ So the answer is ${words[count - 1].toLowerCase()}.${
       const v3 = 500 * (1 + a / 100) * (1 + b / 100);
       if (up ? v3 > 500 + 1e-9 : v3 < 500 - 1e-9) count++;
     }
-    return mcsCheck(q, ['One', 'Two', 'Three', 'Four', 'Five'][count - 1] ?? 'none');
+    return mcsCheck(q, ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][count]);
   },
 };
 

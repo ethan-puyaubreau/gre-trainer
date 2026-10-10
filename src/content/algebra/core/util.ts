@@ -251,24 +251,23 @@ export const sgn = (c: number | Frac) => {
 };
 
 /**
- * Filler values on a random side of the answer (all below, all above, or alternating), so the
- * correct choice of a numeric question does not always sit in the same position.
+ * Filler values on both sides of the answer (alternating above and below). numericChoices picks a
+ * random position for the answer and takes fillers from the side that still needs values.
  */
-export function sideFill(rng: Rng, center: number | Frac, step: number | Frac = 1, count = 6): Frac[] {
+export function sideFill(_rng: Rng, center: number | Frac, step: number | Frac = 1, count = 8): Frac[] {
   const c = center instanceof Frac ? center : new Frac(center);
   const st = step instanceof Frac ? step : new Frac(step);
-  const mode = rng.pick(['low', 'high', 'mix'] as const);
   const out: Frac[] = [];
-  for (let k = 1; k <= count; k++) {
-    const sign = mode === 'low' ? -1 : mode === 'high' ? 1 : k % 2 ? 1 : -1;
-    const j = mode === 'mix' ? Math.ceil(k / 2) : k;
-    out.push(c.add(st.mul(sign * j)));
-  }
+  for (let k = 1; k <= count; k++) out.push(c.add(st.mul((k % 2 ? 1 : -1) * Math.ceil(k / 2))));
   return out;
 }
 
-/** A random non-empty subset of the trap list (all of it when there is only one). */
-export function someTraps<T>(rng: Rng, traps: T[]): T[] {
-  if (traps.length <= 1) return traps;
-  return rng.shuffle(traps).slice(0, rng.int(1, traps.length));
+/** Trap list passed through (numericChoices keeps the traps that fit around the answer position). */
+export function someTraps<T>(_rng: Rng, traps: T[]): T[] {
+  return traps;
 }
+
+/** m times an expression, for explanations: "5", "-(5)", "3(5)". */
+export const times = (m: number, inner: string) => (m === 1 ? inner : m === -1 ? `-(${inner})` : `${m}(${inner})`);
+/** b^e without a visible exponent 1. */
+export const powT = (b: number | string, e: number | string) => (e === 1 || e === '1' ? `${b}` : `${b}^{${e}}`);

@@ -213,7 +213,7 @@ $$${new Frac(100 + p, 100).toDecimalString()}h \\le ${H} \\quad\\Rightarrow\\qua
 
 The closest choice is ${near}. Taking ${p} percent off the height ($${H} \\times ${new Frac(100 - p, 100).toDecimalString()} = ${Number(wrong.toFixed(2))}$) is wrong: the frozen volume is ${p} percent MORE than the liquid's volume, so divide by $${new Frac(100 + p, 100).toDecimalString()}$. The length and width are not needed.`;
     }
-    const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.02, ...(step ? { step } : {}) });
+    const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.02, ...(step ? { step } : {}), scales: mode !== 'tank' });
     return {
       params: { mode, dims, values },
       q: { format: 'mcs', stem, ...(withFigure ? { figure: fig.build(false) } : {}), choices, answer, explanation },

@@ -487,8 +487,8 @@ Adding ${P(p)} back gives $${dec(F(1).add(t))}s$, which is too small: the ${P(p)
       if (all.some((c) => (c.a.eq(w.a) && c.b.eq(w.b)) || c.text === w.text)) continue;
       all.push(w);
     }
-    // GRE-like order: forms with a constant first, then pure multiples of s by increasing coefficient.
-    const ordered = [...all].sort((x, y) => (x.b.sign() !== 0 ? 0 : 1) - (y.b.sign() !== 0 ? 0 : 1) || x.a.cmp(y.a) || x.b.cmp(y.b));
+    // Algebraic choices have no natural numeric order: shuffle them so the answer can be anywhere.
+    const ordered = rng.shuffle(all);
     const choices: Choice[] = ordered.map((c) => ({ text: c.text, ...(c.trap ? { trap: c.trap } : {}) }));
     return {
       params: { mode, p, base, lin: ordered.map(({ a, b }) => ({ a, b })) },

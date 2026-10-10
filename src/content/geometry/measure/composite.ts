@@ -199,7 +199,9 @@ The ring is not $\\pi(${R} - ${r})^2 = ${Ex.pi(w * w).tex()}$: subtract the area
     // scaled copies of the answer give plausible-looking values on both sides of it
     const whole = (v: Ex) => v.data().every(([, den]) => den === 1);
     fillers.push(...[correct.scale(new Frac(1, 2)), correct.scale(new Frac(3, 2)), correct.scale(2), correct.scale(3)].filter(whole));
-    const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.03 });
+    // step along the pi coefficient (or the constant) so that both sides of the answer have candidates
+    const step = mode === 'segment-one' ? Ex.of(1) : mode === 'corner-one' ? Ex.pi(new Frac(1, 4)) : Ex.pi(1);
+    const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.03, step });
     return {
       params: { mode, s, r, values },
       q: { format: 'mcs', stem, figure: fig.build(false), choices, answer, explanation },
@@ -208,7 +210,7 @@ The ring is not $\\pi(${R} - ${r})^2 = ${Ex.pi(w * w).tex()}$: subtract the area
   check(q, p) {
     if (q.format !== 'mcs') return 'wrong format';
     // Area of the shaded region as drawn, rebuilt with fine arcs.
-    return checkChoiceValue(p.values, q.answer, areaOf(shadedPolys(p, 0.5)), 1e-3);
+    return checkChoiceValue(p.values, q.answer, areaOf(shadedPolys(p, 1)), 1e-3);
   },
 };
 

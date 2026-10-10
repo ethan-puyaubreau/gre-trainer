@@ -204,17 +204,15 @@ const percentPowerTen: Template<PTParams> = {
     const forgot100 = -lg; // treated q% as q
     const reversed = -c;
     const mult = 10 ** Math.abs(c === 0 ? 2 : c);
-    const withMult = rng.chance(0.4);
-    const nNum = withMult ? 4 : 5;
-    // required distractors, then neighbors chosen so that c lands at a random rank among the numeric choices
-    const required = [reversed, ...(rng.chance(0.7) ? [forgot100] : [])].filter((v, i, arr) => v !== c && arr.indexOf(v) === i);
-    const nb = required.filter((v) => v < c).length;
-    const na = required.length - nb;
-    const rank = rng.int(nb, nNum - 1 - na);
-    const below = rng.shuffle([c - 1, c - 2, c - 3, c - 4, c - 5].filter((v) => !required.includes(v))).slice(0, rank - nb);
-    const above = rng.shuffle([c + 1, c + 2, c + 3, c + 4, c + 5].filter((v) => !required.includes(v))).slice(0, nNum - 1 - na - rank);
-    const numeric = [c, ...required, ...below, ...above].sort((a, b) => a - b);
-    const final: (number | null)[] = withMult ? (rng.chance(0.5) ? [null, ...numeric] : [...numeric, null]) : numeric;
+    // Uniform position for the answer among 5 relations y = x + r (sorted by r); the two classic slips
+    // are kept when they fit on their side, then neighbors fill each side.
+    const target = rng.int(0, 4);
+    const slips = [reversed, forgot100].filter((v, i, arr) => v !== c && arr.indexOf(v) === i);
+    const lowSide = slips.filter((v) => v < c).slice(0, target);
+    const highSide = slips.filter((v) => v > c).slice(0, 4 - target);
+    for (let k = 1; lowSide.length < target; k++) if (!lowSide.includes(c - k)) lowSide.push(c - k);
+    for (let k = 1; highSide.length < 4 - target; k++) if (!highSide.includes(c + k)) highSide.push(c + k);
+    const final: (number | null)[] = [...lowSide, c, ...highSide].sort((a, b) => a - b);
     const relTex = (r: number | null) => (r === null ? `$y = ${num(mult)}x$` : r === 0 ? '$y = x$' : `$y = x ${r > 0 ? '+' : '-'} ${Math.abs(r)}$`);
     const trapOf = (r: number | null) => (r === null ? undefined : r === c ? undefined : r === reversed ? 'num-exponent-sign' : r === forgot100 ? 'num-percent-as-number' : undefined);
     const choices = final.map((r) => ({ text: relTex(r), ...(trapOf(r) ? { trap: trapOf(r)! } : {}) }));
