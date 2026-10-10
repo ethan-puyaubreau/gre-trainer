@@ -12,12 +12,17 @@ export interface SectionSpec {
   minutes: number;
   /** Format slots, QC first like the official sections. */
   formats: Record<Format, number>;
+  /** Size of the data interpretation set that replaces some non-QC slots (the book's 15-question sets end with a 4-item set). */
+  setSize?: number;
 }
 
 export const SPECS: Record<'s1' | 's2', SectionSpec> = {
-  s1: { questions: 12, minutes: 21, formats: { qc: 4, mcs: 5, mcm: 1, ne: 2 } },
-  s2: { questions: 15, minutes: 26, formats: { qc: 5, mcs: 6, mcm: 2, ne: 2 } },
+  s1: { questions: 12, minutes: 21, formats: { qc: 4, mcs: 5, mcm: 1, ne: 2 }, setSize: 3 },
+  s2: { questions: 15, minutes: 26, formats: { qc: 5, mcs: 6, mcm: 2, ne: 2 }, setSize: 4 },
 };
+
+/** Which standalone slot each data-set question replaces, in order (keeps at least one of each format). */
+const SET_REPLACES: Format[] = ['mcs', 'ne', 'mcs', 'mcm', 'mcs'];
 
 const DIFF_WEIGHTS: Record<Level, [number, number, number]> = {
   easy: [0.45, 0.5, 0.05],
@@ -51,16 +56,17 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
     setFamily = fam[0].set;
     const seed = randomSeed();
     const d = pickDifficulty(rng, level);
-    setQuestions = rng.sample(fam, Math.min(3, fam.length)).map((t) => generateQuestion(t, seed, d));
+    setQuestions = rng.sample(fam, Math.min(spec.setSize ?? 3, fam.length)).map((t) => generateQuestion(t, seed, d));
   }
 
   const usedSkills = new Set<string>();
   const usedTemplates = new Set<string>(setQuestions.map((q) => q.templateId));
   const out: Question[] = [];
   let slots: Format[] = (Object.entries(spec.formats) as [Format, number][]).flatMap(([f, n]) => Array<Format>(n).fill(f));
-  // The set replaces non-QC slots, taken from the end (numeric entry / select-all first).
+  // The set replaces standalone non-QC slots.
   for (let k = 0; k < setQuestions.length; k++) {
-    const i = slots.map((f) => f !== 'qc').lastIndexOf(true);
+    let i = slots.lastIndexOf(SET_REPLACES[k % SET_REPLACES.length]);
+    if (i < 0) i = slots.map((f) => f !== 'qc').lastIndexOf(true);
     slots = slots.filter((_, j) => j !== i);
   }
   const regularPool = pool.filter((t) => !setFamily || t.set !== setFamily);
