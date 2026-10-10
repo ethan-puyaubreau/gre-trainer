@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { formatClock } from '../components/Timer';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
-import { exportProgress, useProgress } from '../store/progress';
+import { exportProgress, isProgressData, NOT_AN_EXPORT, useProgress } from '../store/progress';
 
 export function Settings() {
   const { settings, updateSettings, importData, reset, history } = useProgress();
@@ -19,7 +19,11 @@ export function Settings() {
 
   const upload = async (f: File) => {
     try {
-      importData(JSON.parse(await f.text()));
+      const data: unknown = JSON.parse(await f.text());
+      if (!isProgressData(data)) throw new Error(NOT_AN_EXPORT);
+      const n = (k: number) => `${k} answer${k === 1 ? '' : 's'}`;
+      if (!window.confirm(`Importing replaces the ${n(history.length)} in this browser with the ${n(data.history.length)} in this file. Continue?`)) return;
+      importData(data);
       setMsg('Progress imported.');
     } catch (e) {
       setMsg(`Import failed: ${(e as Error).message}`);
@@ -78,7 +82,17 @@ export function Settings() {
           <button className="btn" onClick={() => file.current?.click()}>
             Import progress
           </button>
-          <input ref={file} type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          <input
+            ref={file}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = ''; // lets the same file be picked again
+              if (f) upload(f);
+            }}
+          />
           <span className="spacer" />
           <button
             className="btn btn-danger"

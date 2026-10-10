@@ -87,6 +87,8 @@ export function initialData(now = Date.now()): ProgressData {
   };
 }
 
+export const NOT_AN_EXPORT = 'This file is not a GRE Trainer progress export.';
+
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const isNum = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
 
@@ -164,7 +166,7 @@ export const useProgress = create<ProgressData & Actions>()(
       },
 
       importData(data) {
-        if (!isProgressData(data)) throw new Error('This file is not a GRE Trainer progress export.');
+        if (!isProgressData(data)) throw new Error(NOT_AN_EXPORT);
         set({ ...initialData(), ...dropWeakFlags(data), settings: { ...initialData().settings, ...data.settings } });
       },
 
