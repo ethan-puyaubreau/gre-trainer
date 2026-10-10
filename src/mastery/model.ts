@@ -158,3 +158,21 @@ export function nextStep(s: SkillState): string {
       return s.dueAt ? `Review due ${new Date(s.dueAt).toLocaleDateString()}.` : 'Mastered.';
   }
 }
+
+const share = (have: number, need: number) => Math.max(0, Math.min(1, have / need));
+
+/** Share (0..1) of the requirements for the next level already met, mirroring applyAttempt. */
+export function progressToNext(s: SkillState): number {
+  switch (s.level) {
+    case 0:
+      return share(s.attempts, 1);
+    case 1:
+      return 0; // any correct answer moves it up at once, so there is no partial credit
+    case 2:
+      return share(s.styles.length, STYLES_FOR_PROFICIENT);
+    case 3:
+      return (share(s.styles.length, STYLES_FOR_MASTERED) + share(s.days.length, DAYS_FOR_MASTERED)) / 2;
+    case 4:
+      return 1;
+  }
+}
