@@ -10,7 +10,7 @@ Reference implementations: `src/content/arithmetic/cycles.ts` and `src/content/a
 ## Files of an area
 
 ```
-src/content/<area>/
+src/content/<area>/         (algebra splits these into core/ and applied/)
   skills.ts     Skill[]: id, unit, name, summary, strategy card
   traps.ts      Record<trapId, Trap>: the named mistakes distractors come from
   <topic>.ts    templates, exported as an array

@@ -7,7 +7,7 @@ export default defineConfig({
   base: '/gre-trainer/',
   plugins: [react()],
   build: {
-    // The question generators are one chunk on purpose: the whole app works offline once loaded.
+    // The question generators are one chunk on purpose: once loaded, every page works without further requests.
     chunkSizeWarningLimit: 2500,
     rollupOptions: {
       output: {
