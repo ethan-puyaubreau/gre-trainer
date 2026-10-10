@@ -182,3 +182,37 @@ export function listAnd(items: string[]): string {
   if (items.length <= 1) return items.join('');
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
+
+/**
+ * TeX for a plain expression: "3*x^2-(y+1)*(y-1)" -> "3x^{2} - (y + 1)(y - 1)".
+ * '*' becomes juxtaposition, or \cdot between two numbers; '/' becomes \div; binary + and - get spaces.
+ */
+export function plainToTex(plain: string): string {
+  const s = plain.replace(/\s+/g, '');
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const prev = s[i - 1];
+    if (c === '*') {
+      out += /\d/.test(s[i + 1]) ? ' \\cdot ' : '';
+      continue;
+    }
+    if (c === '/') {
+      out += ' \\div ';
+      continue;
+    }
+    if (c === '^') {
+      const m = /^(-?\d+|[a-z])/.exec(s.slice(i + 1));
+      if (!m) throw new Error(`plainToTex: bad exponent in ${plain}`);
+      out += `^{${m[0]}}`;
+      i += m[0].length;
+      continue;
+    }
+    if ((c === '+' || c === '-') && prev !== undefined && /[\da-z)]/.test(prev)) {
+      out += ` ${c} `;
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}

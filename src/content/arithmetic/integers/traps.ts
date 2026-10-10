@@ -60,7 +60,11 @@ export const integerTraps: Record<string, Trap> = {
   },
   'int-least-multiplier': {
     label: 'Did not use the least multiplier',
-    fix: 'Multiplying by $N$ (or by every prime of $N$) works but is not the least. Only the primes whose exponents are not yet even (multiples of 3 for a cube) need extra factors.',
+    fix: 'Multiplying by $N$ itself always gives a square, but rarely the least one, and multiplying by every prime of $N$ may not work at all. Add just enough of each prime to make its exponent even (a multiple of 3 for a cube).',
+  },
+  'int-counted-ordered-pairs': {
+    label: 'Counted each factor pair twice',
+    fix: 'A $4 \\times 9$ rectangle is the same as a $9 \\times 4$ one. Count unordered factor pairs: half the number of divisors, rounded up when $N$ is a perfect square.',
   },
   // ---------------------------------------------------------------- LCM & GCD
   'int-lcm-is-product': {
