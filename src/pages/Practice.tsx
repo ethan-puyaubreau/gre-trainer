@@ -254,7 +254,12 @@ export function Practice({ route }: { route: string[] }) {
           onClose={() => setCalcOpen(false)}
           onTransfer={
             question.format === 'ne' && !result
-              ? (v) => setResponse(question.fractionBoxes ? { format: 'ne', num: v, den: '1' } : { format: 'ne', value: v })
+              ? (v) => {
+                  if (!question.fractionBoxes) return setResponse({ format: 'ne', value: v });
+                  // fraction boxes take integers only: ignore a decimal result
+                  if (!/^-?\d+$/.test(v)) return;
+                  setResponse({ format: 'ne', num: v, den: response?.format === 'ne' && 'den' in response ? response.den : '' });
+                }
               : undefined
           }
         />
