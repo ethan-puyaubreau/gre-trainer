@@ -5,6 +5,7 @@ import { createRng, randomSeed } from '../engine/rng';
 import type { Difficulty, Question } from '../engine/types';
 import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, type AttemptOutcome, type SkillState } from '../mastery/model';
 import { scheduleRepair, type Remediation } from '../mastery/scheduler';
+import { dropWeakFlags } from './migrate';
 
 export type Mode = 'practice' | 'section';
 
@@ -73,16 +74,11 @@ interface Actions {
 
 const MAX_HISTORY = 4000;
 
-/** Skills missed on the Official Guide arithmetic set (Q2 radicals, Q9 primes, Q15 signs, Q18 cycles). */
-const SEEDED_WEAK = ['arith.roots', 'arith.primes', 'arith.real-numbers', 'arith.cycles'];
-
 export function initialData(now = Date.now()): ProgressData {
-  const skills: Record<string, SkillState> = {};
-  for (const id of SEEDED_WEAK) skills[id] = { ...newSkillState(), level: 1, flagged: true };
   return {
     version: 1,
     createdAt: now,
-    skills,
+    skills: {},
     remediation: [],
     history: [],
     sections: [],
@@ -149,7 +145,7 @@ export const useProgress = create<ProgressData & Actions>()(
 
       importData(data) {
         if (!isProgressData(data)) throw new Error('This file is not a GRE Trainer progress export.');
-        set({ ...initialData(), ...data, settings: { ...initialData().settings, ...data.settings } });
+        set({ ...initialData(), ...dropWeakFlags(data), settings: { ...initialData().settings, ...data.settings } });
       },
 
       reset() {
@@ -158,7 +154,8 @@ export const useProgress = create<ProgressData & Actions>()(
     }),
     {
       name: 'gre-trainer-progress',
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => (version < 2 ? dropWeakFlags(persisted as ProgressData) : persisted) as ProgressData & Actions,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         version: s.version,

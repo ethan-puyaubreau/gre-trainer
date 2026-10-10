@@ -40,8 +40,6 @@ export interface SkillState {
   reviewStage: number;
   /** Total time spent and number of timed attempts, for average pace. */
   timeMs: number;
-  /** Set for skills flagged as weak (e.g. from the Official Guide practice set). */
-  flagged?: boolean;
 }
 
 export interface AttemptInput {
@@ -130,7 +128,6 @@ export function applyAttempt(prev: SkillState, a: AttemptInput, paceSec = DEFAUL
   }
   // A clean answer after the "come back tomorrow" date clears it for skills still in progress.
   if (s.level < 4 && prev.dueAt !== undefined && a.at >= prev.dueAt) s.dueAt = undefined;
-  if (s.level >= 3) s.flagged = false;
   return { state: s, clean, from: prev.level, to: s.level };
 }
 

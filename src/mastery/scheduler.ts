@@ -109,12 +109,8 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
       const st = stateOf(s.id);
       return st.level > 0 && st.level < 4 && notLast(s);
     })
-    // weakest first, flagged skills first
-    .sort((a, b) => {
-      const sa = stateOf(a.id);
-      const sb = stateOf(b.id);
-      return Number(!!sb.flagged) - Number(!!sa.flagged) || sa.level - sb.level;
-    });
+    // weakest first
+    .sort((a, b) => stateOf(a.id).level - stateOf(b.id).level);
   const fresh = playable.filter((s) => stateOf(s.id).level === 0 && notLast(s));
 
   // Interleave: reviews 30%, in-progress 50%, new 20% (falling back when a bucket is empty).

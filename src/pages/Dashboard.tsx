@@ -47,7 +47,6 @@ export function Dashboard() {
     ['All areas', calib.overall],
     ...AREAS.filter((a) => calib.byArea[a.area]).map((a) => [AREA_NAMES[a.area], calib.byArea[a.area]!]),
   ] as [string, Row][];
-  const flagged = playable.filter((s) => states[s.id]?.flagged);
 
   return (
     <div>
@@ -111,19 +110,6 @@ export function Dashboard() {
         </a>
       </div>
 
-      {flagged.length > 0 && (
-        <div className="card" style={{ marginTop: 16, borderColor: 'var(--warn)' }}>
-          <strong>Flagged from your Official Guide practice set:</strong>{' '}
-          {flagged.map((s, i) => (
-            <span key={s.id}>
-              {i > 0 && ', '}
-              <a href={href('practice', 'skill', s.id)}>{s.name}</a>
-            </span>
-          ))}
-          . Smart practice serves these first until they reach Proficient.
-        </div>
-      )}
-
       {AREAS.map((area) => {
         const skills = area.skills.filter((s) => (templatesBySkill.get(s.id)?.length ?? 0) > 0);
         if (!skills.length) return null;
@@ -159,7 +145,6 @@ export function Dashboard() {
                           <button key={s.id} className="skill-tile" onClick={() => setOpen(s)} title={LEVEL_NAMES[lvl]}>
                             <i className={`level-dot level-${lvl}`} />
                             <span className="name">{s.name}</span>
-                            {st?.flagged && <span className="chip chip-warn">weak</span>}
                             {st && isDue(st, now) && <span className="chip chip-accent">due</span>}
                           </button>
                         );
