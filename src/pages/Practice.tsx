@@ -172,6 +172,7 @@ export function Practice({ route }: { route: string[] }) {
   const level = st?.level ?? 0;
   const paceSec = store.settings.paceSec;
   const [reasonText, reasonCls] = REASON[pick.reason];
+  const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
 
   return (
     <div>
@@ -259,7 +260,13 @@ export function Practice({ route }: { route: string[] }) {
         />
       )}
       <div className="muted small" style={{ marginTop: 14 }}>
-        Keys: <span className="kbd">A</span>–<span className="kbd">E</span> or <span className="kbd">1</span>–<span className="kbd">5</span> to pick,{' '}
+        Keys:{' '}
+        {nChoices > 0 && (
+          <>
+            <span className="kbd">A</span>–<span className="kbd">{String.fromCharCode(64 + nChoices)}</span> or <span className="kbd">1</span>–
+            <span className="kbd">{nChoices}</span> to pick,{' '}
+          </>
+        )}
         <span className="kbd">Enter</span> to check / next. <a href={href('')}>Back to dashboard</a> ·{' '}
         <a href="#" onClick={(e) => (e.preventDefault(), go('strategies', skill.id))}>
           Strategy card
