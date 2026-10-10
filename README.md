@@ -30,6 +30,8 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
   - an on-screen calculator that follows the order of operations, with Transfer Display
   - a data interpretation set
 - **Strategy cards** for every skill, with the shortcuts.
+- **Difficulty check.** The dashboard shows your success rate and time per difficulty level, overall
+  and per area, and lists the skills where harder questions went better than easier ones.
 - **Progress** is kept in your browser's local storage. Export and import it as JSON from Settings.
 
 ## Content

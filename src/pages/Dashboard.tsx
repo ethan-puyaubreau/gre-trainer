@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock } from '../components/Timer';
-import { AREA_NAMES, AREAS, SKILLS, templatesBySkill, TRAPS } from '../content';
+import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
 import type { Skill } from '../engine/types';
+import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, type Level } from '../mastery/model';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 
 /** Khan-style course mastery: Familiar 50, Proficient 80, Mastered 100 points per skill. */
 const POINTS: Record<Level, number> = { 0: 0, 1: 0, 2: 50, 3: 80, 4: 100 };
+const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
 export function Dashboard() {
   const { skills: states, history, remediation, settings } = useProgress();
@@ -40,6 +42,11 @@ export function Dashboard() {
     };
   }, [history, states, now, playable]);
 
+  const calib = useMemo(() => calibrate(history, (id) => skillById.get(id)?.area), [history]);
+  const diffRows = [
+    ['All areas', calib.overall],
+    ...AREAS.filter((a) => calib.byArea[a.area]).map((a) => [AREA_NAMES[a.area], calib.byArea[a.area]!]),
+  ] as [string, Row][];
   const flagged = playable.filter((s) => states[s.id]?.flagged);
 
   return (
@@ -188,8 +195,61 @@ export function Dashboard() {
         </section>
       )}
 
+      {calib.overall.some((c) => c.n > 0) && (
+        <section>
+          <h2>Difficulty check</h2>
+          <div className="card">
+            <p className="muted small" style={{ marginTop: 0 }}>
+              Your success should fall from easy to hard. If it does not, the difficulty levels of those questions are mislabeled. Hinted answers are
+              not counted, and cells with fewer than {MIN_PER_CELL} answers are greyed out.
+            </p>
+            <table className="review-table">
+              <thead>
+                <tr>
+                  <th />
+                  <th>Easy</th>
+                  <th>Medium</th>
+                  <th>Hard</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diffRows.map(([name, row]) => (
+                  <tr key={name}>
+                    <th>{name}</th>
+                    {row.map((c, i) => (
+                      <DiffCell key={i} cell={c} />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {calib.inverted.length > 0 && (
+              <p className="small" style={{ marginBottom: 0 }}>
+                <strong>Harder went better than easier in:</strong>{' '}
+                {calib.inverted.map((v, i) => (
+                  <span key={v.skillId}>
+                    {i > 0 && ', '}
+                    {skillById.get(v.skillId)?.name ?? v.skillId} ({DIFF_NAMES[v.easier - 1]} {Math.round(100 * v.rates[v.easier - 1]!)}% vs{' '}
+                    {DIFF_NAMES[v.easier]} {Math.round(100 * v.rates[v.easier]!)}%)
+                  </span>
+                ))}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
       {open && <SkillDrawer skill={open} onClose={() => setOpen(null)} />}
     </div>
+  );
+}
+
+function DiffCell({ cell }: { cell: Cell }) {
+  if (!cell.n) return <td className="muted">–</td>;
+  return (
+    <td className={cell.n < MIN_PER_CELL ? 'muted' : undefined}>
+      {Math.round((100 * cell.correct) / cell.n)}% · {formatClock(cell.timeMs / cell.n)} <span className="muted small">({cell.n})</span>
+    </td>
   );
 }
 
