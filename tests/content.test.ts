@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AREAS, SKILLS, TEMPLATES, TRAPS } from '../src/content';
+import { arithmeticTraps } from '../src/content/arithmetic/traps';
+import { integersTraps } from '../src/content/arithmetic/integers';
+import { numbersTraps } from '../src/content/arithmetic/numbers';
 import { generateBody, rngFor } from '../src/engine/generate';
 import type { Difficulty } from '../src/engine/types';
 import { qKey, questionErrors, richErrors } from './validate';
@@ -33,6 +36,13 @@ describe('registry', () => {
       ...Object.entries(TRAPS).flatMap(([id, t]) => [...richErrors(t.label, `trap ${id}.label`), ...richErrors(t.fix, `trap ${id}.fix`)]),
     ];
     expect(errs).toEqual([]);
+  });
+
+  it('has no trap id defined twice', () => {
+    const maps = [arithmeticTraps, integersTraps, numbersTraps, ...AREAS.filter((a) => a.area !== 'arithmetic').map((a) => a.traps)];
+    const seen = new Map<string, number>();
+    for (const m of maps) for (const id of Object.keys(m)) seen.set(id, (seen.get(id) ?? 0) + 1);
+    expect([...seen].filter(([, n]) => n > 1).map(([id]) => id)).toEqual([]);
   });
 
   it('keeps each area self-consistent', () => {

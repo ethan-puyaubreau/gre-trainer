@@ -298,12 +298,13 @@ const equalRadicalsMCM: Template<EqualParams> = {
     const N = k * k * r;
     const divs = [2, 3, 4, 5, 6].filter((m) => k % m === 0 && m < k);
     const m = rng.pick(divs);
-    const trueForms: Expr[] = [
+    const forms: Expr[] = [
       { t: 'root', n: N },
       { t: 'coef', c: m, n: (k / m) ** 2 * r },
       { t: 'prod', x: 2 * r, y: (k * k) / 2 },
       { t: 'quot', x: N * 4, y: 4 },
-    ].filter((e): e is Expr => (e.t !== 'prod' || Number.isInteger(e.y)) && Math.abs(exprValue(e) - k * Math.sqrt(r)) < 1e-9);
+    ];
+    const trueForms = forms.filter((e) => (e.t !== 'prod' || Number.isInteger(e.y)) && Math.abs(exprValue(e) - k * Math.sqrt(r)) < 1e-9);
     const falseForms: (Expr & { trap?: string })[] = [
       { t: 'root', n: k * r, trap: 'radical-coefficient' },
       { t: 'sum', x: k * k, y: r, trap: 'radical-add' },
