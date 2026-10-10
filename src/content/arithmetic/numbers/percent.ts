@@ -316,6 +316,7 @@ Compare $${dec(V)}$ with $${dec(m)}$. ${qcEnd(answer)}`,
           quantityA: qa,
           quantityB: qb,
           answer: 'C',
+          traps: { A: 'num-percent-swap', B: 'num-percent-swap' },
           explanation: `$${pct(p)}$ of $${n}$ is $\\frac{${p}}{100} \\cdot ${n} = \\frac{${p} \\cdot ${n}}{100}$, and $${pct(n)}$ of $${p}$ is $\\frac{${n}}{100} \\cdot ${p} = \\frac{${n} \\cdot ${p}}{100}$: the same product. Both equal $${dec(F(p * n, 100))}$.
 
 Swapping the percent and the number never changes the result. ${qcEnd('C')}`,
@@ -701,11 +702,13 @@ const rateChangeMCS: Template<RCParams> = {
     const points = p2.sub(p1).abs();
     const ratio = p2.mul(100).div(p1);
     const newBase = p2.sub(p1).abs().mul(100).div(p2);
-    const optional = [
-      { value: ratio, trap: 'num-ratio-as-change' },
-      { value: newBase, trap: 'num-percent-wrong-base' },
+    const allTraps = [
+      { value: points, trap: 'num-percentage-points', keep: 0.75 },
+      { value: ratio, trap: 'num-ratio-as-change', keep: 0.55 },
+      { value: newBase, trap: 'num-percent-wrong-base', keep: 0.5 },
     ];
-    const rcTraps = [{ value: points, trap: 'num-percentage-points' }, ...(rng.chance(0.4) ? optional : [rng.pick(optional)])];
+    let rcTraps = allTraps.filter((t) => rng.chance(t.keep)).map(({ value, trap }) => ({ value, trap }));
+    if (!rcTraps.length) rcTraps = [{ value: points, trap: 'num-percentage-points' }];
     const steps = [F(10), F(20), F(25), F(50), F(75), F(100)];
     const { choices, answer, values } = numChoices(rng, {
       correct,

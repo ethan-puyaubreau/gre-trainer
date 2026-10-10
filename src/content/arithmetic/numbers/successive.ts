@@ -63,6 +63,7 @@ const netChangeQC: Template<NetParams> = {
     let rel: QCChoice;
     let trapRel: QCChoice | null = null;
     let trapId = 'num-add-percents';
+    let orderTraps = false;
     let why: string;
     const P = usd(price);
     if (mode === 'same') {
@@ -111,6 +112,7 @@ const netChangeQC: Template<NetParams> = {
       qb = "Store Y's final price";
       rel = 'C';
       trapRel = null;
+      orderTraps = true;
       const fin = mult(a).mul(mult(b)).mul(price);
       why = `Store X: ${P} $\\times ${dec(mult(a))} \\times ${dec(mult(b))}$. Store Y: ${P} $\\times ${dec(mult(b))} \\times ${dec(mult(a))}$. The same three numbers are multiplied, so both final prices are ${usdF(fin, !fin.isInt())}. The order of successive percent changes does not matter.`;
     } else if (mode === 'vs-sum') {
@@ -147,7 +149,7 @@ ${sgn > 0 ? 'The second increase is taken on a larger amount, so two increases a
     }
     const answer = swap ? swapQC(rel) : rel;
     const tr = trapRel && trapRel !== rel ? (swap ? swapQC(trapRel) : trapRel) : null;
-    const traps: QCQuestion['traps'] = tr ? { [tr]: trapId } : undefined;
+    const traps: QCQuestion['traps'] = orderTraps ? { A: 'num-order-of-changes', B: 'num-order-of-changes' } : tr ? { [tr]: trapId } : undefined;
     return {
       params: { mode, a, b, price, swap },
       q: {

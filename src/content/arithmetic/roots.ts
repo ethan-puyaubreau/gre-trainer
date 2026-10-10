@@ -1,7 +1,7 @@
-import { flaggedChoices, qcCompare, qcCompareNum } from '../../engine/build';
+import { flaggedChoices, qcCompare, qcCompareNum, valuedChoices } from '../../engine/build';
 import { frac } from '../../engine/frac';
 import { num } from '../../engine/tex';
-import type { Choice, QCQuestion, Template } from '../../engine/types';
+import type { QCQuestion, Template } from '../../engine/types';
 
 /** A radical expression term: coef * root_index(radicand). */
 interface Rad {
@@ -119,37 +119,37 @@ const simplifyRadicals: Template<SimplifyParams> = {
     const absSum = coefs.reduce((s, c) => s + c, 0);
 
     const correct: Rad = { coef: k, radicand: r, index: 2 };
-    const cands: (Rad & { trap?: string })[] = [
+    const cands = ([
       { coef: 1, radicand: insideSum, index: 2, trap: signs.includes(-1) ? 'radical-subtract' : 'radical-add' },
       { coef: 1, radicand: k * r, index: 2, trap: 'radical-coefficient' },
       { coef: absSum, radicand: r, index: 2 },
-      { coef: k + 1, radicand: r, index: 2 },
       { coef: k - 1, radicand: r, index: 2 },
+      { coef: k + 1, radicand: r, index: 2 },
+      { coef: k - 1, radicand: 2 * r, index: 2 },
       { coef: k, radicand: 2 * r, index: 2 },
+      { coef: k + 2, radicand: r, index: 2 },
       { coef: k * k, radicand: r, index: 2 },
-    ];
-    const seen = new Set([radValue(correct).toFixed(9)]);
-    const wrong: (Rad & { trap?: string })[] = [];
-    for (const cand of cands) {
-      if (cand.radicand <= 0 || cand.coef <= 0) continue;
-      // Simplify display of the candidate radicand when the student would (e.g. sqrt(4*3) shows as sqrt(12)).
-      const v = radValue(cand).toFixed(9);
-      if (seen.has(v)) continue;
-      seen.add(v);
-      wrong.push(cand);
-      if (wrong.length === 4) break;
-    }
-    const all = [{ ...correct, ok: true }, ...wrong].sort((x, y) => radValue(x) - radValue(y));
-    const choices: Choice[] = all.map((x) => ({ text: `$${radTex(x)}$`, ...('trap' in x && x.trap ? { trap: x.trap } : {}) }));
+      { coef: 1, radicand: r, index: 2 },
+    ] as (Rad & { trap?: string })[]).filter((c) => c.radicand > 0 && c.coef > 0);
+    const byText = new Map<string, Rad>([[`$${radTex(correct)}$`, correct], ...cands.map((c) => [`$${radTex(c)}$`, c] as [string, Rad])]);
+    const { choices, answer } = valuedChoices(
+      rng,
+      { text: `$${radTex(correct)}$`, value: radValue(correct) },
+      cands.map((c) => ({ text: `$${radTex(c)}$`, value: radValue(c), trap: c.trap })),
+    );
+    const shown = choices.map((c) => {
+      const { coef, radicand, index } = byText.get(c.text)!;
+      return { coef, radicand, index };
+    });
     const expr = terms.map((t, i) => `${i === 0 ? '' : t.sign < 0 ? ' - ' : ' + '}\\sqrt{${num(t.radicand)}}`).join('');
     const steps = coefs.map((c) => `\\sqrt{${num(c * c * r)}} = ${radTex({ coef: c, radicand: r, index: 2 })}`).join(',\\; ');
     return {
-      params: { terms, choices: all.map(({ coef, radicand, index }) => ({ coef, radicand, index })) },
+      params: { terms, choices: shown },
       q: {
         format: 'mcs',
         stem: `Which of the following is equal to $${expr}$?`,
         choices,
-        answer: all.findIndex((x) => 'ok' in x),
+        answer,
         explanation: `Simplify each radical: $${steps}$.
 
 All the terms are multiples of $\\sqrt{${r}}$, so they combine like ordinary terms: $${coefs

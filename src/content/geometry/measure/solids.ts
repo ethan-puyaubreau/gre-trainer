@@ -1,6 +1,6 @@
 import { flaggedChoices, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
-import { num } from '../../../engine/tex';
+import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { checkChoiceValue, Ex, exChoices, unitCircle, type ExData } from './ex';
 import { drawBox, drawCylinder, Fig } from './fig';
@@ -83,6 +83,7 @@ const measures: Template<MeasuresParams> = {
       correct = Ex.sqrt(3, e);
       traps.push({ v: Ex.sqrt(2, e), trap: 'geom-solid-face-diagonal' }, { v: Ex.of(3 * e), trap: 'geom-solid-added-edges' });
       fillers = [Ex.of(e), Ex.of(2 * e), Ex.sqrt(6, e), Ex.of(e * e)];
+      step = Ex.sqrt(3, 1);
       drawBox(fig, e, e, e, { L: `$${e}$` }, { diagonal: true });
       stem = `The figure above shows a cube with edges of length ${e}. What is the length of the dashed segment, which joins two opposite vertices of the cube?`;
       explanation = `The diagonal of the bottom face is $${e}\\sqrt{2}$ (a 45-45-90 triangle). The dashed diagonal is the hypotenuse of a right triangle with that face diagonal and a vertical edge as legs:
@@ -97,6 +98,7 @@ $${e}\\sqrt{2}$ is only a face diagonal, and adding the three edges does not giv
       correct = Ex.of(dg);
       traps.push({ v: Ex.sqrt(a * a + b * b), trap: 'geom-solid-face-diagonal' }, { v: Ex.of(a + b + c), trap: 'geom-solid-added-edges' });
       fillers = [Ex.sqrt(b * b + c * c), Ex.of(dg + 1), Ex.of(dg - 1), Ex.sqrt(a * a + b * b + c * c + 2 * a * b)];
+      step = Ex.of(1);
       drawBox(fig, a, b, c, { L: `$${a}$`, W: `$${b}$`, H: `$${c}$` }, { diagonal: true });
       stem = `The rectangular box shown above has dimensions ${a}, ${b} and ${c}. What is the length of the dashed segment, which joins two opposite vertices of the box?`;
       explanation = `The space diagonal of a box is $\\sqrt{\\ell^2 + w^2 + h^2}$ (the Pythagorean theorem used twice: first across the bottom face, then up):
@@ -132,7 +134,8 @@ Counting each pair once gives ${half}, and $${a} \\cdot ${b} \\cdot ${c} = ${a *
         correct = Ex.of(S);
         traps.push({ v: Ex.of(4 * e * e), trap: 'geom-solid-cube-four-faces' }, { v: Ex.of(e * e), trap: 'geom-solid-one-face' });
         fillers = [Ex.of(V), Ex.of(8 * e * e), Ex.of(6 * e), Ex.of(12 * e)];
-        stem = `The volume of a cube is ${num(V)} cubic centimeters. What is the total surface area of the cube, in square centimeters?`;
+        step = Ex.of(e * e);
+        stem = `The volume of a cube is ${plain(V)} cubic centimeters. What is the total surface area of the cube, in square centimeters?`;
         explanation = `The edge is $\\sqrt[3]{${num(V)}} = ${e}$. Each face is a ${e}-by-${e} square of area ${e * e}, and a cube has 6 faces: $6 \\cdot ${e * e} = ${S}$.
 
 A cube has 6 faces, not 4: $4 \\cdot ${e * e} = ${4 * e * e}$ leaves out the top and bottom.`;
@@ -140,7 +143,8 @@ A cube has 6 faces, not 4: $4 \\cdot ${e * e} = ${4 * e * e}$ leaves out the top
         correct = Ex.of(V);
         traps.push({ v: Ex.of(e * e), trap: 'geom-solid-one-face' }, { v: Ex.of(S), trap: 'geom-solid-volume-for-surface' });
         fillers = [Ex.of(e), Ex.of(2 * V), Ex.of((e + 1) ** 3), Ex.of((e - 1) ** 3)];
-        stem = `The total surface area of a cube is ${num(S)} square inches. What is the volume of the cube, in cubic inches?`;
+        step = Ex.of(e * e);
+        stem = `The total surface area of a cube is ${plain(S)} square inches. What is the volume of the cube, in cubic inches?`;
         explanation = `Each of the 6 faces has area $\\frac{${num(S)}}{6} = ${e * e}$, so the edge is $\\sqrt{${e * e}} = ${e}$ and the volume is $${e}^3 = ${num(V)}$.
 
 ${e * e} is the area of one face, not the volume.`;
@@ -155,13 +159,14 @@ ${e * e} is the area of one face, not the volume.`;
       correct = Ex.of(a * b * c);
       traps.push({ v: Ex.of(f1 * f2 * f3), trap: 'geom-solid-face-product' }, { v: Ex.of(2 * (f1 + f2 + f3)), trap: 'geom-solid-volume-for-surface' });
       fillers = [Ex.of(f1 + f2 + f3), Ex.of(a * b * c * 2), Ex.of(a * b * c - a * b), Ex.of(a * b * c + b * c)];
+      step = Ex.of(Math.min(f1, f2, f3));
       withFigure = false;
       stem = `Three faces of a rectangular box that share a vertex have areas ${f1}, ${f2} and ${f3} square inches. What is the volume of the box, in cubic inches?`;
       explanation = `If the edges are $\\ell$, $w$ and $h$, the faces are $\\ell w$, $\\ell h$ and $wh$, so their product is $(\\ell w)(\\ell h)(wh) = (\\ell w h)^2$:
 
 $$(\\ell w h)^2 = ${f1} \\cdot ${f2} \\cdot ${f3} = ${num(f1 * f2 * f3)}, \\quad \\ell w h = \\sqrt{${num(f1 * f2 * f3)}} = ${a * b * c}$$
 
-(The edges are ${[a, b, c].sort((x, y) => x - y).join(', ')}.) Do not forget the square root: ${num(f1 * f2 * f3)} is the square of the volume.`;
+(The edges are ${[a, b, c].sort((x, y) => x - y).join(', ')}.) Do not forget the square root: ${plain(f1 * f2 * f3)} is the square of the volume.`;
     } else if (mode === 'cylinder') {
       const r = rng.int(2, 9);
       const h = rng.int(2, 12);
@@ -170,6 +175,7 @@ $$(\\ell w h)^2 = ${f1} \\cdot ${f2} \\cdot ${f3} = ${num(f1 * f2 * f3)}, \\quad
       correct = Ex.pi(2 * r);
       traps.push({ v: Ex.pi(r), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(r * r), trap: 'geom-solid-base-area' }, { v: Ex.of(r), trap: 'geom-solid-radius-not-circ' });
       fillers = [Ex.of(r * r), Ex.pi(4 * r), Ex.of(2 * r), Ex.pi(h)];
+      step = Ex.pi(2);
       drawCylinder(fig, 3, 3 * Math.max(0.8, Math.min(2.2, h / (2 * r))), { h: `$${h}$` });
       stem = `The volume $V$ of a right circular cylinder with radius $r$ and height $h$ is $V = \\pi r^2 h$. The cylinder shown above has volume $${num(k)}\\pi$ and height ${h}. What is the circumference of its base?`;
       explanation = `From $\\pi r^2 \\cdot ${h} = ${num(k)}\\pi$: $r^2 = \\frac{${num(k)}}{${h}} = ${r * r}$, so $r = ${r}$.
@@ -435,7 +441,7 @@ Number of cubes: $${fl(L)} \\cdot ${fl(W)} \\cdot ${fl(H)} = ${count}$.${
       suffix = 'minutes';
       explanation = `The empty part of the tank is $${L} \\cdot ${W} \\cdot (${H} - ${h0}) = ${num(vol)}$ cubic feet. At ${R} cubic feet per minute, it fills in $\\frac{${num(vol)}}{${R}} = ${answer.isInt() ? answer.n : answer.toDecimalString()}$ minutes.
 
-Only the empty part needs water: using the full volume (${num(L * W * H)}) ignores the ${h0} feet already there.`;
+Only the empty part needs water: using the full volume (${plain(L * W * H)}) ignores the ${h0} feet already there.`;
     }
     return {
       params: { mode, a, b, extra },
@@ -604,23 +610,23 @@ The same sheet gives the same curved surface area both ways, but not the same vo
       let traps: QCQuestion['traps'];
       let explanation: string;
       if (variant === 'free-eq') {
-        info = `A rectangular box has a volume of ${num(V)} cubic centimeters.`;
+        info = `A rectangular box has a volume of ${plain(V)} cubic centimeters.`;
         k = S;
         answer = 'D';
         traps = { C: 'geom-solid-assumed-cube' };
-        explanation = `If the box is a cube, its edge is ${e} and its surface area is $6 \\cdot ${e}^2 = ${S}$ (equal). But a box with volume ${num(V)} need not be a cube: a $1 \\times 1 \\times ${num(V)}$ box has surface area $2(1 + ${num(V)} + ${num(V)}) = ${num(2 * (1 + 2 * V))}$, greater than ${S}. (D)
+        explanation = `If the box is a cube, its edge is ${e} and its surface area is $6 \\cdot ${e}^2 = ${S}$ (equal). But a box with volume ${plain(V)} need not be a cube: a $1 \\times 1 \\times ${num(V)}$ box has surface area $2(1 + ${num(V)} + ${num(V)}) = ${num(2 * (1 + 2 * V))}$, greater than ${S}. (D)
 
 For a given volume the cube has the smallest surface area; every other shape has more.`;
       } else if (variant === 'free-less') {
-        info = `A rectangular box has a volume of ${num(V)} cubic centimeters.`;
+        info = `A rectangular box has a volume of ${plain(V)} cubic centimeters.`;
         k = S - rng.int(1, Math.max(2, e * 2));
         answer = 'A';
         traps = { D: 'geom-solid-min-surface' };
-        explanation = `For a given volume, the cube has the smallest surface area. A cube with volume ${num(V)} has edge ${e} and surface area $6 \\cdot ${e}^2 = ${S}$, so every box with volume ${num(V)} has surface area at least ${S}, which is greater than ${k}. (A)
+        explanation = `For a given volume, the cube has the smallest surface area. A cube with volume ${plain(V)} has edge ${e} and surface area $6 \\cdot ${e}^2 = ${S}$, so every box with volume ${plain(V)} has surface area at least ${S}, which is greater than ${k}. (A)
 
 The shape is unknown, but the minimum is enough to decide the comparison.`;
       } else if (variant === 'cube') {
-        info = `A cube has a volume of ${num(V)} cubic centimeters.`;
+        info = `A cube has a volume of ${plain(V)} cubic centimeters.`;
         k = rng.chance(0.5) ? S : S + rng.pick([-2, 2]) * e;
         answer = cmpTol(S, k);
         traps = undefined;
@@ -629,11 +635,11 @@ The shape is unknown, but the minimum is enough to decide the comparison.`;
         const s = rng.pick([1, 2].filter((x) => x < e && V % (x * x) === 0) as number[]) || 1;
         const h = V / (s * s);
         const SA = 2 * s * s + 4 * s * h;
-        info = `A rectangular box with a square base of side ${s} centimeters has a volume of ${num(V)} cubic centimeters.`;
+        info = `A rectangular box with a square base of side ${s} centimeters has a volume of ${plain(V)} cubic centimeters.`;
         k = rng.pick([S, SA, SA - 2 * s, SA + 4]);
         answer = cmpTol(SA, k);
         traps = answer !== 'C' && k === S ? { C: 'geom-solid-assumed-cube' } : undefined;
-        explanation = `The height is $\\frac{${num(V)}}{${s}^2} = ${num(h)}$. Surface area: two square ends $2 \\cdot ${s * s}$ plus four sides $4 \\cdot ${s} \\cdot ${num(h)}$, total $${num(SA)}$. Compare with ${num(k)}: ${relText(answer)}. (${answer})`;
+        explanation = `The height is $\\frac{${num(V)}}{${s}^2} = ${num(h)}$. Surface area: two square ends $2 \\cdot ${s * s}$ plus four sides $4 \\cdot ${s} \\cdot ${num(h)}$, total $${num(SA)}$. Compare with ${plain(k)}: ${relText(answer)}. (${answer})`;
         return {
           params: { ...base, mode, a: s, b: h, k, variant },
           q: { format: 'qc', info, quantityA: `The surface area of the box, in square centimeters`, quantityB: `$${num(k)}$`, answer, traps, explanation },
@@ -797,7 +803,11 @@ const fr = ([n, d]: [number, number]) => new Frac(n, d);
 const factorOf = (f: [number, number][]) => f.reduce((acc, x) => acc.mul(fr(x)), new Frac(1));
 /** What a student who scales everything linearly (radius not squared) would compute. */
 const linearFactor = (shape: ScalingParams['shape'], f: [number, number][]) => {
-  if (shape === 'box') return null;
+  if (shape === 'box') {
+    // "doubling every edge doubles the volume"
+    const [a, b, c] = f.map((x) => fr(x).toNumber());
+    return a === b && b === c ? a : null;
+  }
   const r2 = fr(f[0]).toNumber();
   return Math.sqrt(r2) * fr(f[1]).toNumber();
 };

@@ -1,4 +1,4 @@
-import { flaggedChoices, numericChoices, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcFromSamples } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
@@ -6,7 +6,7 @@ import { decimal, num } from '../../../engine/tex';
 import type { GeometryFigure, QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, RAD, add, angleAt, bisect, dir, dist, fromSides, intersect, lerp, mul, near, rot, shoelace, sub, type Pt } from './fig';
 import { mulberry } from './lines';
-import { checkMcm, checkMcs, qcTraps, QC_SAY } from './util';
+import { checkMcm, checkMcs, intChoices, positioned, qcTraps, QC_SAY } from './util';
 
 const SKILL = 'geo.similarity';
 const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
@@ -509,28 +509,24 @@ interface ScaleParams {
 }
 
 function ratioChoice(rng: Rng, correct: [number, number], wrong: { r: [number, number]; trap?: string }[]) {
-  const key = (r: [number, number]) => {
-    const g = gcd(r[0], r[1]);
-    return `${r[0] / g}:${r[1] / g}`;
-  };
-  const items: { r: [number, number]; trap?: string; ok?: boolean }[] = [{ r: correct, ok: true }];
-  for (const w of wrong) if (!items.some((it) => key(it.r) === key(w.r))) items.push(w);
-  const fillers: [number, number][] = [
-    [correct[0] * 2, correct[1]],
-    [correct[0], correct[1] * 2],
-    [correct[0] + 1, correct[1] + 1],
+  const val = (r: [number, number]) => r[0] / r[1];
+  const [a, b] = correct;
+  const cands: [number, number][] = [
+    [a, 2 * b],
+    [2 * a, b],
+    [a, 3 * b],
+    [3 * a, b],
+    [a + b, b],
+    [a, a + b],
   ];
-  for (const f of fillers) if (items.length < 5 && !items.some((it) => key(it.r) === key(f))) items.push({ r: f });
-  items.splice(5);
-  items.sort((x, y) => x.r[0] / x.r[1] - y.r[0] / y.r[1]);
-  void rng;
+  const items = positioned(rng, correct, wrong.map((w) => ({ v: w.r, trap: w.trap })), cands, val);
   return {
     choices: items.map((it) => {
-      const g = gcd(it.r[0], it.r[1]);
-      return { text: `$${num(it.r[0] / g)}$ to $${num(it.r[1] / g)}$`, ...(it.trap ? { trap: it.trap } : {}) };
+      const g = gcd(it.v[0], it.v[1]);
+      return { text: `$${num(it.v[0] / g)}$ to $${num(it.v[1] / g)}$`, ...(it.trap ? { trap: it.trap } : {}) };
     }),
     answer: items.findIndex((it) => it.ok),
-    values: items.map((it) => it.r[0] / it.r[1]),
+    values: items.map((it) => val(it.v)),
   };
 }
 
@@ -564,7 +560,6 @@ const scaleMCS: Template<ScaleParams> = {
           { r: [a, b], trap: 'geo-sim-linear-area' },
           { r: [b * b, a * a], trap: 'geo-sim-inverted' },
           { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
-          { r: [b, a], trap: 'geo-sim-inverted' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the length of each side of $T$ to the length of the corresponding side of $U$ is $${a}$ to $${b}$. What is the ratio of the area of $T$ to the area of $U$?`;
         explanation = `For similar figures, every length scales by $\\frac{${a}}{${b}}$ and every area by $\\left(\\frac{${a}}{${b}}\\right)^2 = \\frac{${a * a}}{${b * b}}$. So the ratio of the areas is $${a * a}$ to $${b * b}$.
@@ -591,17 +586,18 @@ The area ratio $${a * a}$ to $${b * b}$ is not the perimeter ratio.`;
       const up = rng.chance(0.65);
       const f = up ? 100 + pct : 100 - pct;
       const areaPct = new Frac(f * f, 100).sub(100).abs(); // percent change of the area
-      const { choices, answer } = numericChoices(rng, {
-        correct: areaPct,
-        traps: [
+      const { choices, answer, values } = intChoices(
+        rng,
+        areaPct.toNumber(),
+        [
           { value: pct, trap: 'geo-sim-linear-area' },
           { value: 2 * pct, trap: 'geo-sim-double-percent' },
           { value: new Frac(f * f, 100), trap: 'geo-sim-ratio-not-change' },
           { value: new Frac(pct * pct, 100), trap: 'geo-sim-square-percent' },
         ],
-        format: (v) => `$${dec(v)}\\%$`,
-      });
-      const values = choices.map((c) => Number(c.text.replace(/[^0-9.]/g, '')));
+        [areaPct.toNumber() + 10, areaPct.toNumber() - 10, 3 * pct],
+        (v) => `$${dec(v)}\\%$`,
+      );
       const fr = new Frac(f, 100);
       return {
         params: { kind, pct, up, values },
@@ -633,8 +629,7 @@ The area does not change by $${pct}\\%$ (that ignores the squaring) or by $${2 *
           { value: new Frac(s1 * s2, h1), trap: 'geo-sim-inverted' },
           { value: h1 + s2 - s1, trap: 'geo-sim-additive' },
         ].filter((t) => (t.value instanceof Frac ? t.value.isTerminating() : true));
-        const { choices, answer } = numericChoices(rng, { correct: h2, traps, fillers: [h2 + 2, h2 - 3, h2 + 5], format: (v) => `$${dec(v)}$` });
-        const values = choices.map((c) => Number(c.text.replace(/[^0-9.]/g, '')));
+        const { choices, answer, values } = intChoices(rng, h2, traps, [h2 + 2, h2 - 3, h2 + 5, h2 - 5, h2 + 8], (v) => `$${dec(v)}$`);
         // figure: post and tree with their shadows, sun rays dashed
         const sc = 4 / Math.max(h2, s2 + s1 + 6);
         const fb = new FigBuilder();
@@ -678,8 +673,7 @@ Setting up $\\frac{h}{${s2}} = \\frac{${s1}}{${h1}}$ (heights over shadows mixed
         { value: new Frac(h * dd, H), trap: 'geo-sim-part-whole' },
         { value: new Frac(dd * (H - h), h), trap: 'geo-sim-inverted' },
       ].filter((t) => t.value.isTerminating());
-      const { choices, answer } = numericChoices(rng, { correct: s, traps, fillers: [s.add(2), s.add(1), Frac.of(dd)], format: (v) => `$${dec(v)}$` });
-      const values = choices.map((c) => Number(c.text.replace(/[^0-9.]/g, '')));
+      const { choices, answer, values } = intChoices(rng, s.toNumber(), traps, [s.add(2), s.sub(2), Frac.of(dd), s.add(1), s.sub(1)], (v) => `$${dec(v)}$`);
       const sc = 4 / (dd + s.toNumber());
       const fb = new FigBuilder();
       const L0 = fb.helper([0, 0]);

@@ -4,9 +4,10 @@ import { graphTemplates } from './graphs';
 import { sequenceTemplates } from './sequences';
 import { wordProblemTemplates } from './wordProblems';
 import { rateWorkTemplates } from './rateWork';
+import { mixtureTemplates } from './mixtures';
 import { appliedSkillList } from './skills';
 import { appliedTrapMap } from './traps';
 
 export const appliedSkills: Skill[] = appliedSkillList;
-export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates];
+export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates, ...mixtureTemplates];
 export const appliedTraps: Record<string, Trap> = appliedTrapMap;

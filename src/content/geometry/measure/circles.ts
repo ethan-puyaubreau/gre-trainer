@@ -415,7 +415,7 @@ Knowing that $RT$ is less than the diameter does not compare it with the radius.
           answer,
           traps,
           explanation: area
-            ? `Let the radius of $B$ be $r$. The difference of the areas is $\\pi(r + ${k})^2 - \\pi r^2 = \\pi(${2 * k}r + ${k * k})$, which grows with $r$. For a tiny $r$ it is about $${k * k}\\pi \\approx ${(k * k * 3.14).toFixed(1)}$, less than ${num(4 * k * k)}; for a large $r$ it is as large as you like. (D)
+            ? `Let the radius of $B$ be $r$. The difference of the areas is $\\pi(r + ${k})^2 - \\pi r^2 = \\pi(${2 * k}r + ${k * k})$, which grows with $r$. For a tiny $r$ it is about $${k * k}\\pi \\approx ${(k * k * 3.14).toFixed(1)}$, less than ${plain(4 * k * k)}; for a large $r$ it is as large as you like. (D)
 
 For circumferences the radius cancels ($2\\pi(r + ${k}) - 2\\pi r = ${2 * k}\\pi$), but for areas it does not.`
             : `Let the radius of $B$ be $r$. Then Quantity A is $2\\pi(r + ${k}) - 2\\pi r = ${2 * k}\\pi$, whatever $r$ is.
@@ -690,7 +690,7 @@ const lengths: Template<LengthParams> = {
           traps: traps.filter((t) => !t.value.eq(ans)),
           explanation: `Each revolution moves the wheel one circumference: $\\pi d = ${D}\\pi \\approx ${(D * Math.PI).toFixed(2)}$ ${small}.
 
-The distance is $${plain(distance)} \\times ${factor} = ${num(distance * factor)}$ ${small}, so the number of revolutions is $\\frac{${num(distance * factor)}}{${D}\\pi} \\approx ${N.toFixed(2)}$.
+The distance is $${num(distance)} \\times ${factor} = ${num(distance * factor)}$ ${small}, so the number of revolutions is $\\frac{${num(distance * factor)}}{${D}\\pi} \\approx ${N.toFixed(2)}$.
 
 The wheel completes ${ans} revolutions (the last one is not finished). Use the diameter in $\\pi d$ (or $2\\pi r$ with $r = ${D / 2}$), and convert ${big} to ${small} first.`,
         },
@@ -732,7 +732,8 @@ $OP$ is not $${r} + ${t}$: the two legs are perpendicular, not in a straight lin
         fig.pt('B', Bp, [-1, -1]);
         fig.seg('O', 'A', `$${r}$`).seg('A', 'P', `$${t}$`).seg('O', 'P');
         answer = new Frac(dd - r);
-        traps.push({ value: new Frac(dd), trap: 'geom-circle-pb-whole' }, { value: new Frac(t - r), trap: 'geom-circle-no-right-triangle' });
+        traps.push({ value: new Frac(dd), trap: 'geom-circle-pb-whole' });
+        if (t - r > 0) traps.push({ value: new Frac(t - r), trap: 'geom-circle-no-right-triangle' });
         stem = `In the figure above, $O$ is the center of the circle, $PA$ is tangent to the circle at $A$, and $B$ is the point where segment $OP$ meets the circle. What is the length of $PB$?`;
         explanation = `Radius $OA \\perp PA$, so in right triangle $OAP$: $OP = \\sqrt{${r}^2 + ${t}^2} = ${dd}$.
 

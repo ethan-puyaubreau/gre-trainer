@@ -1,8 +1,8 @@
-import { numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { clock, num } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dx, expectMcs, expectNe, expectQc, NAMES, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dx, valuedChoices, expectMcs, expectQc, NAMES, qcEnd, uniqueIndex } from './util';
 
 /** Pairs of times whose combined time a*b/(a+b) is a terminating decimal. */
 function pairsWithNiceTogether(maxT: number, integerOnly: boolean): [number, number][] {
@@ -10,7 +10,7 @@ function pairsWithNiceTogether(maxT: number, integerOnly: boolean): [number, num
   for (let a = 2; a <= maxT; a++)
     for (let b = a + 1; b <= maxT; b++) {
       const t = frac(a * b, a + b);
-      if (integerOnly ? t.isInt() : t.isTerminating() && t.mul(100).isInt()) out.push([a, b]);
+      if (integerOnly ? t.isInt() : t.mul(10).isInt()) out.push([a, b]);
     }
   return out;
 }
@@ -48,7 +48,7 @@ const combinedWork: Template<WorkParams> = {
     const m = rng.pick(MACHINES);
     const base: WorkParams = { kind, a: 0, b: 0, u: 0, M: 0, t: 0 };
     if (kind === 'together') {
-      const [a, b] = rng.shuffle(rng.pick(d === 1 ? INT_PAIRS.filter(([x, y]) => y <= 24 && x >= 3) : DEC_PAIRS.filter(([x, y]) => y <= 30)));
+      const [a, b] = rng.shuffle(rng.pick(d === 1 ? INT_PAIRS.filter(([x, y]) => y <= 24 && x >= 3) : DEC_PAIRS.filter(([, y]) => y <= 30)));
       const T = frac(a * b, a + b);
       const unit = d === 1 ? 'hours' : 'minutes';
       return {
@@ -104,7 +104,7 @@ Rates (${thing} per minute) add; times do not.`,
     }
     if (kind === 'stops') {
       for (;;) {
-        const [a, b] = rng.shuffle(rng.pick(INT_PAIRS.filter(([x, y]) => y <= 30)));
+        const [a, b] = rng.shuffle(rng.pick(INT_PAIRS.filter(([, y]) => y <= 30)));
         const t = rng.int(1, Math.floor((a * b) / (a + b)) - 1 || 1);
         const left = frac(1).sub(frac(t, a)).sub(frac(t, b));
         if (left.sign() <= 0) continue;
@@ -214,7 +214,7 @@ const aloneTime: Template<AloneParams> = {
         { value: Tt.mul(2).sub(a), trap: 'algw-average-times' },
         { value: frac(a).add(Tt), trap: 'algw-add-times' },
         { value: Tt.div(2), trap: 'algw-alone-faster' },
-      ].filter((t) => t.value.sign() > 0 && t.value.isTerminating());
+      ].filter((t) => t.value.sign() > 0 && t.value.mul(100).isInt());
       const m = rng.pick(MACHINES);
       stem = `Working simultaneously at their respective constant rates, ${m.both} can ${m.job} in ${dx(Tt)} hours. Working alone at its constant rate, ${m.A} can ${m.job} in ${a} hours. How many hours would it take ${m.B}, working alone at its constant rate, to ${m.job}?`;
       explanation = `Subtract rates, not times. Together they do $\\frac{1}{${dx(Tt)}}$ of the job per hour and ${m.A} alone does $\\frac{1}{${a}}$, so ${m.B} does
@@ -251,9 +251,7 @@ $${T2} - ${T3} = ${T2 - T3}$ subtracts times instead of rates, and any answer be
     }
     const dir = rng.sign();
     const fillers = [correct.add(dir), correct.add(2 * dir), correct.sub(dir)].filter((v) => v.sign() > 0);
-    const { choices, answer } = numericChoices(rng, { correct, traps: rng.shuffle(traps).slice(0, 3), fillers, format: fmtDec });
-    const pool = [correct, ...traps.map((t) => t.value), ...fillers];
-    const values = choices.map((c) => pool.find((v) => fmtDec(v) === c.text)!);
+    const { choices, answer, values } = valuedChoices(rng, { correct, traps: rng.shuffle(traps).slice(0, 3), fillers, format: fmtDec, positive: true });
     return { params: { kind, together, known, values }, q: { format: 'mcs', stem, choices, answer, explanation } };
   },
   check(q, { together, known, values }) {
@@ -262,7 +260,7 @@ $${T2} - ${T3} = ${T2 - T3}$ subtracts times instead of rates, and any answer be
     // A choice is right when its rate plus the known rate is the team's rate.
     return expectMcs(
       q,
-      uniqueIndex(values, (v) => frac(1).div(known).add(frac(1).div(v)).eq(frac(1).div(together))),
+      uniqueIndex(values, (v) => v.sign() > 0 && frac(1).div(known).add(frac(1).div(v)).eq(frac(1).div(together))),
     );
   },
 };
@@ -320,7 +318,7 @@ const speedQC: Template<SpeedParams> = {
           quantityB: swap ? qAvg : `$${num(N)}$`,
           answer,
           traps,
-          explanation: `Pick a convenient distance, say ${u * v / gcdN(u, v)} miles each way (a multiple of ${u} and ${v}). Going takes $\\frac{${u * v / gcdN(u, v)}}{${u}} = ${v / gcdN(u, v)}$ hours and returning takes $\\frac{${u * v / gcdN(u, v)}}{${v}} = ${u / gcdN(u, v)}$ hours.
+          explanation: `Pick a convenient distance, say ${u * v / gcdN(u, v)} miles each way (a multiple of ${u} and ${v}). Going takes $\\frac{${u * v / gcdN(u, v)}}{${u}} = ${v / gcdN(u, v)}$ hours and returning takes $\\frac{${u * v / gcdN(u, v)}}{${v}} = ${u / gcdN(u, v)}$ ${u / gcdN(u, v) === 1 ? 'hour' : 'hours'}.
 
 Average speed $= \\frac{\\text{total distance}}{\\text{total time}} = \\frac{${(2 * u * v) / gcdN(u, v)}}{${(u + v) / gcdN(u, v)}} = ${H}$ miles per hour, whatever the distance.
 
@@ -330,7 +328,7 @@ ${N === mean ? `It is less than ${mean}, the average of the two speeds, because 
     }
     if (mode === 'split') {
       const u = rng.pick([30, 40, 45, 50]);
-      const v = u + rng.pick([10, 15, 20, 30]);
+      const v = u + rng.pick([10, 20, 30]);
       const cond = rng.pick(['none', 'more-slow', 'more-fast', 'equal-time'] as const);
       const mean = frac(u + v, 2);
       const answer: QCChoice = cond === 'equal-time' ? 'C' : cond === 'more-slow' ? 'B' : 'D';
@@ -347,10 +345,10 @@ ${N === mean ? `It is less than ${mean}, the average of the two speeds, because 
         cond === 'equal-time'
           ? `With equal times $t$ at each speed, the distance is $${u}t + ${v}t$ and the time is $2t$, so the average speed is exactly $\\frac{${u} + ${v}}{2} = ${num(mean)}$. ${qcEnd('C')}`
           : cond === 'more-slow'
-            ? `Even with equal distances, more TIME is spent at ${u} miles per hour, so the average is below ${num(mean)}. With even more distance at ${u}, it is lower still. ${qcEnd('B')}`
-            : `The average speed is ${num(mean)} only when the times at the two speeds are equal. With $x$ miles at ${u} and $y$ miles at ${v}, that happens when $\\frac{x}{${u}} = \\frac{y}{${v}}$. ${
+            ? `Even with equal distances, more TIME is spent at ${u} miles per hour, so the average is below $${num(mean)}$. With even more distance at ${u}, it is lower still. ${qcEnd('B')}`
+            : `The average speed is $${num(mean)}$ only when the times at the two speeds are equal. With $x$ miles at ${u} and $y$ miles at ${v}, that happens when $\\frac{x}{${u}} = \\frac{y}{${v}}$. ${
                 cond === 'more-fast'
-                  ? `Driving more miles at ${v} still allows $\\frac{x}{${u}}$ to be smaller or larger than $\\frac{y}{${v}}$ (for example $x = ${u}, y = ${2 * v}$ or $x = ${u * 2}, y = ${u * 2 + 10}$), so the average can be above or below ${num(mean)}.`
+                  ? `Driving more miles at ${v} still allows $\\frac{x}{${u}}$ to be smaller or larger than $\\frac{y}{${v}}$ (for example $x = ${u}, y = ${2 * v}$ or $x = ${u * 2}, y = ${u * 2 + 10}$), so the average can be above or below $${num(mean)}$.`
                   : `With most of the miles at ${v} the average is close to ${v}; with most at ${u} it is close to ${u}.`
               } ${qcEnd('D')}`;
       return {
@@ -487,7 +485,7 @@ const meetCatch: Template<MeetParams> = {
           if (w.isInt() && w.toNumber() < 600) wrong.push({ t: t0 + w.toNumber(), trap: 'algw-relative-speed-sign' });
         }
         stem = `${n1} and ${n2} live ${D} miles apart. At ${clock(t0, 'short')} they start driving toward each other on the same road, ${n1} at a constant speed of ${u} miles per hour and ${n2} at a constant speed of ${v} miles per hour. At what time do they meet?`;
-        explanation = `They close the gap at $${u} + ${v} = ${u + v}$ miles per hour (approaching, the speeds add). Time to meet: $\\frac{${D}}{${u + v}} = ${hrs(hours)}$ hours, that is, ${hours.mul(60).toNumber()} minutes after ${clock(t0, 'short')}: ${clock(meet, 'short')}.`;
+        explanation = `They close the gap at $${u} + ${v} = ${u + v}$ miles per hour (approaching, the speeds add). Time to meet: $\\frac{${D}}{${u + v}} = ${hrs(hours)}$ ${hours.eq(1) ? 'hour' : 'hours'}, that is, ${hours.mul(60).toNumber()} minutes after ${clock(t0, 'short')}, so they meet at ${clock(meet, 'short')}`;
       } else if (kind === 'catch') {
         u = rng.pick([30, 40, 45, 48, 50, 60]);
         v = u + rng.pick([10, 12, 15, 20, 30]);
@@ -504,7 +502,7 @@ const meetCatch: Template<MeetParams> = {
           t0 + delay,
           'short',
         )} and drives along the same highway in the same direction at a constant speed of ${v} miles per hour. At what time does ${n2} catch up with ${n1}?`;
-        explanation = `When ${n2} leaves, ${n1} has a head start of $${u} \\times ${dx(frac(delay, 60))} = ${hrs(gap)}$ miles. Moving in the same direction, ${n2} closes that gap at $${v} - ${u} = ${v - u}$ miles per hour, so it takes $\\frac{${hrs(gap)}}{${v - u}} = ${hrs(hours)}$ hours (${mins.toNumber()} minutes) after ${clock(t0 + delay, 'short')}: ${clock(meet, 'short')}.
+        explanation = `When ${n2} leaves, ${n1} has a head start of $${u} \\times ${dx(frac(delay, 60))} = ${hrs(gap)}$ miles. Moving in the same direction, ${n2} closes that gap at $${v} - ${u} = ${v - u}$ miles per hour, so it takes $\\frac{${hrs(gap)}}{${v - u}} = ${hrs(hours)}$ ${hours.eq(1) ? 'hour' : 'hours'} (${mins.toNumber()} minutes) after ${clock(t0 + delay, 'short')}, that is, until ${clock(meet, 'short')}
 
 Adding the speeds would be right only if they drove toward each other, and the catch-up time is counted from ${n2}'s departure, not from ${n1}'s.`;
       } else {
@@ -525,7 +523,7 @@ Adding the speeds would be right only if they drove toward each other, and the c
           t0 + delay,
           'short',
         )}, ${n2} leaves Q and drives toward P on the same road at a constant speed of ${v} miles per hour. At what time do they meet?`;
-        explanation = `By ${clock(t0 + delay, 'short')}, ${n1} has driven $${u} \\times ${dx(frac(delay, 60))} = ${hrs(frac(u * delay, 60))}$ miles, so $${hrs(frac(D * 60 - u * delay, 60))}$ miles separate them. From then on they approach each other at $${u} + ${v} = ${u + v}$ miles per hour, meeting $\\frac{${hrs(frac(D * 60 - u * delay, 60))}}{${u + v}} = ${hrs(hoursAfter)}$ hours later: ${clock(meet, 'short')}.
+        explanation = `By ${clock(t0 + delay, 'short')}, ${n1} has driven $${u} \\times ${dx(frac(delay, 60))} = ${hrs(frac(u * delay, 60))}$ miles, so $${hrs(frac(D * 60 - u * delay, 60))}$ miles separate them. From then on they approach each other at $${u} + ${v} = ${u + v}$ miles per hour, meeting $\\frac{${hrs(frac(D * 60 - u * delay, 60))}}{${u + v}} = ${hrs(hoursAfter)}$ ${hoursAfter.eq(1) ? 'hour' : 'hours'} later, at ${clock(meet, 'short')}
 
 Ignoring ${n1}'s head start, or adding the travel time to ${clock(t0, 'short')} instead of ${clock(t0 + delay, 'short')}, gives the wrong time.`;
       }

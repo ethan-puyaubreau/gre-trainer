@@ -1,10 +1,10 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import { num, paren } from '../../../engine/tex';
 import type { GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dots, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dots, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
 
 type Pt = [number, number];
 
@@ -407,11 +407,7 @@ const perpendicularLine: Template<PerpParams> = {
     }
     const dir = rng.sign();
     const fillers = [answer.add(dir), answer.add(2 * dir), answer.sub(dir), answer.add(3 * dir), answer.sub(2 * dir)];
-    const { choices, answer: idx } = numericChoices(rng, { correct: answer, traps: traps.slice(0, 3), fillers, format: fmtChoice });
-    const values = choices.map((c) => {
-      const all = [answer, ...traps.map((t) => t.value), ...fillers];
-      return all.find((v) => fmtChoice(v) === c.text)!;
-    });
+    const { choices, answer: idx, values } = valuedChoices(rng, { correct: answer, traps: traps.slice(0, 3), fillers, format: fmtChoice });
 
     const givenTex = form === 'slope' ? lineTex(m, b) : `${A === 1 ? '' : A}x ${B < 0 ? '-' : '+'} ${Math.abs(B)}y = ${num(C)}`;
     const relWord = rel === 'parallel' ? 'parallel' : 'perpendicular';

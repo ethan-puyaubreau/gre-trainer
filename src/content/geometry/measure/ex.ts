@@ -96,65 +96,48 @@ function termTex(a: Frac, u: Unit): string {
 }
 
 /**
- * Select-one choices from exact values: the correct one, trap values (tagged, kept in priority),
- * then fillers. Non-positive values, duplicates and values too close to another choice are skipped.
- * The position of the correct answer is spread: a random number of wrong choices is taken below it
- * (extra values correct ± k·step are generated when a side runs short). Ascending order.
+ * Select-one choices from exact values. Candidates are, in priority order: the trap values (tagged),
+ * the fillers, scaled copies of the answer with tidy coefficients (×1/2, ×3/4, ×3/2, ×2...), and
+ * answer ± k·step. Non-positive values, duplicates and values too close to another choice are dropped.
+ * The correct answer goes to a uniformly random position (A–E) as far as the candidates on each side
+ * allow; within a side, earlier candidates (traps first) are preferred. Ascending order.
  */
 export function exChoices(
   rng: Rng,
   correct: Ex,
   traps: { v: Ex; trap: string }[],
   fillers: Ex[],
-  opts: { count?: number; minGap?: number; step?: Ex; fmt?: (v: Ex) => string; allowZero?: boolean } = {},
+  opts: { count?: number; minGap?: number; step?: Ex; fmt?: (v: Ex) => string; allowZero?: boolean; scales?: boolean } = {},
 ): { choices: Choice[]; answer: number; values: ExData[] } {
   const count = opts.count ?? 5;
   const minGap = opts.minGap ?? 0.01;
   const c = correct.value();
+  const maxDen = Math.max(...correct.data().map(([, d]) => d), 1);
+  const tidy = (v: Ex) => v.data().every(([, d]) => d <= Math.max(maxDen, 1) * (maxDen === 1 ? 1 : 2));
   const pool: { v: Ex; trap?: string }[] = [...traps.map((t) => ({ v: t.v, trap: t.trap })), ...rng.shuffle(fillers).map((v) => ({ v }))];
+  if (opts.scales !== false)
+    for (const k of rng.shuffle([new Frac(1, 2), new Frac(3, 4), new Frac(3, 2), new Frac(2), new Frac(1, 4), new Frac(3), new Frac(2, 3), new Frac(4, 3)])) {
+      const v = correct.scale(k);
+      if (tidy(v)) pool.push({ v });
+    }
   if (opts.step) for (let k = 1; k <= 8; k++) pool.push({ v: correct.add(opts.step.scale(k)) }, { v: correct.sub(opts.step.scale(k)) });
-  const valid = (x: number) => (opts.allowZero ? x >= 0 : x > 0);
-  const below = pool.filter((it) => valid(it.v.value()) && it.v.value() < c);
-  const above = pool.filter((it) => it.v.value() > c);
-  const items: { v: Ex; trap?: string; ok?: boolean }[] = [{ v: correct, ok: true }];
-  const close = (x: number) => items.some((it) => Math.abs(it.v.value() - x) <= minGap * Math.max(1, Math.abs(x), Math.abs(it.v.value())));
-  const take = (list: { v: Ex; trap?: string }[], n: number) => {
-    let got = 0;
-    for (const it of list) {
-      if (got >= n) break;
-      const x = it.v.value();
-      if (close(x) || items.some((o) => o.v.tex() === it.v.tex())) continue;
-      items.push(it);
-      got++;
-    }
-    return got;
-  };
-  // Count usable values on each side (greedy, ignoring cross-side closeness, which cannot happen).
-  const usable = (list: { v: Ex }[]) => {
-    const kept: number[] = [c];
-    for (const it of list) {
-      const x = it.v.value();
-      if (!kept.some((y) => Math.abs(x - y) <= minGap * Math.max(1, Math.abs(x), Math.abs(y)))) kept.push(x);
-    }
-    return kept.length - 1;
-  };
-  const need = count - 1;
-  const nb = usable(below);
-  const na = usable(above);
-  const lo = Math.max(0, need - na);
-  const hi = Math.min(need, nb);
-  if (lo > hi) throw new Error(`exChoices: only ${nb + na} wrong choices for ${correct.tex()}`);
-  // Keep every trap when possible (they carry the feedback), otherwise spread freely.
-  const tb = Math.min(usable(below.filter((it) => it.trap)), need);
-  const ta = Math.min(usable(above.filter((it) => it.trap)), need);
-  const lo2 = Math.max(lo, tb);
-  const hi2 = Math.min(hi, need - ta);
-  const nBelow = lo2 <= hi2 && !(lo2 === hi2 && rng.chance(0.3)) ? rng.int(lo2, hi2) : rng.int(lo, hi);
-  const gotB = take(below, nBelow);
-  take(above, need - gotB);
-  if (items.length < count) take(below, count - items.length);
-  if (items.length < count) throw new Error(`exChoices: only ${items.length} choices for ${correct.tex()}`);
-  items.sort((a, b) => a.v.value() - b.v.value());
+  const ok = (x: number) => (opts.allowZero ? x >= 0 : x > 0);
+  const near = (x: number, y: number) => Math.abs(x - y) <= minGap * Math.max(1, Math.abs(x), Math.abs(y));
+  // Greedy de-duplication in priority order: every kept value is far enough from the answer and from each other.
+  const kept: { v: Ex; trap?: string; x: number }[] = [];
+  for (const it of pool) {
+    const x = it.v.value();
+    if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x) || k.v.tex() === it.v.tex())) continue;
+    kept.push({ ...it, x });
+  }
+  const below = kept.filter((k) => k.x < c);
+  const above = kept.filter((k) => k.x > c);
+  if (below.length + above.length < count - 1) throw new Error(`exChoices: only ${below.length + above.length} wrong choices for ${correct.tex()}`);
+  let target = rng.int(0, count - 1);
+  target = Math.min(target, below.length);
+  target = Math.max(target, count - 1 - above.length);
+  const items: { v: Ex; trap?: string; ok?: boolean; x: number }[] = [{ v: correct, ok: true, x: c }, ...below.slice(0, target), ...above.slice(0, count - 1 - target)];
+  items.sort((a, b) => a.x - b.x);
   const fmt = opts.fmt ?? ((v: Ex) => `$${v.tex()}$`);
   return {
     choices: items.map((it) => ({ text: fmt(it.v), ...(it.trap ? { trap: it.trap } : {}) })),

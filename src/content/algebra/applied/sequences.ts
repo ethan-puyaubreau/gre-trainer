@@ -1,8 +1,8 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { num, ordinal } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, expectMcm, expectMcs, expectNe, expectQc, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, qcEnd, uniqueIndex } from './util';
 
 const sub = (i: number | string) => `a_{${i}}`;
 const diffWords = (d: number) => (d >= 0 ? `${d} more than` : `${-d} less than`);
@@ -733,8 +733,8 @@ After $${sub(6)}$ the terms only grow. So the terms among the choices are ${[...
 
 Multiplying by a negative number makes the signs alternate: the odd-numbered terms have the sign of $a_1$ and the even-numbered terms the opposite sign. A number with the right size but the wrong sign is not a term.`;
     }
-    const items = [...correct.map((v) => ({ v, correct: true })), ...wrong.map((w) => ({ v: w.v, correct: false, trap: w.trap }))].sort((x, y) => x.v - y.v);
-    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${num(it.v)}$`, correct: it.correct, ...('trap' in it && it.trap ? { trap: it.trap } : {}) })));
+    const items = [...correct.map((v) => ({ v, correct: true, trap: undefined as string | undefined })), ...wrong.map((w) => ({ v: w.v, correct: false, trap: w.trap }))].sort((x, y) => x.v - y.v);
+    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${num(it.v)}$`, correct: it.correct, ...(it.trap ? { trap: it.trap } : {}) })));
     params.values = items.map((it) => it.v);
     return {
       params,
@@ -864,9 +864,8 @@ Miscounting the terms by one adds or drops a whole term.`;
     const dir = rng.sign();
     const step = Math.max(1, Math.round(correct / 20));
     const fillers = [correct + dir * step, correct + 2 * dir * step, correct + 3 * dir * step, correct - dir * step].map((x) => frac(x));
-    const { choices, answer } = numericChoices(rng, { correct, traps, fillers, format: fmtN });
-    const pool = [frac(correct), ...traps.map((t) => t.value), ...fillers];
-    params.values = choices.map((ch) => pool.find((v) => fmtN(v) === ch.text)!);
+    const { choices, answer, values } = valuedChoices(rng, { correct, traps, fillers, format: fmtN, unit: step, positive: correct > 0 });
+    params.values = values;
     return { params, q: { format: 'mcs', stem, choices, answer, explanation } };
   },
   check(q, prm) {

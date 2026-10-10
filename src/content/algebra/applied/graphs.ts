@@ -1,9 +1,9 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { num, poly } from '../../../engine/tex';
 import type { Choice, GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dots, expectMcm, expectMcs, expectNe, expectQc, plot, ptTex, qcEnd, signed, uniqueIndex, type Window } from './util';
+import { choiceValuesMatch, dots, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, plot, ptTex, qcEnd, uniqueIndex, type Window } from './util';
 
 type Pt = [number, number];
 
@@ -61,6 +61,7 @@ const lineMeetsV: Template<VParams> = {
       }
     // Listed by slope (as in the book) or by intercept.
     const bySlope = rng.chance(0.5);
+    if (!meets(correct.m, correct.c) || wrong.some((w) => meets(w.m, w.c))) throw new Error('line-meets-graph: inconsistent choices');
     const all = [{ ...correct, ok: true }, ...wrong.map((w) => ({ ...w, ok: false }))].sort((u, v) => (bySlope ? u.m - v.m || u.c - v.c : u.c - v.c || u.m - v.m));
     const choices: Choice[] = all.map((l) => ({ text: `$${gTex(l.m, l.c)}$`, ...(!l.ok && 'trap' in l && l.trap ? { trap: l.trap } : {}) }));
     const answer = all.findIndex((l) => l.ok);
@@ -399,8 +400,8 @@ const regionPoints: Template<RegionParams> = {
         if (wrong.length >= nWrong) break;
         wrong.push({ p, trap: 'algw-region-eyeball' });
       }
-      const items = [...pickIn.map((p) => ({ p, correct: true })), ...wrong.map((w) => ({ p: w.p, correct: false, trap: w.trap }))].sort((u, v) => u.p[0] - v.p[0] || u.p[1] - v.p[1]);
-      const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${ptTex(it.p[0], it.p[1])}$`, correct: it.correct, ...('trap' in it ? { trap: it.trap } : {}) })));
+      const items = [...pickIn.map((p) => ({ p, correct: true, trap: undefined as string | undefined })), ...wrong.map((w) => ({ p: w.p, correct: false, trap: w.trap as string | undefined }))].sort((u, v) => u.p[0] - v.p[0] || u.p[1] - v.p[1]);
+      const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${ptTex(it.p[0], it.p[1])}$`, correct: it.correct, ...(it.trap ? { trap: it.trap } : {}) })));
       const eq = `${a === 1 ? '' : a}x + ${b === 1 ? '' : b}y = ${c}`;
       const why = items
         .map((it) => {
@@ -452,10 +453,10 @@ Every point here is close to the line, so judging by eye is unreliable: compute.
     const nCorrect = rng.int(1, 3);
     const pickIn = rng.sample(both, Math.min(nCorrect, both.length));
     const pickOut = rng.sample(one, 5 - pickIn.length);
-    const items = [...pickIn.map((p) => ({ p, correct: true })), ...pickOut.map((p) => ({ p, correct: false, trap: 'algw-region-one-condition' }))].sort(
+    const items = [...pickIn.map((p) => ({ p, correct: true, trap: undefined as string | undefined })), ...pickOut.map((p) => ({ p, correct: false, trap: 'algw-region-one-condition' as string | undefined }))].sort(
       (u, v) => u.p[0] - v.p[0] || u.p[1] - v.p[1],
     );
-    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${ptTex(it.p[0], it.p[1])}$`, correct: it.correct, ...('trap' in it ? { trap: it.trap } : {}) })));
+    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${ptTex(it.p[0], it.p[1])}$`, correct: it.correct, ...(it.trap ? { trap: it.trap } : {}) })));
     const why = items
       .map((it) => {
         const [x, y] = it.p;
@@ -785,9 +786,7 @@ $${num(r2)}$ is the $x$-coordinate, not the $y$-coordinate.`;
     }
     const dir = rng.sign();
     const fillers = [...extra, correct.add(dir), correct.add(2 * dir), correct.add(3 * dir), correct.sub(dir), correct.sub(2 * dir)];
-    const { choices, answer } = numericChoices(rng, { correct, traps, fillers, format: fmtV });
-    const pool = [correct, ...traps.map((t) => t.value), ...fillers];
-    const values = choices.map((c) => pool.find((v) => fmtV(v) === c.text)!);
+    const { choices, answer, values } = valuedChoices(rng, { correct, traps, fillers, format: fmtV, positive: kind === 'horizontal' });
     return { params: { kind, P, Q, values }, q: { format: 'mcs', stem, choices, answer, explanation } };
   },
   check(q, { kind, P, Q, values }) {

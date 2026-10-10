@@ -8,8 +8,10 @@ import { regionTemplates } from './di-region';
 import { workTemplates } from './di-worktime';
 import { seasonTemplates } from './di-seasons';
 import { singleDITemplates } from './di-single';
+import { decadeTemplates } from './di-decades';
+import { mixedTemplates } from './di-mixed';
 import { probSkills } from './skills';
 import { probTraps } from './traps';
 
 export { probSkills, probTraps };
-export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...singleDITemplates];
+export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates];

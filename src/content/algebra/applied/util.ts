@@ -2,6 +2,8 @@
 // problems, rates, mixtures and interest). Nothing here decides an answer key on its own.
 
 import { Frac, frac, type FracLike } from '../../../engine/frac';
+import { numericChoices, type NumericChoiceOpts } from '../../../engine/build';
+import type { Rng } from '../../../engine/rng';
 import { decimal, num, poly, usd } from '../../../engine/tex';
 import type { Choice, QCChoice, QuestionBody } from '../../../engine/types';
 
@@ -143,6 +145,41 @@ export function choiceValuesMatch(q: QuestionBody, values: Frac[], fmt: (v: Frac
   if (q.choices.length !== values.length) return 'choice count mismatch';
   for (let i = 0; i < values.length; i++) if (q.choices[i].text !== fmt(values[i])) return `choice ${i} text does not match its value`;
   return null;
+}
+
+/**
+ * numericChoices that also returns the exact value behind each displayed choice (so check() can
+ * grade by value). Extra fallback distractors (correct ± k * unit) are appended to the fillers so
+ * the builder never invents values of its own.
+ */
+export function valuedChoices(
+  rng: Rng,
+  opts: NumericChoiceOpts & { unit?: FracLike; positive?: boolean },
+): { choices: Choice[]; answer: number; values: Frac[] } {
+  const correct = F(opts.correct);
+  const unit = F(opts.unit ?? 1);
+  const fallback: Frac[] = [];
+  const okBelow = (v: Frac) => (opts.positive ? v.sign() > 0 : v.sign() >= 0 || correct.sign() < 0);
+  for (let k = 1; k <= 12; k++) {
+    fallback.push(correct.add(unit.mul(k)));
+    if (okBelow(correct.sub(unit.mul(k)))) fallback.push(correct.sub(unit.mul(k)));
+  }
+  // Positive quantities (times, lengths): add fractions of the answer so nothing below needs to be 0.
+  if (opts.positive) for (let j = 9; j >= 1; j--) fallback.push(correct.mul(j).div(10));
+  const fillers = [...(opts.fillers ?? []).map(F), ...fallback];
+  const { choices, answer } = numericChoices(rng, { ...opts, fillers });
+  // The builder may also invent neighbors with its own step (see syntheticStep in engine/build.ts).
+  const a = Math.abs(correct.n);
+  const engineStep = !correct.isInt() ? new Frac(1, correct.d) : a < 20 ? frac(1) : frac(10 ** Math.max(0, Math.floor(Math.log10(a)) - 1));
+  const synthetic: Frac[] = [];
+  for (let k = 1; k <= 60; k++) synthetic.push(correct.add(engineStep.mul(k)), correct.sub(engineStep.mul(k)));
+  const pool = [correct, ...(opts.traps ?? []).map((t) => F(t.value)), ...fillers, ...synthetic];
+  const values = choices.map((c) => {
+    const v = pool.find((x) => opts.format(x) === c.text);
+    if (!v) throw new Error(`valuedChoices: no value for choice ${c.text}`);
+    return v;
+  });
+  return { choices, answer, values };
 }
 
 /** Index of the single choice whose value satisfies `ok`, or an error. */

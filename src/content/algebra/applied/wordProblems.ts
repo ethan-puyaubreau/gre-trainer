@@ -1,9 +1,9 @@
-import { flaggedChoices, numericChoices, qcFromSamples, textChoices } from '../../../engine/build';
+import { flaggedChoices, qcFromSamples, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { add, div, type E, evalE, mul, N, subE, tex, V } from './expr';
-import { choiceValuesMatch, dx, expectMcm, expectMcs, expectNe, expectQc, money, NAMES, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dx, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, money, NAMES, qcEnd, uniqueIndex } from './util';
 
 const cents = (c: number) => money(frac(c, 100));
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
@@ -78,8 +78,8 @@ const setupSolve: Template<SetupParams> = {
     if (kind === 'twice-more') {
       const ctx = rng.pick(PAIR_CONTEXTS);
       const mult = d === 1 ? 2 : rng.pick([2, 3]);
-      const Y = rng.int(12, 60);
       const k = rng.int(3, 15) * (rng.chance(0.7) ? 1 : -1);
+      const Y = rng.int(k < 0 ? 19 : 12, 60); // keeps X well above Y
       const X = mult * Y + k;
       const T = X + Y;
       const ask: 'big' | 'small' = rng.chance(0.6) ? 'big' : 'small';
@@ -337,9 +337,7 @@ const twoTypes: Template<TwoTypesParams> = {
     const traps = [{ value: frac(other), trap: 'algw-answered-other-unknown' }];
     const dir = rng.sign();
     const fillers = [ans + dir, ans + 2 * dir, ans + 3 * dir, ans - dir, ans - 2 * dir].filter((v) => v > 0).map((v) => frac(v));
-    const { choices, answer } = numericChoices(rng, { correct: ans, traps, fillers, format: (v) => `$${num(v)}$` });
-    const pool = [frac(ans), ...traps.map((t) => t.value), ...fillers];
-    const values = choices.map((c) => pool.find((v) => `$${num(v)}$` === c.text)!);
+    const { choices, answer, values } = valuedChoices(rng, { correct: ans, traps, fillers, format: (v) => `$${num(v)}$`, positive: true });
     const lowTotal = lo * T;
     const u = ctx === 'coins' ? ' cents' : ctx === 'tickets' ? ' dollars' : ctx === 'animals' ? ' legs' : ' points';
     return {
@@ -616,8 +614,8 @@ const equivalentExpressions: Template<EquivParams> = {
     const nCorrect = d === 3 ? rng.int(2, 3) : 2;
     const pickC = [correct[0], ...rng.sample(correct.slice(1), nCorrect - 1)];
     const pickW = rng.sample(usable, Math.min(usable.length, 5 - nCorrect));
-    const items = rng.shuffle([...pickC.map((c) => ({ e: c.e, correct: true })), ...pickW.map((w) => ({ e: w.e, correct: false, trap: w.trap }))]);
-    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${tex(it.e)}$`, correct: it.correct, ...('trap' in it ? { trap: it.trap } : {}) })));
+    const items = rng.shuffle([...pickC.map((c) => ({ e: c.e, correct: true, trap: undefined as string | undefined })), ...pickW.map((w) => ({ e: w.e, correct: false, trap: w.trap as string | undefined }))]);
+    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${tex(it.e)}$`, correct: it.correct, ...(it.trap ? { trap: it.trap } : {}) })));
     const fT = num(f);
     const pT = dx(P);
     return {

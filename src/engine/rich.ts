@@ -18,6 +18,8 @@ export function parseInline(s: string): Segment[] {
   let i = 0;
   const flushText = () => {
     if (!text) return;
+    // {,} is the TeX thousands separator (see usd()); outside math it is just a comma.
+    text = text.replace(/\{,\}/g, ',');
     // **bold** support in plain text
     const parts = text.split(/(\*\*[^*]+\*\*)/);
     for (const p of parts) {

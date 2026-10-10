@@ -307,6 +307,14 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Allowed a concentration that a mixture cannot reach',
     fix: 'A mixture of two solutions is a weighted average: strictly between the two concentrations, and closer to the one used in larger amount.',
   },
+  'algw-pure-adds-volume': {
+    label: 'Forgot that the added substance also adds volume',
+    fix: 'Adding $y$ liters of pure substance increases BOTH the amount of substance and the total volume: use $\\frac{\\text{substance} + y}{\\text{volume} + y}$.',
+  },
+  'algw-compounding-frequency': {
+    label: 'Thought the compounding frequency does not matter',
+    fix: 'More frequent compounding earns interest on interest sooner: 8 percent compounded semiannually gives $1.04^2 = 1.0816$, more than $1.08$.',
+  },
   'algw-simple-for-compound': {
     label: 'Used simple interest for compound interest',
     fix: 'With compound interest the interest also earns interest: the value is $P(1 + r)^n$, which is more than $P(1 + nr)$ for $n \\ge 2$.',

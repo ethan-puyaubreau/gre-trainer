@@ -1,6 +1,6 @@
 import { flaggedChoices, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
-import { num } from '../../../engine/tex';
+import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, unitCircle, type ExData } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
@@ -196,6 +196,9 @@ $$\\pi(${R})^2 - \\pi(${r})^2 = ${num(R * R)}\\pi - ${num(r * r)}\\pi = ${correc
 
 The ring is not $\\pi(${R} - ${r})^2 = ${Ex.pi(w * w).tex()}$: subtract the areas, not the radii.`;
     }
+    // scaled copies of the answer give plausible-looking values on both sides of it
+    const whole = (v: Ex) => v.data().every(([, den]) => den === 1);
+    fillers.push(...[correct.scale(new Frac(1, 2)), correct.scale(new Frac(3, 2)), correct.scale(2), correct.scale(3)].filter(whole));
     const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.03 });
     return {
       params: { mode, s, r, values },
@@ -258,7 +261,7 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
     info: (r) => `A circle of radius ${r} is inscribed in a square.`,
     region: 'square',
     inner: 'circle',
-    outerName: 'the four corner regions',
+    outerName: 'the four corner regions have',
     innerArea: (r) => Ex.pi(r * r),
     outerArea: (r) => Ex.of(4 * r * r).sub(Ex.pi(r * r)),
   },
@@ -266,7 +269,7 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
     info: (r) => `A square is inscribed in a circle of radius ${r}.`,
     region: 'circle',
     inner: 'square',
-    outerName: 'the four regions between the square and the circle',
+    outerName: 'the four regions between the square and the circle have',
     innerArea: (r) => Ex.of(2 * r * r),
     outerArea: (r) => Ex.pi(r * r).sub(2 * r * r),
   },
@@ -274,7 +277,7 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
     info: (r) => `The figure shows a square with sides of length ${r} and a quarter circle of radius ${r} centered at a vertex of the square.`,
     region: 'square',
     inner: 'quarter circle',
-    outerName: 'the region outside the quarter circle',
+    outerName: 'the region outside the quarter circle has',
     innerArea: (r) => Ex.pi(new Frac(r * r, 4)),
     outerArea: (r) => Ex.of(r * r).sub(Ex.pi(new Frac(r * r, 4))),
   },
@@ -282,7 +285,7 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
     info: (r) => `The figure shows a rectangle of length ${2 * r} and width ${r} and a semicircle whose diameter is a longer side of the rectangle.`,
     region: 'rectangle',
     inner: 'semicircle',
-    outerName: 'the two corner regions',
+    outerName: 'the two corner regions have',
     innerArea: (r) => Ex.pi(new Frac(r * r, 2)),
     outerArea: (r) => Ex.of(2 * r * r).sub(Ex.pi(new Frac(r * r, 2))),
   },
@@ -290,7 +293,7 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
     info: (r) => `The two circles have the same center. The smaller circle has radius ${r}, and the larger circle has radius $${r}\\sqrt{2}$.`,
     region: 'larger circle',
     inner: 'smaller circle',
-    outerName: 'the ring between the circles',
+    outerName: 'the ring between the circles has',
     innerArea: (r) => Ex.pi(r * r),
     outerArea: (r) => Ex.pi(r * r),
   },
@@ -408,7 +411,7 @@ The position of $P$ does not matter, so the answer is not D.`,
 The two regions have the same area. (C)
 
 The ring looks thin because $${r}\\sqrt{2} - ${r}$ is small, but areas grow with the square of the radius: $\\pi(${r}\\sqrt{2} - ${r})^2$ is not the ring's area.`
-              : `The ${t.inner} has area $${innerA.tex()}$; ${t.outerName} have area $${outerA.tex()}$ in all.
+              : `The ${t.inner} has area $${innerA.tex()}$; ${t.outerName} area $${outerA.tex()}$ in all.
 
 Shaded: $${approx(qa)}$. Unshaded: $${approx(qb)}$. ${relText(answer)[0].toUpperCase() + relText(answer).slice(1)}. (${answer})`,
         },
@@ -784,8 +787,8 @@ Unlike a corner cut, a notch in the middle of a side adds its two walls to the p
 Area $= ${W * H} - ${w * h} = ${W * H - w * h}$.`;
       }
     } else if (mode === 'frame') {
-      W = rng.int(4, 12);
-      H = rng.int(3, 10);
+      W = rng.int(5, 12);
+      H = rng.int(3, W - 1);
       w = rng.pick([1, 2, 3]);
       ask = 'area';
       const area = (W + 2 * w) * (H + 2 * w) - W * H;
@@ -847,7 +850,7 @@ Adding the width only once per dimension (${W + w} by ${H + w}) is the classic s
 Perimeter $= ${2 * W} + ${H}\\pi \\approx ${val.toFixed(2)}$, which rounds to ${answer.n}.`
             : `The two semicircles form one circle of radius ${rr}: area $${num(rr * rr)}\\pi$. The rectangle has area $${W} \\cdot ${H} = ${num(W * H)}$.
 
-Area $= ${num(W * H)} + ${num(rr * rr)}\\pi \\approx ${val.toFixed(2)}$, which rounds to ${num(answer.n)}.`;
+Area $= ${num(W * H)} + ${num(rr * rr)}\\pi \\approx ${val.toFixed(2)}$, which rounds to ${plain(answer.n)}.`;
       } else {
         fig.polyXY(combinedOutline({ mode, ask, W, H, w, h }, 5).outline);
         fig.pt('A', [0, 0]).pt('B', [W, 0]).pt('C', [W, H]).pt('D', [0, H]).hide('A', 'B', 'C', 'D');

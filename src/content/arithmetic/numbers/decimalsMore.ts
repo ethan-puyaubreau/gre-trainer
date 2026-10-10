@@ -203,12 +203,18 @@ const percentPowerTen: Template<PTParams> = {
     const c = 2 - lg;
     const forgot100 = -lg; // treated q% as q
     const reversed = -c;
-    const extras = rng.shuffle([c + 1, c - 1, c + 2, c - 2, c + 3, c - 3]);
-    const distract = [reversed, ...(rng.chance(0.7) ? [forgot100] : []), ...extras, forgot100].filter((v, i, arr) => v !== c && arr.indexOf(v) === i);
     const mult = 10 ** Math.abs(c === 0 ? 2 : c);
-    const withMult = rng.chance(0.5);
-    const numeric = [c, ...distract.slice(0, withMult ? 3 : 4)].sort((a, b) => a - b);
-    const final: (number | null)[] = [...numeric, ...(withMult ? [null] : [])];
+    const withMult = rng.chance(0.4);
+    const nNum = withMult ? 4 : 5;
+    // required distractors, then neighbors chosen so that c lands at a random rank among the numeric choices
+    const required = [reversed, ...(rng.chance(0.7) ? [forgot100] : [])].filter((v, i, arr) => v !== c && arr.indexOf(v) === i);
+    const nb = required.filter((v) => v < c).length;
+    const na = required.length - nb;
+    const rank = rng.int(nb, nNum - 1 - na);
+    const below = rng.shuffle([c - 1, c - 2, c - 3, c - 4, c - 5].filter((v) => !required.includes(v))).slice(0, rank - nb);
+    const above = rng.shuffle([c + 1, c + 2, c + 3, c + 4, c + 5].filter((v) => !required.includes(v))).slice(0, nNum - 1 - na - rank);
+    const numeric = [c, ...required, ...below, ...above].sort((a, b) => a - b);
+    const final: (number | null)[] = withMult ? (rng.chance(0.5) ? [null, ...numeric] : [...numeric, null]) : numeric;
     const relTex = (r: number | null) => (r === null ? `$y = ${num(mult)}x$` : r === 0 ? '$y = x$' : `$y = x ${r > 0 ? '+' : '-'} ${Math.abs(r)}$`);
     const trapOf = (r: number | null) => (r === null ? undefined : r === c ? undefined : r === reversed ? 'num-exponent-sign' : r === forgot100 ? 'num-percent-as-number' : undefined);
     const choices = final.map((r) => ({ text: relTex(r), ...(trapOf(r) ? { trap: trapOf(r)! } : {}) }));

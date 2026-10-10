@@ -1,7 +1,7 @@
 import { flaggedChoices, qcCompare, qcCompareNum, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac, frac, type FracLike } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
-import { lin, num, paren } from '../../../engine/tex';
+import { lin, num, paren, plain } from '../../../engine/tex';
 import type { Choice, MCSQuestion, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, type ExData } from './ex';
 import { Fig, onCircle, type P2 } from './fig';
@@ -128,9 +128,9 @@ Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$: the po
           figure: fig.build(false),
           choices,
           answer,
-          explanation: `A ${name} has ${n} sides, so its interior angles add up to $(${n} - 2) \\cdot 180^\\circ = ${num(S)}^\\circ$. In a regular polygon all ${n} angles are equal: $x = \\frac{${num(S)}}{${n}} = ${num(I)}$.
+          explanation: `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} has ${n} sides, so its interior angles add up to $(${n} - 2) \\cdot 180^\\circ = ${num(S)}^\\circ$. In a regular polygon all ${n} angles are equal: $x = \\frac{${num(S)}}{${n}} = ${num(I)}$.
 
-Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$, so $x = 180 - ${num(360 / n)} = ${num(I)}$. Answering ${num(360 / n)} gives the exterior angle, not the interior one.`,
+Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$, so $x = 180 - ${num(360 / n)} = ${num(I)}$. Answering ${plain(360 / n)} gives the exterior angle, not the interior one.`,
         },
       };
     }
@@ -564,15 +564,15 @@ const fence: Template<FenceParams> = {
         params: { sides: 4, F: P, A, longerAlongWall: false, choices },
         q: {
           format: 'mcm',
-          stem: `A rectangular pen has an area of ${num(A)} square ${unit} and is enclosed by ${num(P)} ${unit} of fencing along its four sides. Which of the following could be the length, in ${unit}, of a side of the pen?`,
+          stem: `A rectangular pen has an area of ${plain(A)} square ${unit} and is enclosed by ${plain(P)} ${unit} of fencing along its four sides. Which of the following could be the length, in ${unit}, of a side of the pen?`,
           instruction: 'Indicate all such lengths.',
           choices: cs,
           answer,
-          explanation: `Let the sides be $x$ and $y$: $2(x + y) = ${P}$ and $xy = ${num(A)}$, so $x + y = ${P / 2}$. Two numbers with sum ${P / 2} and product ${num(A)} are ${sa} and ${sb} (check: $${sa} + ${sb} = ${P / 2}$, $${sa} \\cdot ${sb} = ${num(A)}$).
+          explanation: `Let the sides be $x$ and $y$: $2(x + y) = ${P}$ and $xy = ${num(A)}$, so $x + y = ${P / 2}$. Two numbers with sum ${P / 2} and product ${plain(A)} are ${sa} and ${sb} (check: $${sa} + ${sb} = ${P / 2}$, $${sa} \\cdot ${sb} = ${num(A)}$).
 
 The pen is ${sa} by ${sb}, so the possible side lengths are ${sa} and ${sb}.
 
-Other factors of ${num(A)} give the right area but the wrong amount of fencing: check both conditions.`,
+Other factors of ${plain(A)} give the right area but the wrong amount of fencing: check both conditions.`,
         },
       };
     }
@@ -618,7 +618,7 @@ Other factors of ${num(A)} give the right area but the wrong amount of fencing: 
       params: { sides: 3, F, A, longerAlongWall, choices },
       q: {
         format: 'mcm',
-        stem: `A rectangular ${what} with an area of ${num(A)} square feet is built against a long wall, so that fencing is needed on only three of its sides. A total of ${num(F)} feet of fencing is used.${longerAlongWall ? ' The side along the wall is longer than each of the other sides.' : ''} Which of the following could be the length, in feet, of a side of the ${what}?`,
+        stem: `A rectangular ${what} with an area of ${plain(A)} square feet is built against a long wall, so that fencing is needed on only three of its sides. A total of ${plain(F)} feet of fencing is used.${longerAlongWall ? ' The side along the wall is longer than each of the other sides.' : ''} Which of the following could be the length, in feet, of a side of the ${what}?`,
         instruction: 'Indicate all such lengths.',
         choices: cs,
         answer,
@@ -632,7 +632,7 @@ So the possible side lengths are ${[...sides]
           .sort((u, v) => u - v)
           .join(', ')}.
 
-A factor of ${num(A)} gives the right area but not necessarily ${F} feet of fencing, and the fence does not cover all four sides.`,
+A factor of ${plain(A)} gives the right area but not necessarily ${F} feet of fencing, and the fence does not cover all four sides.`,
       },
     };
   },
@@ -726,7 +726,7 @@ const compareQC: Template<CompareParams> = {
           traps,
           explanation: `The diagonals of a square bisect each other, so the vertex opposite $${pt(a)}$ is $${pt(2 * b - a)}$. Both points lie on the line $y = x$, so this diagonal is at $45^\\circ$ and the sides of $S$ are horizontal and vertical: the other two vertices are $(${num(a)}, ${num(2 * b - a)})$ and $(${num(2 * b - a)}, ${num(a)})$.
 
-Each side has length $|${num(2 * b - a)} - ${paren(a)}| = ${2 * Math.abs(b - a)}$, so the area is $${2 * Math.abs(b - a)}^2 = ${area}$. Compare with ${num(k)}: ${relText(answer)}. (${answer})
+Each side has length $|${num(2 * b - a)} - ${paren(a)}| = ${2 * Math.abs(b - a)}$, so the area is $${2 * Math.abs(b - a)}^2 = ${area}$. Compare with ${plain(k)}: ${relText(answer)}. (${answer})
 
 The distance from a vertex to the center is half a diagonal, not a side; squaring it gives ${2 * t}, and squaring the full diagonal gives ${8 * t}.`,
         },
@@ -836,7 +836,7 @@ Using the slanted side ${a} as the height gives ${legArea.isInt() ? legArea.n : 
           traps: trapId && trapAns !== answer ? { [trapAns]: trapId } : undefined,
           explanation: `The area of a parallelogram is base × height, and the height is the perpendicular (dashed) segment: $${b} \\cdot ${hgt} = ${area}$.
 
-Compare with ${num(k)}: ${relText(answer)}. (${answer})
+Compare with ${plain(k)}: ${relText(answer)}. (${answer})
 
 Multiplying the two sides, $${b} \\cdot ${a} = ${a * b}$, uses the slanted side as if it were the height; the slanted side is always longer than the height.`,
         },
@@ -984,6 +984,7 @@ const perimeterFraction: Template<FractionParams> = {
     const AR = L * W;
     const AS = s * s;
     const t = (f: Frac) => f.toTex();
+    const fracEq = (n: number, dd: number) => (new Frac(n, dd).n === n ? `\\frac{${n}}{${dd}}` : `\\frac{${n}}{${dd}} = ${t(new Frac(n, dd))}`);
     // figure: R and S side by side
     fig.pt('R1', [0, 0]).pt('R2', [L, 0]).pt('R3', [L, W]).pt('R4', [0, W]);
     const gap = Math.max(2, L * 0.25);
@@ -997,7 +998,7 @@ const perimeterFraction: Template<FractionParams> = {
       stem = `Rectangle $R$ has length ${L} and width ${W}, and square $S$ has sides of length ${s}. The perimeter of $S$ is what fraction of the perimeter of $R$?`;
       explanation = `Perimeter of $S$: $4 \\cdot ${s} = ${PS}$. Perimeter of $R$: $2(${L} + ${W}) = ${PR}$.
 
-The fraction is $\\frac{${PS}}{${PR}} = ${t(answer!)}$ (any equivalent fraction is accepted).
+The fraction is $${fracEq(PS, PR)}$ (any equivalent fraction is accepted).
 
 "$S$ is what fraction of $R$" puts $S$ on top. Using $2 \\cdot ${L} + ${W}$ counts only three sides, and the ratio of the AREAS is a different question.`;
     } else if (mode === 'area') {
@@ -1005,21 +1006,21 @@ The fraction is $\\frac{${PS}}{${PR}} = ${t(answer!)}$ (any equivalent fraction 
       stem = `Rectangle $R$ has length ${L} and width ${W}, and square $S$ has sides of length ${s}. The area of $${top}$ is what fraction of the area of $${bottom}$?`;
       explanation = `Area of $R$: $${L} \\cdot ${W} = ${AR}$. Area of $S$: $${s}^2 = ${AS}$.
 
-The fraction is $\\frac{${inverse ? AR : AS}}{${inverse ? AS : AR}} = ${t(answer!)}$.
+The fraction is $${fracEq(inverse ? AR : AS, inverse ? AS : AR)}$.
 
 The quantity after "of" goes in the denominator; the perimeters give a different fraction.`;
     } else if (mode === 'same-perimeter') {
       stem = `Rectangle $R$ has length ${L} and width ${W}. Square $S$ has the same perimeter as $R$. The area of $R$ is what fraction of the area of $S$?`;
       explanation = `The perimeter of $R$ is $2(${L} + ${W}) = ${PR}$, so each side of $S$ is $\\frac{${PR}}{4} = ${s}$ and the area of $S$ is $${AS}$.
 
-The area of $R$ is $${L} \\cdot ${W} = ${AR}$, so the fraction is $\\frac{${AR}}{${AS}} = ${t(answer!)}$.
+The area of $R$ is $${L} \\cdot ${W} = ${AR}$, so the fraction is $${fracEq(AR, AS)}$.
 
 Equal perimeters do not mean equal areas: among rectangles with a given perimeter, the square has the largest area.`;
     } else {
       stem = `Rectangle $R$ has length ${L} and width ${W}. Square $S$ has the same area as $R$. The perimeter of $S$ is what fraction of the perimeter of $R$?`;
       explanation = `The area of $R$ is $${L} \\cdot ${W} = ${AR}$, so each side of $S$ is $\\sqrt{${AR}} = ${s}$ and the perimeter of $S$ is $${PS}$.
 
-The perimeter of $R$ is $2(${L} + ${W}) = ${PR}$, so the fraction is $\\frac{${PS}}{${PR}} = ${t(answer!)}$.
+The perimeter of $R$ is $2(${L} + ${W}) = ${PR}$, so the fraction is $${fracEq(PS, PR)}$.
 
 Equal areas do not mean equal perimeters: for a given area, the square has the smallest perimeter.`;
     }

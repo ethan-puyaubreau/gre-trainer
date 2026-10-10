@@ -1,6 +1,5 @@
 // Small formatting / choice helpers shared by the shapes templates.
 
-import { numericChoices } from '../../../engine/build';
 import { Frac, type FracLike } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { squareOut } from '../../../engine/math';
@@ -63,24 +62,73 @@ export function surdTex(s: Surd): string {
   return `${sign}\\frac{${an === 1 ? '' : num(an)}${root}}{${num(d)}}`;
 }
 
-/** Five (or `count`) surd choices: correct + traps + fillers, unique by value, ascending. */
+/**
+ * Pick `count` choices (correct + traps + fillers) so that the correct one can land in any position:
+ * the number of fillers below / above the correct value is drawn at random among the feasible splits.
+ * Candidates are used in the order given (put the most plausible first). Sorted ascending by value.
+ */
+export function positioned<T>(
+  rng: Rng,
+  correct: T,
+  traps: { v: T; trap?: string }[],
+  cands: T[],
+  val: (t: T) => number,
+  count = 5,
+): { v: T; trap?: string; ok?: boolean }[] {
+  const same = (a: T, b: T) => Math.abs(val(a) - val(b)) < 1e-9;
+  const good = (t: T) => Number.isFinite(val(t)) && val(t) > 0;
+  const c0 = val(correct);
+  const uniqTraps: { v: T; trap?: string }[] = [];
+  for (const t of traps) if (good(t.v) && !same(t.v, correct) && !uniqTraps.some((u) => same(u.v, t.v))) uniqTraps.push(t);
+  const pool: T[] = [];
+  for (const c of cands) if (good(c) && !same(c, correct) && !uniqTraps.some((u) => same(u.v, c)) && !pool.some((x) => same(x, c))) pool.push(c);
+  const below = pool.filter((c) => val(c) < c0);
+  const above = pool.filter((c) => val(c) > c0);
+  // Choose the target position first, keep the traps that fit on each side, then fill.
+  const order = rng.shuffle([0, 1, 2, 3, 4].filter((k) => k < count));
+  let best: { v: T; trap?: string; ok?: boolean }[] | null = null;
+  for (const K of order) {
+    const items: { v: T; trap?: string; ok?: boolean }[] = [{ v: correct, ok: true }];
+    let nb = 0;
+    let na = 0;
+    for (const t of uniqTraps) {
+      if (items.length >= count) break;
+      if (val(t.v) < c0 && nb < K) {
+        items.push(t);
+        nb++;
+      } else if (val(t.v) > c0 && na < count - 1 - K) {
+        items.push(t);
+        na++;
+      }
+    }
+    const needB = K - nb;
+    const needA = count - 1 - K - na;
+    if (needB > below.length || needA > above.length) continue;
+    for (const c of below.slice(0, needB)) items.push({ v: c });
+    for (const c of above.slice(0, needA)) items.push({ v: c });
+    const kept = items.filter((it) => it.trap).length;
+    if (kept === 0 && uniqTraps.length > 0) {
+      best = best ?? items;
+      continue;
+    }
+    return items.sort((a, b) => val(a.v) - val(b.v));
+  }
+  if (best) return best.sort((a, b) => val(a.v) - val(b.v));
+  throw new Error('positioned: not enough candidate choices');
+}
+
+/** Five (or `count`) surd choices: correct + traps + fillers, unique by value, ascending, correct at a random position. */
 export function surdChoices(
+  rng: Rng,
   correct: Surd,
   traps: { v: Surd; trap?: string }[],
   fillers: Surd[],
   count = 5,
 ): { choices: Choice[]; answer: number; values: Surd[] } {
-  const items: { v: Surd; trap?: string; ok?: boolean }[] = [{ v: correct, ok: true }];
-  const has = (v: Surd) => items.some((it) => Math.abs(surdVal(it.v) - surdVal(v)) < 1e-9);
-  for (const t of traps) if (items.length < count && surdVal(t.v) > 0 && !has(t.v)) items.push(t);
-  for (const f of fillers) if (items.length < count && surdVal(f) > 0 && !has(f)) items.push({ v: f });
-  let m = 2;
-  while (items.length < count) {
-    const f = surd(correct.c.mul(m), correct.r);
-    if (!has(f)) items.push({ v: f });
-    m++;
-  }
-  items.sort((a, b) => surdVal(a.v) - surdVal(b.v));
+  const auto: Surd[] = [];
+  for (const f of [new Frac(1, 2), new Frac(3, 4), new Frac(2, 3), new Frac(1, 3), new Frac(1, 4)]) auto.push(surd(correct.c.mul(f), correct.r));
+  for (const f of [2, new Frac(3, 2), 3, new Frac(4, 3), 4]) auto.push(surd(correct.c.mul(f), correct.r));
+  const items = positioned(rng, correct, traps, [...fillers, ...auto], surdVal, count);
   return {
     choices: items.map((it) => ({ text: `$${surdTex(it.v)}$`, ...(it.trap ? { trap: it.trap } : {}) })),
     answer: items.findIndex((it) => it.ok),
@@ -115,18 +163,34 @@ export function isNiceDecimal(f: Frac, maxPlaces = 2): boolean {
   return dot < 0 || s.length - dot - 1 <= maxPlaces;
 }
 
-/** Positive integer (or terminating decimal) choices, ascending, with their numeric values for check(). */
-export function intChoices(rng: Rng, correct: number, traps: { value: number; trap: string }[], fillers: number[], fmt: (v: Frac) => string = (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`) {
-  const toF = (v: number) => (Number.isInteger(v) ? Frac.of(v) : new Frac(Math.round(v * 100), 100));
+/** Positive integer (or 2-decimal) choices, ascending, correct at a random position, with numeric values for check(). */
+export function intChoices(
+  rng: Rng,
+  correct: number,
+  traps: { value: number | Frac; trap: string }[],
+  fillers: (number | Frac)[],
+  fmt: (v: Frac) => string = (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`,
+) {
+  const toN = (v: number | Frac) => (v instanceof Frac ? v.toNumber() : v);
   const ok = (v: number) => Number.isFinite(v) && v > 0 && Math.abs(v * 100 - Math.round(v * 100)) < 1e-9;
-  const okTraps = traps.filter((t) => ok(t.value) && Math.abs(t.value - correct) > 1e-9).map((t) => ({ value: toF(t.value), trap: t.trap }));
-  const { choices, answer } = numericChoices(rng, {
-    correct: toF(correct),
-    traps: okTraps,
-    fillers: fillers.filter(ok).map(toF),
-    format: fmt,
-  });
-  return { choices, answer, values: choices.map((c) => Number(c.text.replace(/[^0-9.]/g, ''))) };
+  const toF = (v: number) => (Number.isInteger(v) ? Frac.of(v) : new Frac(Math.round(v * 100), 100));
+  const step = correct >= 50 ? 10 : correct >= 15 ? 5 : correct >= 4 ? 2 : 1;
+  const auto: number[] = [];
+  for (let i = 1; i <= 6; i++) auto.push(correct - i * step, correct + i * step);
+  const items = positioned(
+    rng,
+    correct,
+    traps.map((t) => ({ v: toN(t.value), trap: t.trap })).filter((t) => ok(t.v)),
+    [...fillers.map(toN), ...auto].filter(ok),
+    (v) => v,
+  );
+  const texts = items.map((it) => fmt(toF(it.v)));
+  if (new Set(texts).size !== texts.length) throw new Error(`intChoices: duplicate display ${texts.join(' | ')}`);
+  return {
+    choices: items.map((it, i) => ({ text: texts[i], ...(it.trap ? { trap: it.trap } : {}) })),
+    answer: items.findIndex((it) => it.ok),
+    values: items.map((it) => it.v),
+  };
 }
 
 /** Substitution shown in an explanation: evalTex(3, 10, 25) -> "3(25) + 10". */

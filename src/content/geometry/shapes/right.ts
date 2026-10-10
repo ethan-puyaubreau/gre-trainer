@@ -1,9 +1,9 @@
-import { numericChoices, qcFromSamples } from '../../../engine/build';
+import { qcFromSamples } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { decimal, num } from '../../../engine/tex';
 import type { QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, add, bisect, dir, dist, mul, shoelace, sub, unit, type Pt } from './fig';
-import { checkMcs, qcTraps, QC_SAY, surd, surdChoices, surdDiv, surdMul, surdTex, surdVal, type Surd } from './util';
+import { checkMcs, intChoices, qcTraps, QC_SAY, surd, surdChoices, surdDiv, surdMul, surdTex, surdVal, type Surd } from './util';
 
 const SKILL = 'geo.right-triangles';
 
@@ -216,7 +216,7 @@ const special: Template<SpecialParams> = {
         ...(ask === 'area' ? [{ v: surdMul(via(ratio, 'short'), via(ratio, 'long')), trap: 'geo-tri-no-half' }] : []),
       ];
       const fillers = [surdMul(correct, TWO), surdMul(correct, surd(new Frac(1, 2))), surd(correct.c, 1), surdMul(correct, R3)];
-      const { choices, answer, values } = surdChoices(correct, traps, fillers);
+      const { choices, answer, values } = surdChoices(rng, correct, traps, fillers);
       // figure: angle 30 at A, right angle at C, 60 at B. short = BC, long = AC, hyp = AB
       const mirror = rng.chance(0.5);
       const L = 4;
@@ -284,7 +284,7 @@ Mixing up which side gets the $\\sqrt{3}$ and which gets the $2$ (or using the $
           { v: surdMul(g2, surd(new Frac(1, 4))), trap: 'geo-rt-add-legs' },
         ];
       }
-      const { choices, answer, values } = surdChoices(correct, traps, [surdMul(correct, TWO), surdMul(correct, R2), surd(correct.c.add(1), correct.r)]);
+      const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surdMul(correct, R2), surd(correct.c.add(1), correct.r)]);
       const fb = new FigBuilder().pt('A', [0, 3]).pt('B', [3, 3]).pt('C', [3, 0]).pt('D', [0, 0]).poly('A', 'B', 'C', 'D').seg('A', 'C');
       fb.right('A', 'D', 'C');
       if (mode === 'side-to-diag') fb.side('D', 'C', 'A', `$${surdTex(given)}$`);
@@ -344,7 +344,7 @@ Squaring the diagonal gives twice the area, not the area.`;
         { v: surdMul(s2, half), trap: 'geo-tri-slant-height' },
       ];
     }
-    const { choices, answer, values } = surdChoices(correct, traps, [surdMul(correct, TWO), surd(correct.c, 1), surdMul(correct, half)]);
+    const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surd(correct.c, 1), surdMul(correct, half)]);
     const fb = new FigBuilder().pt('P', [2, 2 * Math.sqrt(3)]).pt('Q', [0, 0]).pt('R', [4, 0]).pt('S', [2, 0], [0, -1]).poly('P', 'Q', 'R');
     fb.seg('P', 'S', undefined, true).right('P', 'S', 'R');
     if (mode === 'alt-to-side') fb.text([2.42 + 0.12 * surdTex(given).length / 4, 1.25], `$${surdTex(given)}$`);
@@ -679,16 +679,15 @@ const twoStep: Template<TwoParams> = {
       const n = rng.int(6, 40);
       const L = n * P;
       const unit = rng.pick(['inches', 'centimeters']);
-      const { choices, answer } = numericChoices(rng, {
-        correct: n,
-        traps: [
+      const { choices, answer, values } = intChoices(
+        rng,
+        n,
+        [
           { value: Math.floor(L / (a + b)), trap: 'geo-rt-forgot-hyp' },
           { value: Math.floor(L / ((a * b) / 2)), trap: 'geo-rt-used-area' },
         ],
-        fillers: [Math.floor(L / (a + b + c + 1)), n + 2, n - 2, Math.floor(L / (2 * (a + b)))],
-        format: (v) => `$${num(v)}$`,
-      });
-      const values = choices.map((ch) => Number(ch.text.replace(/[^0-9]/g, '')));
+        [Math.floor(L / (a + b + c + 1)), Math.floor(L / (2 * (a + b))), n + 2, n - 2, n + 4, n - 4],
+      );
       const fb = new FigBuilder();
       const s = 4 / Math.max(a, b);
       const p0 = fb.helper([0, 0]);
@@ -730,7 +729,7 @@ Leaving out the hypotenuse ($${a} + ${b} = ${a + b}$ per triangle) or dividing b
         { v: surd(1, sq), trap: 'geo-rt-ratio-no-k' },
         { v: surd((a + b) * k, 1), trap: 'geo-rt-add-legs' },
       ];
-      const { choices, answer, values } = surdChoices(correct, traps, [surd(2 * k, sq), surd(a * b * k, 1), surd(k * k, sq)]);
+      const { choices, answer, values } = surdChoices(rng, correct, traps, [surd(2 * k, sq), surd(a * b * k, 1), surd(k * k, sq)]);
       return {
         params: { kind, a, b, K, values: values.map(surdVal) },
         q: {
@@ -763,7 +762,7 @@ $${surdTex(surd(1, sq))}$ is the hypotenuse for legs of exactly $${a}$ and $${b}
         { v: surd(h + DC, 1), trap: 'geo-rt-add-legs' },
         { v: surd(1, AB * AB + DC * DC), trap: 'geo-rt-wrong-triangle' },
       ];
-      const { choices, answer, values } = surdChoices(correct, traps, [surd(1, N + 9), surd(1, Math.max(2, N - 7))]);
+      const { choices, answer, values } = surdChoices(rng, correct, traps, [N - 7, N + 9, N - 3, N + 5, N - 12, N + 16].filter((x) => x > 1).map((x) => surd(1, x)));
       const s = 4.6 / (p + DC);
       const fb = new FigBuilder().pt('A', [p * s, h * s]).pt('B', [0, 0]).pt('C', [(p + DC) * s, 0]).pt('D', [p * s, 0], [-0.6, -1]).poly('A', 'B', 'C');
       fb.seg('A', 'D', undefined, true).right('A', 'D', 'C');
@@ -795,7 +794,7 @@ $AB$ is the hypotenuse of the first triangle, so subtract its square; $AC$ is th
       { v: surd(1, Math.abs(zz * zz - x * x - y * y)), trap: 'geo-rt-leg-as-hyp' },
       { v: surd(1, x * x + zz * zz), trap: 'geo-rt-wrong-triangle' },
     ];
-    const { choices, answer, values } = surdChoices(correct, traps, [surd(w + 1, 1), surd(1, N + 4)]);
+    const { choices, answer, values } = surdChoices(rng, correct, traps, [surd(w + 1, 1), surd(1, N + 4), surd(w - 1, 1), surd(1, N - 5), surd(1, N + 12), surd(1, N - 10)]);
     const s = 0.55;
     const B: Pt = [0, 0];
     const A: Pt = [0, x * s * 1.2 + 0.6];
