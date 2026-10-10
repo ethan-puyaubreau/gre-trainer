@@ -821,7 +821,6 @@ ${stmts.map((s) => `- ${text(s).t.replace(/\.$/, '')}: ${why[s.key]} ${s.truth ?
       const AB = AD + DB;
       const AE = dist(g.A, g.E);
       const EC = dist(g.E, g.C);
-      const AC = dist(g.A, g.C);
       const per = (X: Pt[]) => dist(X[0], X[1]) + dist(X[1], X[2]) + dist(X[2], X[0]);
       const ar = shoelace([g.A, g.D, g.E]) / shoelace([g.A, g.B, g.C]);
       const pr = per([g.A, g.D, g.E]) / per([g.A, g.B, g.C]);

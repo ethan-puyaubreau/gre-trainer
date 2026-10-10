@@ -523,7 +523,8 @@ const solidQC: Template<SolidQCParams> = {
       const fig = new Fig();
       drawCylinder(fig, a / 2, b / 2, { r: `$${a}$`, h: `$${b}$` }, { origin: [0, 0] });
       drawCylinder(fig, b / 2, a / 2, { r: `$${b}$`, h: `$${a}$` }, { origin: [a / 2 + b / 2 + 1.5, 0] });
-      fig.label([0, -1], '$P$').label([a / 2 + b / 2 + 1.5, -1], '$Q$');
+      const yl = -(0.16 * Math.max(a, b) + 1);
+      fig.label([0, yl], '$P$').label([a / 2 + b / 2 + 1.5, yl], '$Q$');
       return {
         params: { ...base, mode, a, b },
         q: {

@@ -504,7 +504,7 @@ const meetCatch: Template<MeetParams> = {
           t0 + delay,
           'short',
         )} and drives along the same highway in the same direction at a constant speed of ${v} miles per hour. At what time does ${n2} catch up with ${n1}?`;
-        explanation = `When ${n2} leaves, ${n1} has a head start of $${u} \\times ${dx(frac(delay, 60))} = ${num(gap)}$ miles. Moving in the same direction, ${n2} closes that gap at $${v} - ${u} = ${v - u}$ miles per hour, so it takes $\\frac{${num(gap)}}{${v - u}} = ${hrs(hours)}$ hours (${mins.toNumber()} minutes) after ${clock(t0 + delay, 'short')}: ${clock(meet, 'short')}.
+        explanation = `When ${n2} leaves, ${n1} has a head start of $${u} \\times ${dx(frac(delay, 60))} = ${hrs(gap)}$ miles. Moving in the same direction, ${n2} closes that gap at $${v} - ${u} = ${v - u}$ miles per hour, so it takes $\\frac{${hrs(gap)}}{${v - u}} = ${hrs(hours)}$ hours (${mins.toNumber()} minutes) after ${clock(t0 + delay, 'short')}: ${clock(meet, 'short')}.
 
 Adding the speeds would be right only if they drove toward each other, and the catch-up time is counted from ${n2}'s departure, not from ${n1}'s.`;
       } else {
@@ -525,7 +525,7 @@ Adding the speeds would be right only if they drove toward each other, and the c
           t0 + delay,
           'short',
         )}, ${n2} leaves Q and drives toward P on the same road at a constant speed of ${v} miles per hour. At what time do they meet?`;
-        explanation = `By ${clock(t0 + delay, 'short')}, ${n1} has driven $${u} \\times ${dx(frac(delay, 60))} = ${num(frac(u * delay, 60))}$ miles, so ${num(frac(D * 60 - u * delay, 60))} miles separate them. From then on they approach each other at $${u} + ${v} = ${u + v}$ miles per hour, meeting $\\frac{${num(frac(D * 60 - u * delay, 60))}}{${u + v}} = ${hrs(hoursAfter)}$ hours later: ${clock(meet, 'short')}.
+        explanation = `By ${clock(t0 + delay, 'short')}, ${n1} has driven $${u} \\times ${dx(frac(delay, 60))} = ${hrs(frac(u * delay, 60))}$ miles, so $${hrs(frac(D * 60 - u * delay, 60))}$ miles separate them. From then on they approach each other at $${u} + ${v} = ${u + v}$ miles per hour, meeting $\\frac{${hrs(frac(D * 60 - u * delay, 60))}}{${u + v}} = ${hrs(hoursAfter)}$ hours later: ${clock(meet, 'short')}.
 
 Ignoring ${n1}'s head start, or adding the travel time to ${clock(t0, 'short')} instead of ${clock(t0 + delay, 'short')}, gives the wrong time.`;
       }

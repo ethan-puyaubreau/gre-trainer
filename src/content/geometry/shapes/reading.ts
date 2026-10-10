@@ -375,7 +375,7 @@ So ${QC_SAY[answer]}. (${answer}) The ray only looks perpendicular; the equation
         traps: qcTraps(answer, cmp === 'x-y' ? { C: 'geo-fig-looks-equal' } : { D: 'geo-fig-gave-up' }),
         explanation:
           cmp === 'x-y'
-            ? `The angle sum gives only $x + y = 180 - ${z} = ${180 - z}$. The split is not fixed: $x = ${half - 10}$, $y = ${half + 10}$ works, and so does the reverse. The figure only makes them look equal. (D)`
+            ? `The angle sum gives only $x + y = 180 - ${z} = ${180 - z}$. The split is not fixed: $x = ${Math.round(half) - 10}$, $y = ${180 - z - Math.round(half) + 10}$ works, and so does the reverse. The figure only makes them look equal. (D)`
             : `The angles of a triangle add up to $180^\\circ$, so $x + y = 180 - ${z} = ${180 - z}$, whatever the individual values. Compared with $${N}$: ${QC_SAY[answer]}. (${answer})`,
       },
     };
