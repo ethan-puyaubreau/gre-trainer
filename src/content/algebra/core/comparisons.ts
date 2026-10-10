@@ -3,7 +3,7 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { lin, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { SPECIAL, intExcept, qcEnd, qcSamples, randomReals } from './util';
+import { SPECIAL, intExcept, qcEnd, qcSamples, randomReals, times } from './util';
 
 /* ================================================================== 1. Linear comparison under a one-sided condition (QC) */
 
@@ -453,9 +453,9 @@ The sign depends only on the denominator. ${
         traps.C = 'alg-same-numbers-equal';
         traps.D = 'alg-qc-variable-d';
       } else traps.D = 'alg-qc-variable-d';
-      explanation = `Expand both: Quantity A is $xy + ${b}x + ${a}y + ${a * b}$ and Quantity B is $xy + ${a}x + ${b}y + ${a * b}$. Subtract the common terms $xy$ and $${a * b}$: compare $${b}x + ${a}y$ with $${a}x + ${b}y$, that is, $${lin([[a - b, 'y']])}$ with $${lin([[a - b, 'x']])}$.
+      explanation = `Expand both: Quantity A is $${lin([[1, 'xy'], [b, 'x'], [a, 'y'], [a * b, '']])}$ and Quantity B is $${lin([[1, 'xy'], [a, 'x'], [b, 'y'], [a * b, '']])}$. Subtract the common terms $xy$ and $${a * b}$: compare $${lin([[b, 'x'], [a, 'y']])}$ with $${lin([[a, 'x'], [b, 'y']])}$, that is, $${lin([[a - b, 'y']])}$ with $${lin([[a - b, 'x']])}$.
 
-So Quantity A minus Quantity B is $${a - b > 0 ? a - b : `-${b - a}`}(y - x)$. ${
+So Quantity A minus Quantity B is $${times(a - b, 'y - x')}$. ${
         sgnYX === null
           ? 'Nothing tells whether $y$ is greater than $x$: with $x = y$ the quantities are equal, and otherwise they differ.'
           : sgnYX === 0

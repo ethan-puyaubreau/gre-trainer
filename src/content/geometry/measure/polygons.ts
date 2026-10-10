@@ -210,7 +210,7 @@ function numChoices(
     Ex.of(o.correct),
     (o.traps ?? []).map((t) => ({ v: Ex.of(t.value), trap: t.trap })),
     (o.fillers ?? []).map((f) => Ex.of(f)),
-    { step: Ex.of(o.step), fmt: (v) => o.format(v.rational()!) },
+    { step: Ex.of(o.step), fmt: (v) => o.format(v.rational()!), scales: false },
   );
   return { choices: r.choices, answer: r.answer };
 }

@@ -1,4 +1,4 @@
-import { qcCompare, qcFromSamples, QC_TEXT } from '../../../engine/build';
+import { qcCompare, qcFromSamples, QC_TEXT, valuedChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { num, plain } from '../../../engine/tex';
@@ -134,32 +134,26 @@ Ratio of areas: $\\dfrac{\\pi \\left(${frac(p, 2).toTex()}r\\right)^2}{\\pi r^2}
 Using ${p === 1 ? '' : p}$r$ as the radius of $A$ gives ${p * p} to 1: the diameter is twice the radius.`;
     }
     correct = red(correct);
-    const seen = new Set<string>([correct.join(':')]);
-    const items: { r: [number, number]; trap?: string; ok?: boolean }[] = [{ r: correct, ok: true }];
-    for (const w of wrong) {
-      const r = red(w.r);
-      if (seen.has(r.join(':')) || items.length >= 5) continue;
-      seen.add(r.join(':'));
-      items.push({ r, ...(w.trap ? { trap: w.trap } : {}) });
-    }
-    let extra = 2;
-    while (items.length < 5) {
-      const r = red([correct[0] * extra, correct[1]]);
-      extra++;
-      if (seen.has(r.join(':'))) continue;
-      seen.add(r.join(':'));
-      items.push({ r });
-    }
-    items.sort((x, y) => x.r[0] / x.r[1] - y.r[0] / y.r[1]);
+    const txt = (r: [number, number]) => `${plain(r[0])} to ${plain(r[1])}`;
+    const [x0, y0] = correct;
+    const generic: [number, number][] = [
+      [2 * x0, y0],
+      [x0, 2 * y0],
+      [3 * x0, y0],
+      [x0, 3 * y0],
+      [4 * x0, y0],
+      [x0, 4 * y0],
+    ];
+    const candidates = [...wrong.map((w) => ({ r: red(w.r), trap: w.trap })), ...rng.shuffle(generic).map((r) => ({ r: red(r), trap: undefined as string | undefined }))];
+    const { choices, answer } = valuedChoices(
+      rng,
+      { text: txt(correct), value: x0 / y0 },
+      candidates.map((c) => ({ text: txt(c.r), value: c.r[0] / c.r[1], ...(c.trap ? { trap: c.trap } : {}) })),
+    );
+    const byText = new Map<string, [number, number]>([[txt(correct), correct], ...candidates.map((c) => [txt(c.r), c.r] as [string, [number, number]])]);
     return {
-      params: { mode, a, b, ratios: items.map((it) => it.r) },
-      q: {
-        format: 'mcs',
-        stem,
-        choices: items.map((it) => ({ text: `${plain(it.r[0])} to ${plain(it.r[1])}`, ...(it.trap ? { trap: it.trap } : {}) })),
-        answer: items.findIndex((it) => it.ok),
-        explanation,
-      },
+      params: { mode, a, b, ratios: choices.map((c) => byText.get(c.text)!) },
+      q: { format: 'mcs', stem, choices, answer, explanation },
     };
   },
   check(q, p) {

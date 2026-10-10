@@ -14,6 +14,7 @@ import {
   neg,
   polyEx,
   pow,
+  powT,
   qcEnd,
   qcSamples,
   randomReals,
@@ -209,7 +210,8 @@ The cross term is $2 \\cdot x \\cdot \\frac{1}{x} = 2$; forgetting it gives $${s
       const f = (x: number, y: number) => (p * al * x - p * be * y) * (qq * al * x + qq * be * y) - Nn;
       for (const y of [...randomReals(rng, 40), 0, 1, -2, 3.5]) {
         // f is negative where the first factor vanishes and grows without bound: bisect for x.
-        let lo = (be * y) / al;
+        // Past both zeros of the factors, f increases from a negative value: the root is to the right.
+        let lo = Math.abs((be * y) / al);
         let hi = lo + 1000;
         for (let i = 0; i < 200; i++) {
           const mid = (lo + hi) / 2;
@@ -437,7 +439,7 @@ const powerFactorNE: Template<PowParams> = {
       answer = v * (b ** m + sign * b ** n);
       const e2 = n === 0 ? `${b}^{x}` : `${b}^{x + ${n}}`;
       stem = `If $${b}^{x} = ${v}$, what is the value of $${b}^{x + ${m}} ${sign < 0 ? '-' : '+'} ${e2}$?`;
-      const inside = `${b}^{${m}} ${sign < 0 ? '-' : '+'} ${n === 0 ? '1' : `${b}^{${n}}`}`;
+      const inside = `${powT(b, m)} ${sign < 0 ? '-' : '+'} ${n === 0 ? '1' : powT(b, n)}`;
       explanation = `Factor out $${b}^{x}$: $${b}^{x + ${m}} ${sign < 0 ? '-' : '+'} ${e2} = ${b}^{x}(${inside}) = ${v}(${b ** m + sign * b ** n})$.
 
 So the value is $${num(answer)}$. You never need $x$ itself (it is not an integer).`;

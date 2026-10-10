@@ -5,7 +5,7 @@ import { flaggedChoices } from '../../../engine/build';
 import type { Rng } from '../../../engine/rng';
 import { num, usd } from '../../../engine/tex';
 import type { Choice, Difficulty, LineChartFigure, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { mcmCheck, mcsCheck, nearestIndex } from './util';
+import { mcmCheck, mcsCheck, nearestIndex, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.homes-mean-median';
@@ -140,13 +140,12 @@ const combinedMean: Template<CombineParams> = {
     const u = (m[i] + m[j]) / 2;
     const cb = Math.round(w / step);
     const ub = Math.round(u / step);
-    // Five consecutive multiples of the step that contain the answer and the unweighted trap.
-    const lowB = Math.min(cb, ub);
-    const highB = Math.max(cb, ub);
-    const start = rng.int(highB - 4, lowB);
-    const buckets = [0, 1, 2, 3, 4].map((k) => start + k);
-    const choices: Choice[] = buckets.map((b) => ({ text: money(b * step), ...(b === ub ? { trap: 'prob-di-average-of-averages' } : {}) }));
-    const answer = buckets.indexOf(cb);
+    // Multiples of the step, answer at a random position, the unweighted average as a trap.
+    const { choices, answer } = spacedChoices(rng, cb * step, [{ v: ub * step, trap: 'prob-di-average-of-averages' }], {
+      step,
+      min: step,
+      format: (v) => money(v),
+    });
     const ti = n[i] * m[i];
     const tj = n[j] * m[j];
     const k = (v: number) => num(v);
@@ -198,18 +197,17 @@ const medianChange: Template<MedianParams> = {
     const r = Math.round(Math.abs(pc));
     const wrongBase = Math.round(Math.abs(((md[j] - md[i]) / md[j]) * 100));
     const meanBased = Math.round(Math.abs(((mn[j] - mn[i]) / mn[i]) * 100));
-    const items: { v: number; trap?: string }[] = [{ v: r }];
-    const add = (v: number, trap?: string) => {
-      if (v > 0 && items.every((it) => Math.abs(it.v - v) >= 2)) items.push({ v, ...(trap ? { trap } : {}) });
-    };
-    add(wrongBase, 'prob-percent-wrong-base');
-    add(meanBased, 'prob-di-wrong-column');
-    for (const f of rng.shuffle([r + 5, r - 5, r + 10, r - 10, r + 3, r - 3, r + 15])) if (items.length < 5) add(f);
-    const sorted = items.sort((a, b) => a.v - b.v);
-    const choices: Choice[] = sorted.map((it) => ({ text: `${it.v}%`, ...(it.trap ? { trap: it.trap } : {}) }));
-    const answer = sorted.findIndex((it) => it.v === r);
+    const { choices, answer, values } = spacedChoices(
+      rng,
+      r,
+      [
+        { v: wrongBase, trap: 'prob-percent-wrong-base' },
+        { v: meanBased, trap: 'prob-di-wrong-column' },
+      ],
+      { step: 4, minGap: 3, min: 1, format: (v) => `${v}%` },
+    );
     return {
-      params: { i, j, values: sorted.map((it) => it.v) },
+      params: { i, j, values },
       q: {
         format: 'mcs',
         figure: D.figure,
@@ -398,14 +396,12 @@ const taxOnSales: Template<TaxParams> = {
     const { counts: n, means: m, years: y, ctx } = D;
     const totalDollars = n[k] * m[k] * 1000;
     const tax = (totalDollars * rate) / 100;
-    const powers = rng.pick([
-      [-3, -2, -1, 0, 1],
-      [-3, -2, 0, 1, 2],
-      [-4, -3, -2, 0, 1],
-      [-3, -1, 0, 1, 2],
-    ]);
+    // Five consecutive powers of ten; the answer's position is uniform.
+    const first = -rng.int(0, 4);
+    const powers = [0, 1, 2, 3, 4].map((k) => first + k);
     const traps: Record<number, string> = { [-3]: 'prob-di-thousands', 1: 'prob-percent-decimal' };
-    const choices: Choice[] = powers.map((p) => ({ text: usd(tax * 10 ** p), ...(traps[p] ? { trap: traps[p] } : {}) }));
+    const cash = (v: number) => (Number.isInteger(v) ? usd(v) : usd(Math.round(v * 100) / 100, 2));
+    const choices: Choice[] = powers.map((p) => ({ text: cash(p >= 0 ? tax * 10 ** p : tax / 10 ** -p), ...(traps[p] ? { trap: traps[p] } : {}) }));
     return {
       params: { k, rate },
       q: {

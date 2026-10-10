@@ -6,8 +6,8 @@ import { flaggedChoices } from '../../../engine/build';
 import { frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
-import type { BarChartFigure, Choice, Difficulty, PieChartFigure, QuestionBody, Template } from '../../../engine/types';
-import { mcmCheck, mcsCheck, nearestIndex } from './util';
+import type { BarChartFigure, Difficulty, PieChartFigure, QuestionBody, Template } from '../../../engine/types';
+import { mcmCheck, mcsCheck, nearestIndex, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.region-pie-bar';
@@ -117,24 +117,24 @@ const otherPercent: Template<OtherParams> = {
     const rest = D.T - shown;
     const exact = (rest / D.T) * 100;
     const r = Math.round(exact);
-    const items: { v: number; trap?: string }[] = [{ v: r }];
-    const add = (v: number, trap?: string) => {
-      if (v > 0 && v < 100 && items.every((it) => Math.abs(it.v - v) >= 3)) items.push({ v, ...(trap ? { trap } : {}) });
-    };
-    add(Math.round((shown / D.T) * 100), 'prob-wrong-event');
-    add(Math.round((rest / D.W) * 100), 'prob-di-wrong-total');
-    add(rest, 'prob-count-as-percent');
-    for (const f of rng.shuffle([r + 5, r - 5, r + 10, r - 8, r + 15, r + 20])) if (items.length < 5) add(f);
-    const sorted = items.sort((a, b) => a.v - b.v);
-    const choices: Choice[] = sorted.map((it) => ({ text: `${it.v}%`, ...(it.trap ? { trap: it.trap } : {}) }));
+    const { choices, answer, values } = spacedChoices(
+      rng,
+      r,
+      [
+        { v: Math.round((shown / D.T) * 100), trap: 'prob-wrong-event' },
+        { v: Math.round((rest / D.W) * 100), trap: 'prob-di-wrong-total' },
+        { v: rest, trap: 'prob-count-as-percent' },
+      ],
+      { step: 5, minGap: 3, min: 1, max: 99, format: (v) => `${v}%` },
+    );
     return {
-      params: { values: sorted.map((it) => it.v) },
+      params: { values },
       q: {
         format: 'mcs',
         figure: D.figure,
         stem: `Approximately what percent of the ${D.who} in ${D.focus} were in countries other than the four shown in the bar graph?`,
         choices,
-        answer: sorted.findIndex((it) => it.v === r),
+        answer,
         explanation: `The four countries shown account for $${D.values.join(' + ')} = ${shown}$ million of the ${D.T} million ${D.who} in ${D.focus}. The rest: $${D.T} - ${shown} = ${rest}$ million, which is $\\frac{${rest}}{${D.T}} \\approx ${num(Math.round(exact * 10) / 10)}$%, about ${r}%.
 
 The base is the ${D.focus} total (${D.T} million), not the worldwide total.`,
@@ -188,14 +188,10 @@ const barRange: Template<RangeParams> = {
       traps.push({ v: v[a] + v[b], trap: 'prob-wrong-event' }, { v: v[a], trap: 'prob-di-wrong-column' });
       explanation = `Read the two bars: ${D.countries[a]}, ${mil(v[a])}; ${D.countries[b]}, ${mil(v[b])}. Difference: $${v[a]} - ${v[b]} = ${correct}$ million.`;
     }
-    const items: { v: number; trap?: string }[] = [{ v: correct }];
-    for (const t of traps) if (t.v > 0 && items.every((it) => it.v !== t.v)) items.push(t);
-    for (const f of rng.shuffle([correct + 2, correct - 2, correct + 5, correct - 4, correct + 8, correct * 2])) if (items.length < 5 && f > 0 && items.every((it) => it.v !== f)) items.push({ v: f });
-    const sorted = items.slice(0, 5).sort((x, y) => x.v - y.v);
-    const choices: Choice[] = sorted.map((it) => ({ text: mil(it.v), ...(it.trap ? { trap: it.trap } : {}) }));
+    const { choices, answer } = spacedChoices(rng, correct, traps, { step: 2, minGap: 1, min: 1, format: mil });
     return {
       params: { ask, a, b },
-      q: { format: 'mcs', figure: D.figure, stem, choices, answer: sorted.findIndex((it) => it.v === correct), explanation },
+      q: { format: 'mcs', figure: D.figure, stem, choices, answer, explanation },
     };
   },
   check(q, { ask, a, b }) {
@@ -238,24 +234,24 @@ const howManyTimes: Template<TimesParams> = {
     const st = stepOf(ratio);
     const R = Math.max(st, Math.round(ratio / st) * st);
     const regionCount = (D.W * D.pcts[r]) / 100;
-    const items: { v: number; trap?: string }[] = [{ v: R }];
-    const add = (v: number, trap?: string) => {
-      const g = Math.round(v / st) * st;
-      if (g >= 1 && items.every((it) => Math.abs(it.v - g) >= st)) items.push({ v: g, ...(trap ? { trap } : {}) });
-    };
-    add(D.pcts[r] / D.values[c], 'prob-percent-not-count');
-    add((D.T * D.pcts[r]) / 100 / D.values[c], 'prob-di-wrong-total');
-    for (const f of rng.shuffle([R + st, R - st, R + 2 * st, R - 2 * st, R + 3 * st, R + 4 * st])) if (items.length < 5) add(f);
-    const sorted = items.sort((a, b) => a.v - b.v);
-    const choices: Choice[] = sorted.map((it) => ({ text: `${it.v}`, ...(it.trap ? { trap: it.trap } : {}) }));
+    const g = (v: number) => Math.round(v / st) * st;
+    const { choices, answer, values } = spacedChoices(
+      rng,
+      R,
+      [
+        { v: g(D.pcts[r] / D.values[c]), trap: 'prob-percent-not-count' },
+        { v: g((D.T * D.pcts[r]) / 100 / D.values[c]), trap: 'prob-di-wrong-total' },
+      ],
+      { step: st, min: st > 1 ? st : 1, format: (v) => `${v}` },
+    );
     return {
-      params: { c, r, values: sorted.map((it) => it.v) },
+      params: { c, r, values },
       q: {
         format: 'mcs',
         figure: D.figure,
         stem: `In 2023, the number of ${D.who} of ${D.org} in ${D.regions[r]} was approximately how many times the number of ${D.who} in ${D.countries[c]}?`,
         choices,
-        answer: sorted.findIndex((it) => it.v === R),
+        answer,
         explanation: `First find the worldwide total: ${D.focus} had ${D.T} million ${D.who}, which is ${D.pcts[0]}% of the total, so the total was $\\frac{${D.T}}{${frac(D.pcts[0], 100).toNumber()}} = ${D.W}$ million. ${D.regions[r]} had ${D.pcts[r]}% of that: $${frac(D.pcts[r], 100).toNumber()} \\times ${D.W} = ${num(regionCount)}$ million.
 
 ${D.countries[c]} had ${D.values[c]} million, so the ratio is $\\frac{${num(regionCount)}}{${D.values[c]}} ${Number.isInteger(ratio) ? '=' : '\\approx'} ${num(Math.round(ratio * 100) / 100)}$${ratio === R ? '' : `, closest to ${R}`}.

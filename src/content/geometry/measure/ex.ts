@@ -113,7 +113,7 @@ export function exChoices(
   const minGap = opts.minGap ?? 0.01;
   const c = correct.value();
   const maxDen = Math.max(...correct.data().map(([, d]) => d), 1);
-  const tidy = (v: Ex) => v.data().every(([, d]) => d <= Math.max(maxDen, 1) * (maxDen === 1 ? 1 : 2));
+  const tidy = (v: Ex) => v.data().every(([, d]) => d <= 2 * maxDen);
   const pool: { v: Ex; trap?: string }[] = [...traps.map((t) => ({ v: t.v, trap: t.trap })), ...rng.shuffle(fillers).map((v) => ({ v }))];
   if (opts.scales !== false)
     for (const k of rng.shuffle([new Frac(1, 2), new Frac(3, 4), new Frac(3, 2), new Frac(2), new Frac(1, 4), new Frac(3), new Frac(2, 3), new Frac(4, 3)])) {
@@ -124,11 +124,14 @@ export function exChoices(
   const ok = (x: number) => (opts.allowZero ? x >= 0 : x > 0);
   const near = (x: number, y: number) => Math.abs(x - y) <= minGap * Math.max(1, Math.abs(x), Math.abs(y));
   // Greedy de-duplication in priority order: every kept value is far enough from the answer and from each other.
-  const kept: { v: Ex; trap?: string; x: number }[] = [];
+  const kept: { v: Ex; trap?: string; x: number; t: string }[] = [];
+  const ct = correct.tex();
   for (const it of pool) {
     const x = it.v.value();
-    if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x) || k.v.tex() === it.v.tex())) continue;
-    kept.push({ ...it, x });
+    if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x))) continue;
+    const t = it.v.tex();
+    if (t === ct || kept.some((k) => k.t === t)) continue;
+    kept.push({ ...it, x, t });
   }
   const below = kept.filter((k) => k.x < c);
   const above = kept.filter((k) => k.x > c);

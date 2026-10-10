@@ -527,16 +527,17 @@ Adding the speeds would be right only if they drove toward each other, and the c
 
 Ignoring ${n1}'s head start, or adding the travel time to ${clock(t0, 'short')} instead of ${clock(t0 + delay, 'short')}, gives the wrong time.`;
       }
-      // Choices: correct, traps, and quarter-hour neighbors; listed in time order.
-      const opts = new Map<number, string | undefined>();
-      opts.set(meet, undefined);
-      for (const w of wrong) if (!opts.has(w.t) && w.t > t0 && w.t < 24 * 60 && opts.size < 4) opts.set(w.t, w.trap);
-      const dir = rng.sign();
-      for (const step of [dir * 30, dir * 60, dir * 90, -dir * 30, -dir * 60, dir * 15]) {
-        const t = meet + step;
-        if (opts.size >= 5) break;
-        if (!opts.has(t) && t > t0 && t < 24 * 60) opts.set(t, undefined);
-      }
+      // Choices: correct, traps, and half/quarter-hour neighbors, listed in time order, with the
+      // correct time at a random position.
+      const valid = (t: number) => t > t0 && t < 24 * 60 && t !== meet;
+      const below = [...wrong.filter((w) => w.t < meet && valid(w.t)), ...[30, 60, 15, 45, 90, 120].map((x) => ({ t: meet - x }))].filter((w) => valid(w.t));
+      const above = [...wrong.filter((w) => w.t > meet && valid(w.t)), ...[30, 60, 15, 45, 90, 120].map((x) => ({ t: meet + x }))].filter((w) => valid(w.t));
+      let target = rng.int(0, 4);
+      const uniqB = below.filter((w, i) => below.findIndex((x) => x.t === w.t) === i);
+      const uniqA = above.filter((w, i) => above.findIndex((x) => x.t === w.t) === i);
+      target = Math.max(4 - uniqA.length, Math.min(target, uniqB.length));
+      const opts = new Map<number, string | undefined>([[meet, undefined]]);
+      for (const w of [...uniqB.slice(0, target), ...uniqA.slice(0, 4 - target)]) opts.set(w.t, 'trap' in w ? (w.trap as string | undefined) : undefined);
       if (opts.size < 5 || meet > 22 * 60) continue;
       const times = [...opts.keys()].sort((x, y) => x - y);
       const choices: Choice[] = times.map((t) => ({ text: clock(t, 'short'), ...(opts.get(t) ? { trap: opts.get(t)! } : {}) }));

@@ -1,6 +1,6 @@
 import { flaggedChoices, numericChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
-import { num, poly } from '../../../engine/tex';
+import { lin, num, poly } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { close, intExcept, qcEnd, qcSamples, sideFill, someTraps } from './util';
 
@@ -319,7 +319,7 @@ const solutionsMCM: Template<SolParams> = {
       r1 = frac(0);
       r2 = new Frac(m, a);
       k = [a, m];
-      eq = `${a === 1 ? '' : a}x^2 = ${num(m)}x`;
+      eq = `${a === 1 ? '' : a}x^2 = ${lin([[m, 'x']])}`;
       solve = `Do not divide by $x$. Move everything to one side and factor: $${a === 1 ? '' : a}x^2 ${m > 0 ? '-' : '+'} ${Math.abs(m)}x = ${a === 1 ? '' : a}x(x ${r2.n > 0 ? '-' : '+'} ${num(r2.abs())}) = 0$, so $x = 0$ or $x = ${r2.toTex()}$.`;
       wrong.push({ v: r2.neg(), trap: 'alg-root-sign' }, { v: frac(m), trap: 'alg-dropped-factor' }, { v: frac(a) }, { v: r2.add(1) });
     } else if (form === 'square') {
@@ -456,7 +456,7 @@ Or find $k$ first: substituting $x = ${num(r1)}$ gives $k = ${num(kk)}$, and $${
       stem = `If $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = ${poly([1, S, 0])} + c$ for all values of $x$, where $n$ and $c$ are constants, what is the value of $c$?`;
       explanation = `Expand the left side: $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = x^2 + (${num(a)} + n)x + ${a < 0 ? `(${a})` : a}n$.
 
-Matching the $x$ terms: $${num(a)} + n = ${num(S)}$, so $n = ${num(b)}$. Matching the constants: $c = ${a < 0 ? `(${a})` : a}(${num(b)}) = ${num(answer)}$.`;
+Matching the $x$ terms: $${num(a)} + n = ${num(S)}$, so $n = ${num(b)}$. Matching the constants: $c = ${a === 1 ? num(b) : `${a < 0 ? `(${a})` : a}(${num(b)})`} = ${num(answer)}$.`;
       traps.push({ value: b, trap: 'alg-answered-other-variable' }, { value: a * S, trap: 'alg-factor-pair' });
       fillers.push(-answer, a + S, answer + a, answer - 1, S);
     }

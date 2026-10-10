@@ -3,7 +3,7 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd, lcm } from '../../../engine/math';
 import { lin, num } from '../../../engine/tex';
 import type { QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, close, sideFill, someTraps, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, type Ex } from './util';
+import { N, V, add, close, sideFill, someTraps, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, type Ex } from './util';
 
 /* ================================================================== 1. Solve a linear equation (MCS) */
 
@@ -53,11 +53,11 @@ const solveLinearMCS: Template<SolveParams> = {
       const c = (a + dd) * x0 + b;
       k = [a, b, c, dd];
       stem = `If $${lin([[a, 'x'], [b, '']])} = ${lin([[c, ''], [-dd, 'x']])}$, what is the value of $x$?`;
-      explanation = `Add $${dd}x$ to both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides: $${a + dd}x = ${num(c)} ${b < 0 ? '+' : '-'} ${Math.abs(b)} = ${num(c - b)}$.
+      explanation = `Add $${lin([[dd, 'x']])}$ to both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides: $${a + dd}x = ${num(c)} ${b < 0 ? '+' : '-'} ${Math.abs(b)} = ${num(c - b)}$.
 
-So $x = \\frac{${num(c - b)}}{${a + dd}} = ${num(x0)}$. Check: $${a}(${num(x0)}) ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${num(a * x0 + b)}$ and $${num(c)} - ${dd}(${num(x0)}) = ${num(c - dd * x0)}$.
+So $x = \\frac{${num(c - b)}}{${a + dd}} = ${num(x0)}$. Check: $${a}(${num(x0)}) ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${num(a * x0 + b)}$ and $${num(c)} - ${dd === 1 ? `(${num(x0)})` : `${dd}(${num(x0)})`} = ${num(c - dd * x0)}$.
 
-When a term moves to the other side its sign changes: $-${dd}x$ on the right becomes $+${dd}x$ on the left.`;
+When a term moves to the other side its sign changes: $-${lin([[dd, 'x']])}$ on the right becomes $+${lin([[dd, 'x']])}$ on the left.`;
       traps.push({ value: new Frac(c - b, a - dd), trap: 'alg-move-term-sign' });
       traps.push({ value: new Frac(c + b, a + dd), trap: 'alg-move-term-sign' });
     } else if (kind === 'distribute') {
@@ -115,7 +115,7 @@ The right side must be multiplied by ${L} too.`;
     const answer = frac(x0);
     const { choices, answer: idx } = numericChoices(rng, {
       correct: answer,
-      traps: someTraps(rng, traps.filter((t) => !t.value.eq(answer))).slice(0, 2),
+      traps: someTraps(rng, traps.filter((t) => !t.value.eq(answer))),
       fillers: [...sideFill(rng, x0), frac(-x0)],
       format: (v) => `$${v.toTex()}$`,
     });
@@ -176,7 +176,7 @@ const fractionQC: Template<FracQCParams> = {
       k = [a, sgnB * b, c];
       info = `$\\dfrac{x}{${a}} ${sgnB > 0 ? '+' : '-'} \\dfrac{x}{${b}} = ${num(c)}$`;
       const coefNum = L / a + (sgnB * L) / b;
-      explanation = `Multiply both sides by ${L}: $${L / a}x ${sgnB > 0 ? '+' : '-'} ${L / b}x = ${num(c * L)}$, ${coefNum === 1 ? `so $x = ${num(x0)}$` : `so $${coefNum === -1 ? '-' : coefNum}x = ${num(c * L)}$ and $x = ${num(x0)}$`}.`;
+      explanation = `Multiply both sides by ${L}: $${lin([[L / a, 'x'], [(sgnB * L) / b, 'x']])} = ${num(c * L)}$, ${coefNum === 1 ? `so $x = ${num(x0)}$` : `so $${coefNum === -1 ? '-' : coefNum}x = ${num(c * L)}$ and $x = ${num(x0)}$`}.`;
       if (sgnB > 0) {
         trapVal = c * (a + b);
         trapId = 'alg-fraction-add-denominators';
@@ -289,7 +289,7 @@ const shortcutNE: Template<ShortParams> = {
       stem = `If $${lin([[a, 'x'], [b, '']])} = ${num(c)}$, what is the value of $${target}$?`;
       explanation = `No need to find $x$${(c - b) % a !== 0 ? ` (it is the fraction $${new Frac(c - b, a).toTex()}$)` : ''}. From the equation, $${a}x = ${num(c)} ${b > 0 ? '-' : '+'} ${Math.abs(b)} = ${num(c - b)}$.
 
-Then $${m * a}x = ${m}(${num(c - b)}) = ${num(m * (c - b))}$, so $${target} = ${num(m * (c - b))} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$.`;
+Then $${lin([[m * a, 'x']])} = ${times(m, num(c - b))} = ${num(m * (c - b))}$${e === 0 ? '' : `, so $${target} = ${num(m * (c - b))} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$`}.`;
       const wrong = m * c + e;
       if (wrong !== answer) traps.push({ value: frac(wrong), trap: 'alg-shortcut-constant' });
     } else if (kind === 'two-var') {
@@ -304,9 +304,9 @@ Then $${m * a}x = ${m}(${num(c - b)}) = ${num(m * (c - b))}$, so $${target} = ${
       k = [a, b, c, m, e];
       const target = lin([[m * a, v1], [m * b, v2], [e, '']]);
       stem = `If $${lin([[a, v1], [b, v2]])} = ${num(c)}$, what is the value of $${target}$?`;
-      explanation = `One equation cannot give both $${v1}$ and $${v2}$, so look at the target: $${lin([[m * a, v1], [m * b, v2]])} = ${m}(${lin([[a, v1], [b, v2]])}) = ${m}(${num(c)}) = ${num(m * c)}$.
+      explanation = `One equation cannot give both $${v1}$ and $${v2}$, so look at the target: $${lin([[m * a, v1], [m * b, v2]])} = ${times(m, lin([[a, v1], [b, v2]]))} = ${times(m, num(c))} = ${num(m * c)}$.
 
-So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$.`;
+${e === 0 ? '' : `So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$.`}`;
       if (e !== 0) traps.push({ value: frac(m * (c + e)), trap: 'alg-shortcut-constant' });
     } else {
       const a = rng.int(4, 9);
@@ -322,7 +322,7 @@ So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer
       k = [a, b, dd, e, m, f];
       const target = lin([[m * (a - dd), 'x'], [f, '']]);
       stem = `If $${lin([[a, 'x'], [b, '']])} = ${lin([[dd, 'x'], [e, '']])}$, what is the value of $${target}$?`;
-      explanation = `Collect the $x$ terms: subtract $${dd}x$ from both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides to get $${a - dd}x = ${num(e - b)}$.
+      explanation = `Collect the $x$ terms: subtract $${lin([[dd, 'x']])}$ from both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides to get $${a - dd}x = ${num(e - b)}$.
 
 ${m === 1 ? '' : `Multiply by ${m}: $${m * (a - dd)}x = ${num(m * (e - b))}$. `}${f === 0 ? `So the value is $${num(answer)}$.` : `Then $${target} = ${num(m * (e - b))} ${f < 0 ? '-' : '+'} ${Math.abs(f)} = ${num(answer)}$.`}`;
       const wrong = m * (e + b) + f;

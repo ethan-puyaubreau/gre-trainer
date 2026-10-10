@@ -3,7 +3,9 @@
 
 import { Frac, frac } from '../../../engine/frac';
 import { decimal, num } from '../../../engine/tex';
-import type { QuestionBody } from '../../../engine/types';
+import { valuedChoices } from '../../../engine/build';
+import type { Rng } from '../../../engine/rng';
+import type { Choice, QuestionBody } from '../../../engine/types';
 
 export const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 export const word = (n: number) => WORDS[n] ?? String(n);
@@ -158,4 +160,48 @@ export function neCheckNum(q: QuestionBody, expected: number, eps = 1e-6): strin
   if (q.format !== 'ne') return 'wrong format';
   const a = q.answer.toNumber();
   return Math.abs(a - expected) <= eps * Math.max(1, Math.abs(expected)) ? null : `expected ${expected}, keyed ${a}`;
+}
+
+/**
+ * Select-one numeric choices with the answer at a uniform random position (via valuedChoices).
+ * `cands` are priority-ordered distractors (traps first); fillers correct ± k·step are added after
+ * them. Every kept value is at least `minGap` from the others, so "closest to" questions have a
+ * unique nearest choice. Returns the numeric value of each choice (in choice order) for checks.
+ */
+export function spacedChoices(
+  rng: Rng,
+  correct: number,
+  cands: { v: number; trap?: string }[],
+  opts: { step: number; minGap?: number; min?: number; max?: number; format: (v: number) => string },
+): { choices: Choice[]; answer: number; values: number[] } {
+  const clean = (x: number) => Number(x.toFixed(9));
+  const minGap = opts.minGap ?? opts.step;
+  const lo = opts.min ?? -Infinity;
+  const hi = opts.max ?? Infinity;
+  const kept: { v: number; trap?: string }[] = [];
+  const ok = (v: number) => v >= lo && v <= hi && Math.abs(v - correct) >= minGap - 1e-9 && kept.every((k) => Math.abs(k.v - v) >= minGap - 1e-9);
+  for (const c of cands) {
+    const v = clean(c.v);
+    if (ok(v)) kept.push({ v, ...(c.trap ? { trap: c.trap } : {}) });
+  }
+  for (let k = 1; k <= 12; k++)
+    for (const s of [-1, 1]) {
+      const v = clean(correct + s * k * opts.step);
+      if (ok(v)) kept.push({ v });
+    }
+  const byText = new Map<string, number>([[opts.format(correct), correct]]);
+  const candidates = kept.map((k) => {
+    const text = opts.format(k.v);
+    byText.set(text, k.v);
+    return { text, value: k.v, ...(k.trap ? { trap: k.trap } : {}) };
+  });
+  const { choices, answer } = valuedChoices(rng, { text: opts.format(correct), value: correct }, candidates);
+  return { choices, answer, values: choices.map((c) => byText.get(c.text)!) };
+}
+
+/** Word choices for "for how many" questions: a window of five consecutive counts containing the answer. */
+export function countWordChoices(rng: Rng, count: number, max: number): { choices: Choice[]; answer: number } {
+  const names = ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'];
+  const start = rng.int(Math.max(0, count - 4), Math.min(count, max - 4));
+  return { choices: [0, 1, 2, 3, 4].map((k) => ({ text: names[start + k] })), answer: count - start };
 }

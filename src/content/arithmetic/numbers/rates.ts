@@ -214,6 +214,7 @@ const approxCostMCS: Template<ACParams> = {
   style: 'estimate a cost from two rates',
   generate(rng, d) {
     const mode: ACMode = d === 1 ? 'fuel' : d === 2 ? rng.pick(['fuel', 'round-trip'] as const) : rng.pick(['round-trip', 'heater'] as const);
+    const pos = rng.int(0, 4); // position of the answer on the ladder, chosen first so it is uniform
     for (;;) {
       let x: number[];
       let exact: number;
@@ -243,12 +244,14 @@ const approxCostMCS: Template<ACParams> = {
             : `Dana drove from her home to a city ${miles} miles away and then drove back home along the same route. Her car averaged ${mpg} miles per gallon of gasoline, and the gasoline cost ${usd(price, 2)} per gallon. Approximately what was the cost of the gasoline used for the whole trip?`;
         expl = `${trips === 2 ? `The whole trip is $2 \\times ${miles} = ${num(miles * 2)}$ miles. ` : ''}Gallons used: $\\frac{${num(miles * trips)}}{${mpg}} \\approx ${((miles * trips) / mpg).toFixed(1)}$. Cost: $${((miles * trips) / mpg).toFixed(1)} \\times ${price} \\approx ${exact.toFixed(2)}$ dollars.`;
       }
-      const steps = [5, 10, 20, 25, 50, 100].filter((s) => s >= exact * 0.18 && s <= exact * 0.5);
+      // choices are 5 multiples of a round step; the smallest must stay positive
+      const steps = [5, 10, 15, 20, 25, 50, 100].filter((s) => {
+        const near = Math.round(exact / s) * s;
+        return s >= exact * 0.15 && s <= exact * 0.5 && Math.abs(exact - near) <= 0.3 * s && near - pos * s >= s;
+      });
       if (!steps.length) continue;
       const step = rng.pick(steps);
       const nearest = Math.round(exact / step) * step;
-      if (nearest <= 0 || Math.abs(exact - nearest) > 0.3 * step) continue;
-      const pos = rng.int(0, Math.min(4, Math.floor((nearest - 1) / step)));
       const ladder = [0, 1, 2, 3, 4].map((i) => nearest + (i - pos) * step);
       const halfIdx = half === null ? -1 : ladder.findIndex((v) => Math.abs(v - half!) <= 0.3 * step);
       const choices = ladder.map((v, i) => ({ text: usd(v), ...(i === halfIdx && i !== pos ? { trap: 'num-one-way' } : {}) }));

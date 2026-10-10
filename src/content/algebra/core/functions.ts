@@ -1,8 +1,8 @@
 import { flaggedChoices, numericChoices, qcCompare, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
-import { num, paren, poly } from '../../../engine/tex';
+import { lin, num, paren, poly } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, abs, add, close, sideFill, someTraps, div, evalEx, intExcept, mul, polyEx, pow, qcEnd, qcSamples, texEx, type Ex } from './util';
+import { N, V, abs, add, close, sideFill, someTraps, times, div, evalEx, intExcept, mul, polyEx, pow, qcEnd, qcSamples, texEx, type Ex } from './util';
 
 const horner = (c: number[], x: number) => c.reduce((s, a) => s * x + a, 0);
 const hornerF = (c: number[], x: Frac) => c.reduce((s: Frac, a) => s.mul(x).add(a), new Frac(0));
@@ -77,9 +77,9 @@ Applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)
       stem = `If ${defs} for all values of $x$, for what value of $x$ does $f(g(x)) = ${num(m)}$?`;
       const a = f[0] * g[0];
       const b = f[0] * g[1] + f[1];
-      explanation = `Build $f(g(x))$: replace $x$ in $f$ by $g(x)$: $f(g(x)) = ${f[0]}(${poly(g)}) ${f[1] < 0 ? '-' : '+'} ${Math.abs(f[1])} = ${poly([a, b])}$.
+      explanation = `Build $f(g(x))$: replace $x$ in $f$ by $g(x)$: $f(g(x)) = ${times(f[0], poly(g))} ${f[1] < 0 ? '-' : '+'} ${Math.abs(f[1])} = ${poly([a, b])}$.
 
-Solve $${poly([a, b])} = ${num(m)}$: $${a}x = ${num(m - b)}$, so $x = ${x0.toTex()}${x0.isInt() ? '' : ` = ${x0.toDecimalString()}`}$.`;
+Solve $${poly([a, b])} = ${num(m)}$: $${lin([[a, 'x']])} = ${num(m - b)}$, so $x = ${x0.toTex()}${x0.isInt() ? '' : ` = ${x0.toDecimalString()}`}$.`;
       const wrongInner = new Frac(m - g[1], g[0]); // solved g(x) = m instead
       if (!wrongInner.eq(answer) && wrongInner.isTerminating()) traps.push({ value: wrongInner, trap: 'alg-composition-inner-only' });
     }
@@ -149,7 +149,7 @@ const OPS: OpDef[] = [
   { sym: '\\diamond', terms: [[1, 2, 0], [-1, 1, 1]] }, // a^2 - ab
   { sym: '\\star', terms: [[1, 1, 1], [-1, 1, 0], [-1, 0, 1]] }, // ab - a - b
   { sym: '\\odot', terms: [[2, 1, 0], [-3, 0, 1]] }, // 2a - 3b
-  { sym: '\\#', terms: [[1, 2, 1], [-1, 1, 2]] }, // a^2 b - a b^2
+  { sym: '\\mathbin{\\#}', terms: [[1, 2, 1], [-1, 1, 2]] }, // a^2 b - a b^2
   { sym: '\\diamond', terms: [[1, 0, 2], [-2, 1, 0]] }, // b^2 - 2a
 ];
 
@@ -332,13 +332,15 @@ function dExample(P: number[], lo: number | null, hi: number | null): string {
   for (let n = -24; n <= 24; n++) cands.push(new Frac(n, 2));
   for (let n = -60; n <= 60; n++) cands.push(new Frac(n, 10));
   for (const b of [lo, hi]) if (b !== null) for (let j = -100; j <= 100; j++) cands.push(new Frac(b * 100 + j, 100));
-  const ok = cands.filter((x) => (lo === null || x.gt(lo)) && (hi === null || x.lt(hi)));
+  const ok = cands
+    .filter((x) => (lo === null || x.gt(lo)) && (hi === null || x.lt(hi)))
+    .sort((u, w) => u.abs().cmp(w.abs()) || u.d - w.d);
   const val = (x: Frac) => hornerF([P[3], P[2], P[1], P[0]], x);
   const sign = (x: Frac) => val(x).sign();
   const first = ok.find((x) => sign(x) !== 0)!;
   const second = ok.find((x) => sign(x) !== sign(first))!;
-  const word = (x: Frac) => (sign(x) > 0 ? 'positive, so Quantity A is greater' : sign(x) < 0 ? 'negative, so Quantity B is greater' : '0, so the quantities are equal');
-  return `For example, at $x = ${first.toTex()}$ the difference is $${num(val(first))}$ (${word(first)}), but at $x = ${second.toTex()}$ it is $${num(val(second))}$ (${word(second)}).`;
+  const word = (x: Frac) => (sign(x) > 0 ? 'so Quantity A is greater' : sign(x) < 0 ? 'so Quantity B is greater' : 'so the quantities are equal');
+  return `For example, at $x = ${first.toTex()}$ the difference is $${num(val(first))}$, ${word(first)}; but at $x = ${second.toTex()}$ it is $${num(val(second))}$, ${word(second)}.`;
 }
 
 /** Real roots of a polynomial of degree <= 2 given by coefficients indexed by power. */
@@ -449,7 +451,7 @@ So $f(g(${k})) = ${answer}$. Reading the functions in the other order gives $g(f
           answer: idx,
           explanation: `A linear function changes by the same amount for each step in $x$. From $x = ${num(xs[0])}$ to $x = ${num(xs[1])}$, $f$ changes by $${num(fs[1] - fs[0])}$, so the slope is $\\frac{${num(fs[1] - fs[0])}}{${step}} = ${num(m)}$. Then $f(x) = ${poly([m, b])}$ (check: $f(${num(xs[2])}) = ${num(fs[2])}$).
 
-So $f(${k}) = ${num(m)}(${k}) ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${num(answer)}$. A linear function is not proportional unless its graph passes through the origin.`,
+So $f(${k}) = ${substitute([m, b], frac(k))} = ${num(answer)}$. A linear function is not proportional unless its graph passes through the origin.`,
         },
       };
     }
@@ -617,7 +619,7 @@ So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = $
       stem = `The function $f$ is defined by $f\\left(${input}\\right) = ${rule}$ for all numbers $x$. What is the value of $f(${num(t)})$?`;
       explanation = `Find the $x$ that makes the input equal to $${num(t)}$: $${input} = ${num(t)}$ gives $x = ${m}(${num(t)}) ${h < 0 ? '+' : '-'} ${Math.abs(h)} = ${num(x0)}$.
 
-Then $f(${num(t)}) = ${quad ? `${paren(x0)}^2 ${e < 0 ? '-' : '+'} ${Math.abs(e)}` : `${lin2}(${num(x0)}) ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(answer)}$. Substituting $${num(t)}$ directly into $${rule}$ is the trap: the rule is written for the variable $x$, not for the input of $f$.`;
+Then $f(${num(t)}) = ${quad ? `${paren(x0)}^2` : `${lin2}(${num(x0)})`}${e === 0 ? '' : ` ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(answer)}$. Substituting $${num(t)}$ directly into $${rule}$ is the trap: the rule is written for the variable $x$, not for the input of $f$.`;
       const direct = quad ? t * t + e : lin2 * t + e;
       traps.push({ value: frac(direct), trap: 'alg-substitute-directly' });
     }

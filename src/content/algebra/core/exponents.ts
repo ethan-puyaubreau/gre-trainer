@@ -2,7 +2,7 @@ import { flaggedChoices, textChoices } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { lin, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, allowedValues, close, div, evalEx, lx, mul, pow, qcEnd, qcSamples, sameFunction, texEx, type Ex } from './util';
+import { N, V, add, allowedValues, close, div, evalEx, lx, mul, pow, powT, qcEnd, qcSamples, sameFunction, texEx, type Ex } from './util';
 
 /* ================================================================== 1. Solve an equation by writing every power with one base (NE) */
 
@@ -198,7 +198,7 @@ Subtract in the right order (numerator minus denominator); the other order gives
 
 Equal powers of ${g} have equal exponents: $${e1 === 1 ? '' : e1}m = ${e2 === 1 ? '' : e2}t$, so $m = ${texEx(correct)}$.
 
-Inverting the fraction gives $${texEx(wrongs[0].e)}$; check with $t = ${e1}$: $${b2}^{${e1}} = ${g}^{${e1 * e2}} = ${b1}^{${e2}}$, so $m = ${e2}$.`;
+Inverting the fraction gives $${texEx(wrongs[0].e)}$. Check with $t = ${e1}$: $${powT(b2, e1)} = ${powT(g, e1 * e2)} = ${powT(b1, e2)}$, so $m = ${e2}$.`;
     } else {
       const g = rng.pick([2, 3]);
       const e = g === 2 ? rng.pick([2, 3]) : 2;
@@ -387,7 +387,7 @@ const casesQC: Template<CasesParams> = {
         quantityB: B,
         answer,
         traps: Object.keys(traps).length ? traps : undefined,
-        explanation: `Simplify each quantity with the exponent rules. Quantity A: $${c * dd}x^{-${m} + ${n}} = ${powTex(KA, P)}$. Quantity B: $${num(new Frac(e, f))}x^{${p} - ${qq}} = ${powTex(KB, Q)}$.
+        explanation: `Simplify each quantity with the exponent rules. Quantity A: $${c * dd}x^{-${m} + ${n}} = ${powTex(KA, P)}$. Quantity B: $${KB.eq(1) ? '' : num(KB)}x^{${p} - ${qq}} = ${powTex(KB, Q)}$.
 
 ${reason} ${regionText} ${qcEnd(answer)}`,
       },
@@ -426,7 +426,7 @@ const equalPowersMCM: Template<EqPowParams> = {
     const cands: { e: Ex; ok: boolean; trap?: string; why: string }[] = [];
     const big = `${g}^{${e}n + ${e * c}}`;
     cands.push({ e: pow(N(g), lx(e, e * c, 'n')), ok: true, why: `$${B}^{n + ${c}} = (${g}^{${e}})^{n + ${c}} = ${big}$` });
-    cands.push({ e: mul(N(B ** c), pow(N(B), V('n'))), ok: true, why: `$${B}^{n + ${c}} = ${B}^{${c}} \\cdot ${B}^{n}$ and $${B}^{${c}} = ${B ** c}$` });
+    cands.push({ e: mul(N(B ** c), pow(N(B), V('n'))), ok: true, why: c === 1 ? `$${B}^{n + 1} = ${B} \\cdot ${B}^{n}$` : `$${B}^{n + ${c}} = ${B}^{${c}} \\cdot ${B}^{n}$ and $${B}^{${c}} = ${B ** c}$` });
     cands.push({ e: pow(pow(N(g), nc(c)), e), ok: true, why: `a power of a power multiplies the exponents: $${e}(n + ${c}) = ${e}n + ${e * c}$` });
     cands.push({ e: div(pow(N(B), nc(c + 1)), N(B)), ok: true, why: `dividing by $${B}$ lowers the exponent by 1` });
     if (B === 4) {
