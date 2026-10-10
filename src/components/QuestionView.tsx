@@ -1,5 +1,6 @@
 import { QC_CHOICES, QC_TEXT, letter } from '../engine/build';
 import type { Response } from '../engine/grade';
+import { parseIntBox } from '../engine/frac';
 import { parseNumericResponse } from '../engine/grade';
 import type { QuestionBody } from '../engine/types';
 import { Figure } from './Figure';
@@ -148,6 +149,10 @@ function NE({ q, response, set, locked, reveal, autoFocus }: Sub<Extract<Questio
   const val = response?.format === 'ne' ? response : undefined;
   const parsed = val ? parseNumericResponse(val) : null;
   const cls = reveal ? (parsed && parsed.eq(q.answer) ? 'ne-input correct' : 'ne-input wrong') : 'ne-input';
+  // Hint only once the input is clearly bad: a lone fraction box is just unfinished.
+  const typed = !val ? [] : 'value' in val ? [val.value] : [val.num, val.den].filter((x) => x.trim() !== '');
+  const bad = !parsed && typed.some((x) => x.trim() !== '') && (typed.length > 1 || (!!val && 'value' in val) || parseIntBox(typed[0]) === null);
+  const hint = !bad ? '' : val && 'value' in val && val.value.includes(',') ? 'Use a dot for decimals, e.g. 1.5' : 'Not a valid number';
   return (
     <div>
       <Rich text={q.stem} />
@@ -193,6 +198,11 @@ function NE({ q, response, set, locked, reveal, autoFocus }: Sub<Extract<Questio
       {!locked && (
         <div className="muted small" style={{ textAlign: 'center' }}>
           {q.fractionBoxes ? 'Enter a fraction: integers only, no decimal point.' : 'Integer or decimal; it may be negative. Equivalent forms are accepted.'}
+        </div>
+      )}
+      {!locked && hint && (
+        <div className="muted small" style={{ textAlign: 'center' }} role="status">
+          {hint}
         </div>
       )}
       {reveal && (
