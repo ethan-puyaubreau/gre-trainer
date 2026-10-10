@@ -47,6 +47,12 @@ const DIFF_WEIGHTS: Record<Level, [number, number, number]> = {
   hard: [0.0, 0.4, 0.6],
 };
 
+/** Level of Section 2 from the Section 1 score: 9+ of 12 hard, 5 to 8 medium (ETS does not publish its cut-offs). */
+export function routeSection2(correct: number, total: number): Level {
+  const ratio = correct / total;
+  return ratio >= 9 / 12 ? 'hard' : ratio >= 5 / 12 ? 'medium' : 'easy';
+}
+
 function pickDifficulty(rng: Rng, level: Level): Difficulty {
   const [a, b] = DIFF_WEIGHTS[level];
   const r = rng.next();

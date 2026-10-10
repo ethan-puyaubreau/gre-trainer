@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { AREAS } from '../src/content';
 import { createRng } from '../src/engine/rng';
 import type { Area } from '../src/engine/types';
-import { buildSection } from '../src/mastery/section';
+import { buildSection, routeSection2 } from '../src/mastery/section';
 
 const areas = AREAS.filter((a) => a.templates.length).map((a) => a.area) as Area[];
+
+describe('section 2 routing', () => {
+  it('sends 0-4 of 12 to easy, 5-8 to medium and 9-12 to hard', () => {
+    const levels = Array.from({ length: 13 }, (_, k) => routeSection2(k, 12));
+    expect(levels).toEqual([...Array(5).fill('easy'), ...Array(4).fill('medium'), ...Array(4).fill('hard')]);
+  });
+});
 
 describe('section builder', () => {
   it('builds sections of the official sizes with QC questions first', () => {

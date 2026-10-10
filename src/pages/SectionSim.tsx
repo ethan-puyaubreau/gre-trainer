@@ -7,7 +7,7 @@ import { AREA_NAMES, AREAS, skillById } from '../content';
 import { grade, isAnswered, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
-import { buildSection, SPECS, type Level, type SectionSpec } from '../mastery/section';
+import { buildSection, routeSection2, SPECS, type Level, type SectionSpec } from '../mastery/section';
 import { href } from '../router';
 import { useProgress, type SectionPart } from '../store/progress';
 
@@ -159,8 +159,7 @@ export function SectionSim() {
 
   if (phase.kind === 'between') {
     const s1 = phase.done[0];
-    const ratio = s1.correct.filter(Boolean).length / s1.correct.length;
-    const level: Level = ratio >= 0.75 ? 'hard' : ratio >= 0.42 ? 'medium' : 'easy';
+    const level = routeSection2(s1.correct.filter(Boolean).length, s1.correct.length);
     return (
       <div className="card" style={{ maxWidth: 620, margin: '40px auto', textAlign: 'center' }}>
         <h2 style={{ marginTop: 0 }}>Section 1 is over</h2>
