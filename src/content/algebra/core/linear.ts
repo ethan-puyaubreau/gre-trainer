@@ -3,7 +3,7 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd, lcm } from '../../../engine/math';
 import { lin, num } from '../../../engine/tex';
 import type { QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, close, sideFill, someTraps, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, type Ex } from './util';
+import { N, V, add, close, intExcept, sideFill, someTraps, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, type Ex } from './util';
 
 /* ================================================================== 1. Solve a linear equation (MCS) */
 
@@ -75,7 +75,7 @@ When a term moves to the other side its sign changes: $-${lin([[dd, 'x']])}$ on 
       const left = lin([[a * b, 'x'], [-a * c + dd, '']]);
       explanation = `Distribute the ${a} to both terms in the parentheses: $${a}(${lin([[b, 'x'], [-c, '']])}) = ${lin([[a * b, 'x'], [-a * c, '']])}$, so the left side is $${left}$.
 
-Then $${left} = ${lin([[e, 'x'], [f, '']])}$ gives $${a * b - e}x = ${num(f + a * c - dd)}$ and $x = ${num(x0)}$.
+Then $${left} = ${lin([[e, 'x'], [f, '']])}$ gives $${lin([[a * b - e, 'x']])} = ${num(f + a * c - dd)}$ and $x = ${num(x0)}$.
 
 The usual slip is to multiply only the first term: $${a}(${lin([[b, 'x'], [-c, '']])})$ is not $${lin([[a * b, 'x'], [-c, '']])}$.`;
       traps.push({ value: new Frac(f + c - dd, a * b - e), trap: 'alg-distribute-partial' });
@@ -447,10 +447,14 @@ A sign slip while moving terms gives $${relTex([cr, -cs])}$; check your answer w
       const form = rng.pick(d === 1 ? ['affine'] : ['affine', 'mobius']);
       if (form === 'affine') {
         // y = (p x + q) / r  ->  x = (r y - q) / p
-        const p = rng.int(2, 7);
-        let q = rng.int(-9, 9);
-        if (q === 0) q = 5;
-        const r = rng.int(2, 6);
+        let p: number;
+        let q: number;
+        let r: number;
+        do {
+          p = rng.int(2, 7);
+          q = intExcept(rng, -9, 9, 0);
+          r = rng.int(2, 6);
+        } while (gcd(gcd(p, q), r) !== 1 || gcd(gcd(r, q), p) !== 1);
         const yv = V('y');
         const correct = div(lx(r, -q, 'y'), N(p));
         const wrongs: { e: Ex; trap?: string }[] = [

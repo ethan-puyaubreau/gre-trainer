@@ -188,32 +188,6 @@ export function angleAt(a: P2, v: P2, b: P2): number {
   return (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
 }
 
-/** Point-in-polygon (ray casting). */
-export function inPolygon(pts: P2[], x: number, y: number): boolean {
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const [xi, yi] = pts[i];
-    const [xj, yj] = pts[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
-export const inDisk = (c: P2, r: number, x: number, y: number) => (x - c[0]) ** 2 + (y - c[1]) ** 2 < r * r;
-
-/** Area of {(x, y) in box : pred(x, y)} by counting the midpoints of an n x n grid. */
-export function gridArea(pred: (x: number, y: number) => boolean, box: [number, number, number, number], n = 700): number {
-  const [x0, y0, x1, y1] = box;
-  const hx = (x1 - x0) / n;
-  const hy = (y1 - y0) / n;
-  let count = 0;
-  for (let i = 0; i < n; i++) {
-    const x = x0 + (i + 0.5) * hx;
-    for (let j = 0; j < n; j++) if (pred(x, y0 + (j + 0.5) * hy)) count++;
-  }
-  return count * hx * hy;
-}
-
 /** Polygon approximating a circle (many sides), for numeric circumference/area checks. */
 export function circlePolygon(c: P2, r: number, n = 4000): P2[] {
   return Array.from({ length: n }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)] as P2);

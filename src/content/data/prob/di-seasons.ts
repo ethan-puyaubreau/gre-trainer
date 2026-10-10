@@ -5,7 +5,8 @@ import { frac, Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
 import type { Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { nearestIndex, neCheckNum, roundFrac } from './util';
+import { valuedChoices } from '../../../engine/build';
+import { nearestIndex, neCheckNum, roundFrac, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.season-table';
@@ -137,10 +138,18 @@ const fractionOfTotal: Template<PartParams> = {
       if (dists[1] - dists[0] < 0.03 && t < 300) continue;
       const avgParts = parts.reduce((s, [a, b]) => s + a / b, 0) / 3;
       const trapIdx = nearestIndex(vals, avgParts);
-      // Five consecutive choices containing the answer.
-      const start = Math.max(0, Math.min(FR_CHOICES.length - 5, idx - rng.int(0, 4)));
-      const values = FR_CHOICES.slice(start, start + 5);
-      const choices: Choice[] = values.map(([a, b], k) => ({ text: `$\\frac{${a}}{${b}}$`, ...(start + k === trapIdx && trapIdx !== idx ? { trap: 'prob-di-average-of-averages' } : {}) }));
+      // The answer at a uniform random position; the averaged-fractions trap first, then the nearest fractions.
+      const ftext = ([a, b]: [number, number]) => `$\\frac{${a}}{${b}}$`;
+      const others = FR_CHOICES.map((fr, k) => ({ fr, k }))
+        .filter(({ k }) => k !== idx)
+        .sort((x, y) => (x.k === trapIdx ? -1 : y.k === trapIdx ? 1 : Math.abs(x.k - idx) - Math.abs(y.k - idx)));
+      const vc = valuedChoices(
+        rng,
+        { text: ftext(FR_CHOICES[idx]), value: vals[idx] },
+        others.map(({ fr, k }) => ({ text: ftext(fr), value: vals[k], ...(k === trapIdx ? { trap: 'prob-di-average-of-averages' } : {}) })),
+      );
+      const choices: Choice[] = vc.choices;
+      const values = vc.choices.map((c) => FR_CHOICES.find((fr) => ftext(fr) === c.text)!);
       const season0 = SEASONS[season].toLowerCase();
       const month = season === 1 ? 'April' : 'July';
       const partText = rowsUsed.map((k, j) => `$\\frac{${parts[j][0]}}{${parts[j][1]}}$ of ${D.ctx.cell(D.rows[k], season0)}`);
@@ -152,7 +161,7 @@ const fractionOfTotal: Template<PartParams> = {
           figure: D.figure,
           stem: `Suppose that ${listText} ${D.ctx.happened(month)}. ${D.ctx.inMonth(month)} was approximately what fraction of ${D.ctx.total(season0)}?`,
           choices,
-          answer: idx - start,
+          answer: vc.answer,
           explanation: `In ${month}: ${rowsUsed.map((k, j) => `$\\frac{${parts[j][0]}}{${parts[j][1]}} \\times ${D.cells[k][season]} = ${num(amounts[j])}$`).join(', ')}; together $${num(amounts.reduce((s, a) => s.add(a), frac(0)))}$. The ${season0} total for the three is $${rowsUsed.map((k) => D.cells[k][season]).join(' + ')} = ${total}$. The fraction is about $${(share.toNumber()).toFixed(2)}$, closest to $\\frac{${FR_CHOICES[idx][0]}}{${FR_CHOICES[idx][1]}}$.
 
 Averaging the three fractions ignores that the ${D.ctx.unit} are not split evenly among the three ${D.ctx.group}.`,
@@ -233,26 +242,21 @@ const rowMean: Template<MeanParams> = {
       const step = 5;
       const R = Math.round(mean / step) * step;
       if (Math.abs(mean - R) > 1.5 && t < 100) continue;
-      const items: { v: number; trap?: string }[] = [{ v: R }];
-      const add = (v: number, trap?: string) => {
-        const g = Math.round(v / step) * step;
-        if (g >= 0 && items.every((it) => it.v !== g)) items.push({ v: g, ...(trap ? { trap } : {}) });
-      };
+      const g = (v: number) => Math.round(v / step) * step;
       const nonzero = r.filter((v) => v > 0);
-      if (nonzero.length < 4) add(nonzero.reduce((s, v) => s + v, 0) / nonzero.length, 'prob-di-wrong-divisor');
-      add(r.reduce((s, v) => s + v, 0) / 3, 'prob-di-wrong-divisor');
-      for (const k of rng.shuffle([1, -1, 2, -2, 3])) if (items.length < 5) add(R + k * step);
-      const sorted = items.slice(0, 5).sort((a, b) => a.v - b.v);
-      const choices: Choice[] = sorted.map((it) => ({ text: `${it.v}`, ...(it.trap ? { trap: it.trap } : {}) }));
+      const trapC: { v: number; trap?: string }[] = [];
+      if (nonzero.length < 4) trapC.push({ v: g(nonzero.reduce((s, v) => s + v, 0) / nonzero.length), trap: 'prob-di-wrong-divisor' });
+      trapC.push({ v: g(r.reduce((s, v) => s + v, 0) / 3), trap: 'prob-di-wrong-divisor' });
+      const { choices, answer, values } = spacedChoices(rng, R, trapC, { step, min: step, format: (v) => `${v}` });
       const sum = r.reduce((s, v) => s + v, 0);
       return {
-        params: { row, values: sorted.map((it) => it.v) },
+        params: { row, values },
         q: {
           format: 'mcs',
           figure: D.figure,
           stem: `The average (arithmetic mean) number of ${D.ctx.of(D.rows[row])} per season was closest to which of the following?`,
           choices,
-          answer: sorted.findIndex((it) => it.v === R),
+          answer,
           explanation: `Add the four seasons and divide by 4: $\\frac{${r.join(' + ')}}{4} = \\frac{${sum}}{4} = ${num(mean)}$, closest to ${R}.${
             r.includes(0) ? ` The seasons with 0 still count: divide by 4, not by ${nonzero.length}.` : ''
           }`,

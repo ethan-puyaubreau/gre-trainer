@@ -815,14 +815,24 @@ const powersOfTenPercent: Template<TenParams> = {
     const cands: { d: number; trap?: string }[] = [
       { d: -dStar, trap: 'int-power-ten-direction' },
       { d: dir === 0 ? -t : t, trap: 'int-percent-not-divided' },
-      { d: dStar + 1 },
-      { d: dStar - 1 },
-      { d: dStar + 2 },
-      { d: dStar - 2 },
+      ...[1, -1, 2, -2, 3, -3, 4, -4].map((k) => ({ d: dStar + k })),
     ];
-    const picked: { d: number; trap?: string }[] = [];
-    for (const cnd of cands) if (picked.length < 3 && cnd.d !== dStar && !picked.some((x) => x.d === cnd.d)) picked.push(cnd);
-    const all: { d: number; ok: boolean; trap?: string }[] = [{ d: dStar, ok: true }, ...picked.map((x) => ({ ...x, ok: false })), { d: MULT, ok: false }];
+    const pool: { d: number; trap?: string }[] = [];
+    for (const cnd of cands) if (cnd.d !== dStar && !pool.some((x) => x.d === cnd.d)) pool.push(cnd);
+    // Half the time the last choice is the multiplicative look-alike "y = 10^k x"; the answer
+    // position among the additive choices is uniform.
+    const withMult = rng.chance(0.5);
+    const slots = withMult ? 4 : 5;
+    const below = pool.filter((x) => x.d < dStar);
+    const above = pool.filter((x) => x.d > dStar);
+    let target = rng.int(0, slots - 1);
+    target = Math.max(Math.min(target, below.length), slots - 1 - above.length);
+    const picked = [...below.slice(0, target), ...above.slice(0, slots - 1 - target)];
+    const all: { d: number; ok: boolean; trap?: string }[] = [
+      { d: dStar, ok: true },
+      ...picked.map((x) => ({ ...x, ok: false })),
+      ...(withMult ? [{ d: MULT, ok: false }] : []),
+    ];
     const factor = 10 ** Math.max(1, Math.abs(dStar));
     const relTex = (d: number) => (d === MULT ? `y = ${num(factor)}x` : d === 0 ? 'y = x' : `y = x ${d > 0 ? '+' : '-'} ${Math.abs(d)}`);
     all.sort((u, v) => (u.d === MULT ? 1 : v.d === MULT ? -1 : u.d - v.d));

@@ -790,7 +790,7 @@ Comparing the perimeters (or the numbers of sides) instead of the sides is the t
         params: { ...base, mode, a, b: b1, h: hgt, off, k: kF.toNumber(), kFrac: [kF.n, kF.d], n1: b2 },
         q: {
           format: 'qc',
-          figure: fig.build(true),
+          figure: fig.build(false),
           info: `$ABCD$ is a trapezoid with $AB$ parallel to $DC$.`,
           quantityA: `The area of $ABCD$`,
           quantityB: `$${kF.isInt() ? num(kF.n) : kF.toDecimalString()}$`,
@@ -828,7 +828,7 @@ Using the slanted side ${a} as the height gives ${legArea.isInt() ? legArea.n : 
         params: { ...base, mode, a, b, h: hgt, off, k },
         q: {
           format: 'qc',
-          figure: fig.build(true),
+          figure: fig.build(false),
           info: `$ABCD$ is a parallelogram.`,
           quantityA: `The area of $ABCD$`,
           quantityB: `$${num(k)}$`,
@@ -852,7 +852,7 @@ Multiplying the two sides, $${b} \\cdot ${a} = ${a * b}$, uses the slanted side 
       params: { ...base, mode, a, b, k },
       q: {
         format: 'qc',
-        figure: fig.build(true),
+        figure: fig.build(false),
         info: `$ABCD$ is a parallelogram.`,
         quantityA: `The area of $ABCD$`,
         quantityB: `$${num(k)}$`,
@@ -866,7 +866,7 @@ ${
     : `If $ABCD$ is a rectangle the area is ${ab}${kind === 'eq' ? ', equal to Quantity B' : `, greater than ${k}`}; if the angle at $A$ is small, the area is close to 0, less than ${k}. (D)`
 }
 
-The figure is not drawn to scale: nothing says the angles are right angles.`,
+Do not read the angles off the figure: geometric figures are not necessarily drawn to scale, and nothing says the angles are right angles.`,
       },
     };
   },
