@@ -23,16 +23,19 @@ function Canvas({
   children,
   labels,
   maxWidth,
+  label = 'Figure',
 }: {
   w: number;
   h: number;
   children: ReactNode;
   labels?: { x: number; y: number; text: string; align?: 'center' | 'left' | 'right' }[];
   maxWidth?: number;
+  /** Accessible name of the drawing. */
+  label?: string;
 }) {
   return (
     <div className="figure-wrap" style={{ maxWidth: maxWidth ?? w, margin: '0 auto' }}>
-      <svg viewBox={`0 0 ${w} ${h}`} role="img">
+      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label}>
         {children}
       </svg>
       {labels?.map((l, i) => (
@@ -75,7 +78,7 @@ function NumberLine({ f }: { f: NumberLineFigure }) {
   }
   for (const t of f.ticks ?? []) if (t.label) labels.push({ x: x(t.at), y: y + 24, text: t.label });
   return (
-    <Canvas w={W} h={H} labels={labels}>
+    <Canvas w={W} h={H} labels={labels} label="Number line">
       <line x1={12} y1={y} x2={W - 12} y2={y} stroke={INK} strokeWidth={1.5} />
       <path d={`M12 ${y} l9 -5 v10 z`} fill={INK} />
       <path d={`M${W - 12} ${y} l-9 -5 v10 z`} fill={INK} />
@@ -308,7 +311,7 @@ function Geometry({ f }: { f: GeometryFigure }) {
   }
   return (
     <>
-      <Canvas w={W} h={H} labels={labels} maxWidth={Math.min(W, 460)}>
+      <Canvas w={W} h={H} labels={labels} maxWidth={Math.min(W, 460)} label="Geometry figure">
         {els}
       </Canvas>
       {f.notToScale && <div className="fig-note">Note: Figure not drawn to scale.</div>}
