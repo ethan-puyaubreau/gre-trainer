@@ -177,7 +177,7 @@ export function parseDecimal(raw: string): Frac | null {
   const neg = s.startsWith('-');
   const body = neg ? s.slice(1) : s;
   const [intPart, decPart = ''] = body.split('.');
-  if (decPart.length > 12 || intPart.length > 12) return null;
+  if (decPart.length > 12 || intPart.length > 12 || intPart.length + decPart.length > 15) return null; // 15 digits stay exact
   const n = Number((intPart || '0') + decPart);
   const d = 10 ** decPart.length;
   return new Frac(neg ? -n : n, d);

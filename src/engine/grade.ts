@@ -18,11 +18,15 @@ export interface GradeResult {
 
 export function parseNumericResponse(r: Response): Frac | null {
   if (r.format !== 'ne') return null;
-  if ('value' in r) return parseDecimal(r.value);
-  const n = parseIntBox(r.num);
-  const d = parseIntBox(r.den);
-  if (n === null || d === null || d === 0) return null;
-  return new Frac(n, d);
+  try {
+    if ('value' in r) return parseDecimal(r.value);
+    const n = parseIntBox(r.num);
+    const d = parseIntBox(r.den);
+    if (n === null || d === null || d === 0) return null;
+    return new Frac(n, d);
+  } catch {
+    return null; // user input must never crash a render
+  }
 }
 
 export function isAnswered(r: Response | undefined): boolean {
