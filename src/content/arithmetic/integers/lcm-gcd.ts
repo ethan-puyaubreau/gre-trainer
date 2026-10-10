@@ -574,4 +574,99 @@ The product $${t1} \\cdot ${t2}$ seconds is also a common multiple, but not the 
   },
 };
 
-export const lcmGcdTemplates: Template<any>[] = [schedule, multiplesSelect, commonMultipleQC, groupsWord];
+
+/* ------------------------------------------------------------------ 5. Work/rest cycles: on which days do both rest at once (MCM) */
+
+interface RestParams {
+  a1: number;
+  r1: number;
+  a2: number;
+  r2: number;
+  /** total length of the period, in hours, starting at noon of day 0 */
+  T: number;
+}
+
+const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const clockOf = (t: number) => ((12 + t) % 24 === 0 ? 'midnight' : (12 + t) % 24 === 12 ? 'noon' : clock(((12 + t) % 24) * 60, 'short'));
+const hourText = (t: number) => `${WEEK[Math.floor((12 + t) / 24)]} ${clockOf(t)}`;
+/** "Tuesday 6:00 p.m. to 8:00 p.m.", "Wednesday 10:00 p.m. to midnight", "Friday 10:00 p.m. to Saturday 2:00 a.m." */
+const spanText = (st: number, en: number) => {
+  const sameDay = Math.floor((12 + st) / 24) === Math.floor((12 + en - 1) / 24);
+  return `${hourText(st)} to ${sameDay ? clockOf(en) : hourText(en)}`;
+};
+
+const restOverlap: Template<RestParams> = {
+  id: 'arith.lcm-gcd.rest-overlap',
+  skill: 'arith.lcm-gcd',
+  format: 'mcm',
+  style: 'two machines on work/rest cycles: on which days do they rest at the same time',
+  generate(rng, diff) {
+    for (;;) {
+      const c1 = rng.pick([6, 8, 10, 12, 16]);
+      const k = rng.pick(diff === 1 ? [2] : [2, 3]);
+      const c2 = c1 * k;
+      if (c2 > 48) continue;
+      const r1 = rng.int(2, Math.max(2, Math.floor(c1 / 3)));
+      const r2 = rng.int(2, Math.max(2, Math.floor(c2 / 4)));
+      const a1 = c1 - r1;
+      const a2 = c2 - r2;
+      const days = diff === 3 ? 5 : 4;
+      const T = days * 24;
+      // hour-by-hour: which calendar days contain an hour when both rest
+      const both: number[] = [];
+      for (let t = 0; t < T; t++) if (t % c1 >= a1 && t % c2 >= a2) both.push(t);
+      const dayIdx = [...new Set(both.map((t) => Math.floor((12 + t) / 24)))];
+      const nDays = days + 1; // Monday .. the day the period ends at noon
+      if (dayIdx.length < 1 || dayIdx.length > nDays - 2) continue;
+      const items = range(0, nDays - 1).map((d) => ({ text: WEEK[d], correct: dayIdx.includes(d) }));
+      const { choices, answer } = flaggedChoices(items);
+      // explanation: rest windows within one long cycle, then every overlap in the period
+      const overlaps: [number, number][] = [];
+      for (const t of both) {
+        const last = overlaps[overlaps.length - 1];
+        if (last && last[1] === t) last[1] = t + 1;
+        else overlaps.push([t, t + 1]);
+      }
+      const inCycle = overlaps.filter(([st]) => st < c2).map(([st, en]) => `hours ${st} to ${en}`);
+      const endDay = WEEK[days];
+      return {
+        params: { a1, r1, a2, r2, T },
+        q: {
+          format: 'mcm',
+          stem: `Machine X runs for ${a1} hours, then rests for ${r1} hours, and repeats this cycle without stopping. Machine Y runs for ${a2} hours, then rests for ${r2} hours, and repeats this cycle without stopping. Both machines start running at noon on a Monday, and both are shut down at noon on the following ${endDay}. On which of the following days is there a time when both machines are resting?`,
+          instruction: 'Indicate all such days.',
+          choices,
+          answer,
+          explanation: `Count hours from noon on Monday. Machine X's cycle is ${c1} hours and machine Y's is ${c2} hours, so the pattern of the two machines repeats every lcm$(${c1}, ${c2}) = ${c2}$ hours.
+
+In each ${c1}-hour cycle, X rests during the last ${r1} hours; in each ${c2}-hour cycle, Y rests during hours ${a2} to ${c2}. In the first ${c2} hours, both rest during ${listAnd(inCycle)}.
+
+Repeating every ${c2} hours, the times when both rest before the shutdown are:
+${overlaps.map(([st, en]) => `- ${spanText(st, en)}`).join('\n')}
+
+So the days are ${listAnd(dayIdx.map((d) => WEEK[d]))}. Checking only the first cycle, or only the times when one of the machines rests, misses some days.`,
+        },
+      };
+    }
+  },
+  check(q, { a1, r1, a2, r2, T }) {
+    // intersect the rest intervals directly
+    const rests = (a: number, r: number): [number, number][] => {
+      const out: [number, number][] = [];
+      for (let st = 0; st < T; st += a + r) out.push([st + a, Math.min(st + a + r, T)]);
+      return out.filter(([x, y]) => x < y);
+    };
+    const days = new Set<number>();
+    for (const [x1, y1] of rests(a1, r1))
+      for (const [x2, y2] of rests(a2, r2)) {
+        const lo = Math.max(x1, x2);
+        const hi = Math.min(y1, y2);
+        if (lo < hi) for (let d = Math.floor((12 + lo) / 24); d * 24 - 12 < hi; d++) days.add(d);
+      }
+    if (q.format !== 'mcm') return 'wrong format';
+    const expected = q.choices.flatMap((c, i) => (days.has(WEEK.indexOf(c.text)) ? [i] : []));
+    return expectMcm(q, expected);
+  },
+};
+
+export const lcmGcdTemplates: Template<any>[] = [schedule, multiplesSelect, commonMultipleQC, groupsWord, restOverlap];

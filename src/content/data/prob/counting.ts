@@ -409,9 +409,11 @@ $${num(f(w.length))}$ counts the same string several times.`;
       count = seen.size;
     } else {
       const people = Array.from({ length: n }, (_, i) => i);
+      const pos = new Array<number>(n);
       forEachPermutation(people, (p) => {
-        const px = p.indexOf(0);
-        const py = p.indexOf(1);
+        for (let k = 0; k < n; k++) pos[p[k]] = k;
+        const px = pos[0];
+        const py = pos[1];
         const adj = Math.abs(px - py) === 1;
         let ok = true;
         if (kind === 'first') ok = px === 0;
@@ -421,8 +423,8 @@ $${num(f(w.length))}$ counts the same string several times.`;
         else if (kind === 'apart') ok = !adj;
         else if (kind === 'fixed') ok = px === (where === 'middle' ? (n - 1) / 2 : 0) && adj === near;
         else if (kind === 'block3') {
-          const pos = [0, 1, 2].map((i) => p.indexOf(i)).sort((u, v) => u - v);
-          ok = pos[2] - pos[0] === 2;
+          const b = [pos[0], pos[1], pos[2]].sort((u, v) => u - v);
+          ok = b[2] - b[0] === 2;
         }
         if (ok) count++;
       });
@@ -546,27 +548,22 @@ $5^3 = 125$ allows a leading 0.`;
   check(q, p) {
     let count = 0;
     if (p.kind === 'code') {
-      // Enumerate every code as a list of symbols.
-      const total = p.letters ** p.L * 10 ** p.D;
-      for (let i = 0; i < total; i++) {
-        let x = i;
-        const ls: number[] = [];
-        const ds: number[] = [];
-        for (let j = 0; j < p.L; j++) {
-          ls.push(x % p.letters);
-          x = Math.floor(x / p.letters);
-        }
-        for (let j = 0; j < p.D; j++) {
-          ds.push(x % 10);
-          x = Math.floor(x / 10);
-        }
-        if (p.repeat || (new Set(ls).size === ls.length && new Set(ds).size === ds.length)) count++;
-      }
+      // Enumerate the letter part and the digit part separately; every pair of parts is a code.
+      const strings = (alphabet: number, len: number) => (p.repeat ? alphabet ** len : countSequences(alphabet, len));
+      let letterParts = 0;
+      if (p.repeat) {
+        const rec = (k: number): number => (k === p.L ? 1 : Array.from({ length: p.letters }, () => rec(k + 1)).reduce((a, b) => a + b, 0));
+        letterParts = rec(0);
+      } else letterParts = strings(p.letters, p.L);
+      const digitParts = p.repeat ? 10 ** p.D : countSequences(10, p.D);
+      count = letterParts * digitParts;
     } else {
       const lo = 10 ** (p.digits - 1);
       for (let v = lo; v < lo * 10; v++) {
-        const ds = String(v).split('').map(Number);
-        const distinct = new Set(ds).size === ds.length;
+        const ds: number[] = [];
+        for (let x = v; x > 0; x = Math.floor(x / 10)) ds.push(x % 10);
+        let distinct = true;
+        for (let a = 0; a < ds.length; a++) for (let b = a + 1; b < ds.length; b++) if (ds[a] === ds[b]) distinct = false;
         let ok = false;
         if (p.kind === 'distinct') ok = distinct;
         else if (p.kind === 'odd-distinct') ok = distinct && v % 2 === 1;

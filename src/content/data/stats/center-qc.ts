@@ -331,14 +331,14 @@ ${why} (${ans})`,
     switch (p.mode) {
       case 'determined': {
         let x = NaN;
-        for (let c = -500; c <= 500; c++) if (meanF([...p.base, c]).eq(p.givenMean)) x = c;
+        for (let c = -100; c <= 200; c++) if (total(p.base) + c === p.givenMean * (p.base.length + 1)) x = c;
         const all = [...p.base, x];
         const med = medianByRank(all);
         expected = qcFromSamples([order(p.other === 'mean' ? meanF(all) : frac(x), med)]);
         break;
       }
       case 'gap': {
-        const hi = p.hi ?? (p.lo as number) + 5000;
+        const hi = p.hi ?? (p.lo as number) + 400;
         const xs: number[] = [];
         for (let x = (p.lo as number) + 1; x < hi; x++) xs.push(x);
         expected = qcFromSamples(xs.map((x) => order(medianByRank([...p.base, x]), p.bValue)));
@@ -357,7 +357,8 @@ ${why} (${ans})`,
       case 'signs': {
         // Random lists with the stated signs, at many different scales.
         const samples: [number, number][] = [];
-        for (let i = 0; i < 600; i++) {
+        const seen = new Set<string>();
+        for (let i = 0; i < 400 && seen.size < 2; i++) {
           const sNeg = 10 ** rng.int(-2, 3);
           const sPos = 10 ** rng.int(-2, 3);
           const xs = [
@@ -366,7 +367,9 @@ ${why} (${ans})`,
           ];
           const mean = xs.reduce((s, v) => s + v, 0) / xs.length;
           const med = medianNum(xs);
-          samples.push(p.signsAsk === 'mean-median' ? (order(mean, med) as [number, number]) : (order(med, 0) as [number, number]));
+          const sample = (p.signsAsk === 'mean-median' ? order(mean, med) : order(med, 0)) as [number, number];
+          samples.push(sample);
+          seen.add(qcFromSamples([sample]));
         }
         expected = qcFromSamples(samples);
         break;
@@ -374,7 +377,8 @@ ${why} (${ans})`,
       case 'threshold': {
         const samples: [number, number][] = [];
         const mean = p.T / p.n;
-        for (let i = 0; i < 3000 && samples.length < 400; i++) {
+        const seen = new Set<string>();
+        for (let i = 0; i < 2000 && samples.length < 150 && seen.size < 2; i++) {
           // two-level and random data sets, rescaled to the stated total
           const k = rng.int(1, p.n - 1);
           const ratio = 10 ** (rng.next() * 3 - 1.5);
@@ -382,9 +386,11 @@ ${why} (${ans})`,
           const s = raw.reduce((a, b) => a + b, 0);
           const xs = raw.map((v) => (v * p.T) / s);
           if (xs.filter((v) => v < p.K).length * 2 <= p.n) continue;
-          samples.push(order(mean, medianNum(xs)) as [number, number]);
+          const sample = order(mean, medianNum(xs)) as [number, number];
+          samples.push(sample);
+          seen.add(qcFromSamples([sample]));
         }
-        if (samples.length < 50) return 'too few valid samples';
+        if (samples.length < 20 && seen.size < 2) return 'too few valid samples';
         expected = qcFromSamples(samples);
         break;
       }

@@ -95,6 +95,10 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Assumed a larger $x$ gives a larger $y$ on a parabola',
     fix: 'A parabola is symmetric about its axis $x = h$. Compare the DISTANCES of the two $x$-values from $h$: on a downward parabola the closer one is higher.',
   },
+  'algw-symmetric-points': {
+    label: 'Missed the symmetry of the parabola',
+    fix: 'Two points of a parabola with the same $y$-coordinate are mirror images across its axis $x = h$, so their $x$-coordinates always add up to $2h$, whichever pair is chosen.',
+  },
   'algw-vertex-sign': {
     label: 'Sign error in the axis of symmetry',
     fix: 'For $y = ax^2 + bx + c$ the axis is $x = -\\frac{b}{2a}$; for $y = (x - h)^2 + k$ the vertex is $(h, k)$, not $(-h, k)$.',
@@ -171,6 +175,10 @@ export const appliedTrapMap: Record<string, Trap> = {
   'algw-recursion-order': {
     label: 'Applied the steps of the recursive rule in the wrong order',
     fix: 'Follow the rule exactly: for $a_n = 2a_{n-1} - 3$, multiply the previous term by 2 FIRST, then subtract 3.',
+  },
+  'algw-mean-two-terms': {
+    label: 'Averaged only the two previous terms',
+    fix: 'The rule averages ALL the preceding terms. A term equal to the mean of the earlier terms leaves that mean unchanged, so from then on every term is the same.',
   },
   'algw-recursion-backward': {
     label: 'Ran the rule forward instead of undoing it',

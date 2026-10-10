@@ -1,6 +1,6 @@
 import { flaggedChoices, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
-import { num } from '../../../engine/tex';
+import { decimal, num } from '../../../engine/tex';
 import type { Rng } from '../../../engine/rng';
 import type { GeometryFigure, QCChoice, Template } from '../../../engine/types';
 import {
@@ -18,9 +18,10 @@ import {
   wedgeLabel,
   type Pt,
 } from './fig';
-import { angleLabel, checkMcm, checkMcs, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
+import { angleLabel, checkMcm, checkMcs, evalTex, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
 
 const SKILL = 'geo.lines-angles';
+const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
 
 /* ================================================================== transversal figure (shared) */
 
@@ -164,8 +165,6 @@ interface ParAlgParams {
   values: number[];
 }
 
-/** "3(25) + 10" */
-const evalTex = (c: number, k: number, x: number) => `${c === 1 ? '' : c}(${x})${k === 0 ? '' : ` ${k < 0 ? '-' : '+'} ${Math.abs(k)}`}`;
 const labTex = (l: { c: number; k: number }) => angleLabel(l.c, l.k).replace(/\$/g, '');
 const sumTerm = (l: { c: number; k: number }) => (l.c === 0 || l.k === 0 ? exprTex(l.c, l.k) : `(${exprTex(l.c, l.k)})`);
 
@@ -417,12 +416,12 @@ const aroundPoint: Template<AroundParams> = {
           figure,
           explanation:
             form === 'whole'
-              ? `The two angles form a straight line, so $r + s = 180$. Then $\\dfrac{r}{180} = \\dfrac{${p}}{${q}}$ and $r = \\dfrac{${p} \\cdot 180}{${q}} = ${num(r)}$.
+              ? `The two angles form a straight line, so $r + s = 180$. Then $\\dfrac{r}{180} = \\dfrac{${p}}{${q}}$ and $r = \\dfrac{${p} \\cdot 180}{${q}} = ${dec(r)}$.
 
 The ratio compares $r$ with the WHOLE straight angle, not with $s$: reading it as $r : s = ${p} : ${q}$ would give a different answer. And a straight line is $180^\\circ$, not $360^\\circ$.`
-              : `The two angles form a straight line, so $r + s = 180$. With $r : s = ${p} : ${q}$, the straight angle is split into $${p} + ${q} = ${p + q}$ equal parts of $\\dfrac{180}{${p + q}}$ degrees each, so $r = ${num(r)}$ and $s = ${num(s)}$.
+              : `The two angles form a straight line, so $r + s = 180$. With $r : s = ${p} : ${q}$, the straight angle is split into $${p} + ${q} = ${p + q}$ equal parts of $\\dfrac{180}{${p + q}}$ degrees each, so $r = ${dec(r)}$ and $s = ${dec(s)}$.
 
-So $${ask} = ${num(ans)}$. Careful: $\\frac{r}{s} = \\frac{${p}}{${q}}$ does not mean $r$ is $\\frac{${p}}{${q}}$ of $180$.`,
+So $${ask} = ${dec(ans)}$. Careful: $\\frac{r}{s} = \\frac{${p}}{${q}}$ does not mean $r$ is $\\frac{${p}}{${q}}$ of $180$.`,
         },
       };
     }
@@ -644,7 +643,7 @@ const zigzagQC: Template<ZigParams> = {
     );
     const a = rng.int(5, 13) * 5;
     let b = rng.int(5, 12) * 5;
-    while (a + b > 150 || b === a) b = rng.int(5, 12) * 5;
+    while (a + b > 150 || b === a || a + b === 90) b = rng.int(5, 12) * 5;
     const x = a + b;
     let labA = `$${a}^\\circ$`;
     let labB = `$${b}^\\circ$`;

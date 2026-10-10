@@ -49,6 +49,10 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Added an exponent that should be subtracted',
     fix: 'Dividing by $10^{p}$ subtracts $p$ from the exponent: $\\frac{10^{7}}{10^{-3}} = 10^{7 - (-3)} = 10^{10}$.',
   },
+  'num-repeating-truncate': {
+    label: 'Treated a repeating decimal as if it stopped',
+    fix: '$0.\\overline{4} = 0.444\\ldots = \\frac{4}{9}$, which is more than 0.4. Write repeating decimals as fractions ($0.\\overline{d} = \\frac{d}{9}$, $0.\\overline{ab} = \\frac{ab}{99}$) before adding or comparing.',
+  },
   'num-wrong-pairs': {
     label: 'Matched quantities with the wrong prices',
     fix: 'Multiply each quantity by its own unit price before adding.',

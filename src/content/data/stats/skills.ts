@@ -26,7 +26,7 @@ export const statsSkills: Skill[] = [
     strategy: `The combined average of two groups is $\\dfrac{n_1 a_1 + n_2 a_2}{n_1 + n_2}$. It lies between $a_1$ and $a_2$, closer to the larger group.
 
 - Equal group sizes: the overall average is exactly the midpoint.
-- Distances to the overall average are in the inverse ratio of the sizes: $\\dfrac{n_2}{n_1} = \\dfrac{c - a_1}{a_2 - c}$.
+- Distances to the overall average are in the inverse ratio of the sizes: $\\frac{n_2}{n_1} = \\frac{c - a_1}{a_2 - c}$.
 - "Group 1 has more than $k$ times as many members": the overall average is within $\\frac{1}{k + 1}$ of the gap from $a_1$.
 - Grouped data (counts and values): multiply each value by its count, add, divide by the total count, not by the number of groups.`,
   },

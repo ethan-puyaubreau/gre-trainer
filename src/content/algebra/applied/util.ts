@@ -122,6 +122,17 @@ export function plot(
   return out.filter((c) => c.length >= 2);
 }
 
+/**
+ * Solid dots for unlabeled points. A hidden point name also hides the renderer's dot, so draw it
+ * with circles instead: a ring (radius 2.4 px, stroke 1.6 px) plus a tiny circle inside it whose
+ * stroke fills the center, giving a solid dot of about 3.2 px radius. Pixel size assumes the
+ * renderer's 340 px for the larger side of the window.
+ */
+export function dots(names: string[], w: Window): { center: string; r: number; shade?: boolean }[] {
+  const px = Math.max(w.xMax - w.xMin, w.yMax - w.yMin) / 340;
+  return [...names.map((center) => ({ center, r: 2.4 * px })), ...names.map((center) => ({ center, r: 0.8 * px }))];
+}
+
 /* ---------------------------------------------------------------------------------------------
  * Choices that carry a hidden exact value, so check() can map each displayed text back to it.
  * ------------------------------------------------------------------------------------------- */

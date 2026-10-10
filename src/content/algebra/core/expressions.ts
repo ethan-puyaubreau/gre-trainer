@@ -386,9 +386,7 @@ const expandMCS: Template<ExpandParams> = {
 
 ${neg2 ? `Subtract the second result, changing the sign of every one of its terms` : 'Combine like terms'}: the result is $${quadTex(R, twoVar)}$.
 
-Watch the middle term of a square: $(${linTex(sq.l1, twoVar)})^2$ has the middle term $2 \\cdot ${num(sq.l1[0])}x \\cdot ${
-          sq.l1[1] < 0 ? `(${num(sq.l1[1])}${twoVar ? 'y' : ''})` : `${num(sq.l1[1])}${twoVar ? 'y' : ''}`
-        }$, which is easy to drop.`,
+Watch the middle term of a square: $(${linTex(sq.l1, twoVar)})^2$ has the middle term $2(${lin([[sq.l1[0], 'x']])})(${lin([[sq.l1[1], twoVar ? 'y' : '']])}) = ${lin([[2 * sq.l1[0] * sq.l1[1], twoVar ? 'xy' : 'x']])}$, which is easy to drop.`,
       },
     };
   },
@@ -530,8 +528,8 @@ const equivalentMCM: Template<EquivParams> = {
     let u: number;
     let v: number;
     do {
-      u = rng.int(1, 7) * rng.sign();
-      v = rng.int(1, 7) * rng.sign();
+      u = rng.int(1, k > 3 ? 5 : 7) * rng.sign();
+      v = rng.int(1, k > 3 ? 5 : 7) * rng.sign();
     } while (u === v || u === -v);
     const expanded = polyEx([k, -k * (u + v), k * u * v]);
     const cands: { e: Ex; ok: boolean; trap?: string; why: string }[] = [];

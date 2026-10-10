@@ -16,6 +16,18 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Left a remainder larger than the divisor',
     fix: 'A remainder is always less than the divisor. If the work gives 14 when dividing by 9, keep subtracting 9: the remainder is 5.',
   },
+  'int-huge-number': {
+    label: 'Assumed the remainder of a huge number cannot be found',
+    fix: 'Remainders follow patterns: $10 = 9 + 1$, so every power of 10 leaves remainder 1 when divided by 9 (or 3); $100 = 99 + 1$, so even powers of 10 leave remainder 1 when divided by 11; and 100 is a multiple of 4.',
+  },
+  'int-ignored-different': {
+    label: 'Ignored the word "different"',
+    fix: 'If $x$ and $y$ must be different, the case $x = y$ is not allowed. For different positive odd integers the smallest sum is $1 + 3 = 4$, not $1 + 1 = 2$.',
+  },
+  'int-cancel-first': {
+    label: 'Did not cancel the given factor first',
+    fix: 'Cancel the known part of the denominator first. The unknown factor must divide what is LEFT of the numerator, not the whole numerator.',
+  },
   'int-one-condition-only': {
     label: 'Checked only one of the conditions',
     fix: 'A value must satisfy every condition in the question. Test each candidate against all of them.',
@@ -140,6 +152,18 @@ export const integerTraps: Record<string, Trap> = {
   'int-base-change-exponent': {
     label: 'Changed the base without changing the exponent',
     fix: 'Rewrite the whole power: $4^x = (2^2)^x = 2^{2x}$, not $2^x$; $27^x = 3^{3x}$.',
+  },
+  'int-exponent-distribute': {
+    label: 'Multiplied only part of the exponent',
+    fix: 'The outer exponent multiplies the WHOLE inner exponent: $9^{x+1} = (3^2)^{x+1} = 3^{2x+2}$, not $3^{2x+1}$.',
+  },
+  'int-power-ten-direction': {
+    label: 'Reversed the direction of the exponents',
+    fix: 'If $10^x$ is a small percent of $10^y$, then $10^x$ is the smaller number, so $x < y$. Write the percent as a power of 10 first: $0.1\\% = 10^{-3}$.',
+  },
+  'int-percent-not-divided': {
+    label: 'Treated $q$ percent as $q$',
+    fix: '$q$ percent means $\\frac{q}{100}$: 1 percent is $10^{-2}$, 0.1 percent is $10^{-3}$, and 10 percent is $10^{-1}$.',
   },
   // ---------------------------------------------------------------- evaluating expressions
   'int-distribute-power': {

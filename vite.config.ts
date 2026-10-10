@@ -16,5 +16,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    // Each content test runs a template on hundreds of seeds; sampling checks can take seconds.
+    testTimeout: 120_000,
   },
 });

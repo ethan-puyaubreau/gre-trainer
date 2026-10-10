@@ -50,6 +50,7 @@ const solveExpNE: Template<SolveParams> = {
       if (right.a === 0) right.c = rng.int(2, 7);
       if (left.length === 2 && left[0].e === left[1].e) continue;
       if (left.every((f) => f.e === right.e)) continue;
+      if (left.some((f) => f.e === right.e && f.a === right.a && f.c === right.c)) continue;
       const coef = left.reduce((s, f) => s + f.w * f.e * f.a, 0) - right.e * right.a;
       const rhs = right.e * right.c - left.reduce((s, f) => s + f.w * f.e * f.c, 0);
       if (coef === 0) continue;
@@ -101,7 +102,7 @@ const solveExpNE: Template<SolveParams> = {
 
 ${opText}, so the equation becomes $${g}^{${lExp}} = ${g}^{${rExp}}$. Equal powers of the same base have equal exponents:
 $$${lExp} = ${rExp}$$
-so $${expTex(lA - rA, 0)} = ${num(rC - lC)}$ and $x = ${x.toTex()}${x.isInt() ? '' : ` = ${x.toDecimalString()}`}$.
+${lA - rA === 1 ? 'so' : `so $${expTex(lA - rA, 0)} = ${num(rC - lC)}$ and`} $x = ${x.toTex()}${x.isInt() ? '' : ` = ${x.toDecimalString()}`}$.
 
 Setting the exponents equal before converting to one base is the classic mistake: different bases cannot be compared that way.`,
       },
@@ -193,7 +194,7 @@ Subtract in the right order (numerator minus denominator); the other order gives
       wrongs.push({ e: mul(N(e2), V('t')) }, { e: lx(1, 1, 't') }, { e: mul(N(e1 * e2), V('t')) });
       wrongs.push({ e: mul(N(b2), V('t')) }, { e: pow(V('t'), e2) }, { e: lx(1, -1, 't') }, { e: mul(N(e1 + e2), V('t')) });
       stem = `If $${b1}^{m} = ${b2}^{t}$, which of the following expresses $m$ in terms of $t$?`;
-      explanation = `Write both sides with base ${g}: $${b1}^{m} = ${g}^{${e1 === 1 ? '' : e1}m}$ and $${b2}^{t} = ${g}^{${e2 === 1 ? '' : e2}t}$.
+      explanation = `Write both sides with base ${g}: ${[e1 === 1 ? '' : `$${b1}^{m} = ${g}^{${e1}m}$`, e2 === 1 ? '' : `$${b2}^{t} = ${g}^{${e2}t}$`].filter(Boolean).join(' and ')}.
 
 Equal powers of ${g} have equal exponents: $${e1 === 1 ? '' : e1}m = ${e2 === 1 ? '' : e2}t$, so $m = ${texEx(correct)}$.
 
@@ -212,7 +213,7 @@ Inverting the fraction gives $${texEx(wrongs[0].e)}$; check with $t = ${e1}$: $$
       wrongs.push({ e: mul(N(g ** c), pow(V('k'), e)), trap: 'alg-exponent-distribute' });
       wrongs.push({ e: add(pow(V('k'), e), N(coef)), trap: 'alg-exponent-add-as-sum' });
       wrongs.push({ e: mul(N(coef), V('k')), trap: 'alg-power-base-mult' });
-      wrongs.push({ e: mul(N(e), pow(V('k'), coef)) }, { e: pow(mul(N(coef), V('k')), e) });
+      wrongs.push({ e: mul(N(B), pow(V('k'), e)) }, { e: pow(V('k'), e * (c + 1)) }, { e: mul(N(coef), pow(V('k'), e + 1)) });
       stem = `If $${g}^{n} = k$, which of the following is equal to $${B}^{${c === 0 ? 'n' : `n + ${c}`}}$ in terms of $k$?`;
       explanation = `Write $${B}$ as $${g}^{${e}}$: $${B}^{n + ${c}} = ${g}^{${e}(n + ${c})} = ${g}^{${e}n} \\cdot ${g}^{${e * c}} = (${g}^{n})^{${e}} \\cdot ${num(coef)} = ${texEx(correct)}$.
 
@@ -334,6 +335,15 @@ const casesQC: Template<CasesParams> = {
       p = rng.int(1, 5);
       qq = rng.int(1, 5);
     } while (n === m || p === qq || (n - m === p - qq && !rng.chance(0.3)) || m === n);
+    if (rng.chance(0.18)) {
+      // same power after simplifying: the quantities are equal (when the coefficients match)
+      qq = rng.int(1, 4);
+      p = qq + (n - m);
+      if (p < 1) {
+        p = rng.int(1, 4);
+        qq = p - (n - m);
+      }
+    }
     const P = n - m;
     const Q = p - qq;
     const KA = new Frac(K);
@@ -428,11 +438,14 @@ const equalPowersMCM: Template<EqPowParams> = {
     cands.push({ e: add(pow(N(B), V('n')), N(B ** c)), ok: false, trap: 'alg-exponent-add-as-sum', why: `$${B}^{n + ${c}}$ is the product $${B}^{n} \\cdot ${B ** c}$, not a sum` });
     if (e === 2) {
       const t = pow(N(g), nc(c));
-      cands.push({ e: add(t, t), ok: false, trap: 'alg-power-sum', why: `$${texEx(t)} + ${texEx(t)} = 2 \\cdot ${texEx(t)} = ${g === 2 ? `2^{n + ${c + 1}}` : `2 \\cdot 3^{n + ${c}}`}$` });
+      cands.push({ e: add(t, t), ok: false, trap: 'alg-power-sum', why: `$${texEx(t)} + ${texEx(t)} = 2 \\cdot ${texEx(t)}${g === 2 ? ` = 2^{n + ${c + 1}}` : ''}$, which is not $${B}^{n + ${c}}$` });
     }
     cands.push({ e: mul(N(e), pow(N(g), nc(c))), ok: false, trap: 'alg-power-base-mult', why: `$${B} = ${g}^{${e}}$, not $${e} \\cdot ${g}$, so $${B}^{k}$ is not $${e} \\cdot ${g}^{k}$` });
     if (c === 2) cands.push({ e: pow(pow(N(B), V('n')), 2), ok: false, trap: 'alg-exponent-add-as-mult', why: `$(${B}^{n})^{2} = ${B}^{2n}$, not $${B}^{n + 2}$` });
-    else cands.push({ e: pow(N(B * g), V('n')), ok: false, trap: 'alg-power-base-mult', why: `$${B * g}^{n}$ is not $${g} \\cdot ${B}^{n}$, and that is not $${B}^{n + 1}$ either` });
+    else {
+      const t = pow(N(B), V('n'));
+      cands.push({ e: add(t, t), ok: false, trap: 'alg-power-sum', why: `$${B}^{n} + ${B}^{n} = 2 \\cdot ${B}^{n}$, while $${B}^{n + 1} = ${B} \\cdot ${B}^{n}$` });
+    }
     // Remove wrong candidates that happen to be equal (and drop duplicates).
     const good = rng.shuffle(cands.filter((x) => x.ok));
     const bad = rng.shuffle(cands.filter((x) => !x.ok && !sameFunction(x.e, target, ['n'], rng, 0, 4)));

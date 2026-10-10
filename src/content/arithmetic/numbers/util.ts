@@ -72,6 +72,19 @@ export function usdF(x: Frac, forceCents = false): string {
   return usdRaw(v, 2);
 }
 
+/** Plain-text number (outside math) with thousands separators, also for decimals: 6652.8 -> "6,652.8". */
+export function plainNum(x: Frac | number): string {
+  const s = x instanceof Frac ? (x.isTerminating() ? x.toDecimalString() : x.toNumber().toFixed(4)) : String(Number(x.toFixed(10)));
+  const neg = s.startsWith('-');
+  const [i, d] = (neg ? s.slice(1) : s).split('.');
+  return (neg ? '-' : '') + Number(i).toLocaleString('en-US') + (d ? '.' + d : '');
+}
+
+/** Money for use INSIDE math: thousands separators as {,} so KaTeX does not add a space. */
+export function usdM(x: Frac, forceCents = false): string {
+  return usdF(x, forceCents).replace(/,/g, '{,}');
+}
+
 function usdRaw(x: number, places?: number): string {
   const neg = x < 0;
   const abs = Math.abs(x);
@@ -157,6 +170,34 @@ export function numChoices(
     answer: ordered.findIndex((it) => it.ok),
     values: ordered.map((it) => it.v),
   };
+}
+
+/**
+ * Fillers chosen so that the correct value lands at a random rank among `count` ascending choices.
+ * `below` / `above` are candidate wrong values smaller / larger than the correct one.
+ */
+export function spreadFillers(rng: Rng, correct: Frac, traps: Frac[], below: Frac[], above: Frac[], count = 5): Frac[] {
+  const uniq: Frac[] = [];
+  for (const t of traps) if (!t.eq(correct) && !uniq.some((u) => u.eq(t))) uniq.push(t);
+  const used = uniq.slice(0, count - 1);
+  const nb = used.filter((t) => t.lt(correct)).length;
+  const na = used.length - nb;
+  const free = count - 1 - used.length;
+  const fresh = (xs: Frac[]) => xs.filter((x, i) => !x.eq(correct) && !used.some((u) => u.eq(x)) && xs.findIndex((y) => y.eq(x)) === i);
+  const B = rng.shuffle(fresh(below.filter((x) => x.lt(correct))));
+  const A = rng.shuffle(fresh(above.filter((x) => x.gt(correct))));
+  // target rank of the correct answer, kept feasible
+  const lo = nb;
+  const hi = count - 1 - na;
+  let rank = rng.int(Math.min(lo, hi), Math.max(lo, hi));
+  rank = Math.max(nb, Math.min(rank, nb + Math.min(free, B.length)));
+  let needB = Math.min(rank - nb, B.length);
+  let needA = free - needB;
+  if (needA > A.length) {
+    needA = A.length;
+    needB = Math.min(free - needA, B.length);
+  }
+  return [...B.slice(0, needB), ...A.slice(0, needA), ...B.slice(needB), ...A.slice(needA)];
 }
 
 /* ------------------------------------------------------------------ check helpers */

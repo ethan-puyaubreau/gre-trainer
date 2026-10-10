@@ -505,4 +505,113 @@ ${lines}${trapLine}`,
   },
 };
 
-export const divisibilityTemplates: Template<any>[] = [mustDivide, remainderTransform, onesDigitQC, couldBeN];
+
+/* ------------------------------------------------------------------ 5. Remainder of a power of 10 plus a constant (QC) */
+
+interface PowRemParams {
+  d: number;
+  /** exponent, or 0 when k is unknown */
+  k: number;
+  kInfo: 'given' | 'even' | 'any';
+  c: number;
+  sign: 1 | -1;
+  bv: number;
+}
+
+/** Remainder of 10^k by pattern (generate): 9 and 3 -> 1; 11 -> 1 or 10 by parity; 4 (k >= 2), 8 (k >= 3) -> 0. */
+function tenPowRem(d: number, k: number): number {
+  if (d === 9 || d === 3) return 1;
+  if (d === 11) return k % 2 === 0 ? 1 : 10;
+  return 0;
+}
+
+const powerRemainderQC: Template<PowRemParams> = {
+  id: 'arith.divisibility.power-remainder-qc',
+  skill: 'arith.divisibility',
+  format: 'qc',
+  style: 'remainder of 10^k plus or minus a constant',
+  generate(rng, diff) {
+    for (;;) {
+      const d = rng.pick(diff === 1 ? [9, 3, 4] : diff === 2 ? [9, 11, 4, 8] : [11, 11, 9, 8]);
+      const kInfo: PowRemParams['kInfo'] = d === 11 && diff >= 2 ? rng.pick(['given', 'even', 'any'] as const) : 'given';
+      const k = kInfo === 'given' ? rng.int(d === 8 ? 6 : 10, 40) : 0;
+      const sign: 1 | -1 = diff >= 2 && d !== 4 && d !== 8 && rng.chance(0.35) ? -1 : 1;
+      const c = sign < 0 ? rng.int(1, d === 11 ? 9 : d - 1) : rng.int(1, diff === 1 ? 8 : 20);
+      const ks = kInfo === 'given' ? [k] : kInfo === 'even' ? [2, 4] : [1, 2];
+      const rems = [...new Set(ks.map((kk) => mod(tenPowRem(d, kk) + sign * c, d)))];
+      const raw = tenPowRem(d, ks[0]) + sign * c; // before reducing
+      let bv: number;
+      const roll = rng.next();
+      if (rems.length === 2) {
+        const [lo, hi] = [Math.min(...rems), Math.max(...rems)];
+        bv = roll < 0.6 ? rng.int(lo, hi) : roll < 0.8 ? lo - rng.int(1, 2) : hi + rng.int(1, 2);
+        if (bv < 0) continue;
+      } else {
+        const r = rems[0];
+        bv = roll < 0.35 ? r : roll < 0.7 ? r + rng.int(1, 2) : r - rng.int(1, 2);
+        if (bv < 0) continue;
+      }
+      const rels = new Set(rems.map((r) => qcCompare(r, bv)));
+      const answer: QCChoice = rels.size === 1 ? [...rels][0] : 'D';
+      const traps: QCQuestion['traps'] = {};
+      if (answer !== 'D') traps.D = 'int-huge-number';
+      if (rems.length === 1 && raw !== rems[0] && raw >= 0) {
+        const t = qcCompare(raw, bv);
+        if (t !== answer) traps[t] = 'int-remainder-not-reduced';
+      }
+      if (rems.length === 2) {
+        const t = qcCompare(rems[ks[1] % 2 === 0 ? 1 : 0] ?? rems[0], bv);
+        if (t !== answer && !traps[t]) traps[t] = 'tested-one-value';
+      }
+      const op = sign > 0 ? '+' : '-';
+      const kTex = kInfo === 'given' ? `${k}` : 'k';
+      const info =
+        kInfo === 'given'
+          ? `$m = 10^{${k}} ${op} ${c}$, and $r$ is the remainder when $m$ is divided by ${d}.`
+          : `$k$ is ${kInfo === 'even' ? 'an even positive integer' : 'a positive integer'}, $m = 10^{k} ${op} ${c}$, and $r$ is the remainder when $m$ is divided by ${d}.`;
+      let why: string;
+      if (d === 9 || d === 3)
+        why = `$10^{${kTex}} = 99\\ldots9 + 1$, and a number made of nines is divisible by ${d}. So $10^{${kTex}}$ leaves remainder 1 when divided by ${d}`;
+      else if (d === 11)
+        why = `$100 = 99 + 1$ and 99 is divisible by 11, so every even power of 10 (a power of 100) leaves remainder 1 when divided by 11, while odd powers ($10 \\cdot 100^j$) leave remainder 10`;
+      else why = `$10^{${kTex}}$ ends in at least ${d === 4 ? 'two' : 'three'} zeros, so it is a multiple of ${d === 4 ? '100, hence of 4' : '1,000, hence of 8'}: remainder 0`;
+      const remLine = (kk: number) => {
+        const t0 = tenPowRem(d, kk);
+        const val = t0 + sign * c;
+        if (val < 0) return `$${t0} - ${c} = ${val}$; adding ${d} gives the remainder $${val + d}$`;
+        return `$${t0} ${op} ${c} = ${val}$${val === mod(val, d) ? '' : `, which leaves remainder ${mod(val, d)}`}`;
+      };
+      let body: string;
+      if (rems.length === 1) {
+        body = `Then $m$ leaves the same remainder as ${remLine(ks[0])}: $r = ${rems[0]}$. Compare with ${bv}: ${QC_WORDS[answer]}. (${answer})`;
+      } else {
+        const [ev, od] = [mod(1 + sign * c, d), mod(10 + sign * c, d)];
+        body = `If $k$ is even, $r$ comes from ${remLine(2)}, so $r = ${ev}$; if $k$ is odd, from ${remLine(1)}, so $r = ${od}$.
+
+${answer === 'D' ? `Since ${ev} and ${od} compare differently with ${bv}, the relationship cannot be determined. (D)` : `Both values are ${answer === 'A' ? 'greater' : 'less'} than ${bv}, so ${QC_WORDS[answer]}. (${answer})`}`;
+      }
+      return {
+        params: { d, k, kInfo, c, sign, bv },
+        q: {
+          format: 'qc',
+          info,
+          quantityA: '$r$',
+          quantityB: `$${bv}$`,
+          answer,
+          traps: Object.keys(traps).length ? traps : undefined,
+          explanation: `${why}. ${body}${answer !== 'D' ? `\n\n$m$ is far too large to compute, but its remainder follows the pattern of the powers of 10.` : ''}`,
+        },
+      };
+    }
+  },
+  check(q, { d, k, kInfo, c, sign, bv }) {
+    const ks = kInfo === 'given' ? [k] : kInfo === 'even' ? [2, 4, 6, 8, 10, 12] : range(1, 12);
+    const samples = ks.map((kk): [number, number] => {
+      const m = 10n ** BigInt(kk) + BigInt(sign * c);
+      return [Number(m % BigInt(d)), bv];
+    });
+    return expectQc(q, qcFromSamples(samples));
+  },
+};
+
+export const divisibilityTemplates: Template<any>[] = [mustDivide, remainderTransform, onesDigitQC, couldBeN, powerRemainderQC];

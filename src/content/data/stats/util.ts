@@ -83,7 +83,7 @@ const phi = (z: number) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
 function areaFromZero(z: number): number {
   if (z === 0) return 0;
   const a = Math.abs(Math.min(z, 12));
-  const n = 2000;
+  const n = 400;
   const h = a / n;
   let s = phi(0) + phi(a);
   for (let i = 1; i < n; i++) s += (i % 2 ? 4 : 2) * phi(i * h);

@@ -81,6 +81,13 @@ export class Fig {
       shade,
     );
   }
+  /** Polygon through named points and coordinates (coordinates become helper points). */
+  polyMixed(items: (string | P2)[], shade = false): this {
+    return this.poly(
+      items.map((it) => (typeof it === 'string' ? it : this.h(it))),
+      shade,
+    );
+  }
   circle(center: string, r: number, shade = false): this {
     this.circles.push({ center, r, ...(shade ? { shade } : {}) });
     return this;
@@ -97,7 +104,75 @@ export class Fig {
     this.labels.push({ at, text });
     return this;
   }
+  private pending: { a: string; v: string; b: string; text: Rich }[] = [];
+  /**
+   * Angle arc with its label pushed far enough into the angle that a wide label such as
+   * "(2x - 60)°" does not cross the sides (the position is resolved in build()).
+   */
+  angleLabel(a: string, vertex: string, b: string, text: Rich): this {
+    this.angles.push({ a, vertex, b });
+    this.pending.push({ a, v: vertex, b, text });
+    return this;
+  }
+  private resolvePending(): void {
+    if (!this.pending.length) return;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const [x, y] of Object.values(this.points)) xs.push(x), ys.push(y);
+    for (const c of this.circles) {
+      const [x, y] = this.points[c.center];
+      xs.push(x - c.r, x + c.r), ys.push(y - c.r, y + c.r);
+    }
+    const k = 340 / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-9); // px per unit
+    for (const { a, v, b, text } of this.pending) {
+      const V = this.points[v];
+      const u = (P: P2) => {
+        const dx = P[0] - V[0];
+        const dy = P[1] - V[1];
+        const l = Math.hypot(dx, dy);
+        return [dx / l, dy / l];
+      };
+      const u1 = u(this.points[a]);
+      const u2 = u(this.points[b]);
+      let bx = u1[0] + u2[0];
+      let by = u1[1] + u2[1];
+      let bl = Math.hypot(bx, by);
+      if (bl < 1e-6) {
+        bx = -u1[1];
+        by = u1[0];
+        bl = 1;
+      }
+      const plain = text.replace(/\\circ|\^|\$|\s|\\[a-z]+/g, '');
+      const halfW = 5.5 * plain.length + 6;
+      const halfH = 11;
+      // Smallest distance t (px) along the bisector at which the label box clears both rays.
+      let px = 40;
+      for (const w of [u1, u2]) {
+        let nx = -w[1];
+        let ny = w[0];
+        if (nx * bx + ny * by < 0) {
+          nx = -nx;
+          ny = -ny;
+        }
+        const along = (nx * bx + ny * by) / bl;
+        if (along > 1e-6) px = Math.max(px, (Math.abs(nx) * halfW + Math.abs(ny) * halfH + 6) / along);
+      }
+      // ... and stays outside the angle arc (radius 22 px around the vertex).
+      const gapToArc = (t: number) => {
+        const cx = Math.abs((bx / bl) * t);
+        const cy = Math.abs((by / bl) * t);
+        return Math.hypot(Math.max(cx - halfW, 0), Math.max(cy - halfH, 0));
+      };
+      while (px < 130 && gapToArc(px) < 27) px += 2;
+      px = Math.min(px, 130);
+      this.labels.push({ at: [V[0] + (bx / bl) * (px / k), V[1] + (by / bl) * (px / k)], text });
+      // keep the vertex letter out of the angle: put it on the opposite side
+      if (!this.offsets[v] && !this.hidden.includes(v)) this.offsets[v] = [-bx / bl, -by / bl];
+    }
+    this.pending = [];
+  }
   build(notToScale = true): GeometryFigure {
+    this.resolvePending();
     const f: GeometryFigure = { kind: 'geometry', points: this.points };
     if (this.hidden.length) f.hideLabels = this.hidden;
     if (Object.keys(this.offsets).length) f.labelOffsets = this.offsets;
@@ -117,7 +192,7 @@ export class Fig {
 /**
  * Rectangular solid in oblique projection: front face [x0, x0 + L] x [y0, y0 + H], depth W drawn
  * receding up and to the right. Hidden edges are dashed. Labels go on the bottom front edge (L),
- * the right front edge (H) and the bottom right receding edge (W).
+ * the left front edge (H) and the bottom right receding edge (W).
  */
 export function drawBox(
   fig: Fig,
@@ -149,9 +224,9 @@ export function drawBox(
     fig.polyXY([[c.a[0], y0 + w], [c.b[0], y0 + w], [c.f[0], y0 + dy + w], [c.e[0], y0 + dy + w]], true);
   }
   fig.segXY(c.a, c.b, labels.L);
-  fig.segXY(c.b, c.c, labels.H);
+  fig.segXY(c.b, c.c);
   fig.segXY(c.c, c.d);
-  fig.segXY(c.d, c.a);
+  fig.segXY(c.d, c.a, labels.H);
   fig.segXY(c.d, c.k);
   fig.segXY(c.k, c.g);
   fig.segXY(c.c, c.g);
@@ -177,7 +252,7 @@ export function drawCylinder(
   opts: { origin?: P2; waterLevel?: number; squash?: number } = {},
 ): void {
   const [x0, y0] = opts.origin ?? [0, 0];
-  const ry = r * (opts.squash ?? 0.28);
+  const ry = r * (opts.squash ?? 0.32);
   const bottom: P2 = [x0, y0];
   const top: P2 = [x0, y0 + h];
   if (opts.waterLevel !== undefined) {
@@ -195,6 +270,7 @@ export function drawCylinder(
   // sides
   fig.segXY([x0 - r, y0], [x0 - r, y0 + h]);
   fig.segXY([x0 + r, y0], [x0 + r, y0 + h], labels.h);
-  if (labels.r) fig.segXY(top, [x0 + r, y0 + h], labels.r);
+  // radius drawn toward the front right, so its label sits on the top face, clear of the back rim
+  if (labels.r) fig.segXY(top, [x0 + r * Math.cos(-0.7), y0 + h + ry * Math.sin(-0.7)], labels.r);
   if (labels.d) fig.segXY([x0 - r, y0 + h], [x0 + r, y0 + h], labels.d);
 }

@@ -646,4 +646,84 @@ ${bigText} always gives a perfect ${word}, but not the least one.${rad !== k ? r
   },
 };
 
-export const factorsTemplates: Template<any>[] = [productPair, divisorCountQC, countDivisorsMC, gpfMC, squareMultiplier];
+
+/* ------------------------------------------------------------------ 6. Which divisor keeps a quotient an integer (MCS) */
+
+interface QuotParams {
+  factors: number[];
+  c: number;
+  values: number[];
+}
+
+const exponentOf = (n: number, p: number) => {
+  let e = 0;
+  while (n % p === 0) {
+    n /= p;
+    e++;
+  }
+  return e;
+};
+
+const quotientInteger: Template<QuotParams> = {
+  id: 'arith.factors.quotient-integer',
+  skill: 'arith.factors',
+  format: 'mcs',
+  style: 'which value of y keeps a quotient of products an integer',
+  generate(rng, diff) {
+    for (;;) {
+      const factors = rng.sample(range(2, diff === 1 ? 10 : 12), diff === 1 ? 4 : diff === 2 ? 5 : 6).sort((a, b) => a - b);
+      const N = factors.reduce((s, x) => s * x, 1);
+      const c = rng.pick([4, 6, 8, 9, 10, 12, 14, 15, 18, 20, 21].filter((x) => N % x === 0 && !factors.includes(x)));
+      if (!c) continue;
+      const R = N / c;
+      const fR = factorize(R);
+      const divs = range(2, 120).filter((y) => R % y === 0);
+      const composite = divs.filter((y) => !isPrime(y));
+      if (!composite.length) continue;
+      const big = composite.filter((y) => y >= 10);
+      const correct = rng.pick(big.length && rng.chance(0.7) ? big : composite);
+      const cands: { v: number; trap?: string }[] = [];
+      // divides N but not N / c: forgot to cancel c
+      for (const y of range(2, 120)) if (N % y === 0 && R % y !== 0) cands.push({ v: y, trap: 'int-cancel-first' });
+      // a prime that is not available
+      const missing = [11, 13, 17, 19, 23].filter((p) => N % p !== 0);
+      for (const p of missing) for (const m of [1, 2, 3, 5]) if (p * m < 120) cands.push({ v: p * m });
+      // one power too many
+      for (const [p, e] of fR) if (p ** (e + 1) < 150) cands.push({ v: p ** (e + 1) });
+      const bad = cands.filter((x) => R % x.v !== 0);
+      let built: ReturnType<typeof spreadChoices>;
+      try {
+        built = spreadChoices(rng, correct, [...rng.shuffle(bad.filter((x) => x.trap)).slice(0, 2), ...rng.shuffle(bad.filter((x) => !x.trap))]);
+      } catch {
+        continue;
+      }
+      const values = built.choices.map((ch) => Number(ch.text.slice(1, -1)));
+      const numTex = factors.join(' \\cdot ');
+      const why = values.map((y) => {
+        const label = isPrime(y) ? `${y}` : `$${y} = ${factorTex(factorize(y))}$`;
+        if (R % y === 0) return `- ${label} divides $${num(R)}$ ✓`;
+        const need = factorize(y).find(([p, e]) => exponentOf(R, p) < e)!;
+        const have = exponentOf(R, need[0]);
+        return `- ${label} ✗: ${have === 0 ? `no factor ${need[0]} is left` : `only $${need[0]}${have > 1 ? `^{${have}}` : ''}$ is left`}${N % y === 0 ? ` (it divides the numerator, but ${c} uses up part of it)` : ''}`;
+      });
+      return {
+        params: { factors, c, values },
+        q: {
+          format: 'mcs',
+          stem: `If $x = \\dfrac{${numTex}}{${c}y}$, where $x$ and $y$ are positive integers, which of the following could be the value of $y$?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `Factor the numerator: $${numTex} = ${factorTex(factorize(N))}$. Cancel $${c} = ${factorTex(factorize(c))}$ first: $x = \\dfrac{${factorTex(fR)}}{y}$, that is, $\\frac{${num(R)}}{y}$. So $y$ must be a divisor of $${factorTex(fR)}$.
+
+${why.join('\n')}`,
+        },
+      };
+    }
+  },
+  check(q, { factors, c, values }) {
+    const N = factors.reduce((s, x) => s * x, 1);
+    return expectMcsBy(q, (i) => N % (c * values[i]) === 0);
+  },
+};
+
+export const factorsTemplates: Template<any>[] = [productPair, divisorCountQC, countDivisorsMC, gpfMC, squareMultiplier, quotientInteger];

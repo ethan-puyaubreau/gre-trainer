@@ -26,10 +26,10 @@ export function primeBySieve(n: number): boolean {
   return n >= 0 && SIEVE[n];
 }
 
-/** Count divisors by testing every candidate (slow, independent of the (a+1)(b+1) formula). */
+/** Count divisors by testing candidates in pairs (i, n / i) up to the square root (independent of the (a+1)(b+1) formula). */
 export function countDivisorsBrute(n: number): number {
   let c = 0;
-  for (let i = 1; i <= n; i++) if (n % i === 0) c++;
+  for (let i = 1; i * i <= n; i++) if (n % i === 0) c += i * i === n ? 1 : 2;
   return c;
 }
 

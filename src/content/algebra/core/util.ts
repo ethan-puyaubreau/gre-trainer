@@ -17,13 +17,14 @@ export const QC_WORDS: Record<QCChoice, string> = {
 /** Closing sentence of a QC explanation: "So Quantity A is greater. (A)" */
 export const qcEnd = (a: QCChoice) => `So ${QC_WORDS[a]}. (${a})`;
 
-const WORDS = [
-  'Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
-  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen', 'Twenty',
-  'Twenty-one', 'Twenty-two', 'Twenty-three', 'Twenty-four', 'Twenty-five', 'Twenty-six', 'Twenty-seven',
-  'Twenty-eight', 'Twenty-nine', 'Thirty',
-];
-/** Count written as a word, the way the GRE prints count choices ("Seven"). */
+const UNITS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+const WORDS = Array.from({ length: 100 }, (_, n) =>
+  n < 20 ? UNITS[n] : TENS[Math.floor(n / 10)] + (n % 10 ? `-${UNITS[n % 10].toLowerCase()}` : ''),
+);
+/** Inverse of countWord (-1 when the text is not a count word). */
+export const wordCount = (w: string) => WORDS.indexOf(w);
 export const countWord = (n: number) => (n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
 
 /* ---------------------------------------------------------------------------------------------
@@ -125,7 +126,7 @@ export function texEx(e: Ex): string {
           return;
         }
         const t = factorTex(f);
-        const startsWithDigit = /^[0-9\\]/.test(t) && !(f.k === 'div');
+        const startsWithDigit = /^[0-9]/.test(t) && !(f.k === 'div');
         const needDot = out !== '' && out !== '-' && (startsWithDigit || f.k === 'n' || (f.k === 'pow' && f.b.k === 'n'));
         out += (needDot ? ' \\cdot ' : '') + t;
       });
@@ -248,3 +249,26 @@ export const sgn = (c: number | Frac) => {
   const f = c instanceof Frac ? c : new Frac(c);
   return f.n < 0 ? `- ${num(f.neg())}` : `+ ${num(f)}`;
 };
+
+/**
+ * Filler values on a random side of the answer (all below, all above, or alternating), so the
+ * correct choice of a numeric question does not always sit in the same position.
+ */
+export function sideFill(rng: Rng, center: number | Frac, step: number | Frac = 1, count = 6): Frac[] {
+  const c = center instanceof Frac ? center : new Frac(center);
+  const st = step instanceof Frac ? step : new Frac(step);
+  const mode = rng.pick(['low', 'high', 'mix'] as const);
+  const out: Frac[] = [];
+  for (let k = 1; k <= count; k++) {
+    const sign = mode === 'low' ? -1 : mode === 'high' ? 1 : k % 2 ? 1 : -1;
+    const j = mode === 'mix' ? Math.ceil(k / 2) : k;
+    out.push(c.add(st.mul(sign * j)));
+  }
+  return out;
+}
+
+/** A random non-empty subset of the trap list (all of it when there is only one). */
+export function someTraps<T>(rng: Rng, traps: T[]): T[] {
+  if (traps.length <= 1) return traps;
+  return rng.shuffle(traps).slice(0, rng.int(1, traps.length));
+}

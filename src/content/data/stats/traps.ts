@@ -86,4 +86,167 @@ export const statsTraps: Record<string, Trap> = {
     label: 'Miscounted the integers from one point to another',
     fix: 'From $a$ to $b$ inclusive there are $b - a + 1$ integers. Check the count with a small example.',
   },
+  /* ------------------------------------------------------------------ weighted averages */
+  'stat-weighted-midpoint': {
+    label: 'Took the overall average halfway between the group averages',
+    fix: 'The midpoint is the overall average only when the groups are the same size; otherwise the overall average is closer to the larger group\u2019s average.',
+  },
+  'stat-weighted-bound': {
+    label: 'Mishandled the boundary value of the overall average',
+    fix: 'Compute the overall average for the boundary case ("exactly $k$ times as many"). "More than" excludes that value; "at least" allows it.',
+  },
+  'stat-weighted-wrong-side': {
+    label: 'Pulled the overall average toward the smaller group',
+    fix: 'The larger group has more weight, so the overall average lies on the larger group\u2019s side of the midpoint.',
+  },
+  'stat-weighted-inverted': {
+    label: 'Inverted the ratio of the group sizes',
+    fix: 'The group whose average is closer to the overall average is the larger group: $\\dfrac{n_1}{n_2} = \\dfrac{a_2 - c}{c - a_1}$.',
+  },
+  'stat-ratio-as-fraction': {
+    label: 'Used the ratio of the two groups as the fraction of the whole',
+    fix: 'If the groups are in the ratio $p : q$, the first group is $\\frac{p}{p + q}$ of the total, not $\\frac{p}{q}$.',
+  },
+  'stat-answered-total': {
+    label: 'Gave the total instead of the part asked for',
+    fix: 'Reread the question: it asks for one group, not for both groups together.',
+  },
+  'stat-unweighted-mean': {
+    label: 'Averaged the group values without weighting by the counts',
+    fix: 'Multiply each value (or group average) by its count, add, and divide by the total count.',
+  },
+  'stat-divided-by-groups': {
+    label: 'Divided the total by the number of groups',
+    fix: 'An average per person divides the total by the number of people, not by the number of groups.',
+  },
+  'stat-shortfall-divided': {
+    label: 'Divided the shortfall by the new value instead of by its excess over the target',
+    fix: 'Each new member raises the total by its value but also raises the count; it helps by only (its value − the target average).',
+  },
+  /* ------------------------------------------------------------------ spread */
+  'stat-sd-shift': {
+    label: 'Thought adding a constant changes the standard deviation',
+    fix: 'Adding (or subtracting) the same number to every value shifts the data and the mean together; the standard deviation, range and IQR do not change.',
+  },
+  'stat-sd-scale': {
+    label: 'Thought multiplying every value by $k$ leaves the standard deviation unchanged',
+    fix: 'Multiplying every value by $k$ multiplies every distance from the mean, and so the standard deviation, by $|k|$.',
+  },
+  'stat-sd-range': {
+    label: 'Judged standard deviation by the range alone',
+    fix: 'Two lists with the same range can have different standard deviations: what matters is how far the values are from the mean overall.',
+  },
+  'stat-sd-constant': {
+    label: 'Gave a nonzero standard deviation to a list of equal values',
+    fix: 'If all values are equal, every value is at the mean, so the standard deviation is 0.',
+  },
+  'stat-sample-sd': {
+    label: 'Divided by $n - 1$ instead of $n$',
+    fix: 'The GRE standard deviation divides the sum of squared deviations by the number of values $n$, then takes the square root.',
+  },
+  'stat-sd-mad': {
+    label: 'Used the average distance from the mean as the standard deviation',
+    fix: 'Square the distances, average the squares, then take the square root. That is at least the average distance.',
+  },
+  'stat-sd-variance': {
+    label: 'Multiplied the standard deviation by $k^2$',
+    fix: '$k^2$ applies to the variance (the square of the SD). The standard deviation itself is multiplied by $|k|$.',
+  },
+  'stat-sd-is-mean': {
+    label: 'Transformed the mean instead of the spread',
+    fix: 'The new mean is $k \\times$ mean $+ c$, but the question asks for a measure of spread, which ignores $c$.',
+  },
+  'stat-sd-intercept': {
+    label: 'Chose the equation with the largest constant term',
+    fix: 'The constant term shifts every $y$-value equally and does not affect the standard deviation; only $|a|$ in $y = ax + b$ matters.',
+  },
+  'stat-sd-negative-slope': {
+    label: 'Compared signed slopes instead of their absolute values',
+    fix: 'A negative coefficient reverses the order of the values but spreads them just as much: compare $|a|$.',
+  },
+  'stat-percentile-direction': {
+    label: 'Moved the percentile the wrong way',
+    fix: 'A value below $x$ has fewer data below it, so its percentile is lower; a value above $x$ has a higher percentile.',
+  },
+  'stat-percentile-no-shift': {
+    label: 'Forgot to account for the values in between',
+    fix: 'Convert the count of values between the two measurements to a percent of all the data and shift the percentile by that amount.',
+  },
+  'stat-percentile-count': {
+    label: 'Mixed up a count of values with percentage points',
+    fix: 'Percentile points are percents of the whole data set: divide the count by the total number of values (times 100).',
+  },
+  'stat-iqr-range': {
+    label: 'Mixed up the range and the interquartile range',
+    fix: 'Range = greatest − least (the whisker ends). Interquartile range = $Q_3 - Q_1$ (the ends of the box).',
+  },
+  'stat-iqr-half': {
+    label: 'Used only half of the box',
+    fix: 'The interquartile range goes from $Q_1$ to $Q_3$, across the whole box, not from the median to a quartile.',
+  },
+  'stat-boxplot-wrong-mark': {
+    label: 'Read the wrong mark on the box plot',
+    fix: 'In a box plot the line inside the box is the median; the box ends are $Q_1$ and $Q_3$; the whisker ends are the least and greatest values.',
+  },
+  /* ------------------------------------------------------------------ distributions */
+  'stat-freq-as-data': {
+    label: 'Treated the frequencies as the data values',
+    fix: 'In a frequency table the counts say how many times each value occurs; the data are the values, each repeated as often as its count.',
+  },
+  'stat-freq-ignored': {
+    label: 'Ignored the frequencies',
+    fix: 'Each value counts as many times as its frequency: use cumulative counts for the median and (value × count) for the total.',
+  },
+  'stat-interval-complement': {
+    label: 'Found the probability outside the interval instead of inside',
+    fix: 'Add the probabilities of the regions between the two endpoints; use 1 minus the rest only as a check.',
+  },
+  'stat-interval-extra': {
+    label: 'Included a region outside the interval',
+    fix: 'Each labeled region covers one unit interval; include only the regions between the two endpoints.',
+  },
+  'stat-class-midpoints': {
+    label: 'Used class midpoints as if they were the data',
+    fix: 'A grouped table hides the exact values. Find the least and greatest possible values of the statistic by pushing values to the ends of their classes.',
+  },
+  'stat-grouped-unknown': {
+    label: 'Thought nothing can be concluded from grouped data',
+    fix: 'Even without exact values, class boundaries bound the statistic: if every possible value is on one side of the other quantity, the answer is determined.',
+  },
+  'stat-sd-interval-edge': {
+    label: 'Misjudged a value near the edge of the interval',
+    fix: 'Within $k$ standard deviations means from mean $- k \\times$ SD to mean $+ k \\times$ SD, inclusive. Compute both endpoints exactly.',
+  },
+  'stat-sd-units': {
+    label: 'Miscounted the number of standard deviations',
+    fix: 'The number of standard deviations from the mean is $\\dfrac{|\\text{value} - \\text{mean}|}{\\text{SD}}$.',
+  },
+  'stat-raw-distance': {
+    label: 'Compared raw distances from the mean instead of standard units',
+    fix: 'Divide each distance from the mean by that distribution\u2019s standard deviation before comparing.',
+  },
+  'stat-sd-midpoint': {
+    label: 'Put the mean halfway between the two values',
+    fix: 'The mean is halfway only when the two values are the same number of SDs from it. Set up value = mean $\\pm$ $z \\times$ SD for both values and solve.',
+  },
+  'stat-sd-z-subtract': {
+    label: 'Subtracted the SD counts of values on opposite sides of the mean',
+    fix: 'One value below the mean and one above are $z_1 + z_2$ standard deviations apart.',
+  },
+  'stat-normal-one-side': {
+    label: 'Used a two-sided percent for one side of the mean',
+    fix: 'About 68% lie within 1 SD on both sides together; between the mean and 1 SD on one side there are only about 34%.',
+  },
+  'stat-normal-complement': {
+    label: 'Found the percent outside the range instead of inside',
+    fix: 'Add the region percents between the two values; the rest of the 100% lies outside.',
+  },
+  'stat-normal-percent-only': {
+    label: 'Gave the percent instead of the number of items',
+    fix: 'Multiply the percent by the total number of items to get how many.',
+  },
+  'stat-normal-sd-count': {
+    label: 'Used the wrong number of standard deviations for the percentile',
+    fix: 'From the figure: 16% below $-1$ and 2% below $-2$ (84% and 98% below $+1$ and $+2$). Match the percentile to the right tick mark.',
+  },
 };

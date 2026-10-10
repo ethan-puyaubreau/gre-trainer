@@ -3,8 +3,8 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import { num, paren } from '../../../engine/tex';
-import type { Difficulty, GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
+import type { GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
+import { choiceValuesMatch, dots, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
 
 type Pt = [number, number];
 
@@ -134,15 +134,15 @@ const SIDE_CMPS: SideCmp[] = [
   },
   {
     id: '3c', m: 2, needsR: false, ans: 'A',
-    A: (L) => `${L.p2}`, B: (L) => `2${L.p1}`,
-    val: (P) => [P[1], 2 * P[0]],
-    why: (L) => `That is exactly the condition for $(${L.p1}, ${L.p2})$ to be above the line.`,
+    A: (L) => `${L.p2} + 2${L.q1}`, B: (L) => `2${L.p1} + ${L.q2}`,
+    val: (P, Q) => [P[1] + 2 * Q[0], 2 * P[0] + Q[1]],
+    why: (L) => `Add the inequalities $${L.p2} > 2${L.p1}$ and $2${L.q1} > ${L.q2}$: $${L.p2} + 2${L.q1} > 2${L.p1} + ${L.q2}$.`,
   },
   {
     id: '3d', m: 2, needsR: false, ans: 'B',
-    A: (L) => `${L.q2}`, B: (L) => `2${L.q1}`,
-    val: (_P, Q) => [Q[1], 2 * Q[0]],
-    why: (L) => `That is exactly the condition for $(${L.q1}, ${L.q2})$ to be below the line.`,
+    A: (L) => `${L.q2} - ${L.p2}`, B: (L) => `2${L.q1} - 2${L.p1}`,
+    val: (P, Q) => [Q[1] - P[1], 2 * Q[0] - 2 * P[0]],
+    why: (L) => `Add $${L.p2} - 2${L.q1}$ to both quantities: the comparison becomes $${L.q2} - 2${L.q1}$ (negative, since the point is below the line) versus $${L.p2} - 2${L.p1}$ (positive, since the point is above it).`,
   },
   {
     id: '3e', m: 2, needsR: true, ans: 'C',
@@ -183,8 +183,8 @@ const SIDE_WINDOWS: Record<1 | -1 | 2, { xMin: number; xMax: number; yMin: numbe
   2: { xMin: -2, xMax: 5, yMin: -2, yMax: 9 },
 };
 
-function sidePoint(rng: Rng, m: number, side: 1 | -1 | 0, w: (typeof SIDE_WINDOWS)[1], avoid: Pt[]): Pt {
-  for (let tries = 0; tries < 2000; tries++) {
+function sidePoint(rng: Rng, m: number, side: 1 | -1 | 0, w: (typeof SIDE_WINDOWS)[1], avoid: Pt[]): Pt | null {
+  for (let tries = 0; tries < 400; tries++) {
     let p: Pt;
     if (side === 0) {
       const x = rng.int(2 * (w.xMin + 1), 2 * (w.xMax - 1)) / 2;
@@ -195,11 +195,11 @@ function sidePoint(rng: Rng, m: number, side: 1 | -1 | 0, w: (typeof SIDE_WINDOW
       const dist = (p[1] - m * p[0]) / Math.hypot(1, m);
       if (side * dist < 1.1) continue;
     }
-    if (Math.hypot(p[0], p[1]) < 1.6) continue;
+    if (Math.hypot(p[0], p[1]) < 1.5) continue;
     if (avoid.some((a) => Math.hypot(a[0] - p[0], a[1] - p[1]) < 2)) continue;
     return p;
   }
-  throw new Error('sidePoint: no point found');
+  return null;
 }
 
 const aboveBelowQC: Template<SideParams> = {
@@ -217,9 +217,16 @@ const aboveBelowQC: Template<SideParams> = {
     const w = SIDE_WINDOWS[m];
     const k = m === 1 ? rng.pick([4, 5]) : m === -1 ? rng.pick([-3, -4]) : rng.pick([3, 4]);
     const K: Pt = [k, m * k];
-    const P = sidePoint(rng, m, 1, w, [K]);
-    const Q = sidePoint(rng, m, -1, w, [K, P]);
-    const R = useR ? sidePoint(rng, m, 0, w, [K, P, Q]) : null;
+    let P: Pt | null = null;
+    let Q: Pt | null = null;
+    let R: Pt | null = null;
+    for (let tries = 0; tries < 100; tries++) {
+      P = sidePoint(rng, m, 1, w, [K]);
+      Q = P && sidePoint(rng, m, -1, w, [K, P]);
+      R = useR && P && Q ? sidePoint(rng, m, 0, w, [K, P, Q]) : null;
+      if (P && Q && (R || !useR)) break;
+    }
+    if (!P || !Q || (useR && !R)) throw new Error('above-below: could not place the points');
 
     // Labels: off-line points get their label pushed away from the line, on-line points to one side.
     const nrm = [-m / Math.hypot(1, m), 1 / Math.hypot(1, m)]; // unit normal pointing "above"
@@ -229,16 +236,17 @@ const aboveBelowQC: Template<SideParams> = {
     const labels: { at: [number, number]; text: string }[] = [
       { at: off(P, 1, labelDist), text: `$(${L.p1}, ${L.p2})$` },
       { at: off(Q, -1, labelDist), text: `$(${L.q1}, ${L.q2})$` },
-      { at: off(K, R ? 1 : -1, labelDist), text: `$${kTex}$` },
-      { at: [m === -1 ? 0.45 : -0.4, -0.45], text: '$O$' },
+      { at: off(K, R ? 1 : -1, labelDist + 0.5), text: `$${kTex}$` },
+      { at: [m === -1 ? -0.4 : 0.4, -0.45], text: '$O$' },
     ];
-    if (R) labels.push({ at: off(R, -1, labelDist), text: `$(${L.r1}, ${L.r2})$` });
+    if (R) labels.push({ at: off(R, -1, labelDist + 0.5), text: `$(${L.r1}, ${L.r2})$` });
     const points: Record<string, Pt> = { P, Q, K };
     if (R) points.R = R;
     const figure: GeometryFigure = {
       kind: 'geometry',
       points,
       hideLabels: Object.keys(points),
+      circles: dots(Object.keys(points), w),
       axes: { ...w, step: 1 },
       lines: [{ through: [[0, 0], [K[0], K[1]]], label: '$\\ell$' }],
       labels,
@@ -397,7 +405,8 @@ const perpendicularLine: Template<PerpParams> = {
       push(bk.div(s), 'algw-intercept-sign');
       for (const w of wrongSlopes) push(xInt(w.slope, yInt(w.slope)), w.trap);
     }
-    const fillers = [answer.add(1), answer.sub(1), answer.add(2), answer.sub(2), answer.add(3)];
+    const dir = rng.sign();
+    const fillers = [answer.add(dir), answer.add(2 * dir), answer.sub(dir), answer.add(3 * dir), answer.sub(2 * dir)];
     const { choices, answer: idx } = numericChoices(rng, { correct: answer, traps: traps.slice(0, 3), fillers, format: fmtChoice });
     const values = choices.map((c) => {
       const all = [answer, ...traps.map((t) => t.value), ...fillers];
@@ -631,8 +640,9 @@ const pointsOnLine: Template<OnLineParams> = {
       run = d === 1 ? 1 : d === 2 ? rng.pick([2, 3]) : rng.pick([2, 3, 4]);
       rise = (d === 1 ? rng.int(1, 3) : d === 2 ? rng.int(1, 2) : rng.pick([1, 3])) * rng.sign();
     } while (gcd(run, Math.abs(rise)) !== 1);
+    // Start at an x that is a multiple of the run, so the y-intercept is an integer.
     let A0: Pt;
-    do A0 = [rng.int(-4, 4 - run), rng.int(-4, 4)];
+    do A0 = [run * rng.int(Math.ceil(-4 / run), Math.floor((4 - run) / run)), rng.int(-4, 4)];
     while (Math.abs(A0[1] + rise) > 4 || (A0[0] === 0 && A0[1] === 0));
     const A1: Pt = [A0[0] + run, A0[1] + rise];
     const onLine = (p: Pt) => (p[0] - A0[0]) * rise === (p[1] - A0[1]) * run;
@@ -675,6 +685,7 @@ const pointsOnLine: Template<OnLineParams> = {
       kind: 'geometry',
       points: { U: A0, V: A1 },
       hideLabels: ['U', 'V'],
+      circles: dots(['U', 'V'], { xMin: -5, xMax: 5, yMin: -5, yMax: 5 }),
       axes: { xMin: -5, xMax: 5, yMin: -5, yMax: 5, grid: true, step: 1, labelTicks: true },
       lines: [{ through: [A0, A1], label: '$\\ell$' }],
     };
@@ -682,7 +693,7 @@ const pointsOnLine: Template<OnLineParams> = {
       .map((it) => {
         const y = m.mul(it.p[0]).add(b);
         return `- $${ptTex(it.p[0], it.p[1])}$: $${num(m)}(${num(it.p[0])}) ${b.sign() < 0 ? '-' : '+'} ${num(b.abs())} = ${num(y)}$, ${
-          it.correct ? 'on $\\ell$' : `not ${num(it.p[1])}, so not on $\\ell$`
+          it.correct ? 'on $\\ell$' : `not $${num(it.p[1])}$, so not on $\\ell$`
         }`;
       })
       .join('\n');
@@ -695,7 +706,7 @@ const pointsOnLine: Template<OnLineParams> = {
         instruction: 'Indicate all such points.',
         choices,
         answer,
-        explanation: `The marked points of $\\ell$ are $${ptTex(A0[0], A0[1])}$ and $${ptTex(A1[0], A1[1])}$, so the slope is $\\frac{\\text{rise}}{\\text{run}} = \\frac{${rise}}{${run}}${m.isInt() ? ` = ${num(m)}` : ''}$ and the equation of $\\ell$ is $${lineTex(m, b)}$.
+        explanation: `The marked points of $\\ell$ are $${ptTex(A0[0], A0[1])}$ and $${ptTex(A1[0], A1[1])}$, so the slope is $\\frac{\\text{rise}}{\\text{run}} = \\frac{${rise}}{${run}}${m.isInt() || rise < 0 ? ` = ${num(m)}` : ''}$ and the equation of $\\ell$ is $${lineTex(m, b)}$.
 
 A point lies on $\\ell$ when its $y$-coordinate equals $${num(m)}x ${b.sign() < 0 ? '-' : '+'} ${num(b.abs())}$:
 ${checks}
@@ -742,7 +753,8 @@ const slopeQC: Template<SlopeParams> = {
     const mode = rng.pick(modes);
     const base: SlopeParams = { mode, lines: [], k: 0, pt: [0, 0], slopeSign: 0, icptSign: 0, qa: 'x-int', qb: 'zero' };
     const randLine = (target?: Frac): [Pt, Pt] => {
-      for (;;) {
+      for (let tries = 0; ; tries++) {
+        if (tries > 5000) throw new Error(`randLine: no line with slope ${target}`);
         const P: Pt = [rng.int(-6, 6), rng.int(-6, 6)];
         const dx = rng.int(1, 6) * rng.sign();
         let dy: number;
@@ -787,8 +799,12 @@ Slope is rise over run (change in $y$ over change in $x$), not run over rise.`,
       };
     }
     if (mode === 'two-lines') {
-      const t1 = rng.pick([frac(1, 2), frac(2, 3), frac(3, 4), frac(-1, 2), frac(-3, 2), frac(2), frac(-2), frac(4, 3), frac(1, 3)]);
-      const t2 = rng.chance(0.3) ? t1 : rng.pick([t1.add(frac(1, 6)), t1.sub(frac(1, 6)), t1.neg(), t1.inv()].filter((x) => !x.eq(t1)));
+      const SET = [frac(-2), frac(-3, 2), frac(-1), frac(-2, 3), frac(-1, 2), frac(-1, 3), frac(1, 3), frac(1, 2), frac(2, 3), frac(3, 4), frac(1), frac(4, 3), frac(3, 2), frac(2), frac(3)];
+      const i1 = rng.int(0, SET.length - 1);
+      const t1 = SET[i1];
+      const t2 = rng.chance(0.3)
+        ? t1
+        : rng.pick([SET[i1 - 1], SET[i1 + 1], t1.neg(), t1.inv()].filter((x): x is Frac => x !== undefined && !x.eq(t1)));
       const L1 = randLine(t1);
       const L2 = randLine(t2);
       const s1 = frac(L1[1][1] - L1[0][1], L1[1][0] - L1[0][0]);
@@ -817,7 +833,7 @@ ${answer === 'C' ? 'The slopes are equal (the lines are parallel or the same lin
     if (mode === 'through-point') {
       // Line through a given point with a slope of known sign: compare an intercept with a coordinate.
       const pt: Pt = [rng.int(1, 6) * rng.sign(), rng.int(1, 6) * rng.sign()];
-      const slopeSign: 1 | -1 | 0 = rng.chance(0.25) ? 0 : rng.sign();
+      const slopeSign: 1 | -1 | 0 = rng.chance(0.35) ? 0 : rng.sign();
       const qa: SlopeParams['qa'] = rng.pick(['x-int', 'y-int'] as const);
       const answer = SLOPE_THROUGH(pt, slopeSign, qa);
       const phrase = slopeSign === 0 ? 'a nonzero slope' : slopeSign > 0 ? 'a positive slope' : 'a negative slope';
@@ -964,14 +980,29 @@ interface QuadParams {
 const QUAD_NAMES = ['I', 'II', 'III', 'IV'];
 const quadOf = (x: number, y: number) => (x > 0 && y > 0 ? 1 : x < 0 && y > 0 ? 2 : x < 0 && y < 0 ? 3 : x > 0 && y < 0 ? 4 : 0);
 
-/** Quadrants crossed by the infinite line y = m x + b, by walking along it. */
+/** Quadrants crossed by the infinite line y = m x + b: one sample point inside each piece between the axis crossings. */
 function crossedQuadrants(m: number, b: number): Set<number> {
+  const cuts = m === 0 ? [0] : [0, -b / m].sort((u, v) => u - v);
+  const xs = [cuts[0] - 1, (cuts[0] + cuts[cuts.length - 1]) / 2, cuts[cuts.length - 1] + 1, cuts[0] - 1000, cuts[cuts.length - 1] + 1000];
   const out = new Set<number>();
-  for (let x = -500; x <= 500; x += 0.25) {
+  for (const x of xs) {
     const qd = quadOf(x, m * x + b);
     if (qd) out.add(qd);
   }
   return out;
+}
+
+/** Quadrants from the sign facts alone: the line passes through the two quadrants next to each intercept. */
+function quadrantsBySigns(slope: 1 | -1 | 0, given: QuadParams['given'], sign: 1 | -1, quadrant: number): number[] {
+  if (slope === 0) return sign > 0 ? [1, 2] : [3, 4];
+  if (given === 'origin') return slope > 0 ? [1, 3] : [2, 4];
+  let ySign: number;
+  let xSign: number;
+  if (given === 'y') [ySign, xSign] = [sign, -sign * slope];
+  else if (given === 'x') [xSign, ySign] = [sign, -sign * slope];
+  else [xSign, ySign] = [quadrant === 1 || quadrant === 4 ? 1 : -1, quadrant <= 2 ? 1 : -1];
+  const set = new Set([...(ySign > 0 ? [1, 2] : [3, 4]), ...(xSign > 0 ? [1, 4] : [2, 3])]);
+  return [...set].sort();
 }
 
 const quadrantsCrossed: Template<QuadParams> = {
@@ -985,10 +1016,10 @@ const quadrantsCrossed: Template<QuadParams> = {
     if (slope === 0 && given !== 'y') given = 'y';
     if (given === 'origin' && slope === 0) slope = 1;
     const sign: 1 | -1 = rng.sign();
-    const quadrant = rng.int(1, 4);
-    // Representative line, used to read off the answer (check() samples many).
-    const rep = repLine(slope, given, sign, quadrant, 1.7);
-    const crossed = crossedQuadrants(rep.m, rep.b);
+    // A point fixes the quadrants only when the slope pushes both intercepts away from it:
+    // positive slope through Quadrant II or IV, negative slope through Quadrant I or III.
+    const quadrant = slope > 0 ? rng.pick([2, 4]) : rng.pick([1, 3]);
+    const crossed = new Set(quadrantsBySigns(slope, given, sign, quadrant));
     const { choices, answer } = flaggedChoices(QUAD_NAMES.map((nm, i) => ({ text: `Quadrant ${nm}`, correct: crossed.has(i + 1) })));
     const slopeWord = slope > 0 ? 'a positive slope' : slope < 0 ? 'a negative slope' : 'slope 0';
     const info =
@@ -1020,7 +1051,7 @@ const quadrantsCrossed: Template<QuadParams> = {
         figure: {
           kind: 'geometry',
           points: {},
-          axes: { xMin: -4, xMax: 4, yMin: -4, yMax: 4 },
+          axes: { xMin: -4, xMax: 4, yMin: -4, yMax: 4, step: 5 },
           labels: [
             { at: [2, 2], text: 'I' },
             { at: [-2, 2], text: 'II' },
@@ -1066,4 +1097,3 @@ function repLine(slope: 1 | -1 | 0, given: QuadParams['given'], sign: 1 | -1, qu
 
 export const coordinateTemplates: Template<any>[] = [aboveBelowQC, perpendicularLine, distanceMidpoint, pointsOnLine, slopeQC, quadrantsCrossed];
 
-export type { Difficulty };

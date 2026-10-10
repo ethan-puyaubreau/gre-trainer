@@ -1,7 +1,6 @@
 import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac } from '../../../engine/frac';
 import { lcm, range } from '../../../engine/math';
-import type { Rng } from '../../../engine/rng';
 import { num, ordinal, plain } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { QC_WORDS, expectMcm, expectMcsBy, expectNe, expectQc, spreadChoices } from './util';
@@ -57,7 +56,7 @@ const sumFunction: Template<SumFnParams> = {
 
 Or use the given value: each of the integers $${m + 1}, ${m + 2}, \\ldots, ${n}$ is ${m} more than one of $1, 2, \\ldots, ${m}$, so their sum is $S(${m}) + ${m} \\cdot ${m}$. Then $S(${n}) = 2S(${m}) + ${m}^2 = ${num(2 * T(m))} + ${num(m * m)} = ${num(answer)}$.
 
-Doubling $S(${m})$ gives only ${num(2 * T(m))}: it misses the extra ${m} added to each of the ${m} upper terms.`;
+Doubling $S(${m})$ gives only $${num(2 * T(m))}$: it misses the extra ${m} added to each of the ${m} upper terms.`;
     } else {
       for (;;) {
         n = rng.int(diff === 2 ? 4 : 8, diff === 2 ? 12 : 20) * 10;
@@ -290,8 +289,8 @@ Check with numbers: $j = ${ex.j}$ and $k = ${ex.k}$ give ${listed.join(', ')}, w
   check(q, { parity, lo, hi, forms }) {
     // brute force over many (j, k) pairs of the right kind
     const pairs: [number, number][] = [];
-    for (let j = -12; j <= 12; j++)
-      for (let k = j + 1; k <= j + 40; k++) {
+    for (let j = -7; j <= 7; j++)
+      for (let k = j + 1; k <= j + 25; k++) {
         const ok = (x: number) => (parity === 'any' ? true : parity === 'mult3' ? x % 3 === 0 : parity === 'even' ? x % 2 === 0 : Math.abs(x % 2) === 1);
         if (ok(j) && ok(k)) pairs.push([j, k]);
       }
@@ -399,7 +398,7 @@ const canBeSum = (v: number, k: number, step: number, parity: PossParams['parity
   return parity === 'any' || (parity === 'even' ? x % 2 === 0 : Math.abs(x % 2) === 1);
 };
 
-function possibleSumsChoices(rng: Rng, k: number, step: 1 | 2, parity: PossParams['parity'], nChoices: number) {
+function possibleSumsChoices(k: number, step: 1 | 2, parity: PossParams['parity'], nChoices: number) {
   const pool = range(20, 160);
   const good = pool.filter((v) => canBeSum(v, k, step, parity));
   const nearMiss = pool.filter((v) => !canBeSum(v, k, step, parity) && v % k === 0);
@@ -418,7 +417,7 @@ const possibleSums: Template<PossParams> = {
     const k = diff === 1 ? rng.pick([3, 5]) : diff === 2 ? rng.pick([4, 6]) : parity === 'even' ? rng.pick([3, 4]) : rng.pick([3, 4]);
     const nChoices = diff === 1 ? 5 : 6;
     for (;;) {
-      const { good, nearMiss, other } = possibleSumsChoices(rng, k, step, parity, nChoices);
+      const { good, nearMiss, other } = possibleSumsChoices(k, step, parity, nChoices);
       const nGood = rng.int(1, 3);
       const nNear = nearMiss.length ? Math.min(nearMiss.length, rng.int(1, 2)) : 0;
       const g = rng.sample(good, nGood);
@@ -448,8 +447,14 @@ const possibleSums: Template<PossParams> = {
             return `${k * x + offset}`;
           })
           .join(', ')}, and so on, going up by ${2 * k}.`;
+      const whyNot = (v: number) => {
+        if (parity === 'any') return k % 2 === 1 ? `not a multiple of ${k}` : `leaves remainder ${v % k}, not ${offset % k}, when divided by ${k}`;
+        const rest = v - offset;
+        if (rest % k !== 0) return `$${v} - ${offset} = ${rest}$ is not a multiple of ${k}`;
+        return `the least term would be ${rest / k}, which is not ${parity}`;
+      };
       const lines = values.map((v) => {
-        if (!canBeSum(v, k, step, parity)) return `- ${v} ✗`;
+        if (!canBeSum(v, k, step, parity)) return `- ${v}: ${whyNot(v)} ✗`;
         const x = (v - offset) / k;
         return `- $${v} = ${range(0, k - 1)
           .map((i) => x + step * i)
@@ -508,10 +513,10 @@ const sumQC: Template<SumQCParams> = {
   generate(rng, diff) {
     const items: SumQCItem[] =
       diff === 1
-        ? ['odd-squares', 'x-plus-z', 'count-multiples', 'xz-y2']
+        ? ['odd-squares', 'x-plus-z', 'count-multiples', 'xz-y2', 'four-vs-5n']
         : diff === 2
-          ? ['upper-half', 'neg-cancel', 'xz-y2', 'four-vs-5n', 'count-multiples', 'odd-squares']
-          : ['upper-half', 'neg-cancel', 'four-vs-5n', 'odd-ends', 'odd-products', 'count-multiples'];
+          ? ['upper-half', 'neg-cancel', 'xz-y2', 'four-vs-5n', 'four-vs-5n', 'count-multiples', 'odd-squares']
+          : ['upper-half', 'neg-cancel', 'four-vs-5n', 'odd-ends', 'odd-ends', 'count-multiples', 'four-vs-5n'];
     const item = rng.pick(items);
     let m = 0;
     let n = 0;
@@ -536,7 +541,7 @@ const sumQC: Template<SumQCParams> = {
         answer = qcCompare(sum, k);
         explanation = `The odd integers from 1 to ${2 * n - 1} are ${n} numbers (since $${2 * n - 1} = 2 \\cdot ${n} - 1$) with average $\\frac{1 + ${2 * n - 1}}{2} = ${n}$. Their sum is $${n} \\times ${n} = ${num(sum)}$. (The sum of the first $n$ odd integers is always $n^2$.)
 
-Compare ${num(sum)} with ${num(k)}: ${QC_WORDS[answer]}. (${answer})`;
+Compare ${plain(sum)} with ${plain(k)}: ${QC_WORDS[answer]}. (${answer})`;
         break;
       }
       case 'upper-half': {
@@ -578,11 +583,14 @@ ${useEq ? `That is exactly Quantity B. (C)` : `Quantity B also includes ${m}, so
       }
       case 'xz-y2': {
         info = '$x$, $y$, and $z$ are consecutive integers, and $x < y < z$.';
+        k = rng.pick([0, 1, 2]); // B = y^2 - k
         A = '$xz$';
-        B = '$y^2$';
-        answer = 'B';
-        traps = { C: 'int-gave-middle-term' };
-        explanation = `Write $x = y - 1$ and $z = y + 1$. Then $xz = (y - 1)(y + 1) = y^2 - 1$, which is always 1 less than $y^2$. For example, $4 \\cdot 6 = 24 < 25 = 5^2$, and $(-1)(1) = -1 < 0 = 0^2$. (B)`;
+        B = k === 0 ? '$y^2$' : `$y^2 - ${k}$`;
+        answer = (['B', 'C', 'A'] as QCChoice[])[k];
+        traps = k === 0 ? { C: 'int-gave-middle-term' } : k === 2 ? { D: 'tested-one-value' } : undefined;
+        explanation = `Write $x = y - 1$ and $z = y + 1$. Then $xz = (y - 1)(y + 1) = y^2 - 1$ for every $y$. For example, $4 \\cdot 6 = 24 = 5^2 - 1$, and $(-1)(1) = -1 = 0^2 - 1$.
+
+So $xz$ is ${k === 0 ? 'always 1 less than $y^2$' : k === 1 ? 'always equal to $y^2 - 1$' : 'always 1 more than $y^2 - 2$'}. (${answer})`;
         break;
       }
       case 'x-plus-z': {
@@ -622,7 +630,7 @@ ${useEq ? `That is exactly Quantity B. (C)` : `Quantity B also includes ${m}, so
         const off = (k * (k - 1)) / 2; // sum = k n + off
         const roll = rng.next();
         // compare with (k + 1)n -> D, or with k n + off - c -> A
-        if (roll < 0.55) {
+        if (roll < 0.7) {
           A = `The sum of the ${k} consecutive integers beginning with $n$`;
           B = `$${k + 1}n$`;
           bv = k + 1;
@@ -719,7 +727,7 @@ Compare ${count} with ${Bv}: ${QC_WORDS[answer]}. (${answer})`;
         samples.push([loopSum(-m, n), loopSum(bv, n)]);
         break;
       case 'xz-y2':
-        for (let x = -30; x <= 30; x++) samples.push([x * (x + 2), (x + 1) ** 2]);
+        for (let x = -30; x <= 30; x++) samples.push([x * (x + 2), (x + 1) ** 2 - k]);
         break;
       case 'x-plus-z':
         for (let x = -30; x <= 30; x++) {

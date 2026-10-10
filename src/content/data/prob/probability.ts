@@ -10,13 +10,15 @@ const SKILL = 'data.probability';
 const dtex = (f: Frac) => decimal(f);
 const rel = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
 
-/** k random positive parts that add up to total, each at least min. */
+/** k random parts that add up to total, each at least min (distinct when that is easy to get). */
 function partition(rng: Rng, total: number, k: number, min: number): number[] {
-  for (;;) {
-    const cuts = Array.from({ length: k - 1 }, () => rng.int(1, total - 1)).sort((a, b) => a - b);
-    const parts = [...cuts, total].map((c, i, arr) => c - (i ? arr[i - 1] : 0));
-    if (parts.every((p) => p >= min) && new Set(parts).size === parts.length) return parts;
+  let parts: number[] = [];
+  for (let attempt = 0; attempt < 200; attempt++) {
+    parts = Array.from({ length: k }, () => min);
+    for (let left = total - k * min; left > 0; left--) parts[rng.int(0, k - 1)]++;
+    if (new Set(parts).size === k) return parts;
   }
+  return parts;
 }
 
 /* ================================================================== 1. One item drawn: not / neither / either (MCS) */
@@ -326,9 +328,9 @@ interface WRParams {
 }
 
 const WR_CTX = [
-  { setup: (a: number, b: number) => `A bag contains ${a} red marbles and ${b} blue marbles. Two marbles are to be drawn at random from the bag, one after the other, without replacement.`, A: 'red', B: 'blue', items: 'marbles', both: (s: string) => `both marbles drawn will be ${s}`, oneEach: 'one marble of each color will be drawn', atLeast: 'at least one blue marble will be drawn', same: 'the two marbles will be the same color' },
-  { setup: (a: number, b: number) => `A team consists of ${a} women and ${b} men. Two members of the team are to be selected at random to attend a conference.`, A: 'women', B: 'men', items: 'members', both: (s: string) => `both people selected will be ${s}`, oneEach: 'one woman and one man will be selected', atLeast: 'at least one man will be selected', same: 'the two people selected will be of the same gender' },
-  { setup: (a: number, b: number) => `A box contains ${a} working light bulbs and ${b} defective light bulbs. Two bulbs are to be chosen at random from the box without replacement.`, A: 'working', B: 'defective', items: 'bulbs', both: (s: string) => `both bulbs chosen will be ${s}`, oneEach: 'exactly one of the two bulbs chosen will be defective', atLeast: 'at least one defective bulb will be chosen', same: 'both bulbs will be working or both will be defective' },
+  { setup: (a: number, b: number) => `A bag contains ${a} red marbles and ${b} blue marbles. Two marbles are to be drawn at random from the bag, one after the other, without replacement.`, A: 'red', B: 'blue', A1: 'a red marble', B1: 'a blue marble', items: 'marbles', both: (s: string) => `both marbles drawn will be ${s}`, oneEach: 'one marble of each color will be drawn', atLeast: 'at least one blue marble will be drawn', same: 'the two marbles will be the same color' },
+  { setup: (a: number, b: number) => `A team consists of ${a} women and ${b} men. Two members of the team are to be selected at random to attend a conference.`, A: 'women', B: 'men', A1: 'a woman', B1: 'a man', items: 'members', both: (s: string) => `both people selected will be ${s}`, oneEach: 'one woman and one man will be selected', atLeast: 'at least one man will be selected', same: 'the two people selected will be of the same gender' },
+  { setup: (a: number, b: number) => `A box contains ${a} working light bulbs and ${b} defective light bulbs. Two bulbs are to be chosen at random from the box without replacement.`, A: 'working', B: 'defective', A1: 'a working bulb', B1: 'a defective bulb', items: 'bulbs', both: (s: string) => `both bulbs chosen will be ${s}`, oneEach: 'exactly one of the two bulbs chosen will be defective', atLeast: 'at least one defective bulb will be chosen', same: 'both bulbs will be working or both will be defective' },
 ];
 
 const withoutReplacement: Template<WRParams> = {
@@ -356,14 +358,14 @@ const withoutReplacement: Template<WRParams> = {
       correct = frac(k * (k - 1), pairs);
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.both(label)}?`;
       traps.push({ value: frac(k * k, n * n), trap: 'prob-with-replacement' }, { value: frac(k, n), trap: 'prob-one-draw' });
-      explanation = `First draw: $\\frac{${k}}{${n}}$. After one ${ctx.items === 'members' ? 'person' : 'item'} of that kind is gone, the second draw: $\\frac{${k - 1}}{${n - 1}}$. Multiply: $\\frac{${k}}{${n}} \\times \\frac{${k - 1}}{${n - 1}} = ${correct.toTex()}$.
+      explanation = `First draw: $\\frac{${k}}{${n}}$. Once ${useB ? ctx.B1 : ctx.A1} is gone, ${k - 1} of the remaining ${n - 1} are of that kind, so the second draw: $\\frac{${k - 1}}{${n - 1}}$. Multiply: $\\frac{${k}}{${n}} \\times \\frac{${k - 1}}{${n - 1}} = ${correct.toTex()}$.
 
 $\\left(\\frac{${k}}{${n}}\\right)^2$ assumes the first one is put back.`;
     } else if (ask === 'one-each') {
       correct = frac(2 * a * b, pairs);
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.oneEach}?`;
       traps.push({ value: frac(a * b, pairs), trap: 'prob-one-order' }, { value: frac(2 * a * b, n * n), trap: 'prob-with-replacement' });
-      explanation = `Two orders work: ${ctx.A} then ${ctx.B}, $\\frac{${a}}{${n}} \\times \\frac{${b}}{${n - 1}}$, or ${ctx.B} then ${ctx.A}, $\\frac{${b}}{${n}} \\times \\frac{${a}}{${n - 1}}$. Total: $2 \\times \\frac{${a * b}}{${pairs}} = ${correct.toTex()}$.
+      explanation = `Two orders work: ${ctx.A1} then ${ctx.B1}, $\\frac{${a}}{${n}} \\times \\frac{${b}}{${n - 1}}$, or ${ctx.B1} then ${ctx.A1}, $\\frac{${b}}{${n}} \\times \\frac{${a}}{${n - 1}}$. Total: $2 \\times \\frac{${a * b}}{${pairs}} = ${correct.toTex()}$.
 
 $${frac(a * b, pairs).toTex()}$ counts only one of the two orders.`;
     } else if (ask === 'at-least-one-b') {
@@ -381,7 +383,9 @@ $${frac(b * (b - 1), pairs).toTex()}$ is the probability that both are ${ctx.B},
 
 $${frac(a * (a - 1), pairs).toTex()}$ is only the first case.`;
     }
-    const fillers = [correct.mul(frac(1, 2)), correct.add(frac(1, n)), correct.sub(frac(1, n)), frac(1, 2), frac(1, n - 1)].filter((v) => v.sign() > 0 && v.lt(1));
+    const fillers = rng
+      .shuffle([frac(a * (a - 1), pairs), frac(b * (b - 1), pairs), frac(a, n), frac(b, n), frac(a * b, pairs), frac(1, 2), frac(a * a, n * n)])
+      .filter((v) => v.sign() > 0 && v.lt(1));
     const { choices, answer } = numericChoices(rng, {
       correct: correct!,
       traps: traps.filter((t) => t.value.sign() > 0 && t.value.lt(1)),
@@ -548,6 +552,8 @@ The points are chosen without replacement, so the probability is not a power lik
         { rc: { kind: 'binomial', r, p: [t, N], x: 1, complement: false }, trap: 'prob-with-replacement' },
         { rc: ratio([[t, 1], [N - t, r]], [N, r]) },
         { rc: ratio([[N - t, r - 1]], [N, r]), trap: 'prob-missed-factor' },
+        { rc: ratio([[t, 2], [N - t, r - 2]], [N, r]) },
+        { rc: ratio([[t, 1]], [N, 1]), trap: 'prob-one-draw' },
       );
       stem = `${ctx.setup(N, t)} If ${r} of the ${N} ${ctx.items} are to be selected at random, without replacement, what is the probability that exactly 1 of the ${r} ${ctx.items} selected ${ctx.has}?`;
       explanation = `All selections of ${r} out of ${N}: $\\binom{${N}}{${r}}$. Favorable: choose the 1 from the ${t} that have it, $\\binom{${t}}{1}$, and the other ${r - 1} from the ${N - t} that do not, $\\binom{${N - t}}{${r - 1}}$. So the probability is $\\dfrac{\\binom{${t}}{1}\\binom{${N - t}}{${r - 1}}}{\\binom{${N}}{${r}}}$.
@@ -561,6 +567,8 @@ Dropping the factor $\\binom{${N - t}}{${r - 1}}$ forgets that the other ${r - 1
         { rc: { kind: 'binomial', r, p: [t, N], x: 0, complement: true }, trap: 'prob-with-replacement' },
         { rc: ratio([[t, r]], [N, r], true) },
         { rc: ratio([[t, 1], [N - t, r - 1]], [N, r]), trap: 'prob-exactly-vs-at-least' },
+        { rc: ratio([[t, 1], [N - 1, r - 1]], [N, r]), trap: 'prob-at-least-one-overcount' },
+        { rc: ratio([[t, 1]], [N, 1]), trap: 'prob-one-draw' },
       );
       stem = `${ctx.setup(N, t)} If ${r} of the ${N} ${ctx.items} are to be selected at random, without replacement, what is the probability that at least 1 of the ${r} ${ctx.items} selected ${ctx.has}?`;
       explanation = `Use the complement: ${ctx.haveNone} when all ${r} come from the ${N - t} without it, which has probability $\\dfrac{\\binom{${N - t}}{${r}}}{\\binom{${N}}{${r}}}$. So the answer is $1 - \\dfrac{\\binom{${N - t}}{${r}}}{\\binom{${N}}{${r}}}$.
@@ -925,10 +933,10 @@ The 11 possible sums are not equally likely.`;
       expected = qcFromSamples(samples);
     } else if (p.kind === 'symbolic') {
       const samples: [Frac, Frac][] = [];
-      for (let i = 1; i < 20; i++)
-        for (let j = 1; j < 20; j++) {
-          const r = frac(i, 20);
-          const s = frac(j, 20);
+      for (let i = 1; i < 10; i++)
+        for (let j = 1; j < 10; j++) {
+          const r = frac(i, 10);
+          const s = frac(j, 10);
           // enumerate the four outcomes
           const pGH = r.mul(s);
           const pG = r.mul(frac(1).sub(s));

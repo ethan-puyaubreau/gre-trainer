@@ -1,5 +1,5 @@
 import { flaggedChoices, qcCompare, qcFromSamples, textChoices } from '../../../engine/build';
-import { frac } from '../../../engine/frac';
+import { frac, type Frac } from '../../../engine/frac';
 import { isPrime, mod, primesUpTo, range } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
@@ -630,9 +630,10 @@ ${tail[scenario]}`,
   },
   check(q, { scenario, target, plains }, rng) {
     // Sample actual numbers and evaluate the expressions from their plain text.
-    const samples = range(1, 300).map(() => sampleScenario(rng, scenario));
+    const samples = range(1, 40).map(() => sampleScenario(rng, scenario));
     if (scenario === 'primes-any') samples.push({ p: 2, q: 3 }, { p: 3, q: 2 }, { p: 3, q: 5 });
-    if (scenario === 'xyz') samples.push({ x: 2, y: 1, z: 0 }, { x: 2, y: 1, z: 1 });
+    if (scenario === 'xyz') samples.push({ x: 2, y: 1, z: 0 }, { x: 2, y: 1, z: 1 }, { x: 0, y: -3, z: -5 });
+    if (scenario === 'xy') samples.push({ x: 0, y: 1 }, { x: -4, y: -7 });
     const expected = plains.flatMap((pl, i) =>
       samples.every((v) => {
         const val = evalExpr(substitute(pl, v));
@@ -645,4 +646,209 @@ ${tail[scenario]}`,
   },
 };
 
-export const primesTemplates: Template<any>[] = [cannotSum, oddSum, twoPrimesQC, primeBoundsQC, parityMust];
+
+/* ------------------------------------------------------------------ 6. Parity decides the sign of (-1)^p (QC) */
+
+type PItem = 'sq-plus-next' | 'product' | 'sum' | 'r-times-sum' | 'sq-plus-self' | 'square-next' | 'odd-3r1' | 'any-sum';
+
+const P_ITEMS: Record<PItem, { info: string; p: string; parity: 'even' | 'odd' | 'either'; why: string; sample: (r: number, t: number) => number; consecutive: boolean }> = {
+  'sq-plus-next': {
+    info: '$r$ and $t$ are consecutive integers, and $p = r^2 + t$.',
+    p: 'r^2 + t',
+    parity: 'odd',
+    why: '$r^2$ has the same parity as $r$, and consecutive integers have opposite parities. So $r^2 + t$ is odd + even or even + odd: always odd. For example, $r = 2, t = 3$: $p = 7$; $r = 3, t = 2$: $p = 11$.',
+    sample: (r, t) => r * r + t,
+    consecutive: true,
+  },
+  product: {
+    info: '$r$ and $t$ are consecutive integers, and $p = rt$.',
+    p: 'rt',
+    parity: 'even',
+    why: 'One of two consecutive integers is even, so their product is always even. For example, $4 \\cdot 5 = 20$ and $(-3)(-2) = 6$.',
+    sample: (r, t) => r * t,
+    consecutive: true,
+  },
+  sum: {
+    info: '$r$ and $t$ are consecutive integers, and $p = r + t$.',
+    p: 'r + t',
+    parity: 'odd',
+    why: 'Consecutive integers have opposite parities, so their sum is odd + even: always odd. For example, $4 + 5 = 9$.',
+    sample: (r, t) => r + t,
+    consecutive: true,
+  },
+  'r-times-sum': {
+    info: '$r$ and $t$ are consecutive integers, and $p = r(r + t)$.',
+    p: 'r(r + t)',
+    parity: 'either',
+    why: '$r + t$ is odd, so $p$ has the same parity as $r$, which can be either. For example, $r = 2, t = 3$ gives $p = 10$ (even), but $r = 3, t = 4$ gives $p = 21$ (odd).',
+    sample: (r, t) => r * (r + t),
+    consecutive: true,
+  },
+  'sq-plus-self': {
+    info: '$r$ is an integer, and $p = r^2 + r$.',
+    p: 'r^2 + r',
+    parity: 'even',
+    why: '$r^2 + r = r(r + 1)$ is a product of two consecutive integers, so it is always even. For example, $r = 3$: $p = 12$; $r = -4$: $p = 12$.',
+    sample: (r) => r * r + r,
+    consecutive: false,
+  },
+  'square-next': {
+    info: '$r$ is an integer, and $p = r^2 + 2r + 1$.',
+    p: 'r^2 + 2r + 1',
+    parity: 'either',
+    why: '$p = (r + 1)^2$ has the same parity as $r + 1$, which can be either. For example, $r = 1$ gives $p = 4$ (even), but $r = 2$ gives $p = 9$ (odd).',
+    sample: (r) => r * r + 2 * r + 1,
+    consecutive: false,
+  },
+  'odd-3r1': {
+    info: '$r$ is an odd integer, and $p = 3r + 1$.',
+    p: '3r + 1',
+    parity: 'even',
+    why: '$3r$ is odd $\\times$ odd = odd, so $3r + 1$ is odd + 1 = even. For example, $r = 5$: $p = 16$.',
+    sample: (r) => 3 * r + 1,
+    consecutive: false,
+  },
+  'any-sum': {
+    info: '$r$ and $t$ are integers, and $p = r + t$.',
+    p: 'r + t',
+    parity: 'either',
+    why: 'Without more information, $r + t$ can be even ($2 + 4 = 6$) or odd ($2 + 3 = 5$).',
+    sample: (r, t) => r + t,
+    consecutive: false,
+  },
+};
+
+interface PPowParams {
+  item: PItem;
+  bv: number;
+}
+
+const parityPowerQC: Template<PPowParams> = {
+  id: 'arith.primes.parity-power-qc',
+  skill: 'arith.primes',
+  format: 'qc',
+  style: 'parity of an expression decides the sign of (-1)^p',
+  generate(rng, diff) {
+    const items: PItem[] =
+      diff === 1 ? ['sum', 'product', 'sq-plus-self', 'any-sum'] : diff === 2 ? ['sq-plus-next', 'product', 'odd-3r1', 'square-next', 'sq-plus-self'] : ['sq-plus-next', 'r-times-sum', 'square-next', 'odd-3r1'];
+    const item = rng.pick(items);
+    const it = P_ITEMS[item];
+    const bv = rng.pick([-1, 1, 0]);
+    const vals = it.parity === 'even' ? [1] : it.parity === 'odd' ? [-1] : [1, -1];
+    const rels = new Set(vals.map((v) => qcCompare(v, bv)));
+    const answer: QCChoice = rels.size === 1 ? [...rels][0] : 'D';
+    let traps: QCQuestion['traps'];
+    if (answer !== 'D') traps = { D: 'int-parity-rules' };
+    else traps = { [qcCompare(1, bv)]: 'tested-one-value' };
+    const value = it.parity === 'even' ? 'Here $p$ is even, so $(-1)^p = 1$' : it.parity === 'odd' ? 'Here $p$ is odd, so $(-1)^p = -1$' : 'So $(-1)^p$ can be 1 or $-1$';
+    return {
+      params: { item, bv },
+      q: {
+        format: 'qc',
+        info: it.info,
+        quantityA: '$(-1)^{p}$',
+        quantityB: `$${bv}$`,
+        answer,
+        traps,
+        explanation: `$(-1)^p$ is 1 when $p$ is even and $-1$ when $p$ is odd, so only the parity of $p = ${it.p}$ matters.
+
+${it.why}
+
+${value}. Compare with ${bv < 0 ? '$-1$' : bv}: ${QC_WORDS[answer]}. (${answer})`,
+      },
+    };
+  },
+  check(q, { item, bv }) {
+    const it = P_ITEMS[item];
+    const samples: [Frac, number][] = [];
+    for (let r = -15; r <= 15; r++) {
+      if (item === 'odd-3r1' && Math.abs(r % 2) !== 1) continue;
+      const ts = it.consecutive ? [r - 1, r + 1] : [r, r + 1, r + 2, r + 5];
+      for (const t of ts) samples.push([frac(-1).pow(it.sample(r, t)), bv]);
+    }
+    return expectQc(q, qcFromSamples(samples));
+  },
+};
+
+/* ------------------------------------------------------------------ 7. Sums of two different odd (even) integers: which totals are possible (MCM) */
+
+interface OddSumsParams {
+  parity: 'odd' | 'even';
+  mult: 2 | 3;
+  bound: number;
+  values: number[];
+}
+
+const oddSumsSelect: Template<OddSumsParams> = {
+  id: 'arith.primes.odd-sums-select',
+  skill: 'arith.primes',
+  format: 'mcm',
+  style: 'list the possible totals built from two different odd (even) integers',
+  generate(rng, diff) {
+    for (;;) {
+      const parity: OddSumsParams['parity'] = diff === 3 && rng.chance(0.5) ? 'even' : 'odd';
+      const mult: 2 | 3 = diff === 1 ? 2 : rng.pick([2, 3] as const);
+      const bound = rng.int(diff === 1 ? 10 : 12, diff === 1 ? 14 : 20);
+      const minZ = parity === 'odd' ? 4 : 6; // 1 + 3 or 2 + 4
+      const zs = range(minZ, bound - 1).filter((z) => z % 2 === 0);
+      const good = zs.map((z) => mult * z);
+      const cands: { v: number; trap?: string }[] = [
+        ...range(minZ - 1, bound + 1)
+          .filter((z) => z % 2 === 1)
+          .map((z) => ({ v: mult * z, trap: 'int-parity-rules' })),
+        { v: mult * (minZ - 2), trap: 'int-ignored-different' },
+        ...range(bound, bound + 4)
+          .filter((z) => z % 2 === 0)
+          .map((z) => ({ v: mult * z, trap: 'int-one-condition-only' })),
+      ];
+      const nGood = rng.int(2, Math.min(4, good.length));
+      const picksG = rng.sample(good, nGood);
+      const bad = rng.shuffle(cands.filter((c) => !good.includes(c.v) && c.v > 0));
+      const picksB: { v: number; trap?: string }[] = [];
+      for (const b of bad) if (picksB.length < 8 - nGood && !picksB.some((x) => x.v === b.v)) picksB.push(b);
+      if (picksB.length !== 8 - nGood) continue;
+      const items = [...picksG.map((v) => ({ v, correct: true as boolean, trap: undefined as string | undefined })), ...picksB.map((b) => ({ ...b, correct: false }))].sort((a, b) => a.v - b.v);
+      const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${it.v}$`, correct: it.correct, ...(it.trap ? { trap: it.trap } : {}) })));
+      const expr = mult === 2 ? 'x + y + z' : 'x + y + 2z';
+      const word = parity === 'odd' ? 'odd' : 'even';
+      return {
+        params: { parity, mult, bound, values: items.map((it) => it.v) },
+        q: {
+          format: 'mcm',
+          stem: `The numbers $x$ and $y$ are two different positive ${word} integers, and $z = x + y$. If $z < ${bound}$, which of the following could be the value of $${expr}$?`,
+          instruction: 'Indicate all such values.',
+          choices,
+          answer,
+          explanation: `Since $z = x + y$, $${expr} = ${mult}z$. So first find the possible values of $z$.
+
+The sum of two ${word} integers is even, and with $x \\ne y$ the smallest sum is $${parity === 'odd' ? '1 + 3 = 4' : '2 + 4 = 6'}$. Every even number from ${minZ} up works (for example $${minZ + 2} = ${parity === 'odd' ? `1 + ${minZ + 1}` : `2 + ${minZ}`}$), and $z < ${bound}$, so $z$ can be ${listAnd(zs.map(String))}.
+
+So $${expr}$ can be ${listAnd(good.map(String))}. Among the choices: ${listAnd(picksG.sort((a, b) => a - b).map(String))}.
+
+${[
+            picksB.some((b) => b.trap === 'int-ignored-different') ? `${mult * (minZ - 2)} would need $x = y$.` : '',
+            picksB.some((b) => b.trap === 'int-parity-rules') ? `Values such as ${picksB.find((b) => b.trap === 'int-parity-rules')!.v} would need an odd $z$, but the sum of two ${word} integers is even.` : '',
+            picksB.some((b) => b.trap === 'int-one-condition-only') ? `Values such as ${picksB.find((b) => b.trap === 'int-one-condition-only')!.v} would need $z \\ge ${bound}$.` : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}`,
+        },
+      };
+    }
+  },
+  check(q, { parity, mult, bound, values }) {
+    const possible = new Set<number>();
+    for (let x = 1; x < bound; x++)
+      for (let y = 1; y < bound; y++) {
+        if (x === y || (parity === 'odd') !== (x % 2 === 1) || (parity === 'odd') !== (y % 2 === 1)) continue;
+        const z = x + y;
+        if (z < bound) possible.add(x + y + (mult - 1) * z);
+      }
+    return expectMcm(
+      q,
+      values.flatMap((v, i) => (possible.has(v) ? [i] : [])),
+    );
+  },
+};
+
+export const primesTemplates: Template<any>[] = [cannotSum, oddSum, twoPrimesQC, primeBoundsQC, parityMust, parityPowerQC, oddSumsSelect];

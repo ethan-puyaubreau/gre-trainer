@@ -1,7 +1,7 @@
-import { flaggedChoices, numericChoices, qcCompare, qcCompareNum, qcFromSamples, QC_TEXT } from '../../../engine/build';
-import { Frac, frac } from '../../../engine/frac';
+import { flaggedChoices, qcCompare, qcCompareNum, qcFromSamples, QC_TEXT } from '../../../engine/build';
+import { Frac, frac, type FracLike } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
-import { lin, num } from '../../../engine/tex';
+import { lin, num, paren } from '../../../engine/tex';
 import type { Choice, MCSQuestion, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, type ExData } from './ex';
 import { Fig, onCircle, type P2 } from './fig';
@@ -77,11 +77,11 @@ const angleSum: Template<AngleSumParams> = {
     const S = (n - 2) * 180;
     const name = POLY_NAME[n] ?? `${n}-sided polygon`;
     if (mode === 'regular-sum') {
-      const { choices, answer } = numericChoices(rng, {
+      const { choices, answer } = numChoices(rng, {
+        step: 180,
         correct: S,
         traps: [
           { value: n * 180, trap: 'geom-poly-sum-n180' },
-          { value: n, trap: 'geom-poly-answered-other' },
         ],
         fillers: rng.shuffle([(n - 1) * 180, (n - 3) * 180, (n + 1) * 180, 360, (n - 4) * 180]),
         format: (v) => `$${num(v)}^\\circ$`,
@@ -98,7 +98,7 @@ const angleSum: Template<AngleSumParams> = {
 
 The interior angles then add up to $(${n} - 2) \\cdot 180^\\circ = ${num(S)}^\\circ$ (check: $${n} \\cdot ${I} = ${num(S)}$).
 
-Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$, and ${n} is the number of sides, not the angle sum.`,
+Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$: the polygon splits into $${n} - 2$ triangles, not ${n}.`,
         },
       };
     }
@@ -110,7 +110,8 @@ Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$, and ${
     if (mode === 'regular-angle') {
       fig.hide(...names);
       fig.angle(names[n - 1], names[0], names[1], '$x^\\circ$');
-      const { choices, answer } = numericChoices(rng, {
+      const { choices, answer } = numChoices(rng, {
+        step: 5,
         correct: I,
         traps: [
           { value: 360 / n, trap: 'geom-poly-exterior-angle' },
@@ -137,7 +138,8 @@ Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$
     fig.seg(names[0], names[2]);
     fig.angle(names[1], names[0], names[2], '$x^\\circ$');
     const x = new Frac(180, n);
-    const { choices, answer } = numericChoices(rng, {
+    const { choices, answer } = numChoices(rng, {
+        step: 5,
       correct: x,
       traps: [
         { value: new Frac(I, 2), trap: 'geom-poly-diagonal-bisects' },
@@ -197,6 +199,21 @@ The diagonal does not bisect the angle at $${names[0]}$: $\\frac{${num(I)}}{2}$ 
     return hits[0] === q.answer ? null : `expected choice ${hits[0]} (${expected})`;
   },
 };
+
+/** Numeric select-one choices with a spread answer position (wrapper over exChoices). */
+function numChoices(
+  rng: Rng,
+  o: { correct: FracLike; traps?: { value: FracLike; trap: string }[]; fillers?: FracLike[]; format: (v: Frac) => string; step: number },
+): { choices: Choice[]; answer: number } {
+  const r = exChoices(
+    rng,
+    Ex.of(o.correct),
+    (o.traps ?? []).map((t) => ({ v: Ex.of(t.value), trap: t.trap })),
+    (o.fillers ?? []).map((f) => Ex.of(f)),
+    { step: Ex.of(o.step), fmt: (v) => o.format(v.rational()!) },
+  );
+  return { choices: r.choices, answer: r.answer };
+}
 
 function choicesValues(choices: Choice[]): number[] {
   return choices.map((c) => {
@@ -275,7 +292,8 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
       const second = [...values].sort((a, b) => b - a).find((v) => v < maxV);
       fillers = rng.shuffle([maxV + 10, maxV - 10, ...(second ? [second] : []), maxV + 20, maxV - 20, maxV + 5]);
     }
-    const { choices, answer } = numericChoices(rng, {
+    const { choices, answer } = numChoices(rng, {
+        step: 5,
       correct,
       traps,
       fillers,
@@ -286,7 +304,7 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
     const names = 'ABCDEF'.slice(0, n).split('');
     names.forEach((nm, i) => fig.pt(nm, pts[i]));
     fig.poly(names).hide(...names);
-    ordered.forEach((ex, i) => fig.angle(names[(i + n - 1) % n], names[i], names[(i + 1) % n], `$${angleTex(ex)}$`));
+    ordered.forEach((ex, i) => fig.angleLabel(names[(i + n - 1) % n], names[i], names[(i + 1) % n], `$${angleTex(ex)}$`));
 
     const eqn = exprs.map((ex) => (ex[0] === 0 ? `${ex[1]}` : ex[1] === 0 ? lin([[ex[0], 'x']]) : `(${lin([[ex[0], 'x'], [ex[1], '']])})`)).join(' + ');
     const big = maxIdx >= 0 ? exprs[maxIdx] : exprs[0];
@@ -374,7 +392,7 @@ const rectangles: Template<RectParams> = {
       if (Number.isInteger(wP * lP) && lP > 0) traps.push({ v: Ex.of(wP * lP), trap: 'geom-rect-percent-of-perimeter' });
       traps.push({ v: Ex.of(4 * A), trap: 'geom-rect-semiperimeter' });
       if (Number.isInteger(P / 4)) traps.push({ v: Ex.of((P / 4) ** 2), trap: 'geom-rect-assumed-square' });
-      const { choices, answer, values } = exChoices(rng, Ex.of(A), traps, [Ex.of(A / 2), Ex.of(2 * A), Ex.of(l * l), Ex.of(A + l), Ex.of(A - w)]);
+      const { choices, answer, values } = exChoices(rng, Ex.of(A), rng.sample(traps, Math.min(2, traps.length)), [Ex.of(A / 2), Ex.of(2 * A), Ex.of(l * l), Ex.of(A + l), Ex.of(A - w), Ex.of(A - l), Ex.of(w * w)]);
       return {
         params: { mode, P, A, pct, verts: [], ask: 'area', values },
         q: {
@@ -426,7 +444,7 @@ Traps: the width is ${pct} percent of the LENGTH, not of the perimeter; and $\\e
               { v: Ex.of(W * Hs), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(2 * (W + H)), trap: 'geom-rect-area-for-perimeter' },
             ];
-      const { choices, answer, values } = exChoices(rng, Ex.of(correct), traps, [Ex.of(correct + 2), Ex.of(correct - 2), Ex.of(correct + 4), Ex.of(2 * correct)]);
+      const { choices, answer, values } = exChoices(rng, Ex.of(correct), rng.sample(traps, 2), [Ex.of(correct + 2), Ex.of(correct - 2), Ex.of(correct + 4), Ex.of(2 * correct), Ex.of(correct - 4), Ex.of(correct + 6)]);
       const pt = ([x, y]: P2) => `(${num(x)}, ${num(y)})`;
       return {
         params: { mode, P: 2 * (W + H), A: W * H, pct: 0, verts, ask, values },
@@ -532,7 +550,8 @@ const fence: Template<FenceParams> = {
       const sb = b * g;
       const P = 2 * (sa + sb);
       const A = sa * sb;
-      const choices = Array.from({ length: 8 }, (_, i) => (i + 1) * g);
+      const start = rng.int(1, a);
+      const choices = Array.from({ length: 8 }, (_, i) => (i + start) * g);
       const wrongTrap = (v: number) => (A % v === 0 ? 'geom-rect-factor-only' : undefined);
       const items = choices.map((v) => ({
         text: `$${num(v)}$`,
@@ -575,7 +594,10 @@ Other factors of ${num(A)} give the right area but the wrong amount of fencing: 
       [a2, 2 * a1],
     ].filter(([x, y]) => !longerAlongWall || y > x) as [number, number][];
     const sides = new Set(pairs.flat());
-    const choices = Array.from({ length: 8 }, (_, i) => (i + 1) * g);
+    const lo = Math.min(...sides) / g;
+    const hi = Math.max(...sides) / g;
+    const start = rng.int(Math.max(1, hi - 7), lo);
+    const choices = Array.from({ length: 8 }, (_, i) => (i + start) * g);
     const trapFor = (v: number): string | undefined => (A % v === 0 ? 'geom-rect-factor-only' : undefined);
     const items = choices.map((v) => {
       const t = sides.has(v) ? undefined : trapFor(v);
@@ -704,7 +726,7 @@ const compareQC: Template<CompareParams> = {
           traps,
           explanation: `The diagonals of a square bisect each other, so the vertex opposite $${pt(a)}$ is $${pt(2 * b - a)}$. Both points lie on the line $y = x$, so this diagonal is at $45^\\circ$ and the sides of $S$ are horizontal and vertical: the other two vertices are $(${num(a)}, ${num(2 * b - a)})$ and $(${num(2 * b - a)}, ${num(a)})$.
 
-Each side has length $|${num(2 * b - a)} - (${num(a)})| = ${2 * Math.abs(b - a)}$, so the area is $${2 * Math.abs(b - a)}^2 = ${area}$. Compare with ${num(k)}: ${relText(answer)}. (${answer})
+Each side has length $|${num(2 * b - a)} - ${paren(a)}| = ${2 * Math.abs(b - a)}$, so the area is $${2 * Math.abs(b - a)}^2 = ${area}$. Compare with ${num(k)}: ${relText(answer)}. (${answer})
 
 The distance from a vertex to the center is half a diagonal, not a side; squaring it gives ${2 * t}, and squaring the full diagonal gives ${8 * t}.`,
         },
@@ -742,7 +764,8 @@ Comparing the perimeters (or the numbers of sides) instead of the sides is the t
     }
     // parallelogram family
     const [a, hgt, off] = rng.pick(TRIPLES.filter((t) => t[0] <= (d === 1 ? 10 : 17)));
-    const b = rng.int(Math.max(off + 3, 6), 16);
+    const bLo = Math.max(off + 3, 6);
+    const b = rng.int(bLo, Math.max(bLo + 2, Math.round(Math.min(16, 2.5 * hgt + off))));
     const fig = new Fig();
     if (mode === 'trapezoid') {
       // isosceles trapezoid: bottom b1, top b1 - 2 off

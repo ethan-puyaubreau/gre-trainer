@@ -15,6 +15,8 @@ import {
   pickWeighted,
   qcEnd,
   qcFromFloatSamples,
+  plainNum,
+  spreadFillers,
   swapQC,
 } from './util';
 
@@ -38,6 +40,9 @@ interface RedParams {
 interface RedCtx {
   x: string;
   y: string;
+  /** "the lamp's original price" */
+  ox: string;
+  oy: string;
   /** Sentence describing the two changes. */
   changes: (p: number, q: number) => string;
   qty: (who: string) => string;
@@ -53,6 +58,8 @@ const RED_CTX: RedCtx[] = [
   {
     x: 'lamp',
     y: 'rug',
+    ox: "the lamp's original price",
+    oy: "the rug's original price",
     changes: (p, q) => `A store lowered the price of a lamp by ${P(p)} and the price of a rug by ${P(q)}.`,
     qty: (w) => `The number of dollars by which the price of the ${w} was lowered`,
     relation: (k) => `Before the change, the lamp cost ${kText(k)} as much as the rug.`,
@@ -63,6 +70,8 @@ const RED_CTX: RedCtx[] = [
   {
     x: 'jacket',
     y: 'sweater',
+    ox: "the jacket's price before the sale",
+    oy: "the sweater's price before the sale",
     changes: (p, q) => `During a sale, the price of a jacket was reduced by ${P(p)} and the price of a sweater was reduced by ${P(q)}.`,
     qty: (w) => `The dollar amount of the reduction in the price of the ${w}`,
     relation: (k) => `Before the sale, the jacket's price was ${kText(k)} the sweater's price.`,
@@ -73,6 +82,8 @@ const RED_CTX: RedCtx[] = [
   {
     x: 'Ana',
     y: 'Ben',
+    ox: "Ana's salary last year",
+    oy: "Ben's salary last year",
     changes: (p, q) => `This year Ana's salary increased by ${P(p)} and Ben's salary increased by ${P(q)}.`,
     qty: (w) => `The dollar amount of the increase in ${w}'s salary`,
     relation: (k) => `Last year Ana's salary was ${kText(k)} Ben's salary.`,
@@ -83,6 +94,8 @@ const RED_CTX: RedCtx[] = [
   {
     x: 'Store P',
     y: 'Store Q',
+    ox: "Store P's revenue in May",
+    oy: "Store Q's revenue in May",
     changes: (p, q) => `From May to June, the monthly revenue of Store P rose by ${P(p)} and the monthly revenue of Store Q rose by ${P(q)}.`,
     qty: (w) => `The increase, in dollars, in the monthly revenue of ${w}`,
     relation: (k) => `In May, the revenue of Store P was ${kText(k)} the revenue of Store Q.`,
@@ -149,7 +162,7 @@ const reductionQC: Template<RedParams> = {
             }
       }
     }
-    if (mode === 'unknown' && p === q && rng.chance(0.6)) q = p + 5;
+    if ((mode === 'unknown' || mode === 'after') && p === q && rng.chance(mode === 'after' ? 0.8 : 0.6)) q = p + 5;
     // Exact dollar changes are (p/100) X and (q/100) Y.
     let rel: QCChoice;
     if (mode === 'unknown') rel = 'D';
@@ -164,18 +177,18 @@ const reductionQC: Template<RedParams> = {
     const Y = C.y;
     if (mode === 'unknown') {
       const [a1, b1] = p > q ? [100, 1000] : [1000, 100];
-      why = `A ${P(p)} change of an amount $X$ is $${dec(F(p, 100))}X$ dollars, so the dollar changes depend on the original amounts, which are not given. If both original amounts were ${usd(100)}, the changes would be ${usd(p)} and ${usd(q)}. If the ${X} amount were ${usd(a1)} and the ${Y} amount ${usd(b1)}, they would be ${usd((p * a1) / 100)} and ${usd((q * b1) / 100)}.${
+      why = `A ${P(p)} change of an amount $X$ is $${dec(F(p, 100))}X$ dollars, so the dollar changes depend on the original amounts, which are not given. If both original amounts were ${usd(100)}, the changes would be ${usd(p)} and ${usd(q)}. If ${C.ox} were ${usd(a1)} and ${C.oy} were ${usd(b1)}, they would be ${usd((p * a1) / 100)} and ${usd((q * b1) / 100)}.${
         p !== q ? ` The larger percent does not guarantee the larger dollar change.` : ''
       }`;
     } else if (mode === 'relation') {
-      why = `Let $y$ be the original amount for ${Y}; the amount for ${X} was $${k.eq(F(1, 2)) ? '\\frac{1}{2}' : k.toTex()}y$. The changes are $${pct(p)}$ of $${k.eq(F(1, 2)) ? '\\frac{1}{2}' : k.toTex()}y$, which is $${dec(k.mul(p).div(100))}y$, and $${pct(q)}$ of $y$, which is $${dec(F(q, 100))}y$. Since $y > 0$, compare $${dec(k.mul(p).div(100))}$ with $${dec(F(q, 100))}$.`;
+      why = `Let $y$ be ${C.oy}; then ${C.ox} was $${k.eq(F(1, 2)) ? '\\frac{1}{2}' : k.toTex()}y$. The changes are $${pct(p)}$ of $${k.eq(F(1, 2)) ? '\\frac{1}{2}' : k.toTex()}y$, which is $${dec(k.mul(p).div(100))}y$, and $${pct(q)}$ of $y$, which is $${dec(F(q, 100))}y$. Since $y > 0$, compare $${dec(k.mul(p).div(100))}$ with $${dec(F(q, 100))}$.`;
     } else if (mode === 'given') {
-      why = `${X}: $${pct(p)}$ of ${usd(P1)} is ${usd((p * P1) / 100)}. ${Y}: $${pct(q)}$ of ${usd(P2)} is ${usd((q * P2) / 100)}.`;
+      why = `Quantity A: $${pct(p)}$ of ${usd(P1)} is ${usd((p * P1) / 100)}. Quantity B: $${pct(q)}$ of ${usd(P2)} is ${usd((q * P2) / 100)}.`;
     } else {
       const f = (r: number) => (C.up ? F(r, 100 + r) : F(r, 100 - r));
-      why = `Let $c$ be the common amount after the changes. The original amount for ${X} was $\\frac{c}{${dec(F(C.up ? 100 + p : 100 - p, 100))}}$, so its change was $\\frac{${dec(F(p, 100))}c}{${dec(
+      why = `Let $c$ be the common amount after the changes. Then ${C.ox} was $\\frac{c}{${dec(F(C.up ? 100 + p : 100 - p, 100))}}$, so that change was $\\frac{${dec(F(p, 100))}c}{${dec(
         F(C.up ? 100 + p : 100 - p, 100),
-      )}} = ${f(p).toTex()}c$. For ${Y} the change was $\\frac{${dec(F(q, 100))}c}{${dec(F(C.up ? 100 + q : 100 - q, 100))}} = ${f(q).toTex()}c$. ${
+      )}} = ${f(p).toTex()}c$. For ${C.oy.split("'s")[0]}, the change was $\\frac{${dec(F(q, 100))}c}{${dec(F(C.up ? 100 + q : 100 - q, 100))}} = ${f(q).toTex()}c$. ${
         p === q ? 'These are equal.' : `Since $${f(p).toTex()} ${f(p).gt(f(q)) ? '>' : '<'} ${f(q).toTex()}$, the ${p > q ? 'first' : 'second'} change is larger.`
       } Here the information IS enough: equal final amounts tie the two bases together.`;
     }
@@ -329,9 +342,7 @@ Swapping the percent and the number never changes the result. ${qcEnd('C')}`,
           quantityB: swap ? qa : qb,
           answer,
           traps: { C: 'num-percent-greater-less' },
-          explanation: `Take $y = 100$. Then $x = ${dec(ratio.mul(100))}$. The difference is ${p}, and "$y$ is ___ percent ${other} than $x$" compares that difference with $x$: $\\frac{${p}}{${dec(ratio.mul(100))}} = ${k.isTerminating() ? dec(k.div(100)) : `${(k.toNumber() / 100).toFixed(4)}\\ldots`}$, that is, $${pct(k)}$${
-            k.isTerminating() ? '' : ' (about)'
-          }.
+          explanation: `Take $y = 100$. Then $x = ${dec(ratio.mul(100))}$. The difference is ${p}, and "$y$ is ___ percent ${other} than $x$" compares that difference with $x$: $\\frac{${p}}{${dec(ratio.mul(100))}} = ${k.isTerminating() ? dec(k.div(100)) : `${(k.toNumber() / 100).toFixed(4)}\\ldots`}$, that is, ${k.isTerminating() ? `$${pct(k)}$` : `about $${k.toNumber().toFixed(1)}\\%$`}.
 
 ${dir === 'greater' ? 'The base for "less than $x$" is the larger number $x$, so the percent is smaller' : 'The base for "greater than $x$" is the smaller number $x$, so the percent is larger'} than $${pct(p)}$. ${qcEnd(answer)}`,
         },
@@ -409,7 +420,7 @@ const expressionMCS: Template<ExParams> = {
   generate(rng, d) {
     const modes: ExMode[] = d === 1 ? ['tax', 'discount', 'tip'] : d === 2 ? ['tax', 'discount', 'tip', 'commission'] : ['commission', 'original', 'discount', 'tax'];
     const mode = rng.pick(modes);
-    const p = mode === 'original' ? rng.pick([20, 50, 60, 75, 80]) : mode === 'tax' ? rng.pick([4, 5, 6, 7, 8, 9]) : mode === 'tip' ? rng.pick([15, 18, 20]) : mode === 'commission' ? rng.pick([3, 4, 5, 6, 8]) : rng.pick([10, 15, 20, 25, 30, 35]);
+    const p = mode === 'original' ? rng.pick([20, 50, 60, 75, 80]) : mode === 'tax' ? rng.pick([4, 5, 6, 7, 9]) : mode === 'tip' ? rng.pick([15, 18, 20]) : mode === 'commission' ? rng.pick([3, 4, 5, 6, 8]) : rng.pick([10, 15, 20, 25, 30, 35]);
     const t = F(p, 100);
     const base = mode === 'commission' ? rng.pick([300, 400, 500, 600, 750]) : 0;
     const coef = (a: Frac) => (a.eq(1) ? 's' : `${dec(a)}s`);
@@ -528,7 +539,7 @@ const profitNE: Template<PCParams> = {
       const c = d === 1 ? 5 * rng.int(3, 30) : rng.int(12, 480);
       const ratio = mode === 'decrease' ? rng.int(55, 95) / 100 : rng.int(105, 180) / 100;
       const s = Math.round(c * ratio);
-      if (s === c) continue;
+      if (s === c || (c === 15 && s === 20)) continue;
       const change = Math.abs(s - c);
       const exact = F(100 * change, c);
       // nearest whole percent, avoiding exact halves
@@ -662,11 +673,11 @@ interface RCParams {
 }
 
 const RC_CTX = [
-  { who: 'households in a town', what: 'had solar panels', group: 'households with solar panels' },
-  { who: 'employees of a company', what: 'worked from home', group: 'employees working from home' },
-  { who: 'students at a college', what: 'commuted by bicycle', group: 'students commuting by bicycle' },
-  { who: 'customers of a bank', what: 'used the mobile app', group: 'customers using the app' },
-  { who: 'the trees in a park', what: 'were oaks', group: 'oak trees' },
+  { who: 'households in a town', again: 'households in the town', what: 'had solar panels', group: 'households with solar panels' },
+  { who: 'employees of a company', again: "company's employees", what: 'worked from home', group: 'employees working from home' },
+  { who: 'students at a college', again: "college's students", what: 'commuted by bicycle', group: 'students commuting by bicycle' },
+  { who: 'customers of a bank', again: "bank's customers", what: "used the bank's mobile app", group: 'customers using the app' },
+  { who: 'trees in a park', again: 'trees in the park', what: 'were oaks', group: 'oak trees' },
 ];
 
 const rateChangeMCS: Template<RCParams> = {
@@ -690,14 +701,22 @@ const rateChangeMCS: Template<RCParams> = {
     const points = p2.sub(p1).abs();
     const ratio = p2.mul(100).div(p1);
     const newBase = p2.sub(p1).abs().mul(100).div(p2);
+    const optional = [
+      { value: ratio, trap: 'num-ratio-as-change' },
+      { value: newBase, trap: 'num-percent-wrong-base' },
+    ];
+    const rcTraps = [{ value: points, trap: 'num-percentage-points' }, ...(rng.chance(0.4) ? optional : [rng.pick(optional)])];
+    const steps = [F(10), F(20), F(25), F(50), F(75), F(100)];
     const { choices, answer, values } = numChoices(rng, {
       correct,
-      traps: [
-        { value: points, trap: 'num-percentage-points' },
-        { value: ratio, trap: 'num-ratio-as-change' },
-        { value: newBase, trap: 'num-percent-wrong-base' },
-      ],
-      fillers: [correct.add(50), correct.sub(25), F(Math.round(correct.toNumber() / 2))],
+      traps: rcTraps,
+      fillers: spreadFillers(
+        rng,
+        correct,
+        rcTraps.map((t) => t.value),
+        steps.map((x) => correct.sub(x)).filter((x) => x.sign() > 0),
+        steps.map((x) => correct.add(x)),
+      ),
       format: (v) => `$${pct(v)}$`,
     });
     const y1 = 2019 + rng.int(0, 2);
@@ -706,7 +725,7 @@ const rateChangeMCS: Template<RCParams> = {
       params: { p1, p2, values },
       q: {
         format: 'mcs',
-        stem: `In ${y1}, ${P(p1)} of the ${ctx.who} ${ctx.what}. In ${y2}, ${P(p2)} of the ${ctx.who} ${ctx.what}. By what percent did the percentage of ${ctx.group} ${up ? 'increase' : 'decrease'} from ${y1} to ${y2}?`,
+        stem: `In ${y1}, ${P(p1)} of the ${ctx.who} ${ctx.what}. In ${y2}, ${P(p2)} of the ${ctx.again} ${ctx.what}. By what percent did the percentage of ${ctx.group} ${up ? 'increase' : 'decrease'} from ${y1} to ${y2}?`,
         choices,
         answer,
         explanation: `Percent change = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$, with the old value ${P(p1)} as the base: $\\frac{${dec(p2)} - ${dec(p1)}}{${dec(p1)}} \\times 100 = ${change.isInt() ? change.toNumber() : dec(change)}$, ${up ? 'an increase' : 'a decrease'} of $${pct(correct)}$.
@@ -736,7 +755,7 @@ interface WParams {
 
 interface WCtx {
   noun: string;
-  intro: string;
+  intro: (n: number) => string;
   /** "were size small" */
   be: string[];
   /** "the small shirts" */
@@ -749,7 +768,7 @@ interface WCtx {
 const W_CTX: WCtx[] = [
   {
     noun: 'shirts',
-    intro: 'A store received a shipment of shirts in three sizes.',
+    intro: (n) => `A store received a shipment of shirts in ${n === 2 ? 'two' : 'three'} sizes.`,
     be: ['were size small', 'were size medium', 'were size large'],
     of: ['the small shirts', 'the medium shirts', 'the large shirts'],
     rest: 'the rest were divided equally between the other two sizes',
@@ -758,7 +777,7 @@ const W_CTX: WCtx[] = [
   },
   {
     noun: 'employees',
-    intro: 'Every employee of a company works in exactly one of three departments.',
+    intro: (n) => `Every employee of a company works in exactly one of ${n === 2 ? 'two' : 'three'} departments.`,
     be: ['work in sales', 'work in research', 'work in operations'],
     of: ['the employees in sales', 'the employees in research', 'the employees in operations'],
     rest: 'the rest are divided equally between the other two departments',
@@ -767,7 +786,7 @@ const W_CTX: WCtx[] = [
   },
   {
     noun: 'respondents',
-    intro: 'The people who answered a survey were in three age groups.',
+    intro: (n) => `The people who answered a survey were divided into ${n === 2 ? 'two' : 'three'} age groups.`,
     be: ['were under 30', 'were 30 to 50 years old', 'were over 50'],
     of: ['the respondents under 30', 'the respondents 30 to 50 years old', 'the respondents over 50'],
     rest: 'the rest were divided equally between the other two age groups',
@@ -802,12 +821,18 @@ const weightedMCS: Template<WParams> = {
       const rates = shares.map(() => 10 * rng.int(2, 9));
       const overall = shares.reduce((s, w, i) => s.add(w.mul(rates[i])), F(0));
       const mean = F(rates.reduce((s, r) => s + r, 0), rates.length);
-      if (!overall.isInt() || overall.eq(mean) || new Set(rates).size < rates.length) continue;
+      if (!overall.isInt() || !mean.isInt() || overall.eq(mean) || new Set(rates).size < rates.length) continue;
       const biggest = shares.reduce((bi, w, i) => (w.gt(shares[bi]) ? i : bi), 0);
       const { choices, answer, values } = numChoices(rng, {
         correct: overall,
-        traps: [{ value: mean, trap: 'num-unweighted-mean' }, ...(F(rates[biggest]).eq(overall) ? [] : [{ value: F(rates[biggest]), trap: 'num-unweighted-mean' }])],
-        fillers: [overall.add(5), overall.sub(5), overall.add(10), overall.sub(10)],
+        traps: [{ value: mean, trap: 'num-unweighted-mean' }],
+        fillers: spreadFillers(
+          rng,
+          overall,
+          [mean],
+          [F(rates[biggest]), ...[5, 10, 15, 20].map((x) => overall.sub(x))].filter((x) => x.sign() > 0),
+          [F(rates[biggest]), ...[5, 10, 15, 20].map((x) => overall.add(x))].filter((x) => x.lt(100)),
+        ),
         format: (v) => `$${pct(v)}$`,
       });
       let split: string;
@@ -823,7 +848,7 @@ const weightedMCS: Template<WParams> = {
         params: { shares, rates, values },
         q: {
           format: 'mcs',
-          stem: `${shares.length === 3 ? `${ctx.intro} ` : ''}${split} ${ctx.did(rateSentence)} ${ctx.ask}`,
+          stem: `${ctx.intro(shares.length)} ${split} ${ctx.did(rateSentence)} ${ctx.ask}`,
           choices,
           answer,
           explanation: `Weight each group's percent by its share of the whole: $${terms} = ${overall.toNumber()}$, so ${P(overall)} of all the ${ctx.noun}.
@@ -879,22 +904,24 @@ const reverseNE: Template<RvParams> = {
       const now = mult.mul(orig).toNumber();
       const naive = F(now).mul(F(up ? 100 - p : 100 + p, 100));
       const thing = rng.pick([
-        { s: 'the population of a town', unit: 'people', before: 'last year', now: 'this year', money: false },
-        { s: 'the number of visitors to a museum', unit: 'visitors', before: 'in 2022', now: 'in 2023', money: false },
-        { s: 'the price of a printer', unit: '', before: 'before the change', now: 'after the change', money: true },
+        { s: 'the population of a town', again: 'the population of the town', unit: 'people', money: false },
+        { s: 'the number of visitors to a museum', again: 'the number of visitors', unit: 'visitors', money: false },
+        d === 3
+          ? { s: 'the price of a used car', again: 'the price of the car', unit: '', money: true }
+          : { s: 'the price of a printer', again: 'the price of the printer', unit: '', money: true },
       ]);
       const verb = up ? 'increased' : 'decreased';
       return {
         params: { mode, p, q: 0, n: now, up },
         q: {
           format: 'ne',
-          stem: `After ${thing.s} ${verb} by ${P(p)}, it was ${thing.money ? usd(now) : plain(now)}. What was ${thing.s} before the ${up ? 'increase' : 'decrease'}?`,
+          stem: `After ${thing.s} ${verb} by ${P(p)}, it was ${thing.money ? usd(now) : plain(now)}. What was ${thing.again} before the ${up ? 'increase' : 'decrease'}?`,
           answer: F(orig),
           ...(thing.money ? { prefix: '\\$' } : { suffix: thing.unit }),
           traps: naive.eq(orig) ? [] : [{ value: naive, trap: 'num-reverse-percent' }],
           explanation: `If the original amount is $x$, then $${dec(mult)}x = ${num(now)}$, so $x = \\frac{${num(now)}}{${dec(mult)}} = ${num(orig)}$.
 
-${up ? 'Taking' : 'Adding'} ${P(p)} ${up ? 'off' : 'back to'} ${plain(now)} gives ${dec(naive)}, which is wrong: the ${P(p)} was computed on the original amount, not on ${plain(now)}.`,
+${up ? 'Taking' : 'Adding'} ${P(p)} ${up ? 'off' : 'back to'} ${plain(now)} gives ${plainNum(naive)}, which is wrong: the ${P(p)} was computed on the original amount, not on ${plain(now)}.`,
         },
       };
     }
@@ -928,6 +955,7 @@ Percents of percents multiply: adding them (${p + q}) or forgetting to divide by
       const tenths = exact.mul(10);
       if (tenths.isInt()) continue; // want rounding to matter
       if (tenths.mul(2).isInt()) continue; // avoid exact ties
+      if (p === 10 && q === 5) continue; // the published example uses these numbers
       const ans = F(Math.floor(tenths.toNumber() + 0.5), 10);
       const names = rng.pick([
         ['Jalen', 'Rosa'],

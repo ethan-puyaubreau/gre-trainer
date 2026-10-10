@@ -151,4 +151,142 @@ export const probTraps: Record<string, Trap> = {
     label: 'Forgot the lower limit $P(A) + P(B) - 1$',
     fix: 'Since $P(A \\text{ or } B) \\le 1$, $P(A \\text{ and } B) = P(A) + P(B) - P(A \\text{ or } B) \\ge P(A) + P(B) - 1$.',
   },
+  // ---------------------------------------------------------------- sets
+  'prob-venn-no-overlap': {
+    label: 'Forgot to subtract the overlap',
+    fix: 'Members of both groups are counted once in each group: at least one = A + B $-$ both.',
+  },
+  'prob-venn-forgot-neither': {
+    label: 'Forgot the members in neither group',
+    fix: 'Total = A + B $-$ both + neither. Leave the neither group out only when the question says everyone is in at least one group.',
+  },
+  'prob-venn-only': {
+    label: 'Mixed up "only A" and "A"',
+    fix: 'A circle includes its overlap. Only A = A $-$ both; exactly one = A + B $-$ 2(both).',
+  },
+  'prob-venn-min-zero': {
+    label: 'Assumed the overlap could be 0',
+    fix: 'If A + B is more than the total, at least A + B $-$ total members must be in both groups.',
+  },
+  'prob-venn-max': {
+    label: 'Went past the greatest possible value',
+    fix: 'The overlap cannot exceed the smaller group, and the neither group cannot exceed the total minus the larger group.',
+  },
+  'prob-venn-triple': {
+    label: 'Mishandled the members in all three groups',
+    fix: 'With "exactly two" data: at least one = A + B + C $-$ (exactly two) $-$ 2(all three). With pairwise overlaps: A + B + C $-$ (pairs) + (all three).',
+  },
+  'prob-venn-exactly-two': {
+    label: 'Used "exactly two" as if it were the pairwise overlaps',
+    fix: 'Pairwise overlaps include the members in all three groups; "exactly two" does not. Subtract (exactly two) and then 2 × (all three).',
+  },
+  'prob-venn-difference-fixed': {
+    label: 'Answered D although the difference is fixed',
+    fix: 'Neither $-$ both = total $-$ A $-$ B for every possible overlap, so the comparison is determined.',
+  },
+  'prob-overlap-off-by-one': {
+    label: 'Counted the shared integers off by one',
+    fix: 'The median of an odd list of consecutive integers is a member: it and the $\\frac{m-1}{2}$ integers on one side make $\\frac{m+1}{2}$ shared integers.',
+  },
+  'prob-percent-not-count': {
+    label: 'Gave the percent instead of the number',
+    fix: 'Convert at the end: $p$ percent of $N$ is $\\frac{p}{100} \\times N$.',
+  },
+  'prob-percent-of-whole': {
+    label: 'Used the whole population as the base',
+    fix: '"What percent of the car owners" divides by the car owners, not by everyone: $\\frac{\\text{part}}{\\text{that group}} \\times 100$.',
+  },
+  // ---------------------------------------------------------------- data interpretation
+  'prob-add-percents': {
+    label: 'Added successive percent changes',
+    fix: 'Successive changes multiply: +10% then +20% is $1.1 \\times 1.2 = 1.32$, a 32% increase, not 30%. Two decreases add up to less than their sum.',
+  },
+  'prob-percent-cancel': {
+    label: 'Assumed +k% and $-$k% cancel out',
+    fix: 'The second percent applies to a different base: $1.1 \\times 0.9 = 0.99$, a net 1% loss.',
+  },
+  'prob-percent-reverse': {
+    label: 'Undid a percent change by flipping its sign',
+    fix: 'To go back from the new amount, divide by the growth factor: after a 20% increase, divide by 1.2 (do not multiply by 0.8).',
+  },
+  'prob-percent-wrong-base': {
+    label: 'Used the wrong base for the percent',
+    fix: 'Percent change and "X as a percent of Y" divide by the base (the earlier value, or Y). Identify the base before dividing.',
+  },
+  'prob-di-one-step': {
+    label: 'Applied only one of the changes',
+    fix: 'From the first year to the third year, apply both yearly changes in order.',
+  },
+  'prob-di-wrong-column': {
+    label: 'Read the wrong row or column',
+    fix: 'Match the row and column headings (and the legend) to the exact years and categories in the question before reading a value.',
+  },
+  'prob-di-sign': {
+    label: 'Applied the change in the wrong direction',
+    fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',
+  },
+  'prob-di-rates-not-sizes': {
+    label: 'Inferred amounts from percent changes',
+    fix: 'Percent changes say nothing about sizes: a small store can grow faster than a big one. A statement about amounts needs the amounts.',
+  },
+  'prob-di-average-of-averages': {
+    label: 'Averaged two averages of different-sized groups',
+    fix: 'Combine totals, not means: (mean₁ × count₁ + mean₂ × count₂) ÷ (count₁ + count₂). The bigger group pulls the result toward its mean.',
+  },
+  'prob-di-mean-not-total': {
+    label: 'Compared totals by comparing means',
+    fix: 'A total is mean × count. A higher mean can still give a smaller total when fewer items were sold.',
+  },
+  'prob-di-median-total': {
+    label: 'Drew a conclusion the median cannot support',
+    fix: 'The median gives the middle value only. Totals need mean × count, and the median says nothing about the largest or smallest values.',
+  },
+  'prob-di-thousands': {
+    label: 'Ignored the units of the display',
+    fix: 'Check the title and axis labels: "(in thousands)" or "thousands of dollars" means multiply every value read by 1,000.',
+  },
+  'prob-percent-decimal': {
+    label: 'Converted the percent to a decimal incorrectly',
+    fix: '$p$ percent is $\\frac{p}{100}$: 2% = 0.02, not 0.2.',
+  },
+  'prob-di-wrong-total': {
+    label: 'Applied a percent to the wrong total',
+    fix: 'Each percent in a circle graph is a percent of that graph\'s total. Find the right total first (it may have to be derived from a part and its percent).',
+  },
+  'prob-di-range': {
+    label: 'Took the largest value as the range',
+    fix: 'Range = greatest value $-$ least value.',
+  },
+  'prob-di-largest-not-majority': {
+    label: 'Took the largest category for a majority',
+    fix: 'A category beats all the others combined only if it is more than 50% of the total.',
+  },
+  'prob-di-lumped-category': {
+    label: 'Drew conclusions about members of a lumped category',
+    fix: 'A bar or sector like "Other" gives only a total; it says nothing about how that total is split among its members.',
+  },
+  'prob-di-per-unit': {
+    label: 'Compared single units instead of the quantities asked',
+    fix: 'Multiply each value read from the graph by the quantity in the choice before comparing.',
+  },
+  'prob-di-unit-conversion': {
+    label: 'Skipped or reversed the unit conversion',
+    fix: 'Convert the quantity into the unit of the graph first: 10 kilograms ≈ $10 \\times 2.2 = 22$ pounds.',
+  },
+  'prob-di-difference-of-quotients': {
+    label: 'Divided by the difference instead of subtracting quotients',
+    fix: 'Find how many units each year\'s time buys ($\\frac{\\text{total minutes}}{\\text{minutes per unit}}$), then subtract. $\\frac{T}{b} - \\frac{T}{a} \\ne \\frac{T}{a - b}$.',
+  },
+  'prob-di-sd-size': {
+    label: 'Judged spread by the size of the numbers',
+    fix: 'Standard deviation measures how far the values are from their own mean. Small values can be very spread out; large, nearly equal values have a small standard deviation.',
+  },
+  'prob-di-wrong-divisor': {
+    label: 'Divided by the wrong number of values',
+    fix: 'An average per season divides by the number of seasons (zeros included), not by the number of nonzero entries.',
+  },
+  'prob-percent-ratio-as-change': {
+    label: 'Gave new ÷ old as the percent increase',
+    fix: 'Percent increase = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$; $\\frac{\\text{new}}{\\text{old}} \\times 100$ is the new value as a percent of the old one.',
+  },
 };

@@ -128,3 +128,6 @@ export function intChoices(rng: Rng, correct: number, traps: { value: number; tr
   });
   return { choices, answer, values: choices.map((c) => Number(c.text.replace(/[^0-9.]/g, ''))) };
 }
+
+/** Substitution shown in an explanation: evalTex(3, 10, 25) -> "3(25) + 10". */
+export const evalTex = (c: number, k: number, x: number) => `${c === 1 ? '' : c}(${x})${k === 0 ? '' : ` ${k < 0 ? '-' : '+'} ${Math.abs(k)}`}`;

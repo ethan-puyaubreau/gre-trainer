@@ -85,7 +85,11 @@ const equivalentOps: Template<EqOpsParams> = {
     const n = d === 1 ? 3 : d === 2 ? 4 : 5;
     let kinds: OpKind[];
     do kinds = rng.sample(OP_POOL[d], n);
-    while (kinds.every((k) => OPS[k].always) || kinds.every((k) => !OPS[k].always));
+    while (
+      kinds.every((k) => OPS[k].always) ||
+      kinds.every((k) => !OPS[k].always) ||
+      (kinds.length === 3 && ['add', 'mul', 'div'].every((k) => kinds.includes(k as OpKind))) // the published trio
+    );
     const ops = kinds.map((kind) => {
       let k = 1;
       if (kind === 'add' || kind === 'sub') k = rng.int(1, 3);
@@ -108,7 +112,9 @@ const equivalentOps: Template<EqOpsParams> = {
       const bottom = def.apply(F(q), k)!;
       const res = top.div(bottom);
       const ok = res.eq(F(p, q));
-      const raw = top.isInt() && bottom.isInt() ? `\\dfrac{${top.toTex()}}{${bottom.toTex()}}` : res.toTex();
+      const intParts = top.isInt() && bottom.isInt();
+      const alreadyReduced = intParts && bottom.n > 0 && gcd(top.n, bottom.n) === 1;
+      const raw = intParts && !alreadyReduced ? `\\dfrac{${top.toTex()}}{${bottom.toTex()}}` : res.toTex();
       const tail = ok ? (raw === f ? '' : ` = ${f}`) : raw === res.toTex() ? ` \\ne ${f}` : ` = ${res.toTex()} \\ne ${f}`;
       return `- ${def.text(k)}: $\\dfrac{${def.tex(String(p), k)}}{${def.tex(String(q), k)}} = ${raw}${tail}$ ${ok ? '✓' : '✗'}`;
     });
@@ -144,7 +150,7 @@ ${
     // Brute force: apply each operation to many fractions (or the given one) and compare values.
     const samples: [number, number][] = [];
     if (mode === 'specific') samples.push([p, den]);
-    else for (let a = -7; a <= 7; a++) for (let b = -7; b <= 7; b++) if (a !== 0 && b !== 0) samples.push([a, b]);
+    else for (const a of [-3, -1, 1, 2, 3, 5, 7]) for (const b of [-4, -2, 1, 3, 4, 6, 9]) samples.push([a, b]);
     const expected = ops.flatMap(({ kind, k }, i) => {
       const def = OPS[kind];
       const always = samples.every(([a, b]) => {

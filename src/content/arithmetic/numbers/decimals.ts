@@ -210,10 +210,10 @@ ${qcEnd(answer)}`,
     while (!Number.isInteger(R) || R % 10 === 0);
     // R is an integer number of units 10^-k with a nonzero last digit.
     const kase = pickWeighted<RoundCase>(rng, [
-      ['eq', 3],
-      ['inside', 2.5],
-      ['below', 2],
-      ['above', 2.5],
+      ['eq', 1.6],
+      ['inside', 1.2],
+      ['below', 2.6],
+      ['above', 2.4],
     ]);
     // c in units of 10^-(k+1)
     let j: number;
@@ -398,7 +398,8 @@ The choices differ only by powers of 10, so the whole question is where the deci
         { r: correct.r, e: correct.e - 2 },
       ];
       const uniq: typeof cands = [];
-      for (const x of cands) if (!uniq.some((u) => u.r.eq(x.r) && u.e === x.e)) uniq.push(x);
+      for (const x of [cands[0], cands[3], ...rng.shuffle([cands[1], cands[2], cands[4], cands[5], cands[6]])])
+        if (!uniq.some((u) => u.r.eq(x.r) && u.e === x.e)) uniq.push(x);
       const picked = uniq.slice(0, 5);
       if (picked.length < 5) continue;
       const valueOf = (x: { r: Frac; e: number }) => x.r.toNumber() * 10 ** x.e;

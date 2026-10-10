@@ -96,35 +96,68 @@ function termTex(a: Frac, u: Unit): string {
 }
 
 /**
- * Select-one choices from exact values: the correct one, trap values (tagged), then fillers, until
- * `count`; duplicates (same value), non-positive values and values too close to another choice are
- * skipped; ascending order.
+ * Select-one choices from exact values: the correct one, trap values (tagged, kept in priority),
+ * then fillers. Non-positive values, duplicates and values too close to another choice are skipped.
+ * The position of the correct answer is spread: a random number of wrong choices is taken below it
+ * (extra values correct ± k·step are generated when a side runs short). Ascending order.
  */
 export function exChoices(
   rng: Rng,
   correct: Ex,
   traps: { v: Ex; trap: string }[],
   fillers: Ex[],
-  opts: { count?: number; minGap?: number } = {},
+  opts: { count?: number; minGap?: number; step?: Ex; fmt?: (v: Ex) => string; allowZero?: boolean } = {},
 ): { choices: Choice[]; answer: number; values: ExData[] } {
   const count = opts.count ?? 5;
   const minGap = opts.minGap ?? 0.01;
+  const c = correct.value();
+  const pool: { v: Ex; trap?: string }[] = [...traps.map((t) => ({ v: t.v, trap: t.trap })), ...rng.shuffle(fillers).map((v) => ({ v }))];
+  if (opts.step) for (let k = 1; k <= 8; k++) pool.push({ v: correct.add(opts.step.scale(k)) }, { v: correct.sub(opts.step.scale(k)) });
+  const valid = (x: number) => (opts.allowZero ? x >= 0 : x > 0);
+  const below = pool.filter((it) => valid(it.v.value()) && it.v.value() < c);
+  const above = pool.filter((it) => it.v.value() > c);
   const items: { v: Ex; trap?: string; ok?: boolean }[] = [{ v: correct, ok: true }];
-  const close = (x: number) =>
-    items.some((it) => Math.abs(it.v.value() - x) <= minGap * Math.max(1, Math.abs(x), Math.abs(it.v.value())));
-  const tryAdd = (v: Ex, trap?: string) => {
-    if (items.length >= count) return;
-    const x = v.value();
-    if (!(x > 0) || close(x)) return;
-    if (items.some((it) => it.v.tex() === v.tex())) return;
-    items.push({ v, ...(trap ? { trap } : {}) });
+  const close = (x: number) => items.some((it) => Math.abs(it.v.value() - x) <= minGap * Math.max(1, Math.abs(x), Math.abs(it.v.value())));
+  const take = (list: { v: Ex; trap?: string }[], n: number) => {
+    let got = 0;
+    for (const it of list) {
+      if (got >= n) break;
+      const x = it.v.value();
+      if (close(x) || items.some((o) => o.v.tex() === it.v.tex())) continue;
+      items.push(it);
+      got++;
+    }
+    return got;
   };
-  for (const t of traps) tryAdd(t.v, t.trap);
-  for (const f of rng.shuffle(fillers)) tryAdd(f);
+  // Count usable values on each side (greedy, ignoring cross-side closeness, which cannot happen).
+  const usable = (list: { v: Ex }[]) => {
+    const kept: number[] = [c];
+    for (const it of list) {
+      const x = it.v.value();
+      if (!kept.some((y) => Math.abs(x - y) <= minGap * Math.max(1, Math.abs(x), Math.abs(y)))) kept.push(x);
+    }
+    return kept.length - 1;
+  };
+  const need = count - 1;
+  const nb = usable(below);
+  const na = usable(above);
+  const lo = Math.max(0, need - na);
+  const hi = Math.min(need, nb);
+  if (lo > hi) throw new Error(`exChoices: only ${nb + na} wrong choices for ${correct.tex()}`);
+  // Keep every trap when possible (they carry the feedback), otherwise spread freely.
+  const tb = Math.min(usable(below.filter((it) => it.trap)), need);
+  const ta = Math.min(usable(above.filter((it) => it.trap)), need);
+  const lo2 = Math.max(lo, tb);
+  const hi2 = Math.min(hi, need - ta);
+  const nBelow = lo2 <= hi2 && !(lo2 === hi2 && rng.chance(0.3)) ? rng.int(lo2, hi2) : rng.int(lo, hi);
+  const gotB = take(below, nBelow);
+  take(above, need - gotB);
+  if (items.length < count) take(below, count - items.length);
   if (items.length < count) throw new Error(`exChoices: only ${items.length} choices for ${correct.tex()}`);
   items.sort((a, b) => a.v.value() - b.v.value());
+  const fmt = opts.fmt ?? ((v: Ex) => `$${v.tex()}$`);
   return {
-    choices: items.map((it) => ({ text: `$${it.v.tex()}$`, ...(it.trap ? { trap: it.trap } : {}) })),
+    choices: items.map((it) => ({ text: fmt(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
     answer: items.findIndex((it) => it.ok),
     values: items.map((it) => it.v.data()),
   };
@@ -198,4 +231,14 @@ export function gridArea(pred: (x: number, y: number) => boolean, box: [number, 
 /** Polygon approximating a circle (many sides), for numeric circumference/area checks. */
 export function circlePolygon(c: P2, r: number, n = 4000): P2[] {
   return Array.from({ length: n }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)] as P2);
+}
+
+let unitCache: { area: number; perim: number } | null = null;
+/** Area and perimeter of the unit-radius 4000-gon (computed once): circle measures for radius r are r²·area and r·perim. */
+export function unitCircle(): { area: number; perim: number } {
+  if (!unitCache) {
+    const pts = circlePolygon([0, 0], 1);
+    unitCache = { area: shoelace(pts), perim: pathLength(pts, true) };
+  }
+  return unitCache;
 }

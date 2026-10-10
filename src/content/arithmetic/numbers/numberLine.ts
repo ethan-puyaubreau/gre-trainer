@@ -1,9 +1,9 @@
-import { flaggedChoices, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { decimal, num } from '../../../engine/tex';
 import type { Difficulty, NumberLineFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { expectMCM, expectMCS, expectNE, expectQC, extremeIndex, F, numChoices, pickWeighted, qcEnd, swapQC } from './util';
+import { expectMCM, expectMCS, expectNE, expectQC, extremeIndex, F, numChoices, pickWeighted, qcEnd, qcFromFloatSamples, spreadFillers, swapQC } from './util';
 
 /** Coordinate display: integers plainly, terminating values as decimals (when asked), else fractions. */
 function coordTex(x: Frac, style: 'decimal' | 'fraction'): string {
@@ -70,11 +70,13 @@ const segmentRatio: Template<SegParams> = {
     } else if (d === 2) {
       const k = rng.pick([2, 3, 4]);
       r = [1, k, 1];
-      [A, D] = rng.pick(FRAC_ENDS);
+      do [A, D] = rng.pick(FRAC_ENDS);
+      while (k === 3 && A.eq(F(1, 3)) && D.eq(F(1, 2))); // the published example
     } else {
       r = rng.chance(0.6) ? rng.pick(RATIOS) : [1, rng.pick([3, 4]), 1];
       [A, D] = rng.chance(0.5) ? rng.pick(NEG_ENDS) : rng.pick(FRAC_ENDS);
     }
+    if (A.eq(F(1, 3)) && D.eq(F(1, 2)) && r.join() === '1,3,1') r = [1, 4, 1]; // the published example
     const ask: 'B' | 'C' = rng.pick(['B', 'C'] as const);
     const total = r[0] + r[1] + r[2];
     const len = D.sub(A);
@@ -87,14 +89,23 @@ const segmentRatio: Template<SegParams> = {
     const u2 = len.div(total - 1);
     const fewer = ask === 'B' ? A.add(u2.mul(r[0])) : D.sub(u2.mul(r[2]));
     const style = d === 1 ? 'decimal' : 'fraction';
+    const trapList = [
+      { value: thirds, trap: 'num-equal-segments' },
+      { value: fewer, trap: 'num-segment-count' },
+      { value: other, trap: 'num-wrong-point' },
+    ];
+    const offs = [u.div(2), u.div(3), u, u.mul(3).div(2), u.mul(2).div(3), u.div(4)];
+    const inside = (x: Frac) => x.gt(A) && x.lt(D) && (d > 1 || x.isInt());
     const { choices, answer, values } = numChoices(rng, {
       correct,
-      traps: [
-        { value: thirds, trap: 'num-equal-segments' },
-        { value: fewer, trap: 'num-segment-count' },
-        { value: other, trap: 'num-wrong-point' },
-      ],
-      fillers: rng.shuffle([A.add(D).div(2), A.add(u.mul(2)), D.sub(u.mul(2)), A.add(len.div(4)), D.sub(len.div(4)), A.add(len.mul(2).div(5))]),
+      traps: trapList,
+      fillers: spreadFillers(
+        rng,
+        correct,
+        trapList.map((t) => t.value),
+        offs.map((o) => correct.sub(o)).filter(inside),
+        offs.map((o) => correct.add(o)).filter(inside),
+      ),
       format: (v) => `$${coordTex(v, style)}$`,
       allowNonPositive: true,
     });
@@ -174,13 +185,19 @@ const farthestClosest: Template<FarParams> = {
   generate(rng, d) {
     const style = d === 3 ? 'fraction' : 'decimal';
     for (;;) {
-      const mode: FarParams['mode'] = d === 1 ? 'far' : rng.pick(['far', 'close'] as const);
+      const mode: FarParams['mode'] = rng.chance(d === 1 ? 0.6 : 0.45) ? 'far' : 'close';
       let c: Frac;
       let vals: Frac[];
-      if (d === 1) {
+      if (d === 1 && mode === 'far') {
         c = F(rng.int(1, 6) * rng.sign());
-        const s = rng.pick([4, 5, 6, 8, 10]);
+        const s = rng.pick([4, 6, 8, 12]);
         vals = [-2 * s, -s, 0, s, 2 * s].map((x) => F(x));
+      } else if (d === 1) {
+        c = F(rng.int(2, 9) * rng.sign());
+        vals = rng.sample(
+          Array.from({ length: 25 }, (_, i) => F(i - 12)),
+          5,
+        );
       } else if (d === 2) {
         c = F(rng.int(-14, 14), 4);
         if (c.isInt()) continue;
@@ -549,7 +566,7 @@ ${lines.join('\n')}`,
       const key = ticks ? l.region : neg(l.region) ? 2 : 3;
       groups.set(key, [...(groups.get(key) ?? []), i]);
     });
-    for (let t = 0; t < 600; t++) {
+    for (let t = 0; t < 150; t++) {
       const v: number[] = letters.map(() => 0);
       for (const [key, members] of groups) {
         const r = key as Region;
@@ -594,7 +611,7 @@ const tickMarks: Template<TickParams> = {
     let m: number;
     let style: 'decimal' | 'fraction' = 'decimal';
     if (d === 1) {
-      m = rng.pick([2, 4, 5]);
+      m = rng.pick([4, 5]);
       const width = rng.pick([1, 2]);
       s = F(width, m);
       a = F(rng.int(-2, 2));
@@ -605,7 +622,7 @@ const tickMarks: Template<TickParams> = {
     } else if (rng.chance(0.6)) {
       style = 'fraction';
       const pairs: [Frac, Frac, number][] = [
-        [F(1, 3), F(1, 2), 5],
+        [F(1, 4), F(1, 2), 5],
         [F(1, 4), F(1, 3), 4],
         [F(1, 3), F(1, 2), 4],
         [F(1, 5), F(1, 3), 4],
@@ -672,12 +689,12 @@ Point $P$ is ${Math.abs(k)} interval${Math.abs(k) === 1 ? '' : 's'} to the ${k >
 /* ================================================================== 5. Distances on the number line (QC) */
 
 interface DistParams {
-  mode: 'two' | 'mid';
+  mode: 'two' | 'mid' | 'mids';
   a: Frac;
   d1: Frac;
   b: Frac;
   d2: Frac;
-  /** mid: R = a, S = b, w = d1 */
+  /** mid: R = a, S = b, w = d1. mids: RS = a, RT = d1, b = which quantity B is (0: ST, 1: RS, 2: half of RT) */
   swap: boolean;
 }
 
@@ -687,8 +704,49 @@ const distanceQC: Template<DistParams> = {
   format: 'qc',
   style: 'points at a given distance, midpoints',
   generate(rng, d) {
-    const mode: DistParams['mode'] = rng.chance(0.55) ? 'two' : 'mid';
+    const mode = pickWeighted<DistParams['mode']>(rng, [
+      ['two', 4.5],
+      ['mid', 3],
+      ['mids', 3],
+    ]);
     const swap = rng.chance(0.4);
+    if (mode === 'mids') {
+      // R, S, T with S between R and T; RS = a, RT = b. Distance between the midpoints of RS and ST is b / 2.
+      const style = d === 1 ? 1 : 10;
+      const which = d === 3 && rng.chance(0.25) ? 2 : rng.chance(0.7) ? 0 : 1;
+      let a: Frac;
+      let b: Frac;
+      const kase = rng.pick(['C', 'more', 'less'] as const);
+      do {
+        b = F(2 * rng.int(4, 30), style);
+        a = kase === 'C' ? b.div(2) : kase === 'more' ? b.div(2).add(F(rng.int(1, 6), style)) : b.div(2).sub(F(rng.int(1, 6), style));
+      } while (!a.gt(0) || !a.lt(b));
+      const t = (x: Frac) => coordTex(x, 'decimal');
+      const half = b.div(2);
+      const other = which === 0 ? b.sub(a) : which === 1 ? a : half;
+      const rel = qcCompare(half, other);
+      const answer = swap ? swapQC(rel) : rel;
+      const naive = a.add(b).div(2);
+      const naiveRel = qcCompare(naive, other);
+      const naiveAns = swap ? swapQC(naiveRel) : naiveRel;
+      const traps: QCQuestion['traps'] = naiveAns !== answer ? { [naiveAns]: 'num-wrong-point' } : undefined;
+      const qa = 'The distance between the midpoint of $RS$ and the midpoint of $ST$';
+      const qb = which === 0 ? 'The length of $ST$' : which === 1 ? 'The length of $RS$' : 'Half the length of $RT$';
+      return {
+        params: { mode, a, d1: b, b: F(which), d2: F(0), swap },
+        q: {
+          format: 'qc',
+          info: `Points $R$, $S$, and $T$ lie on a number line, with $S$ between $R$ and $T$. The distance between $R$ and $S$ is $${t(a)}$, and the distance between $R$ and $T$ is $${t(b)}$.`,
+          quantityA: swap ? qb : qa,
+          quantityB: swap ? qa : qb,
+          answer,
+          traps,
+          explanation: `Put $R$ at 0. Then $S$ is at $${t(a)}$ and $T$ is at $${t(b)}$. The midpoint of $RS$ is at $${t(a.div(2))}$ and the midpoint of $ST$ is at $\\frac{${t(a)} + ${t(b)}}{2} = ${t(naive)}$, so the distance between the midpoints is $${t(naive)} - ${t(a.div(2))} = ${t(half)}$: always half of $RT$, wherever $S$ is.
+
+${which === 0 ? `$ST = ${t(b)} - ${t(a)} = ${t(b.sub(a))}$.` : which === 1 ? `$RS = ${t(a)}$.` : `Half of $RT$ is $${t(half)}$.`} ${qcEnd(answer)}`,
+        },
+      };
+    }
     if (mode === 'two') {
       const target = pickWeighted<QCChoice>(rng, [
         ['A', 1],
@@ -806,13 +864,24 @@ ${rel !== 'D' || naiveAns === answer ? '' : `Using only the points to the right 
         quantityB: swap ? qa : qb,
         answer,
         traps,
-        explanation: `$RS = ${t(S)} - ${paren(t(R))} = ${t(S.sub(R).abs())}$. Since $S$ is the midpoint, $ST = RS$, so $T = ${t(S)} ${T.gt(S) ? '+' : '-'} ${t(S.sub(R).abs())} = ${t(T)}$.
+        explanation: `$RS = ${S.gt(R) ? `${t(S)} - ${paren(t(R))}` : `${t(R)} - ${paren(t(S))}`} = ${t(S.sub(R).abs())}$. Since $S$ is the midpoint, $ST = RS$, so $T = ${t(S)} ${T.gt(S) ? '+' : '-'} ${t(S.sub(R).abs())} = ${t(T)}$.
 
 Compare $${t(T)}$ with $${t(w)}$.${trapC ? ` (The value $${t(w)}$ is the midpoint of $R$ and $S$, not the coordinate of $T$.)` : ''} ${qcEnd(answer)}`,
       },
     };
   },
   check(q, { mode, a, d1, b, d2, swap }) {
+    if (mode === 'mids') {
+      // Place the points and measure.
+      const R = 0;
+      const S = R + a.toNumber();
+      const T = R + d1.toNumber();
+      const m1 = (R + S) / 2;
+      const m2 = (S + T) / 2;
+      const A = Math.abs(m2 - m1);
+      const B = b.eq(0) ? T - S : b.eq(1) ? S - R : (T - R) / 2;
+      return expectQC(q, qcFromFloatSamples([swap ? [B, A] : [A, B]], 1e-9));
+    }
     if (mode === 'two') {
       // Enumerate the four possible (x, y) pairs.
       const xs = [a.toNumber() - d1.toNumber(), a.toNumber() + d1.toNumber()];
