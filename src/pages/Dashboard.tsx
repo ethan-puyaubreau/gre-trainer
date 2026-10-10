@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
-import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, type Level } from '../mastery/model';
+import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, progressToNext, type Level } from '../mastery/model';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
+import '../fx-dashboard.css';
 
 /** Khan-style course mastery: Familiar 50, Proficient 80, Mastered 100 points per skill. */
 const POINTS: Record<Level, number> = { 0: 0, 1: 0, 2: 50, 3: 80, 4: 100 };
@@ -142,6 +143,8 @@ export function Dashboard() {
                       .map((s) => {
                         const st = states[s.id];
                         const lvl = st?.level ?? 0;
+                        const p = progressToNext(st ?? newSkillState());
+                        const label = lvl === 4 ? LEVEL_NAMES[4] : `${LEVEL_NAMES[lvl]}, ${Math.round(100 * p)}% to ${LEVEL_NAMES[lvl + 1]}`;
                         return (
                           <button
                             key={s.id}
@@ -150,9 +153,15 @@ export function Dashboard() {
                               opener.current = e.currentTarget;
                               setOpen(s);
                             }}
-                            title={LEVEL_NAMES[lvl]}
+                            title={label}
                           >
-                            <i className={`level-dot level-${lvl}`} />
+                            <span
+                              className="mastery-ring"
+                              style={{ '--p': p, '--ring': `var(--level-${Math.min(lvl + 1, 4)})` } as CSSProperties}
+                              aria-hidden="true"
+                            >
+                              <i className={`level-dot level-${lvl}`} />
+                            </span>
                             <span className="name">{s.name}</span>
                             {st && isDue(st, now) && <span className="chip chip-accent">due</span>}
                           </button>

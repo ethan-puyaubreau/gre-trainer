@@ -1,0 +1,24 @@
+/* Mastery ring: a conic-gradient ring around each skill's level dot, filled with the progress toward the next level. */
+.mastery-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+.mastery-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* The next level's colour, nudged toward the text colour so the pale levels stay readable on both themes. */
+  background: conic-gradient(color-mix(in oklab, var(--ring), var(--text) 30%) calc(var(--p) * 1turn), var(--border) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+.skill-tile .mastery-ring .level-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
