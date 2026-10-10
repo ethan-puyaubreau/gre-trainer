@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
@@ -15,6 +15,7 @@ const DIFF_NAMES = ['easy', 'medium', 'hard'];
 export function Dashboard() {
   const { skills: states, history, sections, remediation, settings } = useProgress();
   const [open, setOpen] = useState<Skill | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const now = Date.now();
   const playable = SKILLS.filter((s) => (templatesBySkill.get(s.id)?.length ?? 0) > 0);
 
@@ -142,7 +143,15 @@ export function Dashboard() {
                         const st = states[s.id];
                         const lvl = st?.level ?? 0;
                         return (
-                          <button key={s.id} className="skill-tile" onClick={() => setOpen(s)} title={LEVEL_NAMES[lvl]}>
+                          <button
+                            key={s.id}
+                            className="skill-tile"
+                            onClick={(e) => {
+                              opener.current = e.currentTarget;
+                              setOpen(s);
+                            }}
+                            title={LEVEL_NAMES[lvl]}
+                          >
                             <i className={`level-dot level-${lvl}`} />
                             <span className="name">{s.name}</span>
                             {st && isDue(st, now) && <span className="chip chip-accent">due</span>}
@@ -228,7 +237,7 @@ export function Dashboard() {
         <p className="muted small">The difficulty check appears after your first section tests.</p>
       )}
 
-      {open && <SkillDrawer skill={open} onClose={() => setOpen(null)} />}
+      {open && <SkillDrawer skill={open} opener={opener} onClose={() => setOpen(null)} />}
     </div>
   );
 }
@@ -242,7 +251,17 @@ function DiffCell({ cell }: { cell: Cell }) {
   );
 }
 
-function SkillDrawer({ skill, onClose }: { skill: Skill; onClose: () => void }) {
+/** A native modal dialog: Escape, the focus trap and the inert page come with showModal(). */
+function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObject<HTMLElement | null>; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = dialog.current!;
+    d.showModal();
+    return () => {
+      d.close();
+      opener.current?.focus();
+    };
+  }, [opener]);
   const { skills: states, history, settings } = useProgress();
   const st = states[skill.id] ?? newSkillState();
   const templates = templatesBySkill.get(skill.id) ?? [];
@@ -250,46 +269,66 @@ function SkillDrawer({ skill, onClose }: { skill: Skill; onClose: () => void }) 
   const acc = mine.length ? Math.round((100 * mine.filter((h) => h.correct).length) / mine.length) : null;
   const avg = mine.length ? mine.reduce((s, h) => s + h.timeMs, 0) / mine.length : null;
   return (
-    <>
-      <div className="drawer-backdrop" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-label={skill.name}>
-        <div className="row">
-          <h2 style={{ margin: 0 }}>{skill.name}</h2>
-          <span className="spacer" />
-          <button className="btn btn-ghost" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <p className="muted">{skill.summary}</p>
-        <div className="row">
-          <span className="chip chip-accent">
-            <i className={`level-dot level-${st.level}`} /> {LEVEL_NAMES[st.level]}
-          </span>
-          <span className="chip">difficulty {'●'.repeat(st.difficulty)}</span>
-          {acc !== null && <span className="chip">{acc}% correct</span>}
-          {avg !== null && (
-            <span className={`chip ${avg > settings.paceSec * 1000 ? 'chip-bad' : 'chip-good'}`}>avg {formatClock(avg)}</span>
-          )}
-        </div>
-        <p>{nextStep(st)}</p>
-        <a className="btn btn-primary" href={href('practice', 'skill', skill.id)}>
-          Practice this skill
-        </a>
-        <h3>Question styles</h3>
-        <ul className="list-plain">
-          {templates.map((t) => (
-            <li key={t.id} className="row">
-              <span style={{ width: 18 }}>{st.styles.includes(t.id) ? '✓' : '·'}</span>
-              <span style={{ flex: 1 }}>{t.style}</span>
-              <span className="chip">{{ qc: 'Comparison', mcs: 'Select one', mcm: 'Select all', ne: 'Numeric entry' }[t.format]}</span>
-            </li>
-          ))}
-        </ul>
-        <h3>Strategy</h3>
-        <div className="strategy-box">
-          <Rich text={skill.strategy} />
-        </div>
-      </aside>
-    </>
+    <dialog
+      ref={dialog}
+      className="drawer"
+      aria-label={skill.name}
+      // Reset the browser's centered-dialog defaults; the big shadow dims the page like the old backdrop.
+      style={{
+        left: 'auto',
+        margin: '0 0 0 auto',
+        height: 'auto',
+        maxWidth: 'none',
+        maxHeight: 'none',
+        borderWidth: '0 0 0 1px',
+        color: 'var(--text)',
+        boxShadow: '0 0 0 100vmax rgba(10, 5, 20, 0.35)',
+      }}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        // A click on the ::backdrop targets the dialog itself, outside its box.
+        if (e.target !== e.currentTarget) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose();
+      }}
+    >
+      <div className="row">
+        <h2 style={{ margin: 0 }}>{skill.name}</h2>
+        <span className="spacer" />
+        <button className="btn btn-ghost" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+      </div>
+      <p className="muted">{skill.summary}</p>
+      <div className="row">
+        <span className="chip chip-accent">
+          <i className={`level-dot level-${st.level}`} /> {LEVEL_NAMES[st.level]}
+        </span>
+        <span className="chip">difficulty {'●'.repeat(st.difficulty)}</span>
+        {acc !== null && <span className="chip">{acc}% correct</span>}
+        {avg !== null && <span className={`chip ${avg > settings.paceSec * 1000 ? 'chip-bad' : 'chip-good'}`}>avg {formatClock(avg)}</span>}
+      </div>
+      <p>{nextStep(st)}</p>
+      <a className="btn btn-primary" href={href('practice', 'skill', skill.id)}>
+        Practice this skill
+      </a>
+      <h3>Question styles</h3>
+      <ul className="list-plain">
+        {templates.map((t) => (
+          <li key={t.id} className="row">
+            <span style={{ width: 18 }}>{st.styles.includes(t.id) ? '✓' : '·'}</span>
+            <span style={{ flex: 1 }}>{t.style}</span>
+            <span className="chip">{{ qc: 'Comparison', mcs: 'Select one', mcm: 'Select all', ne: 'Numeric entry' }[t.format]}</span>
+          </li>
+        ))}
+      </ul>
+      <h3>Strategy</h3>
+      <div className="strategy-box">
+        <Rich text={skill.strategy} />
+      </div>
+    </dialog>
   );
 }
