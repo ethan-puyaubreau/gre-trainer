@@ -91,7 +91,6 @@ export function Calculator({ onClose, onTransfer }: { onClose: () => void; onTra
       setTokens(next);
       setFresh(true);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tokens, entry, fresh, error],
   );
 
@@ -115,7 +114,6 @@ export function Calculator({ onClose, onTransfer }: { onClose: () => void; onTra
       setEntry('0');
       setFresh(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokens, entry, fresh, error]);
 
   const press = useCallback(
@@ -181,7 +179,6 @@ export function Calculator({ onClose, onTransfer }: { onClose: () => void; onTra
           digit(k);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [entry, fresh, tokens, mem, digit, op, equals],
   );
 

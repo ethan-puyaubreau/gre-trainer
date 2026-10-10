@@ -6,6 +6,13 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: '/gre-trainer/',
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: { katex: ['katex'], react: ['react', 'react-dom'] },
+      },
+    },
+  },
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
