@@ -390,7 +390,7 @@ ${why}`,
 
 Compare $${dx(ratio)}T$ with $${dx(frac(k100, 100))}T$ ($T > 0$). ${qcEnd(answer)}
 
-A speed ${pct} percent greater does not cut the time by ${pct} percent: $T = \\frac{t}{${dx(ratio)}} = ${dx(frac(100, 100 + pct))}t$.`,
+A speed ${pct} percent greater does not cut the time by ${pct} percent: $T = \\frac{t}{${dx(ratio)}} = ${hrs(frac(100, 100 + pct))}t$.`,
       },
     };
   },
@@ -534,12 +534,12 @@ Ignoring ${n1}'s head start, or adding the travel time to ${clock(t0, 'short')} 
       opts.set(meet, undefined);
       for (const w of wrong) if (!opts.has(w.t) && w.t > t0 && w.t < 24 * 60 && opts.size < 4) opts.set(w.t, w.trap);
       const dir = rng.sign();
-      for (const step of [dir * 30, dir * 60, -dir * 30, dir * 90, -dir * 60, dir * 15]) {
+      for (const step of [dir * 30, dir * 60, dir * 90, -dir * 30, -dir * 60, dir * 15]) {
         const t = meet + step;
         if (opts.size >= 5) break;
         if (!opts.has(t) && t > t0 && t < 24 * 60) opts.set(t, undefined);
       }
-      if (opts.size < 5) continue;
+      if (opts.size < 5 || meet > 22 * 60) continue;
       const times = [...opts.keys()].sort((x, y) => x - y);
       const choices: Choice[] = times.map((t) => ({ text: clock(t, 'short'), ...(opts.get(t) ? { trap: opts.get(t)! } : {}) }));
       return {
