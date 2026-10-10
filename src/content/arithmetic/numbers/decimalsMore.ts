@@ -282,7 +282,7 @@ const decimalPointNE: Template<DPParams> = {
         params: { mode, k, dir: 'right', c: F(c) },
         q: {
           format: 'ne',
-          stem: `When the decimal point of a certain positive number is moved ${k} places to the right, the result is ${c} times the reciprocal of the original number. What is the original number?`,
+          stem: `When the decimal point of a certain positive number is moved ${k} places to the right, the new number equals ${c} times the reciprocal of the starting number. What was the starting number?`,
           answer: x,
           traps: [
             { value: wrongWay, trap: 'num-decimal-shift' },

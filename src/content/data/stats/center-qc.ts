@@ -593,7 +593,7 @@ Equivalently, the mean, $${fTex(meanF(list))}$, is ${meanF(list).gt(med) ? 'grea
       params: { ...NO_TOT, mode, side, a, b, tGiven, against, num: numB },
       q: {
         format: 'qc',
-        info: `List $X$ consists of the numbers $${a}, ${b}, s$, and $${tTxt}$. List $Y$ consists of the numbers $${a}, ${b}$, and $${tTxt}$. The average (arithmetic mean) of the numbers in list $X$ is equal to the average of the numbers in list $Y$.`,
+        info: `List $X$ consists of the numbers $${a}, ${b}, s$, and $${tTxt}$. List $Y$ consists of the numbers $${a}, ${b}$, and $${tTxt}$. Lists $X$ and $Y$ have the same average (arithmetic mean).`,
         quantityA: side === 'A' ? qS : qOther,
         quantityB: side === 'A' ? qOther : qS,
         answer: ans,

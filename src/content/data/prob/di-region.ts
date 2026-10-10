@@ -362,7 +362,7 @@ const regionMust: Template<RegMustParams> = {
       q: {
         format: 'mcm',
         figure: D.figure,
-        stem: 'Based on the information given, which of the following statements must be true?',
+        stem: 'Which of the following statements must be true, according to the data?',
         instruction: 'Indicate all such statements.',
         choices,
         answer,

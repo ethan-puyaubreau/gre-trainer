@@ -576,7 +576,7 @@ const propertyNE: Template<PropParams> = {
       const v = intExcept(rng, -9, 15, 0);
       answer = v;
       k = [p, a, b, v];
-      stem = `The function $f$ has the property that $f(x) = f(x + ${p})$ for all numbers $x$. If $f(${num(a)}) = ${num(v)}$, what is the value of $f(${num(b)})$?`;
+      stem = `For every number $x$, the function $f$ satisfies $f(x) = f(x + ${p})$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
       explanation = `The property says the value of $f$ repeats every ${p} unit${p > 1 ? 's' : ''}: $f(${num(a)}) = f(${num(a + p)}) = f(${num(a + 2 * p)}) = \\cdots$. Since $${num(b)} = ${num(a)} + ${p} \\cdot ${n}$, you reach $${num(b)}$ after ${n} steps, so $f(${num(b)}) = ${num(v)}$.`;
       traps.push({ value: frac(v + (b - a)), trap: 'alg-step-count' });
     } else if (kind === 'step') {
@@ -588,7 +588,7 @@ const propertyNE: Template<PropParams> = {
       const v = rng.int(-10, 15);
       answer = v + c * n;
       k = [p, c, a, b, v];
-      stem = `The function $f$ has the property that $f(x + ${p}) = f(x) ${c < 0 ? '-' : '+'} ${Math.abs(c)}$ for all numbers $x$. If $f(${num(a)}) = ${num(v)}$, what is the value of $f(${num(b)})$?`;
+      stem = `For every number $x$, the function $f$ satisfies $f(x + ${p}) = f(x) ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
       explanation = `Each increase of ${p} in $x$ ${c > 0 ? 'adds' : 'subtracts'} ${Math.abs(c)}. From $x = ${num(a)}$ to $x = ${num(b)}$ the input increases by $${b - a} = ${p} \\cdot ${n}$, which is ${n} steps.
 
 So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = ${num(answer)}$.${p > 1 ? ` Counting ${b - a} steps instead of ${n} gives $${num(v + c * (b - a))}$.` : ''}`;
@@ -600,7 +600,7 @@ So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = $
       const v = rng.int(1, 6);
       answer = v * r ** n;
       k = [r, a, n, v];
-      stem = `The function $f$ has the property that $f(x + 1) = ${num(r)}f(x)$ for all numbers $x$. If $f(${num(a)}) = ${v}$, what is the value of $f(${num(a + n)})$?`;
+      stem = `For every number $x$, the function $f$ satisfies $f(x + 1) = ${num(r)}f(x)$. If $f(${num(a)}) = ${v}$, what is $f(${num(a + n)})$?`;
       explanation = `Each increase of 1 in $x$ multiplies the value by $${num(r)}$. Going from $x = ${num(a)}$ to $x = ${num(a + n)}$ takes ${n} steps, so $f(${num(a + n)}) = ${v} \\cdot ${paren(r)}^{${n}} = ${num(answer)}$.`;
       traps.push({ value: frac(v * r * n), trap: 'alg-growth-linear' });
     } else {

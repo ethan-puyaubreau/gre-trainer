@@ -689,7 +689,7 @@ const normalDist: Template<NormalParams> = {
             figure: normalFigure(),
             stem: `${intro}
 
-The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit}. A ${ctx.noun.replace(/s$/, '')} of $${num(v)}$ ${ctx.unit} is at approximately the ${ordinal(pct)} percentile of the distribution. Of the following, which is the best estimate of the standard deviation of the distribution, in ${ctx.unit}?`,
+The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit}. A ${ctx.noun.replace(/s$/, '')} of $${num(v)}$ ${ctx.unit} is at approximately the ${ordinal(pct)} percentile of the distribution. Which of the following is closest to the standard deviation of the distribution, in ${ctx.unit}?`,
             choices,
             answer: options.indexOf(s),
             explanation: `From the figure, the percent of the distribution below each tick mark is: $-2$: 2%, $-1$: 16%, $0$: 50%, $1$: 84%, $2$: 98%. So the ${ordinal(pct)} percentile is about ${Math.abs(z)} standard deviation${Math.abs(z) === 1 ? '' : 's'} ${z < 0 ? 'below' : 'above'} the mean.
@@ -762,9 +762,12 @@ $${pct}\\%$ of $${num(N)}$ is $${num(ans)}$.`,
 The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit} and a standard deviation of $${num(sigma)}$ ${ctx.unit}. Approximately what percent of the ${ctx.who} have ${ctx.noun.replace(/s$/, '')}s ${ask}?`,
           choices,
           answer,
-          explanation: `${explainBounds(mu, sigma, z1, z2)} So the question asks for the part of the figure ${regionWords(z1, z2)}. Add the percents of those regions: $${REGIONS.slice(Z_EDGES.indexOf(z1), Z_EDGES.indexOf(z2))
-            .map((r) => `${r}\\%`)
-            .join(' + ')} = ${pct}\\%$.${oneSided !== null ? ` (The familiar ${2 * pct}% is for both sides of the mean together.)` : ''}`,
+          explanation: `${explainBounds(mu, sigma, z1, z2)} So the question asks for the part of the figure ${regionWords(z1, z2)}. ${(() => {
+            const parts = REGIONS.slice(Z_EDGES.indexOf(z1), Z_EDGES.indexOf(z2));
+            return parts.length === 1
+              ? `That region holds about $${pct}\\%$.`
+              : `Add the percents of those regions: $${parts.map((r) => `${r}\\%`).join(' + ')} = ${pct}\\%$.`;
+          })()}${oneSided !== null ? ` (The familiar ${2 * pct}% is for both sides of the mean together.)` : ''}`,
         },
       };
     }

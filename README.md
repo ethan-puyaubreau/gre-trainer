@@ -32,19 +32,37 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
 - **Strategy cards** for every skill, with the shortcuts.
 - **Progress** is kept in your browser's local storage. Export and import it as JSON from Settings.
 
+## Content
+
+| Area | Skills | Question styles | Named traps |
+|---|---|---|---|
+| Arithmetic | 17 | 89 | 111 |
+| Algebra | 14 | 63 | 166 |
+| Geometry | 9 | 39 | 141 |
+| Data Analysis | 8 | 66 (7 data interpretation families) | 132 |
+| **Total** | **48** | **257** | **550** |
+
+Each style generates 1,500 verified variants (500 seeds × 3 difficulty levels). Coverage follows
+the question patterns of ETS's *Official GRE Quantitative Reasoning Practice Questions* (Vol. 1,
+3rd ed.) and the ETS Math Review. All questions are original: generators reuse the patterns, never
+the published questions.
+
 ## Answer keys are verified
 
 Each generator has a `check()` that recomputes the answer by an independent method: brute force,
 enumeration, simulation, floating-point evaluation, or random sampling for "must be true" and "cannot
-be determined" questions. The test suite runs every generator on 150 seeds × 3 difficulty levels
-and checks:
+be determined" questions.
 
-- the structure of each question and its KaTeX rendering
-- that the same seed always gives the same question
-- that questions and answers vary across seeds
-- the answer key against `check()`
-
-A second suite corrupts answer keys on purpose and requires every `check()` to reject them.
+- **Full validation.** The test suite runs every generator on 150 seeds × 3 difficulty levels and checks:
+  - the structure of each question and its KaTeX rendering
+  - that the same seed always gives the same question
+  - that questions and answers vary across seeds
+  - that select-one answers are spread over positions A–E
+  - the answer key against `check()`
+- **Every question the app can serve is verified.** The app only serves seeds 1–500. The suite
+  checks the answer key of every one of those questions, for every generator and difficulty.
+- **The checks themselves are tested.** A second suite corrupts answer keys on purpose and requires
+  every `check()` to reject them.
 
 ## Development
 

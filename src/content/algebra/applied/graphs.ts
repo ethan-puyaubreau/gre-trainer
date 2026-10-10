@@ -98,7 +98,7 @@ const lineMeetsV: Template<VParams> = {
       q: {
         format: 'mcs',
         figure,
-        stem: `The graph of the function $f$ is shown in the $xy$-plane above. For which of the following functions $g$, defined for all numbers $x$, does the graph of $g$ intersect the graph of $f$?`,
+        stem: `The graph of the function $f$ is shown in the $xy$-plane above. The graph of which of the following functions $g$, each defined for every real number $x$, meets the graph of $f$?`,
         choices,
         answer,
         explanation: `From the graph, $f(x) = ${a === 1 ? '' : a}|x ${h === 0 ? '' : h > 0 ? `- ${h}` : `+ ${-h}`}| + ${k}$: a V with vertex $${ptTex(h, k)}$ whose branches have slopes $${a}$ and $${-a}$.

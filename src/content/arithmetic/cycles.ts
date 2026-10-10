@@ -181,7 +181,7 @@ const periodicSequenceSum: Template<SeqParams> = {
         format: 'ne',
         stem: `$$${shown}, \\ldots$$
 
-In the sequence above, the first ${L} terms repeat without end. What is the sum of the terms of the sequence from the ${ordinal(m)} term to the ${ordinal(n)} term?`,
+The sequence above repeats its first ${L} terms indefinitely. What is the sum of the ${ordinal(m)} through the ${ordinal(n)} terms of the sequence, inclusive?`,
         answer: frac(answer),
         traps,
         explanation: `The term in position $k$ depends only on the remainder of $k \\div ${L}$: ${mapping}. One full cycle sums to $${num(sum(cycle))}$.

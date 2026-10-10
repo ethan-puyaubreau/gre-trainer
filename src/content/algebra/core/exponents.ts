@@ -193,7 +193,7 @@ Subtract in the right order (numerator minus denominator); the other order gives
       if (b2 % b1 === 0) wrongs.push({ e: mul(N(b2 / b1), V('t')), trap: 'alg-ignore-base' });
       wrongs.push({ e: mul(N(e2), V('t')) }, { e: lx(1, 1, 't') }, { e: mul(N(e1 * e2), V('t')) });
       wrongs.push({ e: mul(N(b2), V('t')) }, { e: pow(V('t'), e2) }, { e: lx(1, -1, 't') }, { e: mul(N(e1 + e2), V('t')) });
-      stem = `If $${b1}^{m} = ${b2}^{t}$, which of the following expresses $m$ in terms of $t$?`;
+      stem = `If $${b1}^{m} = ${b2}^{t}$, then $m$ equals which of the following?`;
       explanation = `Write both sides with base ${g}: ${[e1 === 1 ? '' : `$${b1}^{m} = ${g}^{${e1}m}$`, e2 === 1 ? '' : `$${b2}^{t} = ${g}^{${e2}t}$`].filter(Boolean).join(' and ')}.
 
 Equal powers of ${g} have equal exponents: $${e1 === 1 ? '' : e1}m = ${e2 === 1 ? '' : e2}t$, so $m = ${texEx(correct)}$.

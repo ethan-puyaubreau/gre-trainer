@@ -106,7 +106,7 @@ const twoSetCount: Template<CountParams> = {
       }
       const overlap = anchor === 'median-least' ? (p.m + 1) / 2 : (p.n + 1) / 2;
       answer = p.m + p.n - overlap;
-      const anchorText = anchor === 'median-least' ? 'The median of the integers in list R is equal to the least integer in list T.' : 'The greatest integer in list R is equal to the median of the integers in list T.';
+      const anchorText = anchor === 'median-least' ? 'The median of list R equals the smallest integer in list T.' : 'The greatest integer in list R is equal to the median of the integers in list T.';
       stem = `List R consists of ${p.m} consecutive integers, and list T consists of ${p.n} consecutive integers. ${anchorText} How many different integers are in list R or list T or both?`;
       traps.push({ value: frac(p.m + p.n), trap: 'prob-venn-no-overlap' }, { value: frac(answer + 1), trap: 'prob-overlap-off-by-one' }, { value: frac(answer - 1), trap: 'prob-overlap-off-by-one' });
       explanation =
@@ -302,7 +302,7 @@ const overlapRange: Template<RangeParams> = {
       p.extra = rng.int(2, p.a - 3);
       lo = p.b - p.a + p.extra;
       hi = p.b;
-      stem = `Set $A$ has ${p.a} members and set $B$ has ${p.b} members. At least ${p.extra} of the members of $A$ are not members of $B$. Which of the following could be the number of members of $B$ that are not members of $A$?`;
+      stem = `There are ${p.a} members in set $A$ and ${p.b} in set $B$, and at least ${p.extra} members of $A$ do not belong to $B$. Which of the following could be the number of members of $B$ that are not members of $A$?`;
       explanation = `Members of $B$ not in $A$ $= ${p.b} - (\\text{members in both})$. At least ${p.extra} members of $A$ are outside $B$, so at most $${p.a} - ${p.extra} = ${p.a - p.extra}$ are in both, and at least 0 are. So the count is from $${p.b} - ${p.a - p.extra} = ${lo}$ up to $${p.b} - 0 = ${hi}$, inclusive.
 
 $${p.b - p.a}$ ignores the condition on the ${p.extra} members of $A$ outside $B$.`;

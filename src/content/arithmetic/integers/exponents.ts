@@ -760,7 +760,7 @@ const productInterval: Template<ProductParams> = {
         params: { lo, hi, nums: sorted },
         q: {
           format: 'mcm',
-          stem: 'Which two of the following numbers have a product that is between $-1$ and 0?',
+          stem: 'The product of which two of the following numbers is greater than $-1$ and less than 0?',
           instruction: 'Indicate both of the numbers.',
           choices,
           answer,
