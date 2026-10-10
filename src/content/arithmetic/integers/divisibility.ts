@@ -79,7 +79,7 @@ const mustDivide: Template<MustDivideParams> = {
         params: { d, r, s, values },
         q: {
           format: 'mcs',
-          stem: `When the positive integer $n$ is divided by ${d}, the remainder is ${r}. Which of the following must be a divisor of $${subject}$?`,
+          stem: `The positive integer $n$ leaves a remainder of ${r} when it is divided by ${d}. Which of the following must be a factor of $${subject}$?`,
           choices,
           answer,
           explanation: `${setup}

@@ -18,6 +18,10 @@ describe('section builder', () => {
         const regular = questions.slice(0, sets.length ? sets[0][0] : n);
         const firstNonQc = regular.findIndex((q) => q.format !== 'qc');
         if (firstNonQc >= 0) expect(regular.slice(firstNonQc).every((q) => q.format !== 'qc')).toBe(true);
+        if (areas.length === 4) {
+          const data = questions.filter((q) => q.skillId.startsWith('data.')).length;
+          expect(data).toBeLessThanOrEqual(Math.ceil(n * 0.5));
+        }
         for (const [a, b] of sets) {
           expect(b).toBe(n - 1);
           const figs = questions.slice(a, b + 1).map((q) => JSON.stringify(q.figure));

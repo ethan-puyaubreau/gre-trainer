@@ -21,6 +21,23 @@ export const SPECS: Record<'s1' | 's2', SectionSpec> = {
   s2: { questions: 15, minutes: 26, formats: { qc: 5, mcs: 6, mcm: 2, ne: 2 }, setSize: 4 },
 };
 
+/**
+ * Content mix of the standalone questions. Across the book's 150 questions the split is about
+ * arithmetic 27%, algebra 22%, geometry 16%, data analysis 35%, and most data analysis items come
+ * from the data interpretation set, so standalone slots lean away from data analysis.
+ */
+const AREA_WEIGHTS: Record<Area, number> = { arithmetic: 7, algebra: 6, geometry: 4, data: 3 };
+
+/** Split n slots between areas in proportion to their weights (largest remainder), in random order. */
+function areaSlots(rng: Rng, areas: Area[], n: number): Area[] {
+  const total = areas.reduce((s, a) => s + AREA_WEIGHTS[a], 0);
+  const exact = areas.map((a) => (AREA_WEIGHTS[a] * n) / total);
+  const counts = exact.map(Math.floor);
+  const order = exact.map((x, i) => [x - Math.floor(x) + rng.next() * 1e-6, i] as const).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; counts.reduce((s, c) => s + c, 0) < n; k++) counts[order[k % order.length][1]]++;
+  return rng.shuffle(areas.flatMap((a, i) => Array<Area>(counts[i]).fill(a)));
+}
+
 /** Which standalone slot each data-set question replaces, in order (keeps at least one of each format). */
 const SET_REPLACES: Format[] = ['mcs', 'ne', 'mcs', 'mcm', 'mcs'];
 
@@ -70,9 +87,9 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
     slots = slots.filter((_, j) => j !== i);
   }
   const regularPool = pool.filter((t) => !setFamily || t.set !== setFamily);
-  const areaCycle = rng.shuffle(areas);
+  const slotAreas = areaSlots(rng, areas, slots.length);
   slots.forEach((format, i) => {
-    const preferredArea = areaCycle[i % areaCycle.length];
+    const preferredArea = slotAreas[i];
     const candidates = (filter: (t: Template<any>) => boolean) => regularPool.filter((t) => t.format === format && filter(t));
     const tiers = [
       candidates((t) => skillById.get(t.skill)!.area === preferredArea && !usedSkills.has(t.skill)),

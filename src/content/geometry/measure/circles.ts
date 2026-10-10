@@ -89,7 +89,7 @@ const ratio: Template<RatioParams> = {
         wrong.push({ r: [p, q], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-squared' }, { r: [p * p, q * q] }, { r: [2 * q, p] });
       }
       const rB = frac(p, q).toTex();
-      stem = `The radius of circle $A$ is $r$, and the radius of circle $B$ is $${rB}r$. What is the ratio of the ${areas ? 'area' : 'circumference'} of circle $A$ to the ${areas ? 'area' : 'circumference'} of circle $B$?`;
+      stem = `Circle $A$ has radius $r$, and circle $B$ has radius $${rB}r$. What is the ratio of the ${areas ? 'area' : 'circumference'} of $A$ to that of $B$?`;
       explanation = areas
         ? `Area is $\\pi r^2$, so the ratio is $\\dfrac{\\pi r^2}{\\pi \\left(${rB}r\\right)^2} = \\dfrac{1}{${frac(p * p, q * q).toTex()}} = ${frac(q * q, p * p).toTex({ dfrac: true })}$, that is, ${q * q} to ${p * p}.
 
@@ -103,7 +103,7 @@ Squaring the ratio is only for areas. Keep the order: circle $A$ first.`;
       b = q * q;
       correct = [p, q];
       wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-squared' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p] }, { r: [2 * p, q] });
-      stem = `Circle $W$ has area $${piTex(new Frac(p * p))}$, and circle $Z$ has area $${piTex(new Frac(q * q))}$. What is the ratio of the circumference of circle $W$ to the circumference of circle $Z$?`;
+      stem = `Circle $W$ has area $${piTex(new Frac(p * p))}$, and circle $Z$ has area $${piTex(new Frac(q * q))}$. What is the ratio of the circumference of $W$ to that of $Z$?`;
       explanation = `From $\\pi r^2 = ${piTex(new Frac(p * p))}$ the radius of $W$ is ${p}; from $\\pi r^2 = ${piTex(new Frac(q * q))}$ the radius of $Z$ is ${q}.
 
 Circumferences are $2\\pi \\cdot ${p}$ and $2\\pi \\cdot ${q}$, in the ratio ${p} to ${q}.
@@ -114,7 +114,7 @@ ${p * p} to ${q * q} is the ratio of the AREAS; lengths are in the ratio of the 
       b = 2 * q;
       correct = [p * p, q * q];
       wrong.push({ r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [q, p] }, { r: [2 * p * p, q * q] });
-      stem = `The circumference of circle $W$ is $${piTex(new Frac(2 * p))}$, and the circumference of circle $Z$ is $${piTex(new Frac(2 * q))}$. What is the ratio of the area of circle $W$ to the area of circle $Z$?`;
+      stem = `The circumference of circle $W$ is $${piTex(new Frac(2 * p))}$, and the circumference of circle $Z$ is $${piTex(new Frac(2 * q))}$. What is the ratio of the area of $W$ to that of $Z$?`;
       explanation = `From $2\\pi r = ${piTex(new Frac(2 * p))}$ the radius of $W$ is ${p}; from $2\\pi r = ${piTex(new Frac(2 * q))}$ the radius of $Z$ is ${q}.
 
 The areas are $${piTex(new Frac(p * p))}$ and $${piTex(new Frac(q * q))}$, in the ratio ${p * p} to ${q * q}.
@@ -126,7 +126,7 @@ The circumferences are in the ratio ${p} to ${q}; areas use the square of that r
       a = p;
       correct = red([p * p, 4]);
       wrong.push({ r: [p * p, 1], trap: 'geom-circle-radius-diameter' }, { r: red([p, 2]), trap: 'geom-circle-ratio-linear' }, { r: red([4, p * p]), trap: 'geom-circle-ratio-inverted' }, { r: [p, 1] }, { r: [1, p * p] });
-      stem = `The diameter of circle $A$ is ${p === 1 ? 'equal to' : `${p} times`} the radius of circle $B$. What is the ratio of the area of circle $A$ to the area of circle $B$?`;
+      stem = `The diameter of circle $A$ is ${p === 1 ? 'equal to' : `${p} times`} the radius of circle $B$. What is the ratio of the area of $A$ to that of $B$?`;
       explanation = `Let the radius of $B$ be $r$. The diameter of $A$ is $${p === 1 ? '' : p}r$, so its radius is $${frac(p, 2).toTex()}r$.
 
 Ratio of areas: $\\dfrac{\\pi \\left(${frac(p, 2).toTex()}r\\right)^2}{\\pi r^2} = ${frac(p * p, 4).toTex({ dfrac: true })}$, that is, ${correct[0]} to ${correct[1]}.
@@ -403,7 +403,7 @@ Knowing that $RT$ is less than the diameter does not compare it with the radius.
         params: { ...base, mode, k, variant, m: B, kPi: variant === 'pi' },
         q: {
           format: 'qc',
-          info: `The radius of circle $A$ is ${k} greater than the radius of circle $B$.`,
+          info: `Circle $A$ has a radius ${k} greater than that of circle $B$.`,
           quantityA: area ? `The area of circle $A$ minus the area of circle $B$` : `The circumference of circle $A$ minus the circumference of circle $B$`,
           quantityB: area ? `$${num(4 * k * k)}$` : BTex,
           answer,

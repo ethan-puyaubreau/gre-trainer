@@ -612,7 +612,7 @@ const productPair: Template<PairParams> = {
         params: { lo, hi, nums: order.map(({ it }) => it.v) },
         q: {
           format: 'mcm',
-          stem: `Which two of the following numbers have a product that is between ${lohi}?`,
+          stem: `The product of which two of the following numbers lies between ${lohi}?`,
           instruction: 'Indicate both of the numbers.',
           choices: ch,
           answer,

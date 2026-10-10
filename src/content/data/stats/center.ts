@@ -736,7 +736,7 @@ const consecutiveLists: Template<ConsecParams> = {
     });
     const anchorText =
       anchor === 'medR-minT'
-        ? 'The median of the integers in list $R$ is equal to the least integer in list $T$.'
+        ? 'The median of list $R$ equals the smallest integer in list $T$.'
         : anchor === 'medR-medT'
           ? 'The median of the integers in list $R$ is equal to the median of the integers in list $T$.'
           : 'The greatest integer in list $R$ is equal to the median of the integers in list $T$.';

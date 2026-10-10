@@ -91,13 +91,18 @@ A test checks that all templates of a family produce identical figures for the s
 ## Testing
 
 ```
-npx vitest run tests/content.test.ts                    # every template, 150 seeds x 3 difficulties
-ONLY=arith.cycles npx vitest run tests/content.test.ts  # focus on some templates
-SEEDS=1000 npx vitest run tests/content.test.ts         # deeper run
-npx vitest run tests/mutation.test.ts                   # checks must reject corrupted answer keys
+npx vitest run content                                  # every template, all areas
+npx vitest run content-arithmetic                       # one area (content-algebra, -geometry, -data)
+ONLY=arith.cycles npx vitest run content-arithmetic     # focus on some templates
+SEEDS=600 npx vitest run content                        # deeper full validation
+npx vitest run mutation                                 # checks must reject corrupted answer keys
+PRINT=1 ONLY=<template id> SEED=4 npx vitest run zz-sample   # print sample questions
 ```
 
-The suite checks structure, KaTeX rendering, determinism, variety, and `check()` on every seed.
+For each template the suite checks, on the first 150 seeds × 3 difficulties: structure, KaTeX
+rendering, `check()`, determinism, variety, and (select-one) that the answer position is spread
+over A–E. It also runs `check()` on every seed up to `SEED_POOL` (500): the app only serves
+those seeds, so every question a student can see has a verified answer key.
 
 ## Originality
 

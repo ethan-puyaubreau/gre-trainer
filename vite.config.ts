@@ -7,6 +7,8 @@ export default defineConfig({
   base: '/gre-trainer/',
   plugins: [react()],
   build: {
+    // The question generators are one chunk on purpose: the whole app works offline once loaded.
+    chunkSizeWarningLimit: 2500,
     rollupOptions: {
       output: {
         manualChunks: { katex: ['katex'], react: ['react', 'react-dom'] },

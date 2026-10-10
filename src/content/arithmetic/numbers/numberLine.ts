@@ -736,7 +736,7 @@ const distanceQC: Template<DistParams> = {
         params: { mode, a, d1: b, b: F(which), d2: F(0), swap },
         q: {
           format: 'qc',
-          info: `Points $R$, $S$, and $T$ lie on a number line, with $S$ between $R$ and $T$. The distance between $R$ and $S$ is $${t(a)}$, and the distance between $R$ and $T$ is $${t(b)}$.`,
+          info: `Points $R$, $S$, and $T$ lie on a number line, with $S$ between $R$ and $T$. $RS = ${t(a)}$ and $RT = ${t(b)}$.`,
           quantityA: swap ? qb : qa,
           quantityB: swap ? qa : qb,
           answer,
