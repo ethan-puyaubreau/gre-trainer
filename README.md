@@ -87,3 +87,7 @@ Writing new question styles: see [CONTENT_GUIDE.md](CONTENT_GUIDE.md).
 ## Stack
 
 Vite, React 19, TypeScript, KaTeX for math, Zustand for state (persisted to localStorage), Vitest.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
