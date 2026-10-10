@@ -93,6 +93,9 @@
 
 /* ---------------------------------------------------------------- level change chip */
 .practice-fx .level-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   animation: fx-pop var(--dur) var(--ease-spring) backwards;
 }
 .practice-fx .level-change .lc-dot .level-dot {

@@ -73,7 +73,7 @@ export function SessionRecap({ summary, onKeep, exhausted }: { summary: SessionS
           </ul>
         </>
       )}
-      {up.length + down.length === 0 && <p className="muted small">No skill changed level this session.</p>}
+      {up.length + down.length === 0 && <p className="muted small">No skill ended the session at a different level.</p>}
       {exhausted && <p className="muted small">Nothing else is due in this selection.</p>}
 
       <div className="row" style={{ marginTop: 18 }}>
