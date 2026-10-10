@@ -83,7 +83,7 @@ const angleSum: Template<AngleSumParams> = {
           { value: n * 180, trap: 'geom-poly-sum-n180' },
           { value: n, trap: 'geom-poly-answered-other' },
         ],
-        fillers: [(n - 1) * 180, (n - 3) * 180, n * I + 180, 360],
+        fillers: rng.shuffle([(n - 1) * 180, (n - 3) * 180, (n + 1) * 180, 360, (n - 4) * 180]),
         format: (v) => `$${num(v)}^\\circ$`,
       });
       const values = choicesValues(choices);
@@ -116,7 +116,7 @@ Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$, and ${
           { value: 360 / n, trap: 'geom-poly-exterior-angle' },
           { value: S, trap: 'geom-poly-answered-other' },
         ],
-        fillers: [5, 6, 8, 9, 10, 12].filter((m) => m !== n).map((m) => 180 - 360 / m),
+        fillers: rng.shuffle([5, 6, 8, 9, 10, 12].filter((m) => m !== n).map((m) => 180 - 360 / m)),
         format: (v) => `$${num(v)}$`,
       });
       return {
@@ -144,7 +144,7 @@ Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$
         { value: new Frac(360, n), trap: 'geom-poly-exterior-angle' },
         { value: I, trap: 'geom-poly-answered-other' },
       ],
-      fillers: [x.add(10), x.sub(5), new Frac(I).sub(x)],
+      fillers: rng.shuffle([x.add(10), x.sub(5), new Frac(I).sub(x), x.add(15), x.mul(2).add(5)]),
       format: (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`,
     });
     return {
@@ -265,7 +265,7 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
       correct = x;
       if (good(xN180) && xN180 < 200) traps.push({ value: xN180, trap: 'geom-poly-sum-n180' });
       if (n >= 5 && good(x360)) traps.push({ value: x360, trap: 'geom-poly-sum-360' });
-      fillers = [x + 10, x - 10, x + 5, x + 20, x - 5];
+      fillers = rng.shuffle([x + 10, x - 10, x + 5, x + 20, x - 5, x - 15, x + 15, x - 20]);
     } else {
       const big = exprs[maxIdx];
       correct = maxV;
@@ -273,7 +273,7 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
       if (good(xN180) && angleVal(big, xN180) < 400) traps.push({ value: angleVal(big, xN180), trap: 'geom-poly-sum-n180' });
       if (n >= 5 && good(x360) && angleVal(big, x360) > 0) traps.push({ value: angleVal(big, x360), trap: 'geom-poly-sum-360' });
       const second = [...values].sort((a, b) => b - a).find((v) => v < maxV);
-      fillers = [maxV + 10, maxV - 10, ...(second ? [second] : []), maxV + 20];
+      fillers = rng.shuffle([maxV + 10, maxV - 10, ...(second ? [second] : []), maxV + 20, maxV - 20, maxV + 5]);
     }
     const { choices, answer } = numericChoices(rng, {
       correct,
@@ -683,10 +683,11 @@ const compareQC: Template<CompareParams> = {
       const area = 4 * t;
       const options: [number, string | undefined][] = [
         [area, undefined],
-        [area, undefined],
+        [2 * t, 'geom-quad-center-as-side'],
         [2 * t, 'geom-quad-center-as-side'],
         [8 * t, 'geom-quad-diagonal-as-side'],
         [area + rng.pick([-2, -1, 1, 2]) * Math.max(1, t), undefined],
+        [area - t, undefined],
       ];
       const [k, trapId] = rng.pick(options);
       const answer = qcCompare(area, k);
@@ -712,7 +713,7 @@ The distance from a vertex to the center is half a diagonal, not a side; squarin
     if (mode === 'regular-sides') {
       const [n1, n2] = rng.sample([3, 4, 5, 6, 8, 10], 2);
       const s = new Frac(rng.int(11, d === 1 ? 30 : 49), 10);
-      const rel = rng.pick(['C', 'C', 'A', 'B'] as const);
+      const rel = rng.pick(['C', 'A', 'A', 'B'] as const);
       const s2 = rel === 'C' ? s : rel === 'A' ? s.sub(new Frac(rng.int(1, 3), 10)) : s.add(new Frac(rng.int(1, 3), 10));
       const P1 = s.mul(n1);
       const P2 = s2.mul(n2);
@@ -754,10 +755,11 @@ Comparing the perimeters (or the numbers of sides) instead of the sides is the t
       const legArea = new Frac((b1 + b2) * a, 2);
       const opts: [Frac, string | undefined][] = [
         [area, undefined],
-        [area, undefined],
         [legArea, 'geom-quad-slanted-height'],
         [new Frac(areaTwice), 'geom-quad-trapezoid-no-half'],
-        [area.add(rng.pick([-2, -1, 1, 2])), undefined],
+        [area.sub(rng.int(1, 4)), undefined],
+        [area.sub(rng.int(1, 4)), undefined],
+        [area.add(rng.int(1, 3)), undefined],
       ];
       const [kF, trapId] = rng.pick(opts);
       const answer = qcCompare(area, kF);
@@ -790,9 +792,10 @@ Using the slanted side ${a} as the height gives ${legArea.isInt() ? legArea.n : 
       const area = b * hgt;
       const opts: [number, string | undefined][] = [
         [area, undefined],
-        [area, undefined],
         [a * b, 'geom-quad-slanted-height'],
-        [area + rng.pick([-3, -2, -1, 1, 2, 3]), undefined],
+        [area - rng.int(1, 4), undefined],
+        [area - rng.int(1, 4), undefined],
+        [area + rng.int(1, 3), undefined],
         [Math.round((area + a * b) / 2), 'geom-quad-slanted-height'],
       ];
       const [k, trapId] = rng.pick(opts);
