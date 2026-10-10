@@ -13,6 +13,69 @@ import '../fx-dashboard.css';
 const POINTS: Record<Level, number> = { 0: 0, 1: 0, 2: 50, 3: 80, 4: 100 };
 const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
+const SEEN_KEY = 'gre-trainer-dashboard-seen';
+const COUNT_MS = 600;
+const RAISED_MS = 2600;
+interface Seen {
+  mastery: number;
+  levels: Record<string, number>;
+}
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+function readSeen(): Seen | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? 'null');
+    return typeof v?.mastery === 'number' && v.levels ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Compares with the previous visit in this tab: the old mastery to count up from, and the skills whose level rose. */
+function useSinceLastVisit(mastery: number, levels: Record<string, number>) {
+  const [seen] = useState(readSeen);
+  const [raised, setRaised] = useState(() => new Set(seen ? Object.keys(levels).filter((id) => levels[id] > (seen.levels[id] ?? 0)) : []));
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SEEN_KEY, JSON.stringify({ mastery, levels }));
+    } catch {
+      // Storage blocked: the next visit simply has nothing to compare with.
+    }
+    if (!raised.size) return;
+    const t = setTimeout(() => setRaised(new Set()), RAISED_MS);
+    return () => clearTimeout(t);
+    // Mount only: leaving and coming back compares with this visit.
+  }, []);
+  return { from: seen?.mastery, raised };
+}
+
+/** Eases from `from` to `to` over COUNT_MS; with no `from` or reduced motion, the final value is there from the first render. */
+function useCountUp(to: number, from: number | undefined): number {
+  const [v, setV] = useState(() => (from === undefined || reducedMotion() ? to : from));
+  const cur = useRef(v);
+  useEffect(() => {
+    const a = cur.current;
+    if (a === to || reducedMotion()) {
+      cur.current = to;
+      setV(to);
+      return;
+    }
+    let raf = 0;
+    let t0 = 0;
+    const step = (now: number) => {
+      t0 ||= now;
+      const k = Math.min(1, (now - t0) / COUNT_MS);
+      cur.current = a + (to - a) * (1 - (1 - k) ** 4);
+      setV(cur.current);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [to]);
+  return v;
+}
+
 export function Dashboard() {
   const { skills: states, history, sections, remediation, settings } = useProgress();
   const [open, setOpen] = useState<Skill | null>(null);
@@ -44,6 +107,10 @@ export function Dashboard() {
     };
   }, [history, states, now, playable]);
 
+  const levels = Object.fromEntries(playable.map((sk) => [sk.id, states[sk.id]?.level ?? 0]));
+  const { from, raised } = useSinceLastVisit(stats.mastery, levels);
+  const shown = useCountUp(stats.mastery, from);
+
   const calib = useMemo(() => calibrate(history, sections, (id) => skillById.get(id)?.area), [history, sections]);
   const diffRows = [
     ['All areas', calib.overall],
@@ -56,9 +123,10 @@ export function Dashboard() {
         <div className="row" style={{ alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 260px' }}>
             <div className="muted small">Course mastery</div>
-            <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1 }}>{stats.mastery}%</div>
+            <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1 }}>{Math.round(shown)}%</div>
             <div className="progress" style={{ marginTop: 8 }}>
-              <div style={{ width: `${stats.mastery}%` }} />
+              {/* Slid with transform (the parent clips it) so the animation stays off the layout path. */}
+              <div style={{ width: '100%', transform: `translateX(${shown - 100}%)` }} />
             </div>
             <div className="legend" style={{ marginTop: 10 }}>
               {LEVEL_NAMES.map((n, i) => (
@@ -148,7 +216,7 @@ export function Dashboard() {
                         return (
                           <button
                             key={s.id}
-                            className="skill-tile"
+                            className={raised.has(s.id) ? 'skill-tile fx-raised' : 'skill-tile'}
                             onClick={(e) => {
                               opener.current = e.currentTarget;
                               setOpen(s);
@@ -163,6 +231,11 @@ export function Dashboard() {
                               <i className={`level-dot level-${lvl}`} />
                             </span>
                             <span className="name">{s.name}</span>
+                            {raised.has(s.id) && (
+                              <span className="fx-up" aria-hidden="true">
+                                {LEVEL_NAMES[lvl]}
+                              </span>
+                            )}
                             {st && isDue(st, now) && <span className="chip chip-accent">due</span>}
                           </button>
                         );

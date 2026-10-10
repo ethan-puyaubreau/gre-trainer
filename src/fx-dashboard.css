@@ -22,3 +22,70 @@
   height: 10px;
   border-radius: 2px;
 }
+
+/* Progress since the last visit: a one-time glow and a level badge on the tiles whose level rose. */
+.skill-tile.fx-raised {
+  position: relative;
+}
+.skill-tile.fx-raised::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 10px;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 14px 2px var(--accent-2);
+  animation: fx-glow 1.2s var(--ease-out) both;
+}
+.fx-raised .mastery-ring {
+  animation: fx-ring-pop var(--dur-slow) var(--ease-spring) both;
+}
+.fx-up {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  pointer-events: none;
+  animation: fx-up 2.4s var(--ease-out) both;
+}
+@keyframes fx-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+@keyframes fx-ring-pop {
+  40% {
+    transform: scale(1.35);
+  }
+}
+@keyframes fx-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  12%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
