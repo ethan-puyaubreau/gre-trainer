@@ -287,18 +287,18 @@ const moreUnits: Template<MoreParams> = {
     const D = makeWorkData(rng, d);
     for (let t = 0; ; t++) {
       const i = rng.int(0, 4);
-      const hours = rng.pick([4, 6, 8, 10, 20, 40]);
+      const hours = rng.pick([8, 10, 20, 40]);
       const [a, b] = [D.minutes[0][i], D.minutes[1][i]];
       const diff = (hours * 60) / b - (hours * 60) / a;
       const step = diff < 6 ? 1 : diff < 20 ? 2 : diff < 60 ? 5 : 10;
       const R = Math.round(diff / step) * step;
       const wrong = Math.round((hours * 60) / (a - b) / step) * step;
-      if (R <= 0 && t < 1000) continue;
+      if (R < 6 && t < 1000) continue;
       // Choices spaced by ratios (misreading a bar changes this answer by a proportion), answer at a random position.
-      const geo = [2 / 3, 3 / 2, 1 / 2, 2, 1 / 3, 3, 1 / 4, 4].map((f) => ({ v: Math.max(1, Math.round((R * f) / step) * step) }));
+      const geo = [0.6, 1.5, 0.4, 2, 0.25, 2.75, 0.15, 3.5].map((f) => ({ v: Math.max(1, Math.round((R * f) / step) * step) }));
       const { choices, answer, values } = spacedChoices(rng, R, [{ v: wrong, trap: 'prob-di-difference-of-quotients' }, ...geo], {
         step: 1000,
-        minGap: Math.max(1, Math.round(R / 4)),
+        minGap: Math.max(1, Math.round(R / 8)),
         min: 1,
         format: (v) => `${num(v)}`,
       });

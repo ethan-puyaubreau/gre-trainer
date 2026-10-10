@@ -248,7 +248,7 @@ export const coreAlgebraTraps: Record<string, Trap> = {
   },
   'alg-range-product': {
     label: 'Multiplied the largest (or smallest) endpoints only',
-    fix: 'With negative numbers in a range, check all four endpoint products: $(-6)(-2) = 12$ can beat $(4)(3) = 12$ or more.',
+    fix: 'With negative numbers in a range, check all four endpoint products: for $-7 \\le x \\le 4$ and $-2 \\le y \\le 3$, the greatest $xy$ is $(-7)(-2) = 14$, not $(4)(3) = 12$.',
   },
   'alg-range-square': {
     label: 'Squared the wrong endpoint',
