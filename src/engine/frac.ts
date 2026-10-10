@@ -160,13 +160,20 @@ export function fmtNum(n: number): string {
   return n.toString();
 }
 
+/** Normalise the unicode minus and drop thousands commas; null if a comma is anywhere else. */
+function stripThousands(raw: string): string | null {
+  const s = raw.trim().replace(/−/g, '-');
+  if (!s.includes(',')) return s;
+  return /^-?\d{1,3}(,\d{3})+(\.\d*)?$/.test(s) ? s.replace(/,/g, '') : null;
+}
+
 /**
  * Parse a numeric-entry string the way the GRE accepts it: integers, decimals,
  * negative numbers, thousands separators. Returns null on anything else.
  */
 export function parseDecimal(raw: string): Frac | null {
-  const s = raw.trim().replace(/,/g, '').replace(/−/g, '-');
-  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
+  const s = stripThousands(raw);
+  if (s === null || !/^-?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
   const neg = s.startsWith('-');
   const body = neg ? s.slice(1) : s;
   const [intPart, decPart = ''] = body.split('.');
@@ -178,7 +185,7 @@ export function parseDecimal(raw: string): Frac | null {
 
 /** Parse an integer box (used for fraction numerator/denominator boxes). No decimal point allowed. */
 export function parseIntBox(raw: string): number | null {
-  const s = raw.trim().replace(/,/g, '').replace(/−/g, '-');
-  if (!/^-?\d{1,12}$/.test(s)) return null;
+  const s = stripThousands(raw);
+  if (s === null || !/^-?\d{1,12}$/.test(s)) return null;
   return Number(s);
 }
