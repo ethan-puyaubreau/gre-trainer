@@ -1,7 +1,8 @@
 // Builds GRE-like timed sections: official sizes, QC first, one data interpretation set.
 
-import { skillById, TEMPLATES } from '../content';
-import { generateQuestion, poolSeed } from '../engine/generate';
+import { skillById, TEMPLATES, templateById } from '../content';
+import { generateQuestion, parseQuestionId, poolSeed } from '../engine/generate';
+import type { Response } from '../engine/grade';
 import type { Rng } from '../engine/rng';
 import type { Area, Difficulty, Format, Question, Template } from '../engine/types';
 
@@ -117,4 +118,69 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
   const questions = [...qc, ...rest, ...setQuestions];
   const sets: [number, number][] = setQuestions.length ? [[questions.length - setQuestions.length, questions.length - 1]] : [];
   return { questions, sets };
+}
+
+/* ------------------------------------------------------------------ a section in progress */
+
+export interface RunningSection {
+  index: number; // 0 or 1
+  spec: SectionSpec;
+  level: Level;
+  questions: Question[];
+  sets: [number, number][];
+  responses: (Response | undefined)[];
+  marked: boolean[];
+  timeSpent: number[];
+  endsAt: number;
+  startedAt: number;
+}
+
+export interface SectionResult {
+  sec: RunningSection;
+  correct: boolean[];
+  usedSec: number;
+}
+
+/** What survives a navigation or a reload: sections already finished, plus the one running (none while between sections). */
+export interface SavedRun {
+  length: 'full' | 's1' | 's2';
+  done: SectionResult[];
+  sec?: RunningSection;
+}
+
+const RUN_KEY = 'gre.section.run';
+
+// Questions hold Frac instances, which JSON would flatten: store ids and regenerate (same id, same question).
+type Frozen = Omit<RunningSection, 'questions'> & { questions: string[] };
+const freeze = (s: RunningSection): Frozen => ({ ...s, questions: s.questions.map((q) => q.id) });
+function rebuild(id: string): Question {
+  const p = parseQuestionId(id);
+  const t = p && templateById.get(p.templateId);
+  if (!p || !t) throw new Error(`unknown question ${id}`);
+  return generateQuestion(t, p.seed, p.difficulty);
+}
+// JSON turns the undefined holes of `responses` into null.
+const thaw = (s: Frozen): RunningSection => ({ ...s, questions: s.questions.map(rebuild), responses: s.responses.map((r) => r ?? undefined) });
+
+/** Save the run, or forget it with null. Storage failures are ignored: the test still works, it just cannot be resumed. */
+export function saveRun(run: SavedRun | null, storage?: Pick<Storage, 'setItem' | 'removeItem'>): void {
+  try {
+    const store = storage ?? sessionStorage;
+    if (!run) store.removeItem(RUN_KEY);
+    else store.setItem(RUN_KEY, JSON.stringify({ length: run.length, done: run.done.map((d) => ({ ...d, sec: freeze(d.sec) })), sec: run.sec && freeze(run.sec) }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** The saved run, or null when there is none or it is unreadable. `endsAt` is absolute, so an expired run is still returned. */
+export function loadRun(storage?: Pick<Storage, 'getItem'>): SavedRun | null {
+  try {
+    const r = JSON.parse((storage ?? sessionStorage).getItem(RUN_KEY) ?? 'null');
+    if (!r || !['full', 's1', 's2'].includes(r.length)) return null;
+    const run: SavedRun = { length: r.length, done: r.done.map((d: { sec: Frozen }) => ({ ...d, sec: thaw(d.sec) })), sec: r.sec ? thaw(r.sec) : undefined };
+    return (run.sec ? Number.isFinite(run.sec.endsAt) : run.done.length > 0) ? run : null;
+  } catch {
+    return null;
+  }
 }

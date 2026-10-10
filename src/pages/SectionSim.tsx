@@ -6,25 +6,12 @@ import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById } from '../content';
 import { grade, isAnswered, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
-import type { Area, Question } from '../engine/types';
-import { buildSection, routeSection2, SPECS, type Level, type SectionSpec } from '../mastery/section';
+import type { Area } from '../engine/types';
+import { buildSection, loadRun, routeSection2, saveRun, SPECS, type Level, type RunningSection, type SectionResult } from '../mastery/section';
 import { href } from '../router';
 import { useProgress, type SectionPart } from '../store/progress';
 
 /* ------------------------------------------------------------------ component */
-
-interface RunningSection {
-  index: number; // 0 or 1
-  spec: SectionSpec;
-  level: Level;
-  questions: Question[];
-  sets: [number, number][];
-  responses: (Response | undefined)[];
-  marked: boolean[];
-  timeSpent: number[];
-  endsAt: number;
-  startedAt: number;
-}
 
 type Phase =
   | { kind: 'setup' }
@@ -32,18 +19,22 @@ type Phase =
   | { kind: 'between'; done: SectionResult[] }
   | { kind: 'results'; done: SectionResult[] };
 
-interface SectionResult {
-  sec: RunningSection;
-  correct: boolean[];
-  usedSec: number;
-}
-
 export function SectionSim() {
-  const [phase, setPhase] = useState<Phase>({ kind: 'setup' });
-  const [length, setLength] = useState<'full' | 's1' | 's2'>('full');
+  // A section in progress survives navigation and reload (sessionStorage); an expired one is finished by Exam on mount.
+  const [saved] = useState(loadRun);
+  const [phase, setPhase] = useState<Phase>(() =>
+    saved ? (saved.sec ? { kind: 'running', sec: saved.sec } : { kind: 'between', done: saved.done }) : { kind: 'setup' },
+  );
+  const [length, setLength] = useState<'full' | 's1' | 's2'>(saved?.length ?? 'full');
   const [areas, setAreas] = useState<Area[]>(AREAS.filter((a) => a.templates.length).map((a) => a.area));
-  const completed = useRef<SectionResult[]>([]);
+  const completed = useRef<SectionResult[]>(saved?.done ?? []);
   const store = useProgress();
+
+  // Exam saves the running section as it changes; the other phases are saved or forgotten here.
+  useEffect(() => {
+    if (phase.kind === 'between') saveRun({ length, done: phase.done });
+    else if (phase.kind !== 'running') saveRun(null);
+  }, [phase, length]);
 
   const start = (index: number, level: Level, specKey: 's1' | 's2') => {
     const spec = SPECS[specKey];
@@ -179,13 +170,29 @@ export function SectionSim() {
   if (phase.kind === 'results') return <Results done={phase.done} onRestart={() => setPhase({ kind: 'setup' })} />;
 
   return (
-    <Exam key={`${phase.sec.index}-${phase.sec.startedAt}`} sec={phase.sec} total={length === 'full' ? 2 : 1} onFinish={finish} />
+    <Exam
+      key={`${phase.sec.index}-${phase.sec.startedAt}`}
+      sec={phase.sec}
+      total={length === 'full' ? 2 : 1}
+      onFinish={finish}
+      onChange={(sec) => saveRun({ length, done: completed.current, sec })}
+    />
   );
 }
 
 /* ------------------------------------------------------------------ exam screen */
 
-function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: number; onFinish: (sec: RunningSection) => void }) {
+function Exam({
+  sec: initial,
+  total,
+  onFinish,
+  onChange,
+}: {
+  sec: RunningSection;
+  total: number;
+  onFinish: (sec: RunningSection) => void;
+  onChange: (sec: RunningSection) => void;
+}) {
   const [sec, setSec] = useState(initial);
   const [idx, setIdx] = useState(0);
   const [review, setReview] = useState(false);
@@ -231,6 +238,15 @@ function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: n
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => onChange(sec), [sec]);
+
+  // Reloading or closing the tab with a section running asks first (in-app navigation is covered by the saved run).
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
   }, []);
 
   const remaining = sec.endsAt - now;
