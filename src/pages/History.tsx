@@ -93,7 +93,12 @@ export function History() {
                 const t = parsed && templateById.get(parsed.templateId);
                 return [
                   <tr key={i} className="clickable" onClick={() => setOpen(open === i ? null : i)}>
-                    <td className="small">{new Date(h.at).toLocaleString()}</td>
+                    <td className="small">
+                      {/* No handler of its own: a keyboard or mouse click on the button bubbles to the row, which toggles it. */}
+                      <button type="button" className="btn btn-ghost small" style={{ padding: '2px 6px' }} aria-expanded={open === i}>
+                        {new Date(h.at).toLocaleString()}
+                      </button>
+                    </td>
                     <td>
                       {skillById.get(h.skillId)?.name ?? h.skillId}
                       <div className="muted small">
