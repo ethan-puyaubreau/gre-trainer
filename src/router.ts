@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
 
+/** decodeURIComponent throws on a malformed escape such as "50%": keep the raw segment then. */
+export function decodeSegment(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 /** Hash routing (GitHub Pages serves a single index.html). Returns path segments after "#/". */
 export function useRoute(): string[] {
   const read = () =>
@@ -7,7 +16,7 @@ export function useRoute(): string[] {
       .replace(/^#\/?/, '')
       .split('/')
       .filter(Boolean)
-      .map(decodeURIComponent);
+      .map(decodeSegment);
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => {
