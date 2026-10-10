@@ -232,7 +232,7 @@ const aboveBelowQC: Template<SideParams> = {
 
     // Labels: off-line points get their label pushed away from the line, on-line points to one side.
     const nrm = [-m / Math.hypot(1, m), 1 / Math.hypot(1, m)]; // unit normal pointing "above"
-    const labelDist = m === 2 ? 0.85 : 0.7;
+    const labelDist = m === 2 ? 1 : 0.75;
     // Label position: try a few offsets on the given side of the line and keep the first one whose
     // center stays clear of both axes (labels are about 1.4 units wide and 0.6 high).
     const place = (p: Pt, s: 1 | -1, onLine: boolean): [number, number] => {

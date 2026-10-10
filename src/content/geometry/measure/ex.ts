@@ -113,7 +113,9 @@ export function exChoices(
   const minGap = opts.minGap ?? 0.01;
   const c = correct.value();
   const maxDen = Math.max(...correct.data().map(([, d]) => d), 1);
-  const tidy = (v: Ex) => v.data().every(([, d]) => d <= 2 * maxDen);
+  // integer answers get integer look-alikes; answers with pi or radicals may get halves (e.g. 18 - 9pi/2)
+  const intOnly = correct.rational() !== null && maxDen === 1;
+  const tidy = (v: Ex) => v.data().every(([, d]) => d <= (intOnly ? 1 : 2 * maxDen));
   const pool: { v: Ex; trap?: string }[] = [...traps.map((t) => ({ v: t.v, trap: t.trap })), ...rng.shuffle(fillers).map((v) => ({ v }))];
   if (opts.scales !== false)
     for (const k of rng.shuffle([new Frac(1, 2), new Frac(3, 4), new Frac(3, 2), new Frac(2), new Frac(1, 4), new Frac(3), new Frac(2, 3), new Frac(4, 3)])) {

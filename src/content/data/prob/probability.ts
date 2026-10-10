@@ -93,7 +93,9 @@ const singleDraw: Template<DrawParams> = {
       add(frac(exCount, 100), 'prob-count-as-percent');
       add(frac(100 - exCount, 100), 'prob-count-as-percent');
     }
-    const fillers = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8].map((k) => correct.add(frac(k, 20))).filter((v) => v.sign() > 0 && v.lt(1));
+    const fillers = [...[1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8].map((k) => correct.add(frac(k, 20))), ...[1, -1, 2, -2, 3, -3, 4, -4].map((k) => correct.add(frac(k, 100)))].filter(
+      (v) => v.sign() > 0 && v.lt(1),
+    );
     const { choices, answer } = numericChoices(rng, { correct, traps, fillers, format: (v) => `$${v.toNumber().toFixed(2)}$` });
 
     const list = colors.map((c, i) => `${counts[i]} are ${c}`);
@@ -386,6 +388,7 @@ $${frac(a * (a - 1), pairs).toTex()}$ is only the first case.`;
     const fillers = rng
       .shuffle([frac(a * (a - 1), pairs), frac(b * (b - 1), pairs), frac(a, n), frac(b, n), frac(a * b, pairs), frac(1, 2), frac(a * a, n * n)])
       .concat(Array.from({ length: n - 1 }, (_, k) => frac(k + 1, n)), Array.from({ length: n - 2 }, (_, k) => frac(k + 1, n - 1)))
+      .concat([frac(1, 2), frac(1, 3), frac(2, 3), frac(1, 4), frac(3, 4)].map((f) => correct!.mul(f)), [frac(1, 2), frac(1, 3), frac(1, 4), frac(2, 3), frac(3, 4), frac(1, 5), frac(4, 5)].map((f) => correct!.add(frac(1).sub(correct!).mul(f))))
       .filter((v) => v.sign() > 0 && v.lt(1));
     const { choices, answer } = numericChoices(rng, {
       correct: correct!,
@@ -524,7 +527,14 @@ const chooseK: Template<ChooseParams> = {
       explanation = `All choices of ${p.k} points out of ${total}: $\\binom{${total}}{${p.k}} = ${all}$, all equally likely. Favorable: ${favText}. Probability: $\\frac{${fav}}{${all}}${frac(fav, all).d !== all ? ` = ${correct.toTex()}` : ''}$.
 
 The points are chosen without replacement, so the probability is not a power like $\\left(\\frac{${pos}}{${total}}\\right)^{${p.k}}$.`;
-      const fillers = [correct.mul(2), correct.mul(frac(1, 2)), frac(1, 2), ...Array.from({ length: all - 1 }, (_, k) => frac(k + 1, all))].filter((v) => v.sign() > 0 && v.lt(1));
+      const fillers = [
+        correct.mul(2),
+        correct.mul(frac(1, 2)),
+        frac(1, 2),
+        ...Array.from({ length: all - 1 }, (_, k) => frac(k + 1, all)),
+        ...[frac(1, 3), frac(2, 3), frac(1, 4)].map((f) => correct.mul(f)),
+        ...[frac(1, 2), frac(1, 3), frac(2, 3)].map((f) => correct.add(frac(1).sub(correct).mul(f))),
+      ].filter((v) => v.sign() > 0 && v.lt(1));
       const { choices, answer } = numericChoices(rng, { correct, traps: traps.filter((t) => t.value.sign() > 0 && t.value.lt(1)), fillers, format: (v) => `$${v.toTex()}$` });
       return { params: p, q: { format: 'mcs', stem, figure, choices, answer, explanation } };
     }
