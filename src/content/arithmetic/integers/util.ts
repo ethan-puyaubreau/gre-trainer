@@ -2,7 +2,8 @@
 // generators use, so check() functions can rely on it to re-derive answers another way.
 
 import { Frac } from '../../../engine/frac';
-import type { QCChoice, QuestionBody } from '../../../engine/types';
+import type { Rng } from '../../../engine/rng';
+import type { Choice, QCChoice, QuestionBody } from '../../../engine/types';
 
 export const QC_WORDS: Record<QCChoice, string> = {
   A: 'Quantity A is greater',
@@ -215,4 +216,39 @@ export function plainToTex(plain: string): string {
     out += c;
   }
   return out;
+}
+
+/**
+ * Numeric choices (ascending) with the correct answer at a random feasible position: picks how many
+ * wrong values go below and above the answer, preferring candidates tagged with a trap.
+ */
+export function spreadChoices(
+  rng: Rng,
+  correct: number,
+  cands: { v: number; trap?: string }[],
+  format: (v: number) => string = (v) => `$${v}$`,
+  count = 5,
+): { choices: Choice[]; answer: number } {
+  const seen = new Set<number>([correct]);
+  const uniq: { v: number; trap?: string }[] = [];
+  for (const c of cands) {
+    if (!Number.isFinite(c.v) || seen.has(c.v)) continue;
+    seen.add(c.v);
+    uniq.push(c);
+  }
+  const below = uniq.filter((c) => c.v < correct);
+  const above = uniq.filter((c) => c.v > correct);
+  const need = count - 1;
+  const feasible: number[] = [];
+  for (let k = 0; k <= need; k++) if (below.length >= k && above.length >= need - k) feasible.push(k);
+  if (!feasible.length) throw new Error(`spreadChoices: not enough candidates around ${correct}`);
+  const k = rng.pick(feasible);
+  const side = (xs: { v: number; trap?: string }[], n: number) => [...rng.shuffle(xs.filter((c) => c.trap)), ...rng.shuffle(xs.filter((c) => !c.trap))].slice(0, n);
+  const items = [{ v: correct, ok: true as boolean, trap: undefined as string | undefined }, ...[...side(below, k), ...side(above, need - k)].map((c) => ({ v: c.v, ok: false, trap: c.trap }))].sort(
+    (a, b) => a.v - b.v,
+  );
+  return {
+    choices: items.map((it) => ({ text: format(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
+    answer: items.findIndex((it) => it.ok),
+  };
 }

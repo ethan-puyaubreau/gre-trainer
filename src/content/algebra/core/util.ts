@@ -200,9 +200,25 @@ export const SPECIAL = (() => {
   for (let i = -12; i <= 12; i++) out.push(i);
   for (const d of [2, 3, 4, 5, 10])
     for (let n = -3 * d; n <= 3 * d; n++) if (n % d !== 0) out.push(n / d);
-  out.push(0.01, -0.01, 0.001, -0.001, 50, -50, 100, -100, 1000, -1000, 1e5, -1e5);
+  out.push(0.01, -0.01, 0.001, -0.001, 50, -50, 100, -100, 1000, -1000);
   return out;
 })();
+
+/**
+ * QC answer from (A, B) samples with a purely relative tolerance (so tiny values still compare
+ * correctly): D as soon as two samples disagree.
+ */
+export function qcSamples(samples: Iterable<[number, number]>, eps = 1e-9): QCChoice {
+  const seen = new Set<QCChoice>();
+  for (const [a, b] of samples) {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    const r: QCChoice = Math.abs(a - b) <= eps * Math.max(Math.abs(a), Math.abs(b)) ? 'C' : a > b ? 'A' : 'B';
+    seen.add(r);
+    if (seen.size > 1) return 'D';
+  }
+  if (seen.size === 0) throw new Error('qcSamples: no samples');
+  return [...seen][0];
+}
 
 /** Random reals spread over several scales. */
 export function randomReals(rng: Rng, count = 200): number[] {

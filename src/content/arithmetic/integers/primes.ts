@@ -337,7 +337,8 @@ const primeBoundsQC: Template<BoundsParams> = {
         a = rng.int(8, top - 12);
         const p1 = nextPrime(a);
         const p1n = nextPrime(p1);
-        const rel = rng.pick(['A', 'B', 'C'] as const);
+        const roll = rng.next();
+        const rel = roll < 0.45 ? 'A' : roll < 0.72 ? 'B' : 'C';
         b = rel === 'A' ? rng.int(a + 1, p1) : rel === 'C' ? rng.int(p1 + 1, p1n) : rng.int(p1n + 1, p1n + 6);
         if (b - a < 3) continue;
         valA = p1;
@@ -347,7 +348,7 @@ const primeBoundsQC: Template<BoundsParams> = {
       } else if (mode === 'count-less') {
         b = rng.int(12, 40);
         valA = range(1, b - 1).filter((m) => isPrime(m)).length;
-        k = valA + rng.pick([-1, 0, 0, 1]);
+        k = valA + rng.pick([-2, -1, -1, 0, 1, 1]);
         valB = k;
         trapA = valA + 1;
         trapB = k;
@@ -356,7 +357,7 @@ const primeBoundsQC: Template<BoundsParams> = {
         a = rng.int(10, top - 20);
         b = a + rng.int(12, 22);
         valA = countBetween(a, b);
-        k = valA + rng.pick([-1, 0, 0, 1]);
+        k = valA + rng.pick([-2, -1, -1, 0, 1, 1]);
         valB = k;
         trapA = countBetween(a, b, looksPrime);
         trapB = k;

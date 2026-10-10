@@ -1,9 +1,9 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac } from '../../../engine/frac';
 import { gcd, lcm, mod, range } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { QC_WORDS, expectMcm, expectMcsBy, expectNe, expectQc, listAnd } from './util';
+import { QC_WORDS, expectMcm, expectMcsBy, expectNe, expectQc, listAnd, spreadChoices } from './util';
 
 /* ------------------------------------------------------------------ 1. Remainder given: what must divide n (MCS) */
 
@@ -21,7 +21,7 @@ const mustDivide: Template<MustDivideParams> = {
   format: 'mcs',
   style: 'remainder given: which number must divide n',
   generate(rng, diff) {
-    const G = diff === 1 ? [3, 4, 5, 6, 7] : diff === 2 ? [3, 4, 5, 6, 7, 8, 9, 12] : [3, 4, 6, 7, 8, 9];
+    const G = diff === 1 ? [4, 5, 6, 7, 8, 9] : diff === 2 ? [5, 6, 7, 8, 9, 12] : [6, 7, 8, 9, 12];
     const [dMin, dMax] = diff === 1 ? [12, 50] : diff === 2 ? [20, 99] : [30, 99];
     for (;;) {
       const g = rng.pick(G);
@@ -39,19 +39,22 @@ const mustDivide: Template<MustDivideParams> = {
       const remOnly = divs(target).filter((v) => d % v !== 0);
       const divOnly = divs(d).filter((v) => target % v !== 0);
       if (!remOnly.length || !divOnly.length) continue;
-      const fillers = rng.shuffle(range(2, 15).filter((v) => d % v !== 0 && target % v !== 0 && g % v !== 0));
+      const fillers = rng.shuffle(range(2, 20).filter((v) => d % v !== 0 && target % v !== 0));
       if (fillers.length < 3) continue;
-      const ro = rng.pick(remOnly);
-      const dOnly = rng.pick(divOnly);
-      const { choices, answer } = numericChoices(rng, {
-        correct: g,
-        traps: [
-          { value: ro, trap: 'int-divides-remainder-only' },
-          { value: dOnly, trap: 'int-divides-divisor-only' },
-        ],
-        fillers,
-        format: (v) => `$${v.toString()}$`,
-      });
+      const pool = [
+        ...rng.sample(remOnly, Math.min(2, remOnly.length)).map((v) => ({ v, trap: 'int-divides-remainder-only' })),
+        ...rng.sample(divOnly, Math.min(2, divOnly.length)).map((v) => ({ v, trap: 'int-divides-divisor-only' })),
+        ...fillers.map((v) => ({ v })),
+      ];
+      let built: ReturnType<typeof spreadChoices>;
+      try {
+        built = spreadChoices(rng, g, pool);
+      } catch {
+        continue;
+      }
+      const { choices, answer } = built;
+      const ro = Number((choices.find((c) => c.trap === 'int-divides-remainder-only') ?? { text: `$${remOnly[0]}$` }).text.slice(1, -1));
+      const dOnly = Number((choices.find((c) => c.trap === 'int-divides-divisor-only') ?? { text: `$${divOnly[0]}$` }).text.slice(1, -1));
       const values = choices.map((c) => Number(c.text.slice(1, -1)));
 
       // Counterexamples for the wrong choices, from the smallest values of n.
@@ -266,7 +269,7 @@ const onesDigitQC: Template<OnesParams> = {
   generate(rng, diff) {
     const op: '+' | '-' = diff === 3 && rng.chance(0.6) ? '-' : '+';
     const roll = rng.next();
-    const kind = roll < 0.5 ? 'const' : roll < 0.75 ? 'half' : 'full';
+    const kind = roll < 0.55 ? 'const' : roll < 0.8 ? 'half' : 'full';
     for (;;) {
       let s: number;
       if (kind === 'const') s = op === '+' ? rng.pick([10, 20]) : rng.pick([10, 20]);

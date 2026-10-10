@@ -39,10 +39,10 @@ export class Fig {
   private k = 0;
 
   /** Named (labeled) point. `offset` overrides where its letter goes, e.g. [0, 1] = above. */
-  pt(name: string, p: P2, offset?: P2): string {
+  pt(name: string, p: P2, offset?: P2): this {
     this.points[name] = p;
     if (offset) this.offsets[name] = offset;
-    return name;
+    return this;
   }
   /** Unlabeled helper point (no dot, no letter). */
   h(p: P2): string {

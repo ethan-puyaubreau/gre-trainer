@@ -1,9 +1,9 @@
-import { numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac } from '../../../engine/frac';
 import { factorize, isPrime, primesUpTo, range } from '../../../engine/math';
 import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { QC_WORDS, countDivisorsBrute, expectMcsBy, expectNe, expectQc, factorTex, listAnd, primeBySieve } from './util';
+import { QC_WORDS, countDivisorsBrute, expectMcsBy, expectNe, expectQc, factorTex, listAnd, primeBySieve, spreadChoices } from './util';
 
 /* ------------------------------------------------------------------ 1. (ax)(by) = N with integer constraints (NE) */
 
@@ -356,12 +356,10 @@ const countDivisorsMC: Template<CountDivParams> = {
       traps.push({ value: total, trap: 'int-divisors-parity' });
       traps.push({ value: kind === 'odd' ? total - odd : odd, trap: 'int-divisors-parity' });
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: traps.filter((t) => t.value > 0 && t.value !== answer),
-      fillers: rng.shuffle([answer + 1, answer + 2, answer - 1, answer + 4, 2 * answer].filter((x) => x > 0)),
-      format: (v) => `$${v.toString()}$`,
-    });
+    const { choices, answer: idx } = spreadChoices(rng, answer, [
+      ...traps.filter((t) => t.value > 0 && t.value !== answer).map((t) => ({ v: t.value, trap: t.trap })),
+      ...range(Math.max(1, answer - 6), 2 * answer + 4).map((v) => ({ v })),
+    ]);
     const shown = diff === 3 ? `$${factorTex(fac)}$` : `${num(N)}`;
     const shownMath = diff === 3 ? factorTex(fac) : num(N);
     const stem =
@@ -538,12 +536,12 @@ $${b}^{${m}} ${op} ${b}^{${n}}$ is not $${b}^{${m - n}}$, and the prime factors 
         fillers.push(...fs.filter((x) => x !== answer), ...primesUpTo(answer + 20).filter((x) => x > answer).slice(0, 2), ...primesUpTo(answer).filter((x) => x < answer).slice(-2));
       }
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: traps.filter((t) => t.value !== answer && t.value > 0),
-      fillers: fillers.filter((x) => x > 0),
-      format: (x) => `$${x.toString()}$`,
-    });
+    const extra = mode === 'count' ? range(1, 7) : primesUpTo(answer + 40);
+    const { choices, answer: idx } = spreadChoices(rng, answer, [
+      ...traps.filter((t) => t.value !== answer && t.value > 0).map((t) => ({ v: t.value, trap: t.trap })),
+      ...rng.shuffle(fillers.filter((x) => x > 0)).slice(0, 2).map((v) => ({ v })),
+      ...extra.map((v) => ({ v })),
+    ]);
     const stem = mode === 'count' ? `How many different prime numbers are factors of $${stemExpr}$?` : `What is the greatest prime factor of $${stemExpr}$?`;
     return { params: p, q: { format: 'mcs', stem, choices, answer: idx, explanation } };
   },

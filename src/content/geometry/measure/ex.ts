@@ -12,7 +12,8 @@ import type { P2 } from './fig';
 type Unit = string;
 const UNIT_ORDER = (u: Unit) => (u === '1' ? 0 : u === 'pi' ? 1 : 2 + Number(u.slice(1)));
 const unitValue = (u: Unit) => (u === '1' ? 1 : u === 'pi' ? Math.PI : Math.sqrt(Number(u.slice(1))));
-const F = (x: FracLike) => (x instanceof Frac ? x : Frac.of(x));
+/** Frac from a Frac, an integer, or a terminating decimal number such as 367.5. */
+const F = (x: FracLike) => (x instanceof Frac ? x : Number.isInteger(x) ? Frac.of(x) : new Frac(Math.round(x * 1e6), 1e6));
 
 /** Serializable exact value: list of [numerator, denominator, unit]. */
 export type ExData = [number, number, Unit][];

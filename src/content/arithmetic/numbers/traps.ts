@@ -127,6 +127,18 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Scaled the percent and the number the same way',
     fix: 'To keep $p\\%$ of $N$ unchanged, scale one up and the other DOWN by the same factor: 12% of 250 = 24% of 125 = 6% of 500.',
   },
+  'num-percentage-points': {
+    label: 'Gave the change in percentage points',
+    fix: 'Going from 4% to 12% is a rise of 8 percentage points, but the percent increase is $\\frac{12 - 4}{4} = 200\\%$: divide the change by the original percent.',
+  },
+  'num-ratio-as-change': {
+    label: 'Used new ÷ old as the percent change',
+    fix: '12 is 300% OF 4, but it is 200% MORE than 4. Percent change = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$.',
+  },
+  'num-unweighted-mean': {
+    label: 'Averaged the percents without weighting them',
+    fix: 'When the groups have different sizes, multiply each percent by its share of the whole and add: $0.5(40\\%) + 0.25(70\\%) + 0.25(90\\%) = 60\\%$, not the plain average.',
+  },
   /* ---------------------------------------------------------------- successive percents */
   'num-add-percents': {
     label: 'Added successive percents',

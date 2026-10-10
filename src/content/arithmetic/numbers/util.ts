@@ -23,6 +23,17 @@ export function relClose(a: number, b: number, eps = 1e-9): boolean {
   return Math.abs(a - b) <= eps * Math.max(Math.abs(a), Math.abs(b));
 }
 
+/** Like qcFromSamples for floats, but with a purely relative tolerance (safe for tiny values). */
+export function qcFromFloatSamples(samples: Iterable<[number, number]>, eps = 1e-12): QCChoice {
+  const seen = new Set<QCChoice>();
+  for (const [a, b] of samples) {
+    seen.add(relClose(a, b, eps) ? 'C' : a > b ? 'A' : 'B');
+    if (seen.size > 1) return 'D';
+  }
+  if (seen.size === 0) throw new Error('qcFromFloatSamples: no samples');
+  return [...seen][0];
+}
+
 /** TeX for a terminating Frac as a decimal (1234.5 -> 1{,}234.5). */
 export const dec = (x: Frac): string => decimal(x);
 

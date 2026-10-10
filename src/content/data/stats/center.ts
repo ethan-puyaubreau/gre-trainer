@@ -1,8 +1,8 @@
-import { flaggedChoices, numericChoices, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, numericChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
-import { num, usd } from '../../../engine/tex';
-import type { Choice, Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { fTex, listTex, meanF, meanFracs, medianByRank, medianF, QC_WORDS, sortAsc, total } from './util';
+import { num, ordinal, usd } from '../../../engine/tex';
+import type { Choice, Difficulty, Template } from '../../../engine/types';
+import { fTex, listTex, meanF, meanFracs, medianByRank, sortAsc, total } from './util';
 
 /* =============================================================================================
  * 1. Sum = mean x count: removed, added, corrected or complementary values (NE)
@@ -258,234 +258,6 @@ The groups have different sizes (${k} and ${n - k}), so the answer is not $2 \\t
 };
 
 /* =============================================================================================
- * 2. Mean vs median with an unknown member (QC)
- * =========================================================================================== */
-
-type MMMode = 'determined' | 'above' | 'below' | 'middle';
-
-interface MMParams {
-  mode: MMMode;
-  base: number[];
-  /** determined: the given mean. */
-  givenMean: number;
-  /** Allowed integer values of x: lo < x < hi (null = unbounded). */
-  lo: number | null;
-  hi: number | null;
-  /** Which side is the mean. */
-  meanSide: 'A' | 'B';
-  /** determined mode: compare the median with 'mean' or with 'x'. */
-  other: 'mean' | 'x';
-}
-
-const meanMedianQC: Template<MMParams> = {
-  id: 'data.center.mean-median-qc',
-  skill: 'data.center',
-  format: 'qc',
-  style: 'mean versus median of a list with an unknown value',
-  generate(rng, d) {
-    const n = d === 3 ? rng.pick([5, 7]) : 5;
-    const modes: MMMode[] = d === 1 ? ['determined', 'determined', 'above', 'below'] : ['determined', 'above', 'below', 'middle'];
-    const mode = rng.pick(modes);
-    const meanSide: 'A' | 'B' = rng.chance(0.5) ? 'A' : 'B';
-    const mid = (n - 1) / 2; // number of base values on each side of the median slot
-
-    if (mode === 'determined') {
-      // The mean is given, which fixes x; compare the median with the mean (or with x).
-      const target = rng.pick(['A', 'B', 'C', 'C'] as QCChoice[]);
-      for (let tries = 0; ; tries++) {
-        const base = sortAsc(rng.sample(Array.from({ length: 40 }, (_, i) => i + 2), n - 1));
-        const M = rng.int(base[0] + 3, base[n - 2] - 2);
-        const x = n * M - total(base);
-        if (x < 1 || x > 60 || base.includes(x)) continue;
-        const all = [...base, x];
-        const med = medianF(all);
-        const other = rng.chance(d === 1 ? 0.2 : 0.4) ? 'x' : 'mean';
-        const B = other === 'mean' ? frac(M) : frac(x);
-        const rel = med.cmp(B);
-        const ans: QCChoice = meanSide === 'A' ? (rel > 0 ? 'B' : rel < 0 ? 'A' : 'C') : rel > 0 ? 'A' : rel < 0 ? 'B' : 'C';
-        if (ans !== target && tries < 400) continue;
-        // Show the list unsorted, x in the middle slot so that "the middle entry" is a trap.
-        const shown = rng.shuffle(base);
-        shown.splice(mid, 0, NaN);
-        const listShown = shown.map((v) => (Number.isNaN(v) ? 'x' : num(v)));
-        const middleAsWritten = shown[mid];
-        void middleAsWritten;
-        const sorted = sortAsc(all);
-        const medTex = fTex(med);
-        const qMedian = 'The median of the numbers';
-        const qOther = other === 'mean' ? `$${M}$` : '$x$';
-        const traps: QCQuestion['traps'] = {};
-        // Trap: taking x (the middle entry as written) as the median.
-        const slip = meanSide === 'A' ? frac(x).cmp(B) : B.cmp(frac(x));
-        const slipAns: QCChoice = other === 'x' ? 'C' : meanSide === 'A' ? (slip > 0 ? 'B' : slip < 0 ? 'A' : 'C') : slip > 0 ? 'B' : slip < 0 ? 'A' : 'C';
-        if (slipAns !== ans) traps[slipAns] = 'stat-median-unsorted';
-        const A = meanSide === 'A' ? qOther : qMedian;
-        const Bq = meanSide === 'A' ? qMedian : qOther;
-        return {
-          params: { mode, base, givenMean: M, lo: null, hi: null, meanSide, other },
-          q: {
-            format: 'qc',
-            info: `The average (arithmetic mean) of the ${n} numbers $${listTex(listShown)}$ is $${M}$.`,
-            quantityA: A,
-            quantityB: Bq,
-            answer: ans,
-            traps: Object.keys(traps).length ? traps : undefined,
-            explanation: `The ${n} numbers total $${n} \\times ${M} = ${n * M}$, so $x = ${n * M} - ${total(base)} = ${x}$.
-
-In increasing order the list is $${listTex(sorted)}$, so the median is the middle value, $${medTex}$. (The middle entry of the list as written is not the median until the list is sorted.)
-
-Compare the median, $${medTex}$, with ${other === 'mean' ? `the mean, $${M}$` : `$x = ${x}$`}: ${QC_WORDS[ans]}. (${ans})`,
-          },
-        };
-      }
-    }
-
-    // Unknown x in a range: build a base list and an interval for x.
-    for (let tries = 0; ; tries++) {
-      const spread = d === 1 ? 30 : 45;
-      const base = sortAsc(rng.sample(Array.from({ length: spread }, (_, i) => i + 1), n - 1));
-      const S = total(base);
-      let lo: number | null = null;
-      let hi: number | null = null;
-      let ans: QCChoice;
-      let explanation: string;
-      let natural: number; // the first value a student would try
-      if (mode === 'above') {
-        lo = base[n - 2] + rng.int(0, 4);
-        natural = lo + 1;
-        // median is fixed: base[mid] (x is the largest); mean = (S + x)/n increases without bound.
-        const med = base[mid];
-        const meanAtLo = new Frac(S + lo + 1, n);
-        const meanGreater = meanAtLo.gt(med);
-        const rel: QCChoice = meanGreater ? (meanSide === 'A' ? 'A' : 'B') : 'D';
-        ans = rel;
-        explanation = `Since $x > ${lo}$, $x$ is the greatest of the ${n} numbers, so the median is the middle number of the others in order: $${med}$, whatever $x$ is.
-
-The mean is $\\dfrac{${S} + x}{${n}}$, which grows with $x$. ${
-          meanGreater
-            ? `Even for the smallest allowed value, $x = ${lo + 1}$, the mean is $${fTex(meanAtLo)}$, already greater than $${med}$. So the mean is always greater than the median.`
-            : `For $x = ${lo + 1}$ the mean is $${fTex(meanAtLo)}$, ${meanAtLo.eq(med) ? 'equal to' : 'less than'} the median $${med}$; for a very large $x$ (say $x = ${num(1000)}$) the mean is far greater than $${med}$. The comparison depends on $x$.`
-        }`;
-      } else if (mode === 'below') {
-        hi = base[0] - rng.int(0, 3);
-        if (hi < 2) continue;
-        natural = hi - 1;
-        const med = base[mid - 1];
-        const meanAtHi = new Frac(S + hi - 1, n);
-        const meanLess = meanAtHi.lt(med);
-        const lowBound = rng.chance(0.5) ? 0 : null;
-        lo = lowBound;
-        // With x >= 1 (x > 0) the mean is bounded below by (S + 1)/n.
-        const meanAtLow = lo === null ? null : new Frac(S + lo + 1, n);
-        let rel: QCChoice;
-        if (meanLess) rel = meanSide === 'A' ? 'B' : 'A';
-        else if (meanAtLow && meanAtLow.gt(med)) rel = meanSide === 'A' ? 'A' : 'B';
-        else rel = 'D';
-        if (meanAtLow && meanAtLow.lte?.(med)) void 0;
-        ans = rel;
-        const range = lo === null ? `$x < ${hi}$` : `$0 < x < ${hi}$`;
-        explanation = `Since ${range}, $x$ is the least of the ${n} numbers, so the median is fixed: $${med}$.
-
-The mean is $\\dfrac{${S} + x}{${n}}$, which shrinks as $x$ decreases. ${
-          meanLess
-            ? `Even for the largest allowed value, $x = ${hi - 1}$, the mean is $${fTex(meanAtHi)}$, less than $${med}$. So the mean is always less than the median.`
-            : meanAtLow && meanAtLow.gt(med)
-              ? `Even for the smallest allowed value, $x = 1$, the mean is $${fTex(meanAtLow)}$, greater than $${med}$. So the mean is always greater than the median.`
-              : `For $x = ${hi - 1}$ the mean is $${fTex(meanAtHi)}$, ${meanAtHi.eq(med) ? 'equal to' : 'greater than'} the median $${med}$; but for ${lo === null ? `a very negative $x$ (say $x = -${num(1000)}$)` : '$x = 1$'} the mean is $${fTex(new Frac(S + (lo === null ? -1000 : 1), n))}$, ${new Frac(S + (lo === null ? -1000 : 1), n).lt(med) ? 'less than' : 'not less than'} $${med}$. The comparison depends on $x$.`
-        }`;
-        if (!meanLess && !(meanAtLow && meanAtLow.gt(med)) && lo !== null && !new Frac(S + 1, n).lt(med)) continue;
-      } else {
-        // middle: x lies strictly between the two middle base values, so x is the median.
-        const a = base[mid - 1];
-        const b = base[mid];
-        if (b - a < 4) continue;
-        lo = a + rng.int(0, Math.floor((b - a) / 3));
-        hi = b - rng.int(0, Math.floor((b - a) / 3));
-        if (hi - lo < 3) continue;
-        natural = lo + 1;
-        // mean - median = (S + x)/n - x = (S - (n - 1)x)/n: positive iff x < S/(n - 1).
-        const crit = new Frac(S, n - 1);
-        const allBelow = crit.gt(hi - 1);
-        const allAbove = crit.lt(lo + 1);
-        const rel: QCChoice = allBelow ? (meanSide === 'A' ? 'A' : 'B') : allAbove ? (meanSide === 'A' ? 'B' : 'A') : 'D';
-        ans = rel;
-        explanation = `Since $${lo} < x < ${hi}$, $x$ is the middle number in order, so the median is $x$ itself.
-
-The mean is greater than the median exactly when $\\dfrac{${S} + x}{${n}} > x$, that is, when $${S} > ${n - 1}x$, or $x < ${fTex(crit)}$. ${
-          allBelow
-            ? `Every allowed $x$ (at most $${hi - 1}$) is less than $${fTex(crit)}$, so the mean is always greater.`
-            : allAbove
-              ? `Every allowed $x$ (at least $${lo + 1}$) is greater than $${fTex(crit)}$, so the mean is always less.`
-              : `Some allowed values of $x$ are below $${fTex(crit)}$ and some are not (try $x = ${lo + 1}$ and $x = ${hi - 1}$), so the comparison depends on $x$.`
-        }`;
-      }
-      // Answer mix: D about 45% of the unknown-x questions.
-      if (tries < 300) {
-        const want = rng.chance(0.45) ? 'D' : 'AB';
-        if ((want === 'D') !== (ans === 'D')) continue;
-      }
-      // Trap: testing only the most natural value.
-      const traps: QCQuestion['traps'] = {};
-      if (ans === 'D') {
-        const all = [...base, natural];
-        const mean = meanF(all);
-        const med = medianF(all);
-        const r = mean.cmp(med);
-        const slip: QCChoice = r === 0 ? 'C' : (r > 0) === (meanSide === 'A') ? 'A' : 'B';
-        traps[slip] = 'stat-one-value-tested';
-      } else traps.C = 'stat-mean-is-median';
-      const cond =
-        mode === 'above' ? `$x > ${lo}$` : mode === 'below' ? (lo === null ? `$x < ${hi}$` : `$0 < x < ${hi}$`) : `$${lo} < x < ${hi}$`;
-      const shown = rng.shuffle([...base.map((v) => num(v)), 'x']);
-      const qMean = 'The average (arithmetic mean) of the numbers';
-      const qMed = 'The median of the numbers';
-      return {
-        params: { mode, base, givenMean: 0, lo, hi, meanSide, other: 'mean' },
-        q: {
-          format: 'qc',
-          info: `$x$ is an integer such that ${cond}.
-
-The list of numbers: $${listTex(shown)}$`,
-          quantityA: meanSide === 'A' ? qMean : qMed,
-          quantityB: meanSide === 'A' ? qMed : qMean,
-          answer: ans,
-          traps,
-          explanation: `${explanation} (${ans})`,
-        },
-      };
-    }
-  },
-  check(q, p, rng) {
-    if (q.format !== 'qc') return 'wrong format';
-    let expected: QCChoice;
-    if (p.mode === 'determined') {
-      // Solve for x by trying every candidate value.
-      let x = NaN;
-      for (let c = -500; c <= 500; c++) if (meanF([...p.base, c]).eq(p.givenMean)) x = c;
-      const all = [...p.base, x];
-      const med = medianByRank(all);
-      const other = p.other === 'mean' ? meanF(all) : frac(x);
-      expected = qcFromSamples([p.meanSide === 'A' ? [other, med] : [med, other]]);
-    } else {
-      const lo = p.lo ?? -100000;
-      const hi = p.hi ?? 100000;
-      const xs = new Set<number>([lo + 1, hi - 1, Math.floor((lo + hi) / 2)]);
-      for (let i = 0; i < 300; i++) xs.add(rng.int(lo + 1, hi - 1));
-      for (let v = lo + 1; v <= Math.min(hi - 1, lo + 200); v++) xs.add(v);
-      for (let v = hi - 1; v >= Math.max(lo + 1, hi - 200); v--) xs.add(v);
-      const samples: [Frac, Frac][] = [...xs].map((x) => {
-        const all = [...p.base, x];
-        const mean = meanF(all);
-        const med = medianByRank(all);
-        return p.meanSide === 'A' ? [mean, med] : [med, mean];
-      });
-      expected = qcFromSamples(samples);
-    }
-    return q.answer === expected ? null : `expected ${expected}`;
-  },
-};
-
-/* =============================================================================================
  * 3. Which values of x give the list a given median (or make mean = median)? (MCM)
  * =========================================================================================== */
 
@@ -573,7 +345,7 @@ const whichValues: Template<WhichParams> = {
           values.map((v) => ({
             text: `$${fTex(v)}$`,
             correct: sols.some((s) => s.eq(v)),
-            ...(v.eq(meanOfBase) && !sols.some((s) => s.eq(v)) ? { trap: 'stat-only-one-case' } : {}),
+            ...(v.eq(meanOfBase) && !sols.some((s) => s.eq(v)) ? { trap: 'stat-case-not-checked' } : {}),
           })),
         );
         const S = total(b);
@@ -649,10 +421,10 @@ So $x$ can be ${sols.map((s) => `$${fTex(s)}$`).join(', ').replace(/, ([^,]*)$/,
       let reason: string;
       if (N % 2 === 1) {
         const k = (N - 1) / 2;
-        reason = `In order, the ${N - 1} known numbers are $${listTex(b)}$. With $x$ added there are ${N} numbers, and the median is the ${k + 1}th of them. Wherever $x$ goes, the median is $${b[k - 1]}$ if $x \\le ${b[k - 1]}$, $x$ itself if $${b[k - 1]} \\le x \\le ${b[k]}$, and $${b[k]}$ if $x \\ge ${b[k]}$.`;
+        reason = `In order, the ${N - 1} known numbers are $${listTex(b)}$. With $x$ added there are ${N} numbers, and the median is the ${ordinal(k + 1)} of them. Wherever $x$ goes, the median is $${b[k - 1]}$ if $x \\le ${b[k - 1]}$, $x$ itself if $${b[k - 1]} \\le x \\le ${b[k]}$, and $${b[k]}$ if $x \\ge ${b[k]}$.`;
       } else {
         const k = N / 2;
-        reason = `In order, the ${N - 1} known numbers are $${listTex(b)}$. With $x$ there are ${N} numbers, so the median is the average of the ${k}th and ${k + 1}th. The ${k}th or ${k + 1}th is always $${b[k - 1]}$; the other middle number is $${b[k - 2]}$ if $x \\le ${b[k - 2]}$, $x$ if $${b[k - 2]} \\le x \\le ${b[k]}$, and $${b[k]}$ if $x \\ge ${b[k]}$. A median of $${fTex(m)}$ needs that other middle number to be $2 \\times ${fTex(m)} - ${b[k - 1]} = ${fTex(m.mul(2).sub(b[k - 1]))}$.`;
+        reason = `In order, the ${N - 1} known numbers are $${listTex(b)}$. With $x$ there are ${N} numbers, so the median is the average of the ${ordinal(k)} and ${ordinal(k + 1)}. One of these two middle numbers is always $${b[k - 1]}$; the other middle number is $${b[k - 2]}$ if $x \\le ${b[k - 2]}$, $x$ if $${b[k - 2]} \\le x \\le ${b[k]}$, and $${b[k]}$ if $x \\ge ${b[k]}$. A median of $${fTex(m)}$ needs that other middle number to be $2 \\times ${fTex(m)} - ${b[k - 1]} = ${fTex(m.mul(2).sub(b[k - 1]))}$.`;
       }
       const solText =
         sol.lo !== null && sol.hi !== null
@@ -690,20 +462,27 @@ ${solText}${mIsBad && values.some((v) => v.eq(m)) ? ` Note that $x = ${fTex(m)}$
 };
 
 /* =============================================================================================
- * 4. Greatest / least possible value given the average and the median (MCS)
+ * 4. Greatest / least possible value of a list built under constraints (MCS)
+ *  - book DA-26: least / greatest possible average given the median and the greatest value
+ *  - largest / smallest member given the average and the median
  * =========================================================================================== */
 
-type ExtremeAsk = 'max-largest' | 'min-largest' | 'max-smallest';
+type ExtremeAsk = 'max-largest' | 'min-largest' | 'max-smallest' | 'min-mean' | 'max-mean';
 
 interface ExtremeParams {
+  n: number;
+  /** Average (for the member asks). */
   M: number;
+  /** Median. */
   D: number;
+  /** Greatest value (for the mean asks). */
+  top: number;
   distinct: boolean;
   ask: ExtremeAsk;
 }
 
-/** Closed-form answer (n = 5 positive integers a <= b <= D <= d <= e). */
-function extremeFormula(M: number, D: number, distinct: boolean, ask: ExtremeAsk): number | null {
+/** Closed-form answer for n = 5 positive integers a <= b <= D <= d <= e with sum 5M. */
+function memberFormula(M: number, D: number, distinct: boolean, ask: ExtremeAsk): number | null {
   const S = 5 * M;
   if (ask === 'max-largest') {
     const others = distinct ? 1 + 2 + D + (D + 1) : 1 + 1 + D + D;
@@ -711,99 +490,157 @@ function extremeFormula(M: number, D: number, distinct: boolean, ask: ExtremeAsk
     return e >= (distinct ? D + 2 : D) ? e : null;
   }
   if (ask === 'min-largest') {
-    const low = distinct ? D - 2 + (D - 1) : 2 * D;
     if (distinct && D < 3) return null;
+    const low = distinct ? D - 2 + (D - 1) : 2 * D;
     const T = S - D - low; // d + e
     const e = distinct ? Math.max(Math.floor(T / 2) + 1, D + 2) : Math.max(Math.ceil(T / 2), D);
-    // need the rest to fit: d = T - e must be >= D (or D + 1)
-    const dd = T - e;
-    if (dd < (distinct ? D + 1 : D)) return null;
-    return e;
+    return T - e >= (distinct ? D + 1 : D) ? e : null;
   }
-  // max-smallest: d, e minimal; a <= b <= D
+  // max-smallest: d, e as small as possible
   const up = distinct ? D + 1 + (D + 2) : 2 * D;
   const T = S - D - up; // a + b
   const a = distinct ? Math.min(Math.floor((T - 1) / 2), D - 2) : Math.min(Math.floor(T / 2), D);
   if (a < 1) return null;
-  // b = T - a must satisfy a <= b <= D (or a < b < D)
   const b = T - a;
-  if (distinct ? !(a < b && b < D) : !(a <= b && b <= D)) return null;
-  return a;
+  return (distinct ? a < b && b < D : a <= b && b <= D) ? a : null;
+}
+
+/** Every multiset of `size` integers from lo..hi, as a list of sums (brute force). */
+function multisetSums(size: number, lo: number, hi: number): number[] {
+  const out: number[] = [];
+  const rec = (left: number, from: number, acc: number) => {
+    if (left === 0) {
+      out.push(acc);
+      return;
+    }
+    for (let v = from; v <= hi; v++) rec(left - 1, v, acc + v);
+  };
+  rec(size, lo, 0);
+  return out;
 }
 
 const extremeValue: Template<ExtremeParams> = {
   id: 'data.center.extreme-value',
   skill: 'data.center',
   format: 'mcs',
-  style: 'greatest or least possible value given the average and the median',
+  style: 'least or greatest possible value: build the extreme list',
   generate(rng, d) {
-    const asks: ExtremeAsk[] = d === 1 ? ['max-largest'] : d === 2 ? ['max-largest', 'min-largest'] : ['min-largest', 'max-smallest', 'max-largest'];
+    const asks: ExtremeAsk[] =
+      d === 1 ? ['max-largest', 'min-mean', 'max-mean'] : d === 2 ? ['min-mean', 'max-mean', 'max-largest', 'min-largest'] : ['min-mean', 'min-largest', 'max-smallest', 'max-mean'];
     for (;;) {
       const ask = rng.pick(asks);
-      const distinct = d === 1 ? false : d === 2 ? rng.chance(0.5) : rng.chance(0.6);
+
+      if (ask === 'min-mean' || ask === 'max-mean') {
+        const n = d === 1 ? 5 : rng.pick(d === 2 ? [5, 7] : [7, 9]);
+        const h = (n - 1) / 2;
+        const D = rng.int(d === 1 ? 5 : 8, d === 3 ? 30 : 20);
+        const top = D + rng.int(5, d === 3 ? 60 : 40);
+        const totalAns = ask === 'min-mean' ? h + h * D + top : (h + 1) * D + h * top;
+        if (totalAns % n) continue;
+        const ans = totalAns / n;
+        const traps: { value: number; trap: string }[] =
+          ask === 'min-mean'
+            ? [
+                { value: (h + D + (h - 1) + top) / n, trap: 'stat-extreme-order' },
+                { value: (h * D + top) / n, trap: 'stat-extreme-zero' },
+              ]
+            : [
+                { value: (h * top + D + h * top) / n, trap: 'stat-extreme-order' },
+                { value: (h * D + D + (h - 1) * D + top) / n, trap: 'stat-extreme-direction' },
+              ];
+        const startMin = Math.max(1, ans - 4);
+        const start = rng.int(startMin, ans);
+        const values = [0, 1, 2, 3, 4].map((i) => start + i);
+        const choices = values.map((v) => {
+          const t = v !== ans ? traps.find((tr) => tr.value === v) : undefined;
+          return { text: `$${v}$`, ...(t ? { trap: t.trap } : {}) };
+        });
+        const ones = Array(h).fill(1);
+        const listMin = [...ones, D, ...Array(h - 1).fill(D), top];
+        const listMax = [...Array(h).fill(D), D, ...Array(h - 1).fill(top), top];
+        const shown = ask === 'min-mean' ? listMin : listMax;
+        const how =
+          ask === 'min-mean'
+            ? `To make the average as small as possible, make every integer as small as the conditions allow. The ${h} integers below the median can each be 1. The median is $${D}$, and the ${h - 1} integer${h - 1 === 1 ? '' : 's'} between the median and the greatest must be at least $${D}$. The greatest is $${top}$.`
+            : `To make the average as large as possible, make every integer as large as the conditions allow. The ${h} integers below the median can be at most $${D}$, the median is $${D}$, and the ${h - 1} integer${h - 1 === 1 ? '' : 's'} above the median can be as large as the greatest, $${top}$.`;
+        return {
+          params: { n, M: 0, D, top, distinct: false, ask },
+          q: {
+            format: 'mcs',
+            stem: `A list consists of ${n} positive integers. The greatest integer in the list is $${top}$, and the median of the list is $${D}$. What is the ${ask === 'min-mean' ? 'least' : 'greatest'} possible value of the average (arithmetic mean) of the ${n} integers?`,
+            choices,
+            answer: ans - start,
+            explanation: `${how}
+
+That list is $${listTex(shown)}$, with total $${num(totalAns)}$, so the ${ask === 'min-mean' ? 'least' : 'greatest'} possible average is $${num(totalAns)} \\div ${n} = ${ans}$.
+
+${ask === 'min-mean' ? `The integers above the median cannot be made 1: in increasing order they come after the median, so they are at least $${D}$.` : `The integers below the median cannot be made $${top}$: in increasing order they come before the median, so they are at most $${D}$.`}`,
+          },
+        };
+      }
+
+      const distinct = d === 1 ? false : rng.chance(d === 2 ? 0.5 : 0.6);
       const D = rng.int(d === 1 ? 6 : 8, d === 3 ? 30 : 20);
       const M = ask === 'min-largest' ? D + rng.int(1, d === 3 ? 8 : 5) : rng.int(Math.max(4, D - 3), D + 10);
-      const ans = extremeFormula(M, D, distinct, ask);
+      const ans = memberFormula(M, D, distinct, ask);
       if (ans === null) continue;
       const S = 5 * M;
       const traps: { value: number; trap: string }[] = [];
+      const alt = memberFormula(M, D, !distinct, ask);
+      if (alt !== null) traps.push({ value: alt, trap: 'stat-extreme-distinct' });
       if (ask === 'max-largest') {
         traps.push({ value: S - (1 + 1 + D + 1), trap: 'stat-extreme-order' });
-        traps.push({ value: S - (0 + 0 + D + D), trap: 'stat-extreme-zero' });
-        traps.push({ value: distinct ? S - (1 + 1 + D + D) : S - (1 + 2 + D + D + 1), trap: 'stat-extreme-distinct' });
+        traps.push({ value: S - 2 * D, trap: 'stat-extreme-zero' });
         traps.push({ value: S - D, trap: 'stat-extreme-order' });
       } else if (ask === 'min-largest') {
-        const alt = extremeFormula(M, D, !distinct, ask);
-        if (alt !== null) traps.push({ value: alt, trap: 'stat-extreme-distinct' });
-        traps.push({ value: S - 4 * D, trap: 'stat-extreme-order' });
-        traps.push({ value: M, trap: 'stat-extreme-order' });
+        traps.push({ value: S - 4 * D, trap: 'stat-extreme-balance' });
+        traps.push({ value: Math.ceil((S - D) / 4), trap: 'stat-extreme-order' });
       } else {
-        const alt = extremeFormula(M, D, !distinct, ask);
-        if (alt !== null) traps.push({ value: alt, trap: 'stat-extreme-distinct' });
         traps.push({ value: Math.floor((S - D) / 4), trap: 'stat-extreme-order' });
-        traps.push({ value: D, trap: 'stat-extreme-order' });
       }
       const usable = traps.filter((t) => t.value > 0 && t.value !== ans);
-      const fillers = [ans + 1, ans - 1, ans + 2, ans - 2, ans + 3].filter((v) => v > 0);
       let built;
       try {
         built = numericChoices(rng, {
           correct: ans,
-          traps: usable.map((t) => ({ value: t.value, trap: t.trap })),
-          fillers,
+          traps: rng.sample(usable, Math.min(usable.length, rng.int(1, 3))),
+          fillers: rng.shuffle([ans + 1, ans - 1, ans + 2, ans - 2, ans + 3, ans - 3, ans + 5, ans - 5]).filter((v) => v > 0),
           format: (v) => `$${fTex(v)}$`,
         });
       } catch {
         continue;
       }
       const what = ask === 'max-largest' ? 'greatest possible value of the largest' : ask === 'min-largest' ? 'least possible value of the largest' : 'greatest possible value of the smallest';
-      const kind = distinct ? 'different positive integers' : 'positive integers';
+      const lt = distinct ? '<' : '\\le';
+      const order = `Write the integers in increasing order as $a ${lt} b ${lt} ${D} ${lt} d ${lt} e$. Their sum is $5 \\times ${M} = ${S}$.`;
       let expl: string;
       if (ask === 'max-largest') {
         const o = distinct ? [1, 2, D, D + 1] : [1, 1, D, D];
-        expl = `Write the integers in order as $a \\le b \\le ${D} \\le d \\le e$${distinct ? ' (all different)' : ''}. Their sum is $5 \\times ${M} = ${S}$.
+        expl = `${order}
 
-To make $e$ as large as possible, make the others as small as possible: $a$ and $b$ ${distinct ? 'are at least 1 and 2' : 'are at least 1'}, and $d$, which is at or above the median, is at least $${o[3]}$. Then $e = ${S} - (${o.join(' + ')}) = ${ans}$.
+To make $e$ as large as possible, make the others as small as possible: $a$ and $b$ ${distinct ? 'can be 1 and 2' : 'can both be 1'}, and $d$, which comes after the median, is at least $${o[3]}$. Then $e = ${S} - (${o.join(' + ')}) = ${ans}$.
 
-The value above the median cannot be made 1: it must be at least the median.`;
+Setting $d$ to 1 as well is not allowed: it must be at least the median.`;
       } else if (ask === 'min-largest') {
         const low = distinct ? [D - 2, D - 1] : [D, D];
         const T = S - D - low[0] - low[1];
-        expl = `Write the integers in order as $a \\le b \\le ${D} \\le d \\le e$${distinct ? ' (all different)' : ''}, with sum $5 \\times ${M} = ${S}$.
+        expl = `${order}
 
-To make $e$ as small as possible, make the others as large as possible. $a$ and $b$ can be at most $${low[0]}$ and $${low[1]}$, so $d + e \\ge ${S} - ${D} - ${low[0]} - ${low[1]} = ${T}$. Since $d ${distinct ? '<' : '\\le'} e$, $e$ is at least ${distinct ? `the least integer greater than half of ${T}` : `half of ${T}`}: $e = ${ans}$ (with $d = ${T - ans}$).`;
+To make $e$ as small as possible, make the others as large as possible. $a$ and $b$ can be at most $${low[0]}$ and $${low[1]}$, which leaves $d + e = ${S} - ${D} - ${low[0]} - ${low[1]} = ${T}$. Share that as evenly as the order allows: $d = ${T - ans}$ and $e = ${ans}$.
+
+Putting all of the remaining total into $e$ (with $d = ${D}$) makes $e$ larger than necessary.`;
       } else {
         const up = distinct ? [D + 1, D + 2] : [D, D];
         const T = S - D - up[0] - up[1];
-        expl = `Write the integers in order as $a \\le b \\le ${D} \\le d \\le e$${distinct ? ' (all different)' : ''}, with sum $5 \\times ${M} = ${S}$.
+        expl = `${order}
 
 To make $a$ as large as possible, make $d$ and $e$ as small as possible: $${up[0]}$ and $${up[1]}$. Then $a + b = ${S} - ${D} - ${up[0]} - ${up[1]} = ${T}$, and since $a ${distinct ? '<' : '\\le'} b ${distinct ? '<' : '\\le'} ${D}$, the greatest possible $a$ is $${ans}$ (with $b = ${T - ans}$).`;
       }
       return {
-        params: { M, D, distinct, ask },
+        params: { n: 5, M, D, top: 0, distinct, ask },
         q: {
           format: 'mcs',
-          stem: `A list consists of 5 ${kind}. The average (arithmetic mean) of the 5 integers is $${M}$, and their median is $${D}$. What is the ${what} integer in the list?`,
+          stem: `A list consists of 5 ${distinct ? 'different positive integers' : 'positive integers'}. The average (arithmetic mean) of the 5 integers is $${M}$, and their median is $${D}$. What is the ${what} integer in the list?`,
           choices: built.choices,
           answer: built.answer,
           explanation: expl,
@@ -811,11 +648,21 @@ To make $a$ as large as possible, make $d$ and $e$ as small as possible: $${up[0
       };
     }
   },
-  check(q, { M, D, distinct, ask }) {
+  check(q, { n, M, D, top, distinct, ask }) {
     if (q.format !== 'mcs') return 'wrong format';
+    let best: number | null = null;
+    if (ask === 'min-mean' || ask === 'max-mean') {
+      // Enumerate every possible lower half (values 1..D) and upper half (values D..top, top included).
+      const h = (n - 1) / 2;
+      const lows = multisetSums(h, 1, D);
+      const ups = multisetSums(h - 1, D, top).map((s) => s + top);
+      const pickLow = ask === 'min-mean' ? Math.min(...lows) : Math.max(...lows);
+      const pickUp = ask === 'min-mean' ? Math.min(...ups) : Math.max(...ups);
+      const tot = new Frac(pickLow + D + pickUp, n);
+      return q.choices[q.answer].text === `$${fTex(tot)}$` ? null : `expected ${tot}`;
+    }
     // Brute force over every sorted list a <= b <= D <= d <= e of positive integers with sum 5M.
     const S = 5 * M;
-    let best: number | null = null;
     for (let a = 1; a <= D; a++)
       for (let b = a; b <= D; b++)
         for (let dd = D; dd <= S; dd++) {
@@ -823,12 +670,114 @@ To make $a$ as large as possible, make $d$ and $e$ as small as possible: $${up[0
           if (e < dd) break;
           if (distinct && !(a < b && b < D && D < dd && dd < e)) continue;
           const v = ask === 'max-smallest' ? a : e;
-          if (best === null) best = v;
-          else best = ask === 'min-largest' ? Math.min(best, v) : Math.max(best, v);
+          best = best === null ? v : ask === 'min-largest' ? Math.min(best, v) : Math.max(best, v);
         }
     if (best === null) return 'no list satisfies the conditions';
     return q.choices[q.answer].text === `$${num(best)}$` ? null : `expected ${best}`;
   },
 };
 
-export const centerTemplates = [sumUpdate, meanMedianQC, whichValues, extremeValue];
+/* =============================================================================================
+ * 5. Overlapping lists of consecutive integers (MCS), book DA-13
+ * =========================================================================================== */
+
+type Anchor = 'medR-minT' | 'medR-medT' | 'maxR-medT';
+
+interface ConsecParams {
+  m: number;
+  n: number;
+  anchor: Anchor;
+  ask: 'combined' | 'both';
+}
+
+const consecutiveLists: Template<ConsecParams> = {
+  id: 'data.center.consecutive-lists',
+  skill: 'data.center',
+  format: 'mcs',
+  style: 'medians of lists of consecutive integers that overlap',
+  generate(rng, d) {
+    const anchor: Anchor = d === 1 ? 'medR-minT' : rng.pick(d === 2 ? ['medR-minT', 'medR-minT', 'medR-medT', 'maxR-medT'] : ['medR-minT', 'medR-medT', 'maxR-medT']);
+    const ask: ConsecParams['ask'] = d === 3 && rng.chance(0.4) ? 'both' : 'combined';
+    const odd = (lo: number, hi: number) => 2 * rng.int(Math.ceil((lo - 1) / 2), Math.floor((hi - 1) / 2)) + 1;
+    const m = odd(d === 1 ? 7 : 11, d === 3 ? 61 : 31);
+    let n = anchor === 'medR-minT' ? rng.int(d === 1 ? 6 : 8, d === 3 ? 50 : 30) : odd(7, d === 3 ? 61 : 31);
+    if (n === m && anchor !== 'medR-minT') n += 2;
+    let overlap: number;
+    let why: string;
+    if (anchor === 'medR-minT') {
+      overlap = Math.min((m - 1) / 2, n - 1) + 1;
+      why = `The median of $R$ is its middle integer, with $${(m - 1) / 2}$ integers of $R$ above it. $T$ starts at that median, so the integers in both lists are the median of $R$ and the ${n - 1 >= (m - 1) / 2 ? `$${(m - 1) / 2}$ integers above it` : `next $${n - 1}$ integers`}: $${overlap}$ integers.`;
+    } else if (anchor === 'medR-medT') {
+      overlap = Math.min(m, n);
+      why = `Both lists are centered on the same integer, so the shorter list (${Math.min(m, n)} integers) lies entirely inside the longer one: $${overlap}$ integers are in both.`;
+    } else {
+      overlap = Math.min(m, (n + 1) / 2);
+      why = `The median of $T$ is its middle integer, with $${(n - 1) / 2}$ integers of $T$ below it. The greatest integer of $R$ is that median, so the integers in both lists are that median and the ${(n - 1) / 2 <= m - 1 ? `$${(n - 1) / 2}$ integers below it` : `$${m - 1}$ integers below it`}: $${overlap}$ integers.`;
+    }
+    const combined = m + n - overlap;
+    const ans = ask === 'combined' ? combined : overlap;
+    const traps =
+      ask === 'combined'
+        ? [
+            { value: m + n, trap: 'stat-overlap-ignored' },
+            { value: combined + 1, trap: 'stat-overlap-off-by-one' },
+            { value: combined - 1, trap: 'stat-overlap-off-by-one' },
+          ]
+        : [
+            { value: overlap - 1, trap: 'stat-overlap-off-by-one' },
+            { value: overlap + 1, trap: 'stat-overlap-off-by-one' },
+          ];
+    const usable = traps.filter((t) => t.value > 0);
+    const { choices, answer } = numericChoices(rng, {
+      correct: ans,
+      traps: [usable[0], ...rng.sample(usable.slice(1), rng.int(0, usable.length - 1))],
+      fillers: rng.shuffle([ans + 2, ans - 2, ans + 4, ans - 4, Math.max(m, n), m + n - (n + 1) / 2, ans + 6, ans - 6]).filter((v) => v > 0 && Number.isInteger(v) && (ask === 'both' || v <= m + n)),
+      format: (v) => `$${fTex(v)}$`,
+    });
+    const anchorText =
+      anchor === 'medR-minT'
+        ? 'The median of the integers in list $R$ is equal to the least integer in list $T$.'
+        : anchor === 'medR-medT'
+          ? 'The median of the integers in list $R$ is equal to the median of the integers in list $T$.'
+          : 'The greatest integer in list $R$ is equal to the median of the integers in list $T$.';
+    return {
+      params: { m, n, anchor, ask },
+      q: {
+        format: 'mcs',
+        stem: `List $R$ consists of ${m} consecutive integers, and list $T$ consists of ${n} consecutive integers. ${anchorText} ${
+          ask === 'combined' ? 'How many different integers are in list $R$, list $T$, or both?' : 'How many integers are in both list $R$ and list $T$?'
+        }`,
+        choices,
+        answer,
+        explanation: `${why}${
+          ask === 'combined' ? `
+
+The number of different integers is $${m} + ${n} - ${overlap} = ${combined}$: the integers in both lists must be counted only once.` : ''
+        }
+
+A quick check with actual numbers helps: ${
+          anchor === 'medR-minT'
+            ? `if $R$ is $1$ to $${m}$, its median is $${(m + 1) / 2}$ and $T$ is $${(m + 1) / 2}$ to $${(m + 1) / 2 + n - 1}$.`
+            : anchor === 'medR-medT'
+              ? `if $R$ is $1$ to $${m}$, its median is $${(m + 1) / 2}$ and $T$ runs from $${(m + 1) / 2 - (n - 1) / 2}$ to $${(m + 1) / 2 + (n - 1) / 2}$.`
+              : `if $R$ is $1$ to $${m}$, then $T$ runs from $${m - (n - 1) / 2}$ to $${m + (n - 1) / 2}$.`
+        }`,
+      },
+    };
+  },
+  check(q, { m, n, anchor, ask }) {
+    if (q.format !== 'mcs') return 'wrong format';
+    // Build actual lists and count with sets.
+    const R = Array.from({ length: m }, (_, i) => 1000 + i);
+    const medR = R[(m - 1) / 2];
+    const t0 = anchor === 'medR-minT' ? medR : anchor === 'medR-medT' ? medR - (n - 1) / 2 : R[m - 1] - (n - 1) / 2;
+    const T = Array.from({ length: n }, (_, i) => t0 + i);
+    if (anchor !== 'medR-minT' && medianByRank(T).toNumber() !== (anchor === 'medR-medT' ? medR : R[m - 1])) return 'bad construction';
+    const setR = new Set(R);
+    const both = T.filter((v) => setR.has(v)).length;
+    const expected = ask === 'both' ? both : new Set([...R, ...T]).size;
+    return q.choices[q.answer].text === `$${num(expected)}$` ? null : `expected ${expected}`;
+  },
+};
+
+export const centerTemplates = [sumUpdate, whichValues, extremeValue, consecutiveLists];

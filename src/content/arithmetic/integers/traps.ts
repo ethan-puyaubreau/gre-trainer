@@ -104,6 +104,10 @@ export const integerTraps: Record<string, Trap> = {
     label: '$S(b) - S(a) = S(b - a)$',
     fix: '$S(60) - S(40)$ is $41 + 42 + \\cdots + 60$ (20 terms averaging 50.5), not $1 + 2 + \\cdots + 20$.',
   },
+  'int-line-self': {
+    label: 'Miscounted the person in the middle',
+    fix: 'People in line = (people ahead) + 1 + (people behind). Someone who is $k$th from the front and $m$th from the back is counted in both positions, so the line has $k + m - 1$ people.',
+  },
   'int-gave-middle-term': {
     label: 'Gave the average instead of the requested term',
     fix: 'Sum $\\div$ number of terms is the average, which is the middle term. Then step out to the least or greatest term.',

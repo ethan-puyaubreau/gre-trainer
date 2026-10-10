@@ -3,6 +3,7 @@
 
 import { Frac, frac } from '../../../engine/frac';
 import { decimal, num } from '../../../engine/tex';
+import type { QuestionBody } from '../../../engine/types';
 
 export const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 export const word = (n: number) => WORDS[n] ?? String(n);
@@ -133,33 +134,28 @@ export function nearestIndex(values: number[], target: number): number {
 }
 
 /** Compare the text of the chosen choice with the expected rich text. */
-export function mcsCheck(q: { format: string; choices?: { text: string }[]; answer?: unknown }, expected: string): string | null {
+export function mcsCheck(q: QuestionBody, expected: string): string | null {
   if (q.format !== 'mcs') return 'wrong format';
-  const qq = q as { choices: { text: string }[]; answer: number };
-  return qq.choices[qq.answer]?.text === expected ? null : `expected ${expected}, keyed ${qq.choices[qq.answer]?.text}`;
+  return q.choices[q.answer]?.text === expected ? null : `expected ${expected}, keyed ${q.choices[q.answer]?.text}`;
 }
 
 /** Compare a select-all answer with the expected truth value of every choice. */
-export function mcmCheck(q: { format: string }, truth: boolean[]): string | null {
+export function mcmCheck(q: QuestionBody, truth: boolean[]): string | null {
   if (q.format !== 'mcm') return 'wrong format';
-  const qq = q as { answer: number[]; choices: unknown[] };
-  if (truth.length !== qq.choices.length) return 'choice count mismatch';
+  if (truth.length !== q.choices.length) return 'choice count mismatch';
   const expected = truth.flatMap((t, i) => (t ? [i] : []));
-  return JSON.stringify(expected) === JSON.stringify(qq.answer) ? null : `expected ${JSON.stringify(expected)}, keyed ${JSON.stringify(qq.answer)}`;
+  return JSON.stringify(expected) === JSON.stringify(q.answer) ? null : `expected ${JSON.stringify(expected)}, keyed ${JSON.stringify(q.answer)}`;
 }
 
 /** Compare a numeric-entry answer with an expected exact value. */
-export function neCheck(q: { format: string }, expected: Frac | number): string | null {
+export function neCheck(q: QuestionBody, expected: Frac): string | null {
   if (q.format !== 'ne') return 'wrong format';
-  const a = (q as { answer: Frac }).answer;
-  const e = expected instanceof Frac ? expected : expected;
-  const ok = e instanceof Frac ? a.eq(e) : Math.abs(a.toNumber() - e) < 1e-9;
-  return ok ? null : `expected ${e.toString()}, keyed ${a.toString()}`;
+  return q.answer.eq(expected) ? null : `expected ${expected.toString()}, keyed ${q.answer.toString()}`;
 }
 
 /** Compare a numeric-entry answer with a float value (for checks done in floating point). */
-export function neCheckNum(q: { format: string }, expected: number, eps = 1e-6): string | null {
+export function neCheckNum(q: QuestionBody, expected: number, eps = 1e-6): string | null {
   if (q.format !== 'ne') return 'wrong format';
-  const a = (q as { answer: Frac }).answer.toNumber();
+  const a = q.answer.toNumber();
   return Math.abs(a - expected) <= eps * Math.max(1, Math.abs(expected)) ? null : `expected ${expected}, keyed ${a}`;
 }
