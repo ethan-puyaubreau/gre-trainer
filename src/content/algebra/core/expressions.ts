@@ -444,7 +444,7 @@ const powerFactorNE: Template<PowParams> = {
 
 So the value is $${num(answer)}$. You never need $x$ itself (it is not an integer).`;
       if (sign < 0 && n === 0) {
-        explanation += ` Note that $${b}^{x + ${m}} - ${b}^{x} \\ne ${b}^{${m}}$: exponents subtract only when powers are divided.`;
+        explanation += ` Note that $${b}^{x + ${m}} - ${b}^{x} \\ne ${powT(b, m)}$: exponents subtract only when powers are divided.`;
         traps = [{ value: frac(b ** m), trap: 'alg-power-difference' }];
       }
     } else if (kind === 'k') {

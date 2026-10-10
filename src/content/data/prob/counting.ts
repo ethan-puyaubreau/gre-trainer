@@ -862,9 +862,10 @@ const outcomesQC: Template<OutcomeParams> = {
       qa = DIGIT_TEXT[p.cond](p.s);
       why = r.why;
       const roll = rng.next();
-      if (r.trap !== undefined && roll < 0.35) p.k = r.trap;
-      else if (roll < 0.6) p.k = count;
-      else p.k = count + rng.pick([-2, -1, 1, 2]);
+      if (r.trap !== undefined && roll < 0.25) p.k = r.trap;
+      else if (roll < 0.5) p.k = count;
+      else if (roll < 0.8) p.k = count - rng.int(1, 2);
+      else p.k = count + rng.int(1, 2);
       if (r.trap !== undefined) traps = { [qcCompare(r.trap, p.k)]: r.trapId! };
     } else {
       const m = rng.int(2, d === 1 ? 3 : 4);
@@ -879,7 +880,7 @@ const outcomesQC: Template<OutcomeParams> = {
       info = `$S = \\{${p.S.join(', ')}\\}$ and $T = \\{${p.T.join(', ')}\\}$. The number $x$ is in $S$ and the number $y$ is in $T$.`;
       const op = kind === 'products' ? 'xy' : 'x + y';
       qa = `The number of different values of $${op}$`;
-      p.k = rng.chance(0.6) ? m * n : count + rng.pick([-1, 0, 1]);
+      p.k = rng.chance(0.35) ? m * n : count + rng.pick([-1, -1, 0, 1]);
       if (p.k === m * n && count < m * n) traps = { C: 'prob-assumed-distinct' };
       const vals = new Map<number, string[]>();
       for (const x of p.S) for (const y of p.T) {

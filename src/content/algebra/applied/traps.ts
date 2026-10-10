@@ -201,6 +201,10 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Applied "years ago" (or "from now") to only one person',
     fix: 'Everyone ages at the same rate: $n$ years ago BOTH ages were $n$ less.',
   },
+  'algw-formula-order': {
+    label: 'Applied the formula in the wrong order (or with the factor inverted)',
+    fix: 'Follow the formula exactly: $F = \\frac{9}{5}C + 32$ means multiply by $\\frac{9}{5}$, then add 32. To solve for $C$, undo in reverse order: subtract 32, then multiply by $\\frac{5}{9}$.',
+  },
   'algw-forgot-fixed-fee': {
     label: 'Ignored the fixed charge',
     fix: 'Subtract the fixed fee from the total first; only the rest is paid at the per-unit rate.',

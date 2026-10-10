@@ -114,5 +114,22 @@ for (const t of TEMPLATES.filter((t) => !ONLY || t.id.includes(ONLY))) {
       expect(keys.size, 'distinct questions').toBeGreaterThanOrEqual(10);
       if (t.format === 'qc' || t.format === 'mcs') expect(answers.size, 'distinct answers / positions').toBeGreaterThanOrEqual(2);
     });
+
+    if (t.format === 'mcs')
+      it('spreads the correct answer over positions A to E', () => {
+        const counts = [0, 0, 0, 0, 0];
+        let n = 0;
+        for (const d of DIFFS)
+          for (let seed = 1; seed <= 80; seed++) {
+            const { q } = generateBody(t, seed, d);
+            if (q.format === 'mcs') {
+              counts[q.answer]++;
+              n++;
+            }
+          }
+        const shares = counts.map((c) => c / n);
+        expect(Math.max(...shares), `positions ${counts.join('/')}`).toBeLessThanOrEqual(0.45);
+        expect(Math.min(...shares), `positions ${counts.join('/')}`).toBeGreaterThanOrEqual(0.05);
+      });
   });
 }

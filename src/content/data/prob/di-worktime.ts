@@ -5,7 +5,7 @@
 import type { Rng } from '../../../engine/rng';
 import { num, usd } from '../../../engine/tex';
 import type { BarChartFigure, Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { nearestIndex } from './util';
+import { nearestIndex, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.work-time-bars';
@@ -179,15 +179,12 @@ const priceFromWage: Template<PriceParams> = {
       const price = (mins / 60) * wage;
       const step = price < 4 ? 0.5 : price < 10 ? 1 : 2;
       const R = Math.round(price / step) * step;
-      const vals = new Set<number>([R]);
       const other = (D.minutes[1 - year][i] / 60) * wage;
       const trapV = Math.round(other / step) * step;
-      if (trapV > 0) vals.add(trapV);
-      for (const k of rng.shuffle([1, -1, 2, -2, 3, 4])) if (vals.size < 5 && R + k * step > 0) vals.add(R + k * step);
-      const values = [...vals].sort((a, b) => a - b);
+      if (R <= 0 && t < 1000) continue;
+      const { choices, answer, values } = spacedChoices(rng, R, [{ v: trapV, trap: 'prob-di-wrong-column' }], { step, min: step, format: (v) => usd(v, 2) });
       const f = (m: [number[], number[]]) => (m[year][i] / 60) * wage;
-      if ((values.length < 5 && t < 1000) || (!robust(values, f, D.minutes, [[year, i]]) && t < 300)) continue;
-      const choices: Choice[] = values.map((v) => ({ text: usd(v, 2), ...(v === trapV && v !== R ? { trap: 'prob-di-wrong-column' } : {}) }));
+      if (!robust(values, f, D.minutes, [[year, i]]) && t < 300) continue;
       const it = D.items[i];
       return {
         params: { year, i, wage, values },
@@ -196,7 +193,7 @@ const priceFromWage: Template<PriceParams> = {
           figure: D.figure,
           stem: `If the average hourly wage in ${D.years[year]} was ${usd(wage, 2)}, which of the following is closest to the price of ${qty(it, 1)} in ${D.years[year]}?`,
           choices,
-          answer: values.indexOf(R),
+          answer,
           explanation: `From the footnote, price = $\\frac{\\text{minutes}}{60} \\times \\text{wage}$. The ${D.years[year]} bar for ${it.name.toLowerCase()} is at about ${mins} minutes, so the price was about $\\frac{${mins}}{60} \\times ${num(wage)} \\approx ${usd(Math.round(price * 100) / 100, 2)}$, closest to ${usd(R, 2)}.
 
 Reading the ${D.years[1 - year]} bar instead gives about ${usd(Math.round(other * 100) / 100, 2)}.`,
@@ -235,21 +232,21 @@ const conversion: Template<ConvParams> = {
       const h = (mins * kg * 2.2) / 60;
       const step = h < 5 ? 0.5 : h < 12 ? 1 : 2;
       const R = Math.round(h / step) * step;
-      const vals = new Set<number>([R]);
       const noConv = Math.round((mins * kg) / 60 / step) * step;
       const divConv = Math.round((mins * kg) / 2.2 / 60 / step) * step;
-      if (noConv > 0) vals.add(noConv);
-      if (divConv > 0) vals.add(divConv);
-      for (const k of rng.shuffle([1, -1, 2, 3, -2, 4])) if (vals.size < 5 && R + k * step > 0) vals.add(R + k * step);
-      const values = [...vals].sort((a, b) => a - b);
+      if (R <= 0 && t < 1000) continue;
+      const { choices, answer, values } = spacedChoices(
+        rng,
+        R,
+        [
+          { v: noConv, trap: 'prob-di-unit-conversion' },
+          { v: divConv, trap: 'prob-di-unit-conversion' },
+        ],
+        { step, min: step, format: (v) => `${num(v)}` },
+      );
       const f = (m: [number[], number[]]) => (m[1][i] * kg * 2.2) / 60;
-      if ((values.length < 5 && t < 1000) || (!robust(values, f, D.minutes, [[1, i]]) && t < 300)) continue;
+      if (!robust(values, f, D.minutes, [[1, i]]) && t < 300) continue;
       const it = D.items[i];
-      const fmt = (v: number) => `${num(v)}`;
-      const choices: Choice[] = values.map((v) => ({
-        text: fmt(v),
-        ...(v !== R && (v === noConv || v === divConv) ? { trap: 'prob-di-unit-conversion' } : {}),
-      }));
       return {
         params: { i, kg, values },
         q: {
@@ -257,7 +254,7 @@ const conversion: Template<ConvParams> = {
           figure: D.figure,
           stem: `In ${D.years[1]}, approximately how many hours of work were needed to buy ${kg} kilograms of ${it.name.toLowerCase()}? (1 kilogram is approximately 2.2 pounds.)`,
           choices,
-          answer: values.indexOf(R),
+          answer,
           explanation: `${kg} kilograms is about $${kg} \\times 2.2 = ${num(kg * 2.2)}$ pounds. In ${D.years[1]}, 1 pound took about ${mins} minutes, so ${num(kg * 2.2)} pounds took about $${num(kg * 2.2)} \\times ${mins} = ${num(Math.round(kg * 2.2 * mins * 10) / 10)}$ minutes, which is $\\frac{${num(Math.round(kg * 2.2 * mins * 10) / 10)}}{60} \\approx ${num(Math.round(h * 10) / 10)}$ hours, closest to ${num(R)}.
 
 Skipping the conversion (treating kilograms as pounds) gives about ${num(Math.round(((mins * kg) / 60) * 10) / 10)} hours.`,
@@ -295,15 +292,19 @@ const moreUnits: Template<MoreParams> = {
       const diff = (hours * 60) / b - (hours * 60) / a;
       const step = diff < 6 ? 1 : diff < 20 ? 2 : diff < 60 ? 5 : 10;
       const R = Math.round(diff / step) * step;
-      const vals = new Set<number>([R]);
       const wrong = Math.round((hours * 60) / (a - b) / step) * step;
-      if (wrong > 0) vals.add(wrong);
-      for (const k of rng.shuffle([1, -1, 2, -2, 3, 4])) if (vals.size < 5 && R + k * step > 0) vals.add(R + k * step);
-      const values = [...vals].sort((x, y) => x - y);
+      if (R <= 0 && t < 1000) continue;
+      // Choices spaced by ratios (misreading a bar changes this answer by a proportion), answer at a random position.
+      const geo = [2 / 3, 3 / 2, 1 / 2, 2, 1 / 3, 3, 1 / 4, 4].map((f) => ({ v: Math.max(1, Math.round((R * f) / step) * step) }));
+      const { choices, answer, values } = spacedChoices(rng, R, [{ v: wrong, trap: 'prob-di-difference-of-quotients' }, ...geo], {
+        step: 1000,
+        minGap: Math.max(1, Math.round(R / 4)),
+        min: 1,
+        format: (v) => `${num(v)}`,
+      });
       const f = (m: [number[], number[]]) => (hours * 60) / m[1][i] - (hours * 60) / m[0][i];
-      if (((R <= 0 || values.length < 5) && t < 1000) || (!robust(values, f, D.minutes, [[0, i], [1, i]]) && t < 300)) continue;
+      if (!robust(values, f, D.minutes, [[0, i], [1, i]]) && t < 300) continue;
       const it = D.items[i];
-      const choices: Choice[] = values.map((v) => ({ text: `${num(v)}`, ...(v === wrong && v !== R ? { trap: 'prob-di-difference-of-quotients' } : {}) }));
       const q1 = (hours * 60) / a;
       const q2 = (hours * 60) / b;
       return {
@@ -313,7 +314,7 @@ const moreUnits: Template<MoreParams> = {
           figure: D.figure,
           stem: `With ${hours} hours of work, approximately how many more ${it.units}${it.unit === 'dozen' ? '' : ' of'} ${it.name.toLowerCase()} could be bought in ${D.years[1]} than in ${D.years[0]}?`,
           choices,
-          answer: values.indexOf(R),
+          answer,
           explanation: `${hours} hours is ${hours * 60} minutes. In ${D.years[0]}, 1 ${it.unit} took about ${a} minutes, so $\\frac{${hours * 60}}{${a}} \\approx ${num(Math.round(q1 * 10) / 10)}$ ${it.units}; in ${D.years[1]}, about ${b} minutes, so $\\frac{${hours * 60}}{${b}} \\approx ${num(Math.round(q2 * 10) / 10)}$. Difference: about ${num(Math.round(diff * 10) / 10)}, closest to ${num(R)}.
 
 Dividing ${hours * 60} by the difference of the bars ($${a} - ${b}$) is not the same as subtracting the two quotients.`,

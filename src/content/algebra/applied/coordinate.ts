@@ -232,16 +232,31 @@ const aboveBelowQC: Template<SideParams> = {
 
     // Labels: off-line points get their label pushed away from the line, on-line points to one side.
     const nrm = [-m / Math.hypot(1, m), 1 / Math.hypot(1, m)]; // unit normal pointing "above"
-    const off = (p: Pt, s: number, dist: number): [number, number] => [p[0] + s * nrm[0] * dist, p[1] + s * nrm[1] * dist];
     const labelDist = m === 2 ? 0.85 : 0.7;
+    // Label position: try a few offsets on the given side of the line and keep the first one whose
+    // center stays clear of both axes (labels are about 1.4 units wide and 0.6 high).
+    const place = (p: Pt, s: 1 | -1, onLine: boolean): [number, number] => {
+      const dist = labelDist + (onLine ? 0.5 : 0);
+      const dirs: [number, number][] = [
+        [s * nrm[0], s * nrm[1]],
+        [0, s],
+        [s * nrm[0] * 0.6 + (s * nrm[0] >= 0 ? 0.8 : -0.8), s * nrm[1] * 0.6],
+      ];
+      const cands = dirs.map(([dx0, dy0]) => {
+        const len = Math.hypot(dx0, dy0) || 1;
+        return [p[0] + (dx0 / len) * dist * (dy0 === s && dx0 === 0 ? 0.85 : 1), p[1] + (dy0 / len) * dist] as [number, number];
+      });
+      const clear = (c: [number, number]) => Math.abs(c[0]) > 0.85 && Math.abs(c[1]) > 0.5 && s * (c[1] - m * c[0]) > 0.3;
+      return cands.find(clear) ?? cands[0];
+    };
     const kTex = `(${num(K[0])}, ${num(K[1])})`;
     const labels: { at: [number, number]; text: string }[] = [
-      { at: off(P, 1, labelDist), text: `$(${L.p1}, ${L.p2})$` },
-      { at: off(Q, -1, labelDist), text: `$(${L.q1}, ${L.q2})$` },
-      { at: off(K, R ? 1 : -1, labelDist + 0.5), text: `$${kTex}$` },
+      { at: place(P, 1, false), text: `$(${L.p1}, ${L.p2})$` },
+      { at: place(Q, -1, false), text: `$(${L.q1}, ${L.q2})$` },
+      { at: place(K, R ? 1 : -1, true), text: `$${kTex}$` },
       { at: [m === -1 ? -0.4 : 0.4, -0.45], text: '$O$' },
     ];
-    if (R) labels.push({ at: off(R, -1, labelDist + 0.5), text: `$(${L.r1}, ${L.r2})$` });
+    if (R) labels.push({ at: place(R, -1, true), text: `$(${L.r1}, ${L.r2})$` });
     const points: Record<string, Pt> = { P, Q, K };
     if (R) points.R = R;
     const figure: GeometryFigure = {

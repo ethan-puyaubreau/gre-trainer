@@ -1,11 +1,11 @@
 // Data interpretation family: a bar graph of yearly revenue (in billions) + a table of units sold
 // by category written partly in billions and partly in millions (DA-34). Mixed units are the trap.
 
-import { flaggedChoices } from '../../../engine/build';
+import { flaggedChoices, valuedChoices } from '../../../engine/build';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
 import type { BarChartFigure, Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { mcmCheck, nearestIndex } from './util';
+import { mcmCheck, nearestIndex, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.revenue-mixed-units';
@@ -96,11 +96,8 @@ const timesMixed: Template<TimesParams> = {
     const mag = 10 ** Math.floor(Math.log10(ratio));
     const lead = ratio / mag < 1.5 ? Math.round((ratio / mag) * 10) / 10 : Math.round(ratio / mag);
     const R = lead * mag;
-    const powers = rng.pick([
-      [-3, -2, -1, 0, 1],
-      [-3, -1, 0, 1, 2],
-      [-3, -2, 0, 1, 2],
-    ]);
+    const first = -rng.int(0, 4);
+    const powers = [0, 1, 2, 3, 4].map((k) => first + k);
     const values = powers.map((p) => Number((R * 10 ** p).toPrecision(3)));
     const fmt = (v: number) => (v >= 1 ? num(Math.round(v * 100) / 100) : String(Number(v.toPrecision(2))));
     const choices: Choice[] = values.map((v, k) => ({ text: `$${fmt(v)}$`, ...(powers[k] === -3 ? { trap: 'prob-di-thousands' } : {}) }));
@@ -157,7 +154,12 @@ const intervalRevenue: Template<IntervalParams> = {
     const n = (D.units[c] * p) / 100; // millions of containers
     const L = n * lo;
     const H = n * hi;
-    const money = (m: number) => (m >= 1000 ? `\\$${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })} billion` : `\\$${m.toLocaleString('en-US', { maximumFractionDigits: 2 })} million`);
+    const money = (m: number) =>
+      m >= 1000
+        ? `\\$${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })} billion`
+        : m >= 1
+          ? `\\$${m.toLocaleString('en-US', { maximumFractionDigits: 2 })} million`
+          : `\\$${Math.round(m * 1e6).toLocaleString('en-US')}`;
     const iv = (a: number, b: number) => `From ${money(a)} to ${money(b)}`;
     const cand: { a: number; b: number; trap?: string }[] = [
       { a: L, b: H },
@@ -165,9 +167,18 @@ const intervalRevenue: Template<IntervalParams> = {
       { a: L / 10, b: H / 10, trap: 'prob-percent-decimal' },
       { a: L * 10, b: H * 10, trap: 'prob-percent-decimal' },
       { a: L, b: D.units[c] * hi, trap: 'prob-missed-factor' },
+      { a: L / 1000, b: H / 1000, trap: 'prob-di-thousands' },
+      { a: L / 2, b: H / 2 },
+      { a: L * 100, b: H * 100 },
+      { a: L / 100, b: H / 100 },
     ];
-    const sorted = cand.sort((x, y) => x.a - y.a || x.b - y.b);
-    const choices: Choice[] = sorted.map((x) => ({ text: iv(x.a, x.b), ...(x.trap ? { trap: x.trap } : {}) }));
+    // Order the intervals by their lower end (then upper end); the answer's position is uniform.
+    const vc = valuedChoices(
+      rng,
+      { text: iv(L, H), value: L + H * 1e-7 },
+      cand.slice(1).map((x) => ({ text: iv(x.a, x.b), value: x.a + x.b * 1e-7, ...(x.trap ? { trap: x.trap } : {}) })),
+    );
+    const choices: Choice[] = vc.choices;
     return {
       params: { c, p, lo, hi },
       q: {
@@ -175,7 +186,7 @@ const intervalRevenue: Template<IntervalParams> = {
         figure: D.figure,
         stem: `In ${D.years[3]}, ${p} percent of the ${D.cats[c].toLowerCase()} containers sold by Company M were sold at prices from \\$${lo.toFixed(2)} to \\$${hi.toFixed(2)} per container. Which of the following gives all possible values of the total revenue from the sale of those containers?`,
         choices,
-        answer: sorted.findIndex((x) => !x.trap),
+        answer: vc.answer,
         explanation: `${p}% of ${unitText(D.units[c])} is $${num(n)}$ million containers. At the lowest price: $${num(n)} \\times ${lo} = ${num(L)}$ million dollars; at the highest: $${num(n)} \\times ${hi} = ${num(H)}$ million dollars. So the revenue was ${iv(L, H).toLowerCase()}.
 
 Forgetting to take ${p}% of the containers gives revenues ${Math.round(100 / p)} times too large.`,
@@ -188,7 +199,7 @@ Forgetting to take ${p}% of the containers gives revenues ${Math.round(100 / p)}
     if (q.format !== 'mcs') return 'format';
     // Parse each interval back to millions and find the matching one.
     const parse = (s: string) =>
-      [...s.matchAll(/\\\$([0-9.,]+) (million|billion)/g)].map((m) => Number(m[1].replace(/,/g, '')) * (m[2] === 'billion' ? 1000 : 1));
+      [...s.matchAll(/\\\$([0-9.,]+)( million| billion)?/g)].map((m) => Number(m[1].replace(/,/g, '')) * (m[2] === ' billion' ? 1000 : m[2] === ' million' ? 1 : 1e-6));
     const idx = q.choices.findIndex((ch) => {
       const [a, b] = parse(ch.text);
       return Math.abs(a - n * lo) < 1e-6 && Math.abs(b - n * hi) < 1e-6;
@@ -222,23 +233,24 @@ const revenueGrowth: Template<GrowthParams> = {
     const exact = ((r[to] - r[from]) / r[from]) * 100;
     const step = 10;
     const R = Math.round(exact / 5) * 5;
-    const items: { v: number; trap?: string }[] = [{ v: R }];
-    const add = (x: number, trap?: string) => {
-      const g = Math.round(x / 5) * 5;
-      if (g > 0 && items.every((it) => Math.abs(it.v - g) >= step)) items.push({ v: g, ...(trap ? { trap } : {}) });
-    };
-    add(((r[to] - r[from]) / r[to]) * 100, 'prob-percent-wrong-base');
-    add((r[to] / r[from]) * 100, 'prob-percent-ratio-as-change');
-    for (const k of rng.shuffle([1, -1, 2, -2, 3, 4])) if (items.length < 5) add(R + k * step);
-    const sorted = items.slice(0, 5).sort((x, y) => x.v - y.v);
+    const g = (x: number) => Math.round(x / 5) * 5;
+    const sc = spacedChoices(
+      rng,
+      R,
+      [
+        { v: g(((r[to] - r[from]) / r[to]) * 100), trap: 'prob-percent-wrong-base' },
+        { v: g((r[to] / r[from]) * 100), trap: 'prob-percent-ratio-as-change' },
+      ],
+      { step, min: 5, format: (v) => `${v}%` },
+    );
     return {
-      params: { from, to, values: sorted.map((it) => it.v) },
+      params: { from, to, values: sc.values },
       q: {
         format: 'mcs',
         figure: D.figure,
         stem: `Approximately what was the percent increase in Company M's annual revenue from ${D.years[from]} to ${D.years[to]}?`,
-        choices: sorted.map((it): Choice => ({ text: `${it.v}%`, ...(it.trap ? { trap: it.trap } : {}) })),
-        answer: sorted.findIndex((it) => it.v === R),
+        choices: sc.choices,
+        answer: sc.answer,
         explanation: `Read the bars: about \\$${r[from]} billion in ${D.years[from]} and \\$${r[to]} billion in ${D.years[to]}. Increase: $\\frac{${r[to]} - ${r[from]}}{${r[from]}} \\times 100 \\approx ${Math.round(exact)}$%, closest to ${R}%.
 
 Dividing by the ${D.years[to]} value uses the wrong base.`,

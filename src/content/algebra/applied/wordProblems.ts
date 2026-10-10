@@ -15,7 +15,11 @@ const TIMES = (k: number) => (k === 2 ? 'twice' : `${WORDS[k] ?? k} times`);
  * =========================================================================================== */
 
 interface SetupParams {
-  kind: 'twice-more' | 'fee' | 'ages' | 'break-even';
+  kind: 'twice-more' | 'fee' | 'ages' | 'break-even' | 'formula';
+  /** formula: Celsius and Fahrenheit values, direction asked */
+  cel: number;
+  fah: number;
+  toF: boolean;
   T: number;
   mult: number;
   k: number;
@@ -73,8 +77,46 @@ const setupSolve: Template<SetupParams> = {
   format: 'ne',
   style: 'translate a word problem into one equation and solve',
   generate(rng, d) {
-    const kind: SetupParams['kind'] = d === 1 ? rng.pick(['twice-more', 'fee'] as const) : d === 2 ? rng.pick(['twice-more', 'fee', 'ages'] as const) : rng.pick(['ages', 'break-even'] as const);
-    const base: SetupParams = { kind, T: 0, mult: 0, k: 0, ask: 'big', fee: 0, rate: 0, total: 0, per: 1, p: 0, n: 0, q: 0, future: true, fa: 0, fb: 0, ca: 0, cb: 0 };
+    const kind: SetupParams['kind'] =
+      d === 1 ? rng.pick(['twice-more', 'fee', 'formula'] as const) : d === 2 ? rng.pick(['twice-more', 'fee', 'ages', 'formula'] as const) : rng.pick(['ages', 'break-even'] as const);
+    const base: SetupParams = { kind, T: 0, mult: 0, k: 0, ask: 'big', fee: 0, rate: 0, total: 0, per: 1, p: 0, n: 0, q: 0, future: true, fa: 0, fb: 0, ca: 0, cb: 0, cel: 0, fah: 0, toF: true };
+    if (kind === 'formula') {
+      // [BOOK AL-30] evaluate a stated formula, or solve it for the other variable
+      const toF = d === 1 || rng.chance(0.4);
+      const cel = toF ? rng.int(-4, 9) * 5 : rng.int(-3, 8) * 5;
+      const fah = (9 * cel) / 5 + 32;
+      const ans = toF ? fah : cel;
+      const traps: { value: Frac; trap: string }[] = [];
+      if (toF) {
+        const w1 = frac(5 * cel, 9).add(32);
+        if (w1.isTerminating() && !w1.eq(ans)) traps.push({ value: w1, trap: 'algw-formula-order' });
+        const w2 = frac(9 * (cel + 32), 5);
+        if (w2.isTerminating() && !w2.eq(ans)) traps.push({ value: w2, trap: 'algw-formula-order' });
+      } else {
+        const w1 = frac(5 * fah, 9).sub(32);
+        if (w1.isTerminating() && !w1.eq(ans)) traps.push({ value: w1, trap: 'algw-formula-order' });
+        const w2 = frac(9 * (fah - 32), 5);
+        if (w2.isTerminating() && !w2.eq(ans)) traps.push({ value: w2, trap: 'algw-formula-order' });
+      }
+      const given = toF ? `$${num(cel)}$ degrees Celsius` : `$${num(fah)}$ degrees Fahrenheit`;
+      return {
+        params: { ...base, cel, fah, toF },
+        q: {
+          format: 'ne',
+          stem: `The formula $F = \\frac{9}{5}C + 32$ gives the temperature $F$, in degrees Fahrenheit, that corresponds to a temperature of $C$ degrees Celsius. What temperature, in degrees ${toF ? 'Fahrenheit' : 'Celsius'}, corresponds to ${given}?`,
+          answer: frac(ans),
+          suffix: toF ? 'degrees Fahrenheit' : 'degrees Celsius',
+          traps,
+          explanation: toF
+            ? `Substitute $C = ${num(cel)}$: multiply by $\\frac{9}{5}$ first, then add 32. $F = \\frac{9}{5}(${num(cel)}) + 32 = ${num((9 * cel) / 5)} + 32 = ${num(fah)}$.
+
+Using $\\frac{5}{9}$ instead of $\\frac{9}{5}$, or adding 32 before multiplying, changes the result.`
+            : `Substitute $F = ${num(fah)}$ and undo the steps in reverse order: $${num(fah)} = \\frac{9}{5}C + 32$, so $\\frac{9}{5}C = ${num(fah - 32)}$ and $C = \\frac{5}{9}(${num(fah - 32)}) = ${num(cel)}$.
+
+Subtract 32 FIRST, then multiply by $\\frac{5}{9}$; doing it in the other order gives a different number.`,
+        },
+      };
+    }
     if (kind === 'twice-more') {
       const ctx = rng.pick(PAIR_CONTEXTS);
       const mult = d === 1 ? 2 : rng.pick([2, 3]);
@@ -239,6 +281,15 @@ Each minute, plan B costs ${cb - ca} cents more, and it must make up the ${cents
     }
   },
   check(q, prm) {
+    if (prm.kind === 'formula') {
+      // Search the integer temperatures for the one that satisfies the formula.
+      const sols: number[] = [];
+      for (let t = -500; t <= 500; t++) {
+        if (prm.toF && 5 * (t - 32) === 9 * prm.cel) sols.push(t);
+        if (!prm.toF && 5 * (prm.fah - 32) === 9 * t) sols.push(t);
+      }
+      return sols.length === 1 ? expectNe(q, sols[0]) : `${sols.length} solutions`;
+    }
     if (prm.kind === 'twice-more') {
       const sols: number[] = [];
       for (let y = 0; y <= prm.T; y++) if (prm.mult * y + prm.k + y === prm.T) sols.push(prm.ask === 'big' ? prm.T - y : y);

@@ -61,7 +61,7 @@ const rootExpressionNE: Template<RootParams> = {
     let lead = 1;
     do {
       const a = intExcept(rng, -7, 9, 0);
-      if (d === 3 && rng.chance(0.5)) {
+      if (d === 3 && rng.chance(0.5) && target !== 'ratio-sum' && target !== 'reciprocal-product') {
         lead = rng.pick([2, 3]);
         r1 = frac(a);
         r2 = new Frac(intExcept(rng, -5, 7, 0), lead);
@@ -320,7 +320,7 @@ const solutionsMCM: Template<SolParams> = {
       r2 = new Frac(m, a);
       k = [a, m];
       eq = `${a === 1 ? '' : a}x^2 = ${lin([[m, 'x']])}`;
-      solve = `Do not divide by $x$. Move everything to one side and factor: $${a === 1 ? '' : a}x^2 ${m > 0 ? '-' : '+'} ${Math.abs(m)}x = ${a === 1 ? '' : a}x(x ${r2.n > 0 ? '-' : '+'} ${num(r2.abs())}) = 0$, so $x = 0$ or $x = ${r2.toTex()}$.`;
+      solve = `Do not divide by $x$. Move everything to one side and factor: $${lin([[a, 'x^2'], [-m, 'x']])} = ${a === 1 ? '' : a}x(x ${r2.n > 0 ? '-' : '+'} ${num(r2.abs())}) = 0$, so $x = 0$ or $x = ${r2.toTex()}$.`;
       wrong.push({ v: r2.neg(), trap: 'alg-root-sign' }, { v: frac(m), trap: 'alg-dropped-factor' }, { v: frac(a) }, { v: r2.add(1) });
     } else if (form === 'square') {
       const h = intExcept(rng, -6, 6, 0);
