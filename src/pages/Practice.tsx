@@ -192,8 +192,8 @@ export function Practice({ route }: { route: string[] }) {
         <span className="spacer" />
         <span className="chip">
           Session: {session.correct}/{session.answered}
-          {session.streak >= 3 ? ` · streak ${session.streak}` : ''}
         </span>
+        <Streak n={session.streak} />
         <button className={`btn ${calcOpen ? 'btn-primary' : ''}`} onClick={() => setCalcOpen((v) => !v)}>
           Calculator
         </button>
@@ -289,6 +289,30 @@ export function Practice({ route }: { route: string[] }) {
         </a>
       </div>
     </div>
+  );
+}
+
+/** Streak chip from 3 on: pops on each increment; when the streak breaks its bar drains and the chip leaves. */
+function Streak({ n }: { n: number }) {
+  // Last streak >= 3, kept so the bar can drain after a break instead of vanishing.
+  const [shown, setShown] = useState(0);
+  const live = n >= 3;
+  if (live && n !== shown) setShown(n);
+  useEffect(() => {
+    if (live || !shown) return;
+    const t = window.setTimeout(() => setShown(0), 800);
+    return () => window.clearTimeout(t);
+  }, [live, shown]);
+  if (!shown) return null;
+  return (
+    <span className={`streak${live ? '' : ' broken'}`}>
+      <span key={shown} className="chip chip-accent streak-chip">
+        Streak {shown}
+      </span>
+      <span className="streak-bar">
+        <i style={{ transform: `scaleX(${live ? 1 : 0})` }} />
+      </span>
+    </span>
   );
 }
 
