@@ -13,7 +13,7 @@ const POINTS: Record<Level, number> = { 0: 0, 1: 0, 2: 50, 3: 80, 4: 100 };
 const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
 export function Dashboard() {
-  const { skills: states, history, remediation, settings } = useProgress();
+  const { skills: states, history, sections, remediation, settings } = useProgress();
   const [open, setOpen] = useState<Skill | null>(null);
   const now = Date.now();
   const playable = SKILLS.filter((s) => (templatesBySkill.get(s.id)?.length ?? 0) > 0);
@@ -42,7 +42,7 @@ export function Dashboard() {
     };
   }, [history, states, now, playable]);
 
-  const calib = useMemo(() => calibrate(history, (id) => skillById.get(id)?.area), [history]);
+  const calib = useMemo(() => calibrate(history, sections, (id) => skillById.get(id)?.area), [history, sections]);
   const diffRows = [
     ['All areas', calib.overall],
     ...AREAS.filter((a) => calib.byArea[a.area]).map((a) => [AREA_NAMES[a.area], calib.byArea[a.area]!]),
@@ -180,13 +180,15 @@ export function Dashboard() {
         </section>
       )}
 
-      {calib.overall.some((c) => c.n > 0) && (
+      {calib.overall.some((c) => c.n > 0) ? (
         <section>
           <h2>Difficulty check</h2>
           <div className="card">
             <p className="muted small" style={{ marginTop: 0 }}>
-              Your success should fall from easy to hard. If it does not, the difficulty levels of those questions are mislabeled. Hinted answers are
-              not counted, and cells with fewer than {MIN_PER_CELL} answers are greyed out.
+              Your success should fall from easy to hard. If it does not, the difficulty levels of those questions are mislabeled. Only
+              section tests at medium level count (Section 1 is always medium): there the difficulty of each question is drawn at random, so
+              the rates are not skewed by how well you are doing, unlike practice, where difficulty follows your results. This fills slowly,
+              a few questions per test. Hinted answers are not counted, and cells with fewer than {MIN_PER_CELL} answers are greyed out.
             </p>
             <table className="review-table">
               <thead>
@@ -222,6 +224,8 @@ export function Dashboard() {
             )}
           </div>
         </section>
+      ) : (
+        <p className="muted small">The difficulty check appears after your first section tests.</p>
       )}
 
       {open && <SkillDrawer skill={open} onClose={() => setOpen(null)} />}

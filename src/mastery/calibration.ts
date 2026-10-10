@@ -1,8 +1,11 @@
 // Checks that the declared difficulty levels behave as declared: success should fall from 1 to 3.
+// Only section-test questions of a medium-level section are counted: there the difficulty is drawn at random
+// (see DIFF_WEIGHTS in section.ts), independent of the learner. In practice mode the mastery model raises the
+// difficulty after clean streaks and lowers it after a miss, so practice rates are confounded by the learner's state.
 
 import { parseQuestionId } from '../engine/generate';
 import type { Area, Difficulty } from '../engine/types';
-import type { AttemptRecord } from '../store/progress';
+import type { AttemptRecord, SectionRecord } from '../store/progress';
 
 export interface Cell {
   n: number;
@@ -43,13 +46,14 @@ function add(row: Row, d: Difficulty, h: AttemptRecord) {
   c.timeMs += h.timeMs;
 }
 
-/** Hinted answers are left out: a hint makes any level easier. */
-export function calibrate(history: AttemptRecord[], areaOf: (skillId: string) => Area | undefined): Calibration {
+/** Counts section attempts whose question sits in a medium-level part. Hinted answers are left out: a hint makes any level easier. */
+export function calibrate(history: AttemptRecord[], sections: SectionRecord[], areaOf: (skillId: string) => Area | undefined): Calibration {
+  const medium = new Set(sections.flatMap((s) => s.parts.filter((p) => p.difficulty === 2).flatMap((p) => p.qids)));
   const overall = emptyRow();
   const byArea: Partial<Record<Area, Row>> = {};
   const bySkill = new Map<string, Row>();
   for (const h of history) {
-    const d = h.hinted ? undefined : parseQuestionId(h.qid)?.difficulty;
+    const d = h.hinted || h.mode !== 'section' || !medium.has(h.qid) ? undefined : parseQuestionId(h.qid)?.difficulty;
     if (!d) continue;
     add(overall, d, h);
     const a = areaOf(h.skillId);
