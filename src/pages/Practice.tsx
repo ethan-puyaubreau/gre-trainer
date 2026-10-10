@@ -12,6 +12,7 @@ import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
 import { go, href } from '../router';
 import { useProgress } from '../store/progress';
+import '../fx-practice.css';
 
 function scopeFromRoute(route: string[]): PracticeScope {
   if (route[0] === 'skill' && route[1]) return { kind: 'skill', skillId: route[1] };
@@ -175,7 +176,7 @@ export function Practice({ route }: { route: string[] }) {
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
 
   return (
-    <div>
+    <div className="practice-fx">
       <div className="row" style={{ marginBottom: 12 }}>
         <h1 style={{ margin: 0 }}>{scopeTitle(scope)}</h1>
         <span className="spacer" />

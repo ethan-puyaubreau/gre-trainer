@@ -77,7 +77,7 @@ function QC({ q, response, set, locked, reveal }: Sub<Extract<QuestionBody, { fo
           >
             <span className="bubble">{c}</span>
             <span className="choice-text">{QC_TEXT[c]}</span>
-            {reveal && q.answer === c && <span className="mark" style={{ color: 'var(--good)' }}>✓</span>}
+            {reveal && q.answer === c && <span className="mark mark-ok" style={{ color: 'var(--good)' }}>✓</span>}
             {reveal && picked === c && q.answer !== c && <span className="mark" style={{ color: 'var(--bad)' }}>✗</span>}
           </button>
         ))}
@@ -104,7 +104,7 @@ function MCS({ q, response, set, locked, reveal }: Sub<Extract<QuestionBody, { f
             <span className="choice-text">
               <RichInline text={c.text} />
             </span>
-            {reveal && q.answer === i && <span className="mark" style={{ color: 'var(--good)' }}>✓</span>}
+            {reveal && q.answer === i && <span className="mark mark-ok" style={{ color: 'var(--good)' }}>✓</span>}
             {reveal && picked === i && q.answer !== i && <span className="mark" style={{ color: 'var(--bad)' }}>✗</span>}
           </button>
         ))}
@@ -135,7 +135,7 @@ function MCM({ q, response, set, locked, reveal }: Sub<Extract<QuestionBody, { f
               <span className="choice-text">
                 <RichInline text={c.text} />
               </span>
-              {reveal && ok && <span className="mark" style={{ color: 'var(--good)' }}>{sel ? '✓' : 'missed'}</span>}
+              {reveal && ok && <span className={sel ? 'mark mark-ok' : 'mark'} style={{ color: 'var(--good)' }}>{sel ? '✓' : 'missed'}</span>}
               {reveal && sel && !ok && <span className="mark" style={{ color: 'var(--bad)' }}>✗</span>}
             </button>
           );

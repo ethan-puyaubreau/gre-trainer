@@ -1,0 +1,92 @@
+/* Practice-only visual feedback. Every rule lives under .practice-fx, which only Practice.tsx renders,
+   so QuestionView stays plain in SectionSim, History and Preview. Reduced motion is handled globally in styles.css. */
+
+/* ---------------------------------------------------------------- answer reveal */
+.practice-fx .choice {
+  position: relative;
+}
+
+/* One soft pulse around the correct choice (transform + opacity only). */
+.practice-fx .choice.correct::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border: 1.5px solid var(--good);
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  animation: fx-pulse var(--dur-slow) var(--ease-out) 1;
+}
+@keyframes fx-pulse {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.012, 1.12);
+  }
+}
+
+/* The check mark glyph is replaced by a drawn tick: short arm first, then the long arm. */
+.practice-fx .choice .mark-ok {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  font-size: 0;
+}
+.practice-fx .choice .mark-ok::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 1px;
+  width: 6px;
+  height: 12px;
+  border: solid currentColor;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+  animation: fx-tick var(--dur-slow) var(--ease-out) 60ms backwards;
+}
+@keyframes fx-tick {
+  0% {
+    clip-path: inset(calc(100% - 3px) 100% 0 0);
+  }
+  40% {
+    clip-path: inset(calc(100% - 3px) 0 0 0);
+  }
+  100% {
+    clip-path: inset(0);
+  }
+}
+
+/* A wrong pick shakes once, briefly. */
+.practice-fx .choice.wrong,
+.practice-fx .ne-input.wrong {
+  animation: fx-shake var(--dur-fast) var(--ease-out) 1;
+}
+@keyframes fx-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+.practice-fx .feedback {
+  animation: fx-rise var(--dur) var(--ease-out) 60ms backwards;
+}
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
