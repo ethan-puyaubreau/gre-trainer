@@ -7,7 +7,7 @@ import { AREA_NAMES, AREAS, skillById } from '../content';
 import { grade, isAnswered, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area } from '../engine/types';
-import { buildSection, loadRun, routeSection2, saveRun, SPECS, type Level, type RunningSection, type SectionResult } from '../mastery/section';
+import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, type Level, type RunningSection, type SectionResult } from '../mastery/section';
 import { href } from '../router';
 import { useProgress, type SectionPart } from '../store/progress';
 
@@ -267,6 +267,18 @@ function Exam({
       marked[idx] = !marked[idx];
       return { ...s, marked };
     });
+
+  // Keyboard: letters / digits pick a choice (not while typing or in the calculator). Sections have no per-question submit, so no Enter.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (review || target.tagName === 'INPUT' || target.closest?.('.calc') || e.metaKey || e.ctrlKey || e.altKey) return;
+      const r = choiceKeyResponse(q, e.key, sec.responses[idx]);
+      if (r) setResponse(r);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [review, q, idx, sec.responses]);
 
   const answered = sec.responses.filter((r) => isAnswered(r)).length;
   const low = remaining < 5 * 60_000;

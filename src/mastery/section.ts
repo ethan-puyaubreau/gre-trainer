@@ -4,7 +4,7 @@ import { skillById, TEMPLATES, templateById } from '../content';
 import { generateQuestion, parseQuestionId, poolSeed } from '../engine/generate';
 import type { Response } from '../engine/grade';
 import type { Rng } from '../engine/rng';
-import type { Area, Difficulty, Format, Question, Template } from '../engine/types';
+import type { Area, Difficulty, Format, QCChoice, Question, Template } from '../engine/types';
 
 export type Level = 'easy' | 'medium' | 'hard';
 
@@ -183,4 +183,18 @@ export function loadRun(storage?: Pick<Storage, 'getItem'>): SavedRun | null {
   } catch {
     return null;
   }
+}
+
+/** The response after pressing a choice key (A-H or 1-8) on a question, or null when the key picks nothing. Same keys as practice. */
+export function choiceKeyResponse(q: Question, key: string, prev: Response | undefined): Response | null {
+  const k = key.toUpperCase();
+  const i = /^[1-8]$/.test(k) ? Number(k) - 1 : /^[A-H]$/.test(k) ? k.charCodeAt(0) - 65 : -1;
+  if (i < 0) return null;
+  if (q.format === 'qc') return i < 4 ? { format: 'qc', choice: 'ABCD'[i] as QCChoice } : null;
+  if (q.format === 'mcs') return i < q.choices.length ? { format: 'mcs', choice: i } : null;
+  if (q.format === 'mcm' && i < q.choices.length) {
+    const had = prev?.format === 'mcm' ? prev.choices : [];
+    return { format: 'mcm', choices: (had.includes(i) ? had.filter((x) => x !== i) : [...had, i]).sort((a, b) => a - b) };
+  }
+  return null;
 }

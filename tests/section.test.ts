@@ -4,7 +4,7 @@ import { createRng } from '../src/engine/rng';
 import type { Area } from '../src/engine/types';
 import { Frac } from '../src/engine/frac';
 import { grade } from '../src/engine/grade';
-import { buildSection, loadRun, routeSection2, saveRun, SPECS, type RunningSection, type SavedRun } from '../src/mastery/section';
+import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, type RunningSection, type SavedRun } from '../src/mastery/section';
 
 const areas = AREAS.filter((a) => a.templates.length).map((a) => a.area) as Area[];
 
@@ -83,5 +83,28 @@ describe('resuming a section', () => {
     expect(bad('not json')).toBeNull();
     expect(bad('{"length":"full","done":[]}')).toBeNull();
     expect(bad('{"length":"s1","done":[],"sec":{"endsAt":5,"questions":["nope#1#1"],"responses":[]}}')).toBeNull();
+  });
+});
+
+describe('choice keys', () => {
+  const { questions } = buildSection(createRng(7), SPECS.s2, 'medium', areas);
+  const of = (f: string) => questions.find((q) => q.format === f)!;
+
+  it('picks QC and select-one choices by letter or digit, ignoring the rest', () => {
+    expect(choiceKeyResponse(of('qc'), 'c', undefined)).toEqual({ format: 'qc', choice: 'C' });
+    expect(choiceKeyResponse(of('qc'), '4', undefined)).toEqual({ format: 'qc', choice: 'D' });
+    expect(choiceKeyResponse(of('qc'), 'E', undefined)).toBeNull();
+    expect(choiceKeyResponse(of('mcs'), '2', undefined)).toEqual({ format: 'mcs', choice: 1 });
+    expect(choiceKeyResponse(of('mcs'), 'H', undefined)).toBeNull();
+    expect(choiceKeyResponse(of('mcs'), 'Enter', undefined)).toBeNull();
+    expect(choiceKeyResponse(of('ne'), 'a', undefined)).toBeNull();
+  });
+
+  it('toggles select-all choices and keeps them sorted', () => {
+    const q = of('mcm');
+    const one = choiceKeyResponse(q, 'c', undefined);
+    const two = choiceKeyResponse(q, 'a', one!);
+    expect(two).toEqual({ format: 'mcm', choices: [0, 2] });
+    expect(choiceKeyResponse(q, '1', two!)).toEqual({ format: 'mcm', choices: [2] });
   });
 });
