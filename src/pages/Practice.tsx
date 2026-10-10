@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calculator } from '../components/Calculator';
 import { LevelChange } from '../components/LevelChange';
 import { QuestionView } from '../components/QuestionView';
@@ -11,6 +11,7 @@ import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
 import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
+import { dodgedTraps } from '../mastery/session';
 import { go, href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -44,6 +45,14 @@ const REASON: Record<Pick['reason'], [string, string]> = {
   focus: ['Skill focus', 'chip'],
 };
 
+interface Result {
+  grade: GradeResult;
+  outcome: AttemptOutcome;
+  timeMs: number;
+  /** Trap ids carried by wrong choices the user left alone (correct answers only). */
+  dodged: string[];
+}
+
 interface Current {
   pick: Pick;
   question: Question;
@@ -56,7 +65,7 @@ export function Practice({ route }: { route: string[] }) {
   const [response, setResponse] = useState<Response | undefined>();
   const [hinted, setHinted] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [result, setResult] = useState<{ grade: GradeResult; outcome: AttemptOutcome; timeMs: number } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
   const [session, setSession] = useState({ answered: 0, correct: 0, streak: 0 });
   const [calcOpen, setCalcOpen] = useState(false);
   const [empty, setEmpty] = useState(false);
@@ -118,7 +127,7 @@ export function Practice({ route }: { route: string[] }) {
       mode: 'practice',
       response,
     });
-    setResult({ grade: g, outcome, timeMs });
+    setResult({ grade: g, outcome, timeMs, dodged: dodgedTraps(current.question, response) });
     setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: g.correct ? s.streak + 1 : 0 }));
   }, [current, result, response, elapsed, hinted, store]);
 
@@ -293,7 +302,7 @@ function Feedback({
   onNext,
   nextStepText,
 }: {
-  result: { grade: GradeResult; outcome: AttemptOutcome; timeMs: number };
+  result: Result;
   question: Question;
   paceSec: number;
   skillName: string;
@@ -305,6 +314,7 @@ function Feedback({
   const { grade: g, outcome, timeMs } = result;
   const slow = timeMs > paceSec * 1000;
   const traps = g.traps.map((id) => TRAPS[id]).filter(Boolean);
+  const dodged = result.dodged.filter((id) => TRAPS[id]);
   const nextBtn = useRef<HTMLButtonElement>(null);
   useEffect(() => nextBtn.current?.focus(), []);
   return (
@@ -330,6 +340,18 @@ function Feedback({
             ? 'Correct, but it only counts as practice: answer on pace without hints to move toward mastery.'
             : nextStepText}
       </p>
+
+      {dodged.length > 0 && (
+        <p className="trap-dodged small">
+          <strong>{dodged.length > 1 ? 'Traps dodged' : 'Trap dodged'}:</strong>{' '}
+          {dodged.map((id, i) => (
+            <Fragment key={id}>
+              {i > 0 && ', '}
+              <RichInline text={TRAPS[id].label} />
+            </Fragment>
+          ))}
+        </p>
+      )}
 
       {traps.map((t, i) => (
         <div className="trap-box" key={i}>

@@ -170,3 +170,13 @@
     transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.4);
   }
 }
+
+/* ---------------------------------------------------------------- trap dodged */
+.practice-fx .trap-dodged {
+  margin: 10px 0 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--text);
+  animation: fx-rise var(--dur) var(--ease-out) 180ms backwards;
+}
