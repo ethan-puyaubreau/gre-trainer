@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calculator } from '../components/Calculator';
+import { LevelChange } from '../components/LevelChange';
 import { QuestionView } from '../components/QuestionView';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
@@ -303,8 +304,6 @@ function Feedback({
 }) {
   const { grade: g, outcome, timeMs } = result;
   const slow = timeMs > paceSec * 1000;
-  const up = outcome.to > outcome.from;
-  const down = outcome.to < outcome.from;
   const traps = g.traps.map((id) => TRAPS[id]).filter(Boolean);
   const nextBtn = useRef<HTMLButtonElement>(null);
   useEffect(() => nextBtn.current?.focus(), []);
@@ -324,17 +323,7 @@ function Feedback({
 
       <p className="small" style={{ margin: '10px 0 0' }}>
         <strong>{skillName}</strong>:{' '}
-        {up ? (
-          <span className="chip chip-good">
-            {LEVEL_NAMES[outcome.from]} → {LEVEL_NAMES[outcome.to]}
-          </span>
-        ) : down ? (
-          <span className="chip chip-bad">
-            {LEVEL_NAMES[outcome.from]} → {LEVEL_NAMES[outcome.to]}
-          </span>
-        ) : (
-          <span className="chip">{LEVEL_NAMES[outcome.to]}</span>
-        )}{' '}
+        {outcome.from !== outcome.to ? <LevelChange from={outcome.from} to={outcome.to} /> : <span className="chip">{LEVEL_NAMES[outcome.to]}</span>}{' '}
         {!g.correct
           ? 'This skill comes back in a different style within a few questions, and again tomorrow.'
           : !outcome.clean

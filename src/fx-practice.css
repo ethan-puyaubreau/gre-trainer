@@ -90,3 +90,83 @@
     transform: translateY(8px);
   }
 }
+
+/* ---------------------------------------------------------------- level change chip */
+.practice-fx .level-change {
+  animation: fx-pop var(--dur) var(--ease-spring) backwards;
+}
+.practice-fx .level-change .lc-dot .level-dot {
+  animation: fx-pop var(--dur) var(--ease-spring) 120ms backwards;
+}
+@keyframes fx-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+.practice-fx .level-change .lc-review {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Mastered: a ring fills around the dot, then a few particles fly out. Under 1 s in all. */
+.practice-fx .lc-dot {
+  position: relative;
+  display: inline-flex;
+}
+.practice-fx .lc-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  transform: rotate(-90deg);
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  pointer-events: none;
+  animation: fx-ring 460ms var(--ease-out) 120ms backwards;
+}
+@keyframes fx-ring {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.practice-fx .lc-burst > span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  --d: 26px;
+  animation: fx-burst 560ms var(--ease-out) 340ms;
+}
+.practice-fx .lc-burst > span:nth-child(even) {
+  --d: 20px;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px;
+}
+@keyframes fx-burst {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(-9px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.4);
+  }
+}
