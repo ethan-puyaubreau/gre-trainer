@@ -5,7 +5,7 @@ import { flaggedChoices, valuedChoices } from '../../../engine/build';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
 import type { BarChartFigure, Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { mcmCheck, nearestIndex, spacedChoices } from './util';
+import { commas, mcmCheck, nearestIndex, spacedChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.revenue-mixed-units';
@@ -23,6 +23,7 @@ interface MixedData {
   figure: [BarChartFigure, TableFigure];
 }
 
+const kind = (c: string) => c.toLowerCase().replace(/ drinks$/, ' drink');
 const unitText = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} billion` : `${num(m).replace('{,}', ',')} million`);
 const parseUnits = (s: string) => (s.includes('billion') ? Number(s.replace(/[^0-9.]/g, '')) * 1000 : Number(s.replace(/[^0-9.]/g, '')));
 
@@ -106,7 +107,7 @@ const timesMixed: Template<TimesParams> = {
       q: {
         format: 'mcs',
         figure: D.figure,
-        stem: `In ${D.years[3]}, the number of ${D.cats[a].toLowerCase()} containers sold by Company M was approximately how many times the number of ${D.cats[b].toLowerCase()} containers sold?`,
+        stem: `In ${D.years[3]}, the number of ${kind(D.cats[a])} containers sold by Company M was approximately how many times the number of ${kind(D.cats[b])} containers sold?`,
         choices,
         answer: powers.indexOf(0),
         explanation: `Put both in millions: ${unitText(D.units[a])} = ${num(D.units[a])} million, and ${unitText(D.units[b])}. Ratio: $\\frac{${num(D.units[a])}}{${num(D.units[b])}} \\approx ${num(Math.round(ratio * 100) / 100)}$, closest to $${fmt(R)}$.
@@ -154,12 +155,14 @@ const intervalRevenue: Template<IntervalParams> = {
     const n = (D.units[c] * p) / 100; // millions of containers
     const L = n * lo;
     const H = n * hi;
+    // Exact displays only: billions or millions with at most 2 decimals, otherwise whole dollars.
+    const exact2 = (x: number) => Math.abs(x * 100 - Math.round(x * 100)) < 1e-6;
     const money = (m: number) =>
-      m >= 1000
-        ? `\\$${(m / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })} billion`
-        : m >= 1
-          ? `\\$${m.toLocaleString('en-US', { maximumFractionDigits: 2 })} million`
-          : `\\$${Math.round(m * 1e6).toLocaleString('en-US')}`;
+      m >= 1000 && exact2(m / 1000)
+        ? `\\$${commas(m / 1000)} billion`
+        : m >= 1 && exact2(m)
+          ? `\\$${commas(m)} million`
+          : `\\$${commas(Math.round(m * 1e6))}`;
     const iv = (a: number, b: number) => `From ${money(a)} to ${money(b)}`;
     const cand: { a: number; b: number; trap?: string }[] = [
       { a: L, b: H },
@@ -184,12 +187,12 @@ const intervalRevenue: Template<IntervalParams> = {
       q: {
         format: 'mcs',
         figure: D.figure,
-        stem: `In ${D.years[3]}, ${p} percent of the ${D.cats[c].toLowerCase()} containers sold by Company M were sold at prices from \\$${lo.toFixed(2)} to \\$${hi.toFixed(2)} per container. Which of the following gives all possible values of the total revenue from the sale of those containers?`,
+        stem: `In ${D.years[3]}, ${p} percent of the ${kind(D.cats[c])} containers sold by Company M were sold at prices from \\$${lo.toFixed(2)} to \\$${hi.toFixed(2)} per container. Which of the following gives all possible values of the total revenue from the sale of those containers?`,
         choices,
         answer: vc.answer,
         explanation: `${p}% of ${unitText(D.units[c])} is $${num(n)}$ million containers. At the lowest price: $${num(n)} \\times ${lo} = ${num(L)}$ million dollars; at the highest: $${num(n)} \\times ${hi} = ${num(H)}$ million dollars. So the revenue was ${iv(L, H).toLowerCase()}.
 
-Forgetting to take ${p}% of the containers gives revenues ${Math.round(100 / p)} times too large.`,
+Forgetting to take ${p}% of the containers gives revenues ${num(100 / p)} times too large.`,
       },
     };
   },

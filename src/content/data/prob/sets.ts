@@ -320,7 +320,7 @@ $${p.b - p.a}$ ignores the condition on the ${p.extra} members of $A$ outside $B
       if (ask === 'both') {
         lo = Math.max(0, p.a + p.b - p.N + p.extra);
         hi = Math.min(p.a, p.b);
-        stem = `${pop}, ${p.a} ${ctx.A} and ${p.b} ${ctx.B}.${p.extra ? ` At least ${p.extra} of the ${ctx.unit} ${ctx.neither}.` : ''} Which of the following could be the number of ${ctx.unit} who ${ctx.both}?`;
+        stem = `${pop}, ${p.a} ${ctx.A} and ${p.b} ${ctx.B}.${p.extra ? ` At least ${p.extra} of the ${ctx.unit} ${ctx.neither}.` : ''} Which of the following could be the number of ${ctx.unit} ${ctx.unit === 'households' ? 'that' : 'who'} ${ctx.both}?`;
         explanation = `Least overlap: ${p.extra ? `at most $${p.N} - ${p.extra} = ${p.N - p.extra}$ ${ctx.unit} are in at least one group, so` : `at most ${p.N} ${ctx.unit} are in at least one group, so`} at least $${p.a} + ${p.b} - ${p.N - p.extra} = ${lo}$ must be in both. Greatest overlap: everyone in the smaller group is also in the larger one, $${hi}$. Every whole number from ${lo} to ${hi} is possible.
 
 The overlap cannot be ${lo > 0 ? 'less than ' + lo + ' (the two groups do not fit in the total otherwise) and cannot be' : ''} more than ${hi}.`;
@@ -329,7 +329,7 @@ The overlap cannot be ${lo > 0 ? 'less than ' + lo + ' (the two groups do not fi
       } else {
         lo = Math.max(0, p.N - p.a - p.b);
         hi = p.N - Math.max(p.a, p.b);
-        stem = `${pop}, ${p.a} ${ctx.A} and ${p.b} ${ctx.B}. Which of the following could be the number of ${ctx.unit} who ${ctx.neither}?`;
+        stem = `${pop}, ${p.a} ${ctx.A} and ${p.b} ${ctx.B}. Which of the following could be the number of ${ctx.unit} ${ctx.unit === 'households' ? 'that' : 'who'} ${ctx.neither}?`;
         explanation = `Neither $= ${p.N} - (\\text{at least one})$, and at least one $= ${p.a} + ${p.b} - (\\text{both})$. The overlap can be from $${p.a} + ${p.b} - ${p.N} = ${p.a + p.b - p.N}$ to $${Math.min(p.a, p.b)}$, so at least one is from $${Math.max(p.a, p.b)}$ to $${p.N}$, and neither is from $${lo}$ to $${hi}$, inclusive.
 
 Neither cannot exceed $${p.N} - ${Math.max(p.a, p.b)} = ${hi}$, because all ${Math.max(p.a, p.b)} in the larger group are in at least one group.`;
@@ -403,7 +403,7 @@ const overlapQC: Template<OverlapQCParams> = {
     const lo = Math.max(0, p.a + p.b - p.N);
     const hi = Math.min(p.a, p.b);
     let info = `${ctx.pop(`${p.N}`)}, ${p.a} ${ctx.A} and ${p.b} ${ctx.B}.`;
-    let qa = `The number of the ${p.N} ${ctx.unit} who ${ctx.both}`;
+    let qa = `The number of the ${p.N} ${ctx.unit} ${ctx.unit === 'households' ? 'that' : 'who'} ${ctx.both}`;
     let qb = '';
     let answer: QCChoice;
     let traps: QCQuestion['traps'];
@@ -421,7 +421,7 @@ const overlapQC: Template<OverlapQCParams> = {
       if (t !== answer) traps = { [t]: 'prob-venn-forgot-neither' };
       explanation = `Total = ${ctx.nameA} + ${ctx.nameB} $-$ both + neither: $${p.N} = ${p.a} + ${p.b} - x + ${p.neither}$, so $x = ${both}$. Compare with ${p.k}: ${rel(answer)}. (${answer})`;
     } else if (kind === 'least') {
-      qa = `The least possible number of the ${p.N} ${ctx.unit} who ${ctx.both}`;
+      qa = `The least possible number of the ${p.N} ${ctx.unit} ${ctx.unit === 'households' ? 'that' : 'who'} ${ctx.both}`;
       const roll = rng.next();
       p.k = roll < 0.35 ? lo : lo + rng.pick([-3, -2, -1, 1, 2, 3]);
       if (p.k < 0) p.k = lo + 2;
@@ -431,7 +431,7 @@ const overlapQC: Template<OverlapQCParams> = {
       if (t !== answer) traps = { [t]: 'prob-venn-min-zero' };
       explanation = `The ${p.a} + ${p.b} = ${p.a + p.b} memberships must fit among ${p.N} ${ctx.unit}, so at least $${p.a + p.b} - ${p.N} = ${lo}$ ${ctx.unit} are counted in both groups (and ${lo} is possible: everyone else is in exactly one group). Compare ${lo} with ${p.k}: ${rel(answer)}. (${answer})`;
     } else if (kind === 'neither-vs-both') {
-      qb = `The number of the ${p.N} ${ctx.unit} who ${ctx.neither}`;
+      qb = `The number of the ${p.N} ${ctx.unit} ${ctx.unit === 'households' ? 'that' : 'who'} ${ctx.neither}`;
       // neither - both = N - a - b for every possible overlap
       const diff = p.N - p.a - p.b;
       answer = diff > 0 ? 'B' : diff < 0 ? 'A' : 'C';

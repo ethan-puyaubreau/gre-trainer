@@ -205,3 +205,12 @@ export function countWordChoices(rng: Rng, count: number, max: number): { choice
   const start = rng.int(Math.max(0, count - 4), Math.min(count, max - 4));
   return { choices: [0, 1, 2, 3, 4].map((k) => ({ text: names[start + k] })), answer: count - start };
 }
+
+/** Fast plain-text number with thousands commas and at most `maxDec` decimals (no Intl). */
+export function commas(x: number, maxDec = 2): string {
+  const neg = x < 0;
+  const r = Number(Math.abs(x).toFixed(maxDec));
+  const [i, d] = r.toString().split('.');
+  const int = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (neg ? '-' : '') + int + (d ? '.' + d : '');
+}
