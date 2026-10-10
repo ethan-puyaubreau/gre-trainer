@@ -3,6 +3,8 @@ import { formatClock } from '../components/Timer';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
 import { exportProgress, isProgressData, NOT_AN_EXPORT, useProgress } from '../store/progress';
 
+const answers = (k: number) => `${k} answer${k === 1 ? '' : 's'}`;
+
 export function Settings() {
   const { settings, updateSettings, importData, reset, history } = useProgress();
   const [msg, setMsg] = useState<string | null>(null);
@@ -21,8 +23,7 @@ export function Settings() {
     try {
       const data: unknown = JSON.parse(await f.text());
       if (!isProgressData(data)) throw new Error(NOT_AN_EXPORT);
-      const n = (k: number) => `${k} answer${k === 1 ? '' : 's'}`;
-      if (!window.confirm(`Importing replaces the ${n(history.length)} in this browser with the ${n(data.history.length)} in this file. Continue?`)) return;
+      if (!window.confirm(`Importing replaces the ${answers(history.length)} in this browser with the ${answers(data.history.length)} in this file. Continue?`)) return;
       importData(data);
       setMsg('Progress imported.');
     } catch (e) {
@@ -63,7 +64,7 @@ export function Settings() {
         <h3>Theme</h3>
         <div className="tabs">
           {(['system', 'light', 'dark'] as const).map((t) => (
-            <button key={t} className={settings.theme === t ? 'on' : ''} onClick={() => updateSettings({ theme: t })}>
+            <button key={t} className={settings.theme === t ? 'on' : ''} aria-pressed={settings.theme === t} onClick={() => updateSettings({ theme: t })}>
               {t[0].toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -73,7 +74,7 @@ export function Settings() {
       <div className="card" style={{ marginTop: 16 }}>
         <h3 style={{ marginTop: 0 }}>Your data</h3>
         <p className="muted small">
-          Progress is stored in this browser only ({history.length} answers so far). Export it to keep a backup or to continue on another device.
+          Progress is stored in this browser only ({answers(history.length)} so far). Export it to keep a backup or to continue on another device.
         </p>
         <div className="row">
           <button className="btn" onClick={download}>
