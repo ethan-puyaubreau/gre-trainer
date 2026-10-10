@@ -197,6 +197,13 @@ export const useProgress = create<ProgressData & Actions>()(
   ),
 );
 
+// Another tab wrote its progress: take it, or our next write would overwrite it with this tab's stale copy.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === PROGRESS_KEY) void useProgress.persist.rehydrate();
+  });
+}
+
 export function exportProgress(): string {
   const s = useProgress.getState();
   const data: ProgressData = {
