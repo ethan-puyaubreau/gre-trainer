@@ -56,36 +56,89 @@ export interface NumericChoiceOpts {
   order?: 'asc' | 'desc' | 'random';
 }
 
+/** Step for made-up distractors around a value: 1 for small integers, 10 for hundreds, 1/d for fractions. */
+function syntheticStep(correct: Frac): Frac {
+  if (!correct.isInt()) return new Frac(1, correct.d);
+  const a = Math.abs(correct.n);
+  if (a < 20) return new Frac(1);
+  return new Frac(10 ** Math.max(0, Math.floor(Math.log10(a)) - 1));
+}
+
 /**
- * Build numeric choices: unique values, traps kept in priority, filled up to `count`, then ordered.
- * If traps + fillers are not enough, nearby values around the correct answer are added.
+ * Build numeric choices: unique values, traps kept in priority, then fillers, ordered ascending
+ * (or descending). The correct answer lands at a random position (as uniform as the traps allow):
+ * fillers are taken from the side that still needs values, then made-up neighbors if needed.
  */
 export function numericChoices(rng: Rng, opts: NumericChoiceOpts): { choices: Choice[]; answer: number } {
   const count = opts.count ?? 5;
   const correct = toFrac(opts.correct);
-  const items: { v: Frac; trap?: string; correct?: boolean }[] = [{ v: correct, correct: true }];
-  const has = (v: Frac) => items.some((it) => it.v.eq(v));
-  for (const t of opts.traps ?? []) {
-    const v = toFrac(t.value);
-    if (items.length < count && !has(v)) items.push({ v, trap: t.trap });
-  }
-  for (const f of opts.fillers ?? []) {
-    const v = toFrac(f);
-    if (items.length < count && !has(v)) items.push({ v });
-  }
-  let step = 1;
-  const base = correct.isInt() ? new Frac(Math.max(1, Math.round(Math.abs(correct.toNumber()) / 10))) : new Frac(1, correct.d);
-  while (items.length < count) {
-    const cand = correct.add(base.mul(step * (rng.chance(0.5) ? 1 : -1)));
-    if (!has(cand) && (correct.sign() < 0 || cand.sign() >= 0)) items.push({ v: cand });
-    step++;
-    if (step > 50) throw new Error('numericChoices: could not fill choices');
-  }
   const order = opts.order ?? 'asc';
+  type Item = { v: Frac; trap?: string; correct?: boolean };
+  const used: Frac[] = [correct];
+  const has = (v: Frac) => used.some((u) => u.eq(v));
+  const below: Item[] = [];
+  const above: Item[] = [];
+  const traps = (opts.traps ?? [])
+    .map((t) => ({ v: toFrac(t.value), trap: t.trap }))
+    .filter((t, i, arr) => !t.v.eq(correct) && arr.findIndex((u) => u.v.eq(t.v)) === i);
+  // Uniform random target index (in ascending order), like the real test. Traps are kept in priority
+  // order when they fit on their side of the target.
+  let target = rng.int(0, count - 1);
+  for (const t of traps) {
+    const side = t.v.lt(correct) ? below : above;
+    const cap = order === 'random' ? count - 1 : t.v.lt(correct) ? target : count - 1 - target;
+    if (side.length < cap && below.length + above.length < count - 1) {
+      used.push(t.v);
+      side.push({ v: t.v, trap: t.trap });
+    }
+  }
+
+  let items: Item[];
+  if (order === 'random') {
+    const pool = [...below, ...above];
+    for (const f of opts.fillers ?? []) {
+      const v = toFrac(f);
+      if (pool.length < count - 1 && !has(v)) {
+        used.push(v);
+        pool.push({ v });
+      }
+    }
+    items = [{ v: correct, correct: true }, ...pool];
+  } else {
+    const fillers = (opts.fillers ?? []).map(toFrac).filter((v, i, arr) => !has(v) && arr.findIndex((w) => w.eq(v)) === i);
+    const fillBelow = fillers.filter((v) => v.lt(correct));
+    const fillAbove = fillers.filter((v) => v.gt(correct));
+    const nonNegative = correct.sign() >= 0;
+    const step = syntheticStep(correct);
+    const take = (side: 'below' | 'above', need: number): number => {
+      const list = side === 'below' ? below : above;
+      const src = side === 'below' ? fillBelow : fillAbove;
+      while (need > 0 && src.length) {
+        const v = src.shift()!;
+        if (has(v)) continue;
+        used.push(v);
+        list.push({ v });
+        need--;
+      }
+      for (let k = 1; need > 0 && k <= 60; k++) {
+        const v = side === 'below' ? correct.sub(step.mul(k)) : correct.add(step.mul(k));
+        if (has(v) || (nonNegative && v.sign() < 0)) continue;
+        used.push(v);
+        list.push({ v });
+        need--;
+      }
+      return need; // shortfall
+    };
+    const shortBelow = take('below', target - below.length);
+    if (shortBelow > 0) target -= shortBelow;
+    const shortAbove = take('above', count - 1 - target - above.length);
+    if (shortAbove > 0) take('below', shortAbove);
+    items = [...below, { v: correct, correct: true }, ...above];
+    if (items.length !== count) throw new Error('numericChoices: could not fill choices');
+  }
+
   const ordered =
-    order === 'random'
-      ? rng.shuffle(items)
-      : [...items].sort((a, b) => (order === 'asc' ? a.v.cmp(b.v) : b.v.cmp(a.v)));
+    order === 'random' ? rng.shuffle(items) : [...items].sort((a, b) => (order === 'asc' ? a.v.cmp(b.v) : b.v.cmp(a.v)));
   const texts = ordered.map((it) => opts.format(it.v));
   if (new Set(texts).size !== texts.length) throw new Error(`numericChoices: two choices display the same: ${texts.join(' | ')}`);
   return {
@@ -129,3 +182,35 @@ export function flaggedChoices(items: (Choice & { correct: boolean })[]): { choi
 
 /** Letter label for a choice index: 0 -> A. */
 export const letter = (i: number) => String.fromCharCode(65 + i);
+
+/**
+ * Choices for values that are not exact fractions (radicals, multiples of π...): give the correct
+ * value and a priority-ordered list of candidate distractors with their numeric values. Picks a
+ * uniform random position for the answer, takes candidates from each side of it in priority order,
+ * and sorts the result ascending. Candidates equal in value to the answer or to each other are skipped.
+ */
+export function valuedChoices(
+  rng: Rng,
+  correct: { text: Rich; value: number },
+  candidates: { text: Rich; value: number; trap?: string }[],
+  count = 5,
+): { choices: Choice[]; answer: number } {
+  const same = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+  const uniq: typeof candidates = [];
+  for (const c of candidates) {
+    if (same(c.value, correct.value) || uniq.some((u) => same(u.value, c.value) || u.text === c.text)) continue;
+    uniq.push(c);
+  }
+  const below = uniq.filter((c) => c.value < correct.value);
+  const above = uniq.filter((c) => c.value > correct.value);
+  if (below.length + above.length < count - 1) throw new Error('valuedChoices: not enough distinct candidates');
+  let target = rng.int(0, count - 1);
+  target = Math.min(target, below.length);
+  target = Math.max(target, count - 1 - above.length);
+  const picked = [...below.slice(0, target), ...above.slice(0, count - 1 - target)];
+  const all = [{ ...correct, ok: true }, ...picked].sort((a, b) => a.value - b.value);
+  return {
+    choices: all.map((c) => ({ text: c.text, ...('trap' in c && c.trap ? { trap: c.trap } : {}) })),
+    answer: all.findIndex((c) => 'ok' in c),
+  };
+}

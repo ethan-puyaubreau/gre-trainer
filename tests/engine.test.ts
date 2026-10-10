@@ -105,3 +105,15 @@ describe('rich text', () => {
     expect(() => parseRich('costs $18 total')).toThrow();
   });
 });
+
+describe('money formatting', () => {
+  it('renders thousands separators in and out of math', async () => {
+    const { usd } = await import('../src/engine/tex');
+    expect(usd(1381)).toBe('\\$1{,}381');
+    const [p] = parseRich(`It costs ${usd(1381)} or $${usd(2500, 2)}$.`);
+    if (p.type === 'p') {
+      expect(p.segments[0].value).toBe('It costs $1,381 or ');
+      expect(p.segments[1]).toEqual({ type: 'math', value: '\\$2{,}500.00' });
+    }
+  });
+});

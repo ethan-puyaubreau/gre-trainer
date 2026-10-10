@@ -37,7 +37,9 @@ export function usd(x: number, places?: number): string {
   const abs = Math.abs(x);
   const s = places === undefined ? stripFloat(abs) : abs.toFixed(places);
   const [i, d] = s.split('.');
-  const body = Number(i).toLocaleString('en-US') + (d ? '.' + d : '');
+  // {,} keeps KaTeX from adding a space after the comma; the rich-text parser turns it back into ","
+  // outside math, so usd() works in both places.
+  const body = Number(i).toLocaleString('en-US').replace(/,/g, '{,}') + (d ? '.' + d : '');
   return (neg ? '-' : '') + '\\$' + body;
 }
 
