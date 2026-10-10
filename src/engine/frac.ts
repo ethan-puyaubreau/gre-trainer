@@ -85,6 +85,12 @@ export class Frac {
   gt(o: FracLike): boolean {
     return this.cmp(o) > 0;
   }
+  lte(o: FracLike): boolean {
+    return this.cmp(o) <= 0;
+  }
+  gte(o: FracLike): boolean {
+    return this.cmp(o) >= 0;
+  }
   isInt(): boolean {
     return this.d === 1;
   }
