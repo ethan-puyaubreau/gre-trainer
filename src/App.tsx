@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { History } from './pages/History';
 import { Practice } from './pages/Practice';
+import { Preview } from './pages/Preview';
 import { SectionSim } from './pages/SectionSim';
 import { Settings } from './pages/Settings';
 import { Strategies } from './pages/Strategies';
@@ -44,6 +45,9 @@ export function App() {
       break;
     case 'settings':
       body = <Settings />;
+      break;
+    case 'preview':
+      body = <Preview route={route.slice(1)} />;
       break;
     default:
       body = <Dashboard />;

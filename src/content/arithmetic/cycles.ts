@@ -192,7 +192,7 @@ From term ${m} to term ${n} there are $${n} - ${m} + 1 = ${count}$ terms${full >
           m % L === 0
             ? `Since ${m} is a multiple of ${L}, term ${m} is the last element of the cycle.`
             : `Since $${m} = ${L} \\cdot ${Math.floor(m / L)} + ${m % L}$, term ${m} is element ${startIdx + 1} of the cycle.`
-        }${left > 0 ? ` The leftover terms are $${leftoverTerms.map((x) => num(x)).join(', ')}$.` : ''}
+        }${left > 0 ? ` The leftover term${left > 1 ? 's are' : ' is'} $${leftoverTerms.map((x) => num(x)).join(', ')}$.` : ''}
 
 Total: $${num(answer)}$.`,
       },
