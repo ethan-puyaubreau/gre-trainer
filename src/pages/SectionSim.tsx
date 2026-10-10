@@ -118,7 +118,7 @@ export function SectionSim() {
                 ['s2', 'One section: 15 q / 26 min'],
               ] as const
             ).map(([k, label]) => (
-              <button key={k} className={length === k ? 'on' : ''} onClick={() => setLength(k)}>
+              <button key={k} className={length === k ? 'on' : ''} aria-pressed={length === k} onClick={() => setLength(k)}>
                 {label}
               </button>
             ))}
@@ -131,6 +131,7 @@ export function SectionSim() {
                 <button
                   key={a.area}
                   className={on ? 'on' : ''}
+                  aria-pressed={on}
                   onClick={() => setAreas(on ? areas.filter((x) => x !== a.area) : [...areas, a.area])}
                   disabled={on && areas.length === 1}
                 >
@@ -334,7 +335,12 @@ function Exam({
               <tbody>
                 {sec.questions.map((qq, i) => (
                   <tr key={qq.id} className="clickable" onClick={() => goTo(i)}>
-                    <td>{i + 1}</td>
+                    <td>
+                      {/* No handler of its own: its click bubbles to the row, which does the work. */}
+                      <button type="button" className="btn btn-ghost" style={{ padding: 0 }} aria-label={`Go to question ${i + 1}`}>
+                        {i + 1}
+                      </button>
+                    </td>
                     <td>{isAnswered(sec.responses[i]) ? 'Answered' : <span style={{ color: 'var(--bad)' }}>Not answered</span>}</td>
                     <td>{sec.marked[i] ? '⚑' : ''}</td>
                   </tr>
@@ -445,7 +451,10 @@ function Results({ done, onRestart }: { done: SectionResult[]; onRestart: () => 
               <Fragment key={x.q.id}>
                 <tr className="clickable" onClick={() => setOpen(open === x.q.id ? null : x.q.id)}>
                   <td>
-                    S{x.s + 1}·{i + 1 - (x.s ? done[0].sec.questions.length : 0)}
+                    {/* No handler of its own: its click bubbles to the row, which does the work. */}
+                    <button type="button" className="btn btn-ghost" style={{ padding: 0 }} aria-expanded={open === x.q.id}>
+                      S{x.s + 1}·{i + 1 - (x.s ? done[0].sec.questions.length : 0)}
+                    </button>
                   </td>
                   <td>{skillById.get(x.q.skillId)?.name}</td>
                   <td>{x.ok ? <span className="chip chip-good">correct</span> : <span className="chip chip-bad">{isAnswered(x.r) ? 'wrong' : 'blank'}</span>}</td>
