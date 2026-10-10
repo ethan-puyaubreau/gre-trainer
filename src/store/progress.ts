@@ -87,10 +87,30 @@ export function initialData(now = Date.now()): ProgressData {
   };
 }
 
-function isProgressData(x: unknown): x is ProgressData {
-  if (!x || typeof x !== 'object') return false;
-  const d = x as Partial<ProgressData>;
-  return d.version === 1 && typeof d.skills === 'object' && Array.isArray(d.history) && Array.isArray(d.remediation);
+const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+const isNum = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
+
+/** Shape check for an imported file: every field the pages read without a guard must be there. */
+export function isProgressData(x: unknown): x is ProgressData {
+  if (!isObj(x) || x.version !== 1) return false;
+  if (!isObj(x.skills) || !Object.values(x.skills).every(isObj)) return false;
+  if (!Array.isArray(x.remediation) || (x.sections !== undefined && !Array.isArray(x.sections))) return false;
+  if (x.settings !== undefined && !isObj(x.settings)) return false;
+  if (x.seq !== undefined && !isNum(x.seq)) return false;
+  return (
+    Array.isArray(x.history) &&
+    x.history.every(
+      (h) =>
+        isObj(h) &&
+        typeof h.qid === 'string' &&
+        typeof h.skillId === 'string' &&
+        typeof h.templateId === 'string' &&
+        typeof h.correct === 'boolean' &&
+        isNum(h.timeMs) &&
+        isNum(h.at) &&
+        Array.isArray(h.traps),
+    )
+  );
 }
 
 export const useProgress = create<ProgressData & Actions>()(
