@@ -79,6 +79,15 @@ Set `figure` (or an array of figures) on the question. Kinds: `numberLine`, `geo
 segments, polygons, circles, right-angle and angle marks, labels, optional axes/lines/curves,
 `notToScale`), `table`, `bar`, `line`, `pie`, `scatter`, `histogram`, `boxplot`. See `src/engine/types.ts`.
 
+## Data interpretation sets
+
+On the GRE, 2-3 questions share one table or graph. To make a family, give 2+ templates the same
+`set: '<family name>'` and build the dataset FIRST in `generate()`, with one shared function and
+the same rng calls (e.g. `const data = makeSalesData(rng, difficulty)` as the very first line).
+Templates of a family share a random stream, so for a given seed they draw the same dataset;
+the section test shows them together as "Questions 10 to 12 are based on the following data."
+A test checks that all templates of a family produce identical figures for the same seed.
+
 ## Testing
 
 ```

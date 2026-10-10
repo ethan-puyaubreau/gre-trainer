@@ -45,6 +45,20 @@ describe('registry', () => {
     expect([...seen].filter(([, n]) => n > 1).map(([id]) => id)).toEqual([]);
   });
 
+  it('gives every template of a data interpretation family the same figure for a seed', () => {
+    const families = new Map<string, typeof TEMPLATES>();
+    for (const t of TEMPLATES) if (t.set) families.set(t.set, [...(families.get(t.set) ?? []), t]);
+    for (const [name, ts] of families) {
+      expect(ts.length, `family ${name} needs at least 2 templates`).toBeGreaterThanOrEqual(2);
+      for (const d of DIFFS)
+        for (let seed = 1; seed <= 40; seed++) {
+          const figs = ts.map((t) => JSON.stringify(generateBody(t, seed, d).q.figure ?? null));
+          expect(new Set(figs).size, `family ${name} seed ${seed} d${d}`).toBe(1);
+          expect(figs[0], `family ${name} has no figure`).not.toBe('null');
+        }
+    }
+  });
+
   it('keeps each area self-consistent', () => {
     for (const a of AREAS) for (const s of a.skills) expect(s.area).toBe(a.area);
   });
