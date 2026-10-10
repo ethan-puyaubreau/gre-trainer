@@ -4,7 +4,7 @@ import { QuestionView } from '../components/QuestionView';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
 import { AREA_NAMES, SKILLS, skillById, templateById, templatesBySkill, TRAPS } from '../content';
-import { generateQuestion } from '../engine/generate';
+import { generateQuestion, poolSeed } from '../engine/generate';
 import { grade, isAnswered, type GradeResult, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
@@ -87,7 +87,7 @@ export function Practice({ route }: { route: string[] }) {
       return;
     }
     const t = templateById.get(pick.templateId)!;
-    const question = generateQuestion(t, randomSeed(), pick.difficulty);
+    const question = generateQuestion(t, poolSeed(), pick.difficulty);
     recent.current = [...recent.current, pick.templateId].slice(-12);
     lastSkill.current = pick.skillId;
     setEmpty(false);

@@ -54,6 +54,11 @@ export interface NumericChoiceOpts {
   format: (v: Frac) => Rich;
   /** 'asc' (GRE default for numbers), 'desc', or 'random'. */
   order?: 'asc' | 'desc' | 'random';
+  /**
+   * Spacing of made-up distractors when traps and fillers run out on one side of the answer.
+   * Set it for "approximately" questions so no invented choice sits close to the answer.
+   */
+  step?: FracLike;
 }
 
 /** Step for made-up distractors around a value: 1 for small integers, 10 for hundreds, 1/d for fractions. */
@@ -109,7 +114,7 @@ export function numericChoices(rng: Rng, opts: NumericChoiceOpts): { choices: Ch
     const fillBelow = fillers.filter((v) => v.lt(correct));
     const fillAbove = fillers.filter((v) => v.gt(correct));
     const nonNegative = correct.sign() >= 0;
-    const step = syntheticStep(correct);
+    const step = opts.step !== undefined ? toFrac(opts.step) : syntheticStep(correct);
     const take = (side: 'below' | 'above', need: number): number => {
       const list = side === 'below' ? below : above;
       const src = side === 'below' ? fillBelow : fillAbove;

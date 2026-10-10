@@ -10,6 +10,16 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * The app only serves seeds 1..SEED_POOL, and the test suite verifies the answer key of every one of
+ * them (for every template and difficulty), so no unverified question can reach a student.
+ */
+export const SEED_POOL = 500;
+
+export function poolSeed(): number {
+  return 1 + Math.floor(Math.random() * SEED_POOL);
+}
+
 /** Same (template, seed, difficulty) always gives the same question. */
 export function rngFor(templateId: string, seed: number, difficulty: Difficulty) {
   return createRng((hashString(templateId) ^ Math.imul(seed, 2654435761) ^ (difficulty * 97)) >>> 0);
