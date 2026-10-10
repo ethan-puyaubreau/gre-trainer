@@ -15,8 +15,11 @@ export function rngFor(templateId: string, seed: number, difficulty: Difficulty)
   return createRng((hashString(templateId) ^ Math.imul(seed, 2654435761) ^ (difficulty * 97)) >>> 0);
 }
 
+/** Templates of a data interpretation family share one random stream, hence one dataset per seed. */
+export const streamId = (t: Template<any>) => (t.set ? `set:${t.set}` : t.id);
+
 export function generateBody<P>(t: Template<P>, seed: number, difficulty: Difficulty): { q: QuestionBody; params: P } {
-  return t.generate(rngFor(t.id, seed, difficulty), difficulty);
+  return t.generate(rngFor(streamId(t), seed, difficulty), difficulty);
 }
 
 export function generateQuestion(t: Template<any>, seed: number, difficulty: Difficulty): Question {

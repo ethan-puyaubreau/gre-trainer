@@ -269,6 +269,12 @@ export interface Template<P = unknown> {
   format: Format;
   /** Short description of the question style, e.g. "n-th digit of a repeating decimal". */
   style: string;
+  /**
+   * Data interpretation family. Templates with the same `set` must build their dataset FIRST, with
+   * the same function and the same rng calls, so that for a given seed they share an identical
+   * figure. A section test then shows 2-3 of them as one data interpretation set.
+   */
+  set?: string;
   /** Deterministic given the rng. Difficulty 1 = easy, 2 = medium (GRE typical), 3 = hard. */
   generate(rng: Rng, difficulty: Difficulty): { q: QuestionBody; params: P };
   /**

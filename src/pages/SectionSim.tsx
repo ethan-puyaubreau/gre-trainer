@@ -39,25 +39,50 @@ function pickDifficulty(rng: Rng, level: Level): Difficulty {
   return r < a ? 1 : r < a + b ? 2 : 3;
 }
 
-const hasFigure = (q: Question) => !!q.figure;
+export interface BuiltSection {
+  questions: Question[];
+  /** Data interpretation sets as [first, last] question indices. */
+  sets: [number, number][];
+}
 
-export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: Area[]): Question[] {
+export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: Area[]): BuiltSection {
   const pool = TEMPLATES.filter((t) => areas.includes(skillById.get(t.skill)!.area));
+
+  // One data interpretation set (2-3 questions on a shared figure) when a family is available.
+  const families = new Map<string, Template<any>[]>();
+  for (const t of pool) if (t.set) families.set(t.set, [...(families.get(t.set) ?? []), t]);
+  const famList = [...families.values()].filter((f) => f.length >= 2);
+  let setQuestions: Question[] = [];
+  let setFamily: string | undefined;
+  if (famList.length) {
+    const fam = rng.pick(famList);
+    setFamily = fam[0].set;
+    const seed = randomSeed();
+    const d = pickDifficulty(rng, level);
+    setQuestions = rng.sample(fam, Math.min(3, fam.length)).map((t) => generateQuestion(t, seed, d));
+  }
+
   const usedSkills = new Set<string>();
-  const usedTemplates = new Set<string>();
+  const usedTemplates = new Set<string>(setQuestions.map((q) => q.templateId));
   const out: Question[] = [];
-  const slots: Format[] = (Object.entries(spec.formats) as [Format, number][]).flatMap(([f, n]) => Array<Format>(n).fill(f));
+  let slots: Format[] = (Object.entries(spec.formats) as [Format, number][]).flatMap(([f, n]) => Array<Format>(n).fill(f));
+  // The set replaces non-QC slots, taken from the end (numeric entry / select-all first).
+  for (let k = 0; k < setQuestions.length; k++) {
+    const i = slots.map((f) => f !== 'qc').lastIndexOf(true);
+    slots = slots.filter((_, j) => j !== i);
+  }
+  const regularPool = pool.filter((t) => !setFamily || t.set !== setFamily);
   const areaCycle = rng.shuffle(areas);
   slots.forEach((format, i) => {
     const preferredArea = areaCycle[i % areaCycle.length];
-    const candidates = (filter: (t: Template<any>) => boolean) => pool.filter((t) => t.format === format && filter(t));
+    const candidates = (filter: (t: Template<any>) => boolean) => regularPool.filter((t) => t.format === format && filter(t));
     const tiers = [
       candidates((t) => skillById.get(t.skill)!.area === preferredArea && !usedSkills.has(t.skill)),
       candidates((t) => !usedSkills.has(t.skill)),
       candidates((t) => !usedTemplates.has(t.id)),
       candidates(() => true),
-      pool.filter((t) => !usedTemplates.has(t.id)),
-      pool,
+      regularPool.filter((t) => !usedTemplates.has(t.id)),
+      regularPool.length ? regularPool : pool,
     ];
     const tier = tiers.find((c) => c.length)!;
     const t = rng.pick(tier);
@@ -65,11 +90,12 @@ export function buildSection(rng: Rng, spec: SectionSpec, level: Level, areas: A
     usedTemplates.add(t.id);
     out.push(generateQuestion(t, randomSeed(), pickDifficulty(rng, level)));
   });
-  // QC first; among the rest, questions with data figures last (like a data interpretation block).
+  // QC first like the official sections, then the other formats, then the data interpretation set.
   const qc = out.filter((q) => q.format === 'qc');
   const rest = rng.shuffle(out.filter((q) => q.format !== 'qc'));
-  const dataLast = [...rest.filter((q) => !(hasFigure(q) && skillById.get(q.skillId)!.area === 'data')), ...rest.filter((q) => hasFigure(q) && skillById.get(q.skillId)!.area === 'data')];
-  return [...qc, ...dataLast];
+  const questions = [...qc, ...rest, ...setQuestions];
+  const sets: [number, number][] = setQuestions.length ? [[questions.length - setQuestions.length, questions.length - 1]] : [];
+  return { questions, sets };
 }
 
 /* ------------------------------------------------------------------ component */
@@ -79,6 +105,7 @@ interface RunningSection {
   spec: SectionSpec;
   level: Level;
   questions: Question[];
+  sets: [number, number][];
   responses: (Response | undefined)[];
   marked: boolean[];
   timeSpent: number[];
@@ -108,7 +135,7 @@ export function SectionSim() {
   const start = (index: number, level: Level, specKey: 's1' | 's2') => {
     const spec = SPECS[specKey];
     const rng = createRng(randomSeed());
-    const questions = buildSection(rng, spec, level, areas);
+    const { questions, sets } = buildSection(rng, spec, level, areas);
     const now = Date.now();
     if (index === 0) completed.current = [];
     setPhase({
@@ -118,6 +145,7 @@ export function SectionSim() {
         spec,
         level,
         questions,
+        sets,
         responses: questions.map(() => undefined),
         marked: questions.map(() => false),
         timeSpent: questions.map(() => 0),
@@ -384,7 +412,16 @@ function Exam({ sec: initial, total, onFinish }: { sec: RunningSection; total: n
             </div>
           </div>
         ) : (
-          <QuestionView key={q.id} q={q} response={sec.responses[idx]} onChange={setResponse} />
+          <>
+            {sec.sets
+              .filter(([a, b]) => idx >= a && idx <= b)
+              .map(([a, b]) => (
+                <p key={a} className="instruction" style={{ marginTop: 0 }}>
+                  Questions {a + 1} to {b + 1} are based on the following data.
+                </p>
+              ))}
+            <QuestionView key={q.id} q={q} response={sec.responses[idx]} onChange={setResponse} />
+          </>
         )}
       </div>
       {calc && (
