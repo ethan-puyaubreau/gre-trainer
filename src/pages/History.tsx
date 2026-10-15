@@ -82,7 +82,7 @@ export function History() {
             <thead>
               <tr>
                 <th>When</th>
-                <th>Skill · style</th>
+                <th>Skill · question type</th>
                 <th>Result</th>
                 <th>Time</th>
               </tr>
