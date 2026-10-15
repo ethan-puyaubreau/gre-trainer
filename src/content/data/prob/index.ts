@@ -14,7 +14,8 @@ import { probSkills } from './skills';
 import { probTraps as baseProbTraps } from './traps';
 import { pigeonTemplates, pigeonTraps } from './pigeon';
 import { oddsTemplates, oddsTraps } from './odds';
+import { arrangementTemplates, arrangementTraps } from './arrangements';
 
 export { probSkills };
-export const probTraps = { ...baseProbTraps, ...pigeonTraps, ...oddsTraps };
-export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates, ...pigeonTemplates, ...oddsTemplates];
+export const probTraps = { ...baseProbTraps, ...pigeonTraps, ...oddsTraps, ...arrangementTraps };
+export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates, ...pigeonTemplates, ...oddsTemplates, ...arrangementTemplates];
