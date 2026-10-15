@@ -118,6 +118,7 @@ const squareInTriangle: Template<Params> = {
       hgt = b;
     }
     const sv = new Frac(a * hgt, a + hgt);
+    if (d === 2 && ask !== 'side' && sv.d > 2) throw new Redraw('area or perimeter would be an awkward decimal');
     const val = (v: Frac) => (ask === 'side' ? v : ask === 'area' ? v.mul(v) : v.mul(4));
     const answer = val(sv);
     const traps: { value: Frac; trap: string }[] = [];
