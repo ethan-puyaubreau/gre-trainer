@@ -145,7 +145,7 @@ const oddsMCS: Template<OddsParams> = {
               { value: r1.neg().add(1).mul(r2.neg().add(1)).neg().add(1), trap: 'prob-odds-as-ratio' },
             ];
         lead = `Convert each pair of odds to a probability first, then combine the independent events.`;
-        how = `Odds of ${p1[0]} to ${p1[1]} give $p_1 = ${tex(q1)}$, and ${p2[0]} to ${p2[1]} give $p_2 = ${tex(q2)}$. The probability that an event does not occur is $1 - p$, so for independent events $P(\\text{neither}) = ${tex(q1.neg().add(1))} \\cdot ${tex(q2.neg().add(1))} = ${tex(neither)}$. ${wantNeither ? 'That is the answer.' : `"At least one" is the opposite of "neither": $1 - ${tex(neither)} = ${tex(atLeast)}$.`}`;
+        how = `Odds of ${p1[0]} to ${p1[1]} give $p_1 = ${tex(q1)}$, and ${p2[0]} to ${p2[1]} give $p_2 = ${tex(q2)}$. The probability that an event does not occur is $1 - p$, so for independent events $P(\\text{neither}) = ${tex(q1.neg().add(1))} \\cdot ${tex(q2.neg().add(1))} = ${tex(neither)}$.${wantNeither ? '' : ` "At least one" is the opposite of "neither": $1 - ${tex(neither)} = ${tex(atLeast)}$.`}`;
       }
       traps = traps.filter((t) => t.value.gt(0) && t.value.lt(1));
       const distinct = new Set(traps.filter((t) => !t.value.eq(key)).map((t) => t.value.toString()));
