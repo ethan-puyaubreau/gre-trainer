@@ -77,8 +77,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
   },
 
   'arith.consecutive': {
-    idea: 'An evenly spaced list adds up to (number of terms) $\\times$ (average), and the average is halfway between the first and last terms. The count of integers from $a$ to $b$ inclusive is $b - a + 1$.',
-    recognize: 'If you see "the sum of the integers from $a$ to $b$", consecutive even or odd integers, or multiples of $k$ in a range, count the terms first, then average the ends.',
+    idea: 'An evenly spaced list adds up to (number of terms) $\\times$ (average), and the average is halfway between the first and last terms. Consecutive integers from $a$ to $b$ inclusive number $b - a + 1$.',
+    recognize: 'If you see "the sum of the integers from $a$ to $b$", consecutive even or odd integers, or multiples of $k$ in a range, count the terms first (for multiples of $k$: $\\frac{\\text{last} - \\text{first}}{k} + 1$), then average the ends.',
     example: {
       problem: 'What is $31 + 32 + \\cdots + 50$?',
       steps: [
