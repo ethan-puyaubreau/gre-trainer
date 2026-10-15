@@ -97,12 +97,12 @@ export const algebraLessons: Record<string, Lesson> = {
     recognize:
       'If you see $f(g(3))$, think: compute $g(3)$ first. If you see a symbol such as $a \\diamond b$ defined by a formula, think: substitute in the order written, since $a \\diamond b$ and $b \\diamond a$ may differ. If you see $f(-x)$, think: even functions like $x^2$ give back $f(x)$, odd functions like $x^3$ give $-f(x)$.',
     example: {
-      problem: 'If $f(x) = x^2 - 4x$ and $g(x) = 2x + 1$, what is the value of $f(g(-1))$?',
+      problem: 'If $f(x) = x^2 - 4x$ and $g(x) = 3x - 5$, what is the value of $f(g(1))$?',
       steps: [
-        'Compute the inner function first: $g(-1) = 2(-1) + 1 = -1$, because $f$ needs the output of $g$ as its input.',
-        'Substitute into $f$ with parentheses: $f(-1) = (-1)^2 - 4(-1) = 1 + 4 = 5$, because the whole negative number is squared.',
+        'Compute the inner function first: $g(1) = 3(1) - 5 = -2$, because $f$ needs the output of $g$ as its input.',
+        'Substitute into $f$ with parentheses: $f(-2) = (-2)^2 - 4(-2) = 4 + 8 = 12$, because the whole negative number is squared.',
       ],
-      answer: '$5$. The other order gives $g(f(-1)) = g(5) = 11$, so the order matters.',
+      answer: '$12$. The other order gives $g(f(1)) = g(-3) = -14$, so the order matters.',
     },
     traps: ['alg-composition-order', 'alg-substitute-negative', 'alg-assumed-commutative'],
   },
@@ -126,13 +126,13 @@ export const algebraLessons: Record<string, Lesson> = {
     recognize:
       'If you see "parallel", think: same slope. If you see "perpendicular", think: slopes $m$ and $-\\frac{1}{m}$. If you see "passes through a point", think: substitute that point into $y = mx + b$.',
     example: {
-      problem: 'A line is perpendicular to $y = 2x + 3$ and passes through $(4, 1)$. What is its $y$-intercept?',
+      problem: 'A line is perpendicular to $y = 2x + 3$ and passes through $(2, 6)$. What is its $y$-intercept?',
       steps: [
         'The given slope is 2, so the perpendicular slope is $-\\frac{1}{2}$, because perpendicular slopes multiply to $-1$.',
-        'Write $y = -\\frac{1}{2}x + b$ and substitute $(4, 1)$: $1 = -2 + b$, because a point on the line must satisfy its equation.',
-        'Add 2 to both sides: $b = 3$, because that leaves $b$ alone.',
+        'Write $y = -\\frac{1}{2}x + b$ and substitute $(2, 6)$: $6 = -1 + b$, because a point on the line must satisfy its equation.',
+        'Add 1 to both sides: $b = 7$, because that leaves $b$ alone.',
       ],
-      answer: '$3$ (check: at $x = 4$ the line gives $-2 + 3 = 1$).',
+      answer: '$7$, not the $3$ of the given line (check: at $x = 2$ the line gives $-1 + 7 = 6$).',
     },
     traps: ['algw-perp-no-sign', 'algw-intercept-sign', 'algw-swap-coordinates'],
   },
@@ -172,13 +172,13 @@ export const algebraLessons: Record<string, Lesson> = {
       'If you see "$k$ more than twice $y$", think: $2y + k$. If you see two kinds of items with a total count and a total value, think: one count equation and one value equation.',
     example: {
       problem:
-        'A school sells 40 tickets: student tickets cost 5 dollars and adult tickets cost 8 dollars. The sales total 260 dollars. How many adult tickets were sold?',
+        'A school sells 40 tickets: student tickets cost 5 dollars and adult tickets cost 8 dollars. The sales total 230 dollars. How many adult tickets were sold?',
       steps: [
         'Let $a$ be the number of adult tickets, so $40 - a$ are student tickets, because the two counts add up to 40.',
-        'Write the value equation: $5(40 - a) + 8a = 260$, because the money from both kinds adds up to 260.',
-        'Simplify: $200 + 3a = 260$, so $a = 20$, because $-5a + 8a = 3a$ and $260 - 200 = 60$.',
+        'Write the value equation: $5(40 - a) + 8a = 230$, because the money from both kinds adds up to 230.',
+        'Simplify: $200 + 3a = 230$, so $a = 10$, because $-5a + 8a = 3a$ and $230 - 200 = 30$.',
       ],
-      answer: '$20$ adult tickets (check: $20 \\cdot 5 + 20 \\cdot 8 = 260$).',
+      answer: '$10$ adult tickets, not the $30$ student tickets (check: $10 \\cdot 8 + 30 \\cdot 5 = 230$).',
     },
     traps: ['algw-answered-other-unknown', 'algw-more-than-order', 'algw-more-than-direction'],
   },
