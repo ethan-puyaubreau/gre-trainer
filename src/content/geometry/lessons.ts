@@ -3,12 +3,12 @@ import type { Lesson } from '../lessons';
 export const geometryLessons: Record<string, Lesson> = {
   'geo.lines-angles': {
     idea: `Every angle problem turns into one equation. Pick the fact that links the angles (a straight line is $180^\\circ$, a full turn is $360^\\circ$, vertical angles are equal), solve for $x$, then answer what was asked.`,
-    recognize: `Think angles when you see a transversal across parallel lines, angles written as expressions in $x$, or an angle ratio. Parallel lines make only two measures: matching positions are equal, mixed positions add up to $180^\\circ$.`,
+    recognize: `Think angles when you see a transversal across parallel lines, angles written as expressions in $x$, or an angle ratio. Parallel lines make only two measures: matching positions are equal, mixed positions add up to $180^\\circ$. A path that bends between two parallel lines makes a bend angle equal to the SUM of the two outer angles.`,
     example: {
       problem: `Two parallel lines are cut by a transversal. At the first line an acute angle measures $3x^\\circ$; at the second line an obtuse angle measures $(x + 100)^\\circ$. Find the obtuse angle.`,
       steps: [
         `Write $3x + (x + 100) = 180$, because an acute angle and an obtuse angle made by parallel lines are supplementary.`,
-        `Solve: $4x + 100 = 180$ gives $4x = 80$, so $x = 20$, because subtracting $100$ and then dividing by $4$ isolates $x$.`,
+        `Solve: $4x + 100 = 180$ gives $4x = 80$, so $x = 20$.`,
         `The obtuse angle is $x + 100 = 120$, because the question asks for the angle, not for $x$.`,
       ],
       answer: `$120^\\circ$ (check: $60 + 120 = 180$)`,
@@ -17,7 +17,7 @@ export const geometryLessons: Record<string, Lesson> = {
   },
   'geo.triangles': {
     idea: `The three angles of a triangle add up to $180^\\circ$, and an exterior angle equals the sum of the two remote interior angles. In an isosceles triangle the equal angles sit opposite the equal sides.`,
-    recognize: `Think of these facts when a caption gives equal sides, an angle is missing, or an area is asked. A missing third side lies strictly between the difference and the sum of the other two; an area needs a height perpendicular to the base.`,
+    recognize: `If you see a caption that gives equal sides, think: equal angles opposite them. If you see a missing angle, think: the three angles add up to $180^\\circ$. If you see an area, think: a height perpendicular to the base, never a slanted side. A missing third side lies strictly between the difference and the sum of the other two.`,
     example: {
       problem: `In triangle $ABC$, $AB = BC$ and the angle at $B$ measures $40^\\circ$. Find angle $A$.`,
       steps: [
@@ -31,7 +31,7 @@ export const geometryLessons: Record<string, Lesson> = {
   },
   'geo.right-triangles': {
     idea: `In a right triangle $a^2 + b^2 = c^2$, where $c$ is the hypotenuse, opposite the right angle. Learn the triples (3-4-5, 5-12-13, 8-15-17) and their multiples, plus the special triangles 45-45-90 and 30-60-90.`,
-    recognize: `Think Pythagoras when a square mark, a rectangle, a square or a diagonal appears and two lengths are known. Angles of $45^\\circ$, or $30^\\circ$ and $60^\\circ$, point to the special triangles.`,
+    recognize: `If you see a right-angle mark, a rectangle, a square or a diagonal and two known lengths, think Pythagoras. If you see angles of $45^\\circ$, or $30^\\circ$ and $60^\\circ$, think special triangles: sides $s : s : s\\sqrt{2}$, or $s : s\\sqrt{3} : 2s$ with the shortest side facing the $30^\\circ$ angle.`,
     example: {
       problem: `A rectangle is $15$ wide and $20$ long. What is the length of its diagonal?`,
       steps: [
@@ -58,15 +58,15 @@ export const geometryLessons: Record<string, Lesson> = {
     traps: ['geo-sim-part-whole', 'geo-sim-linear-area', 'geo-sim-inverted'],
   },
   'geo.figure-reasoning': {
-    idea: `GRE figures are not necessarily drawn to scale. Trust only the given facts and what follows from them, then redraw the figure with a free angle or length changed. If the comparison changes, the answer is D.`,
-    recognize: `Think of this when a figure's angles or lengths only look special: a right angle without a square mark, sides that look equal, lines that look parallel.`,
+    idea: `GRE figures are not necessarily drawn to scale. You may assume only that straight-looking lines are straight and that points lie in the order shown. Redraw the figure with a free angle or length changed: if the comparison changes, the answer is D; if every redraw keeps it, it is forced.`,
+    recognize: `If you see angles or lengths that only look special (a right angle without a right-angle mark, equal-looking sides, parallel-looking lines), think: not given, so redraw.`,
     example: {
-      problem: `In triangle $PQR$, $PQ = 6$ and $PR = 8$. The angle at $P$ looks like a right angle but has no square mark. Quantity A is $QR$; Quantity B is $10$.`,
+      problem: `In triangle $PQR$, $PQ = 6$ and $PR = 8$. The angle at $P$ looks like a right angle but has no right-angle mark. Quantity A is $QR$; Quantity B is $10$.`,
       steps: [
-        `Sort the facts: only the two side lengths are given, because a right angle that merely looks right is not a given.`,
+        `Only the two side lengths are given, because an angle that merely looks right is not a given.`,
         `Redraw with $P$ exactly $90^\\circ$: $QR = \\sqrt{36 + 64} = 10$, so the quantities are equal, because $6^2 + 8^2 = 10^2$.`,
-        `Close the angle a little and $QR < 10$; open it wider and $QR > 10$, because the side opposite the angle grows with the angle.`,
-        `So the answer is D, because no single comparison holds in every allowed drawing.`,
+        `Close the angle a little and $QR < 10$; open it wider and $QR > 10$, because with the two sides fixed, the opposite side grows with the angle.`,
+        `So the answer is D, because the comparison changes between allowed drawings.`,
       ],
       answer: `D: the relationship cannot be determined.`,
     },
@@ -74,7 +74,7 @@ export const geometryLessons: Record<string, Lesson> = {
   },
   'geo.polygons': {
     idea: `A polygon with $n$ sides has interior angles adding up to $(n - 2) \\cdot 180^\\circ$. Areas use a height perpendicular to the base: parallelogram $bh$, trapezoid $\\frac{1}{2}(b_1 + b_2)h$.`,
-    recognize: `Think of them when a figure shows a dashed perpendicular height or two parallel sides, when the angle of a regular polygon is asked, or when a question compares area and perimeter.`,
+    recognize: `If you see a dashed perpendicular height or two parallel sides, think: area. If you see a regular polygon, think: the angle sum divided by $n$. If a question compares area and perimeter, think: for a fixed perimeter the square has the largest area.`,
     example: {
       problem: `A trapezoid has parallel sides of $6$ and $10$, a height of $4$ (the dashed perpendicular) and a slanted leg of $5$. Find its area.`,
       steps: [
@@ -116,7 +116,7 @@ export const geometryLessons: Record<string, Lesson> = {
   },
   'geo.solids': {
     idea: `Use the volume formulas (box $\\ell w h$, cylinder $\\pi r^2 h$) and remember scaling: lengths $\\times k$ means areas $\\times k^2$ and volumes $\\times k^3$. In a cylinder the radius counts twice.`,
-    recognize: `Think of these when a box, cube or cylinder is resized, filled, poured into another container or packed with smaller cubes. Pouring keeps the volume of liquid constant.`,
+    recognize: `If you see a container poured into another, think: the volume of liquid stays the same. If you see surface area, think: the total area of the faces, $2(\\ell w + \\ell h + wh)$ for a box, in square units and never the volume. If you see packing with smaller cubes, think: count how many fit along each edge (round down), then multiply; dividing the volumes counts leftover slivers.`,
     example: {
       problem: `A cylinder has radius $3$ and height $10$. Its radius is doubled and its height stays the same. What is the new volume?`,
       steps: [
