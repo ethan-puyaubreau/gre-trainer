@@ -33,6 +33,10 @@ export const rateMeetingTraps: Record<string, Trap> = {
     label: 'Forgot the distance covered during the head start',
     fix: 'Add the distance the first mover covered before the second one left, either as a smaller gap or as extra time.',
   },
+  'rate-gap-as-answer': {
+    label: 'Gave the head-start distance as the meeting point',
+    fix: 'The head-start distance is only where the first mover is when the second one leaves. The meeting point comes later: add the distance covered while both are moving.',
+  },
   'rate-wrong-end': {
     label: 'Measured from the wrong end',
     fix: 'The distances from the two starting points add up to the total. Check which end the question measures from.',
@@ -150,7 +154,7 @@ const meeting: Template<RMParams> = {
           { value: F(Math.round(fast * h * 2), 2 * (fast - slow)), trap: 'rate-gap-wrong-speed' },
         );
         slips = [
-          [other, `${decimal(other)} measures the time from the other departure`],
+          [other, `@ measures the time from the other departure`],
           [traps[1].value, `adding the speeds treats the two as approaching each other`],
           [traps[2].value, `dividing by ${fast} alone forgets that ${ctx.a} keeps moving`],
           [traps[3].value, `the head start is covered at the slower speed, ${slow}, not at ${fast}`],
@@ -165,19 +169,19 @@ const meeting: Template<RMParams> = {
         const meet = v1 * (h + t);
         ans = F(Math.round(meet * 2), 2);
         const hS = decimal(F(h * 2, 2));
-        stem = `${p0} and ${p1} are ${num(D)} ${ctx.len} apart on a straight road. ${ctx.a} leaves ${p0} for ${p1} at ${v1} ${ctx.unit}. ${hS} hours later, ${ctx.b} leaves ${p1} for ${p0} at ${v2} ${ctx.unit}. How many ${ctx.len} from ${p0} are the two when they meet?`;
+        stem = `${p0[0].toUpperCase() + p0.slice(1)} and ${p1} are ${num(D)} ${ctx.len} apart on a straight road. ${ctx.a} leaves ${p0} for ${p1} at ${v1} ${ctx.unit}. ${hS} hours later, ${ctx.b} leaves ${p1} for ${p0} at ${v2} ${ctx.unit}. How many ${ctx.len} from ${p0} are the two when they meet?`;
         steps = `In the ${hS}-hour head start, ${ctx.a} covers $${v1} \\times ${hS} = ${decimal(F(Math.round(v1 * h * 2), 2))}$ ${ctx.len}, leaving a gap of $${num(D)} - ${decimal(F(Math.round(v1 * h * 2), 2))} = ${num(gap)}$ ${ctx.len}. That gap closes at $${v1} + ${v2} = ${v1 + v2}$ ${ctx.len} per hour, taking $${decimal(F(t * 2, 2))}$ hours. ${ctx.a} has then driven ${hS} + ${decimal(F(t * 2, 2))} hours, so the meeting point is $${v1} \\times ${decimal(F(Math.round((h + t) * 2), 2))} = ${decimal(ans)}$ ${ctx.len} from ${p0}.`;
         traps.push(
           { value: F(Math.round(v1 * t * 2), 2), trap: 'rate-head-start-ignored' },
           { value: F(Math.round((D - meet) * 2), 2), trap: 'rate-wrong-end' },
           { value: F(D * v1, v1 + v2), trap: 'rate-simultaneous-start' },
-          { value: F(Math.round(v1 * h * 2), 2), trap: 'rate-gap-wrong-speed' },
+          { value: F(Math.round(v1 * h * 2), 2), trap: 'rate-gap-as-answer' },
         );
         slips = [
-          [traps[0].value, `${ctx.a}'s distance during the shared time leaves out its head start`],
-          [traps[1].value, `that distance is measured from ${p1}`],
-          [traps[2].value, `that answer pretends both left at the same moment`],
-          [traps[3].value, `that is only what ${ctx.a} covers during the head start`],
+          [traps[0].value, `@ is only ${ctx.a}'s distance over the shared ${decimal(F(t * 2, 2))} hours, leaving out its head start`],
+          [traps[1].value, `@ is the distance measured from ${p1}`],
+          [traps[2].value, `@ pretends both left at the same moment`],
+          [traps[3].value, `@ is only what ${ctx.a} covers during the head start`],
         ];
       }
       if (traps.some((x) => x.value.eq(ans))) continue;
@@ -185,7 +189,7 @@ const meeting: Template<RMParams> = {
       if (new Set(okTraps.map((x) => x.value.toString())).size < 2) continue;
       const fillers = [ans.mul(2), ans.div(2), ans.mul(3).div(2), ans.mul(3).div(4), ans.mul(4).div(3)].filter(nice);
       const { choices, answer, values } = numChoices(rng, { correct: ans, traps: okTraps, fillers, format: fmt, order: 'shuffled' });
-      const shown = slips.filter(([v]) => values.some((w) => w.eq(v)) && !v.eq(ans)).map(([, s]) => s);
+      const shown = slips.filter(([v]) => values.some((w) => w.eq(v)) && !v.eq(ans)).map(([v, s]) => s.replace('@', fmt(v)));
       return {
         params: { kind, v1, v2, D, h, t, sinceFirst, values },
         q: {
