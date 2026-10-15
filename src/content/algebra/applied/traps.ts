@@ -205,6 +205,14 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Priced every item at the same rate',
     fix: 'The two kinds of items have different values. Only the items of the asked kind are priced at its rate.',
   },
+  'algw-wrong-divisor': {
+    label: 'Divided the extra value by the wrong number',
+    fix: 'Each swap changes the total by the DIFFERENCE of the two values, so divide the extra by that difference.',
+  },
+  'algw-difference-of-counts': {
+    label: 'Gave the difference between the two counts',
+    fix: 'The question asks for the number of items of one kind, not for how much one kind exceeds the other.',
+  },
   'algw-intermediate-step': {
     label: 'Gave a number from the middle of the solution',
     fix: 'After the last step, reread the question: does your number answer it? The price, the difference of prices and the first subtraction are only stepping stones.',

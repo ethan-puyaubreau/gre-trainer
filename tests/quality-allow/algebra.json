@@ -55,10 +55,5 @@
   "alg.sequences.terms-mcm": {
     "artifacts.sign": "baseline",
     "distractors.trapped": "baseline"
-  },
-  "alg.word-problems.in-terms-of": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
   }
 }

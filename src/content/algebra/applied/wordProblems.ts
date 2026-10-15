@@ -1,5 +1,6 @@
 import { flaggedChoices, qcFromSamples, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
+import { gcd } from '../../../engine/math';
 import { plural } from '../../../engine/text';
 import { lin, num } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
@@ -407,8 +408,13 @@ const twoTypes: Template<TwoTypesParams> = {
     ];
     if (T % 2 === 0) wrongs.push({ value: frac(T / 2), trap: 'algw-assumed-equal-split', why: 'assuming the items split evenly between the two kinds' });
     wrongs.push({ value: frac(hi - lo), trap: 'algw-intermediate-step', why: `giving the difference ${hi - lo} between the two values, a number from the middle of the solution` });
-    wrongs.push({ value: frac(lo), trap: 'algw-intermediate-step', why: `giving the value ${lo} of one item, a number from the middle of the solution` });
-    wrongs.push({ value: frac(hi), trap: 'algw-intermediate-step', why: `giving the value ${hi} of one item, a number from the middle of the solution` });
+    if (!valueAsk) {
+      const extra = askHi ? U - lowTotal : hi * T - U;
+      for (const den of [askHi ? hi : lo, hi + lo]) if (extra % den === 0) wrongs.push({ value: frac(extra / den), trap: 'algw-wrong-divisor', why: `dividing the extra value ${num(extra)} by ${den} instead of by the difference ${hi - lo} of the two values` });
+      wrongs.push({ value: frac(Math.abs(x - y)), trap: 'algw-difference-of-counts', why: 'giving the difference between the two counts' });
+    }
+    const onePrice = rng.chance(0.5) ? lo : hi;
+    wrongs.push({ value: frac(onePrice), trap: 'algw-intermediate-step', why: `giving the value ${onePrice} of one item, a number from the middle of the solution` });
     const res = trapChoices(rng, ans, wrongs, (v) => `$${num(v)}$`);
     if (!res) return twoTypes.generate(rng, d);
     const { choices, answer } = res;
@@ -746,19 +752,24 @@ interface TermsOfParams {
   exprs: E[];
 }
 
-const RATE_STORIES = [
-  {
-    letters: ['n', 'x', 'y'],
-    text: (n: string, x: string, y: string) => `If $${n}$ pencils cost $${x}$ dollars, then at the same price per pencil, how many dollars do $${y}$ pencils cost?`,
-  },
-  {
-    letters: ['k', 'c', 'm'],
-    text: (n: string, x: string, y: string) => `A car uses $${x}$ liters of fuel to travel $${n}$ kilometers. At this rate, how many liters of fuel does the car use to travel $${y}$ kilometers?`,
-  },
-  {
-    letters: ['b', 't', 'w'],
-    text: (n: string, x: string, y: string) => `A machine fills $${n}$ bottles in $${x}$ minutes. Working at the same rate, how many minutes does it take the machine to fill $${y}$ bottles?`,
-  },
+const RATE_STORIES: { text: (n: string, x: string, y: string) => string; unit: string }[] = [
+  { unit: 'dollars', text: (n, x, y) => `If $${n}$ pencils cost $${x}$ dollars, then at the same price per pencil, how many dollars do $${y}$ pencils cost?` },
+  { unit: 'liters', text: (n, x, y) => `A car uses $${x}$ liters of fuel to travel $${n}$ kilometers. At this rate, how many liters of fuel does the car use to travel $${y}$ kilometers?` },
+  { unit: 'minutes', text: (n, x, y) => `A machine fills $${n}$ bottles in $${x}$ minutes. Working at the same rate, how many minutes does it take the machine to fill $${y}$ bottles?` },
+  { unit: 'cups', text: (n, x, y) => `A recipe uses $${x}$ cups of flour for $${n}$ loaves of bread. At this rate, how many cups of flour are needed for $${y}$ loaves?` },
+  { unit: 'gallons', text: (n, x, y) => `A hose delivers $${x}$ gallons of water in $${n}$ minutes. At this rate, how many gallons does it deliver in $${y}$ minutes?` },
+  { unit: 'widgets', text: (n, x, y) => `Working together, $${n}$ workers produce $${x}$ widgets in a day. At the same rate per worker, how many widgets do $${y}$ workers produce in a day?` },
+  { unit: 'dollars', text: (n, x, y) => `A store sells $${n}$ notebooks for $${x}$ dollars. At the same price per notebook, what is the cost, in dollars, of $${y}$ notebooks?` },
+  { unit: 'words', text: (n, x, y) => `A typist types $${x}$ words in $${n}$ minutes. At this rate, how many words does the typist type in $${y}$ minutes?` },
+];
+
+const LETTER_SETS = [['n', 'x', 'y'], ['k', 'c', 'm'], ['b', 't', 'w'], ['p', 'q', 'r'], ['a', 's', 'u']];
+
+const HOUR_STORIES = [
+  (p: string, m: string, h: string) => `A printer prints $${p}$ pages every $${m}$ minutes. At this rate, how many pages does it print in $${h}$ hours?`,
+  (p: string, m: string, h: string) => `A factory machine makes $${p}$ parts every $${m}$ minutes. At this rate, how many parts does it make in $${h}$ hours?`,
+  (p: string, m: string, h: string) => `A cyclist rides $${p}$ kilometers every $${m}$ minutes. At this rate, how many kilometers does the cyclist ride in $${h}$ hours?`,
+  (p: string, m: string, h: string) => `A tap fills $${p}$ liters of water every $${m}$ minutes. At this rate, how many liters does it fill in $${h}$ hours?`,
 ];
 
 const inTermsOf: Template<TermsOfParams> = {
@@ -767,117 +778,145 @@ const inTermsOf: Template<TermsOfParams> = {
   format: 'mcs',
   style: 'write the answer as an expression in the given letters',
   generate(rng, d) {
-    const mode = rng.pick(
-      d === 1 ? (['unit-rate', 'twice-more'] as const) : d === 2 ? (['unit-rate', 'exactly-one', 'twice-more'] as const) : (['unit-rate-hours', 'exactly-one', 'fare'] as const),
-    );
+    const mode = rng.pick(d === 1 ? (['unit-rate', 'twice-more'] as const) : d === 2 ? (['unit-rate', 'twice-more', 'twice-more'] as const) : (['unit-rate-hours', 'exactly-one', 'fare'] as const));
     let correct: E;
-    let wrong: { e: E; trap?: string }[];
+    let wrong: { e: E; trap: string; why: string }[];
     let stem: string;
-    let explanation: string;
+    let method: string;
+    let rule: string;
     let vars: string[];
     let nums: number[] = [];
+    let envs: Record<string, number>[];
     if (mode === 'unit-rate') {
       const st = rng.pick(RATE_STORIES);
-      const [n, x, y] = st.letters;
+      const [n, x, y] = rng.pick(LETTER_SETS);
       vars = [n, x, y];
       const [Nn, X, Y] = [V(n), V(x), V(y)];
       correct = div(mul(X, Y), Nn);
       wrong = [
-        { e: div(mul(Nn, Y), X), trap: 'algw-rate-inverted' },
-        { e: div(mul(Nn, X), Y) },
-        { e: div(Nn, mul(X, Y)) },
-        { e: div(X, mul(Nn, Y)) },
+        { e: div(mul(Nn, Y), X), trap: 'algw-rate-inverted', why: `inverting the unit rate: $\\frac{${n}}{${x}}$ per unit instead of $\\frac{${x}}{${n}}$` },
+        { e: div(mul(Nn, X), Y), trap: 'algw-wrong-pairing', why: `multiplying $${n}$ by $${x}$ and dividing by $${y}$` },
+        { e: div(Nn, mul(X, Y)), trap: 'algw-wrong-pairing', why: `putting the product $${x}${y}$ in the denominator` },
+        { e: div(X, mul(Nn, Y)), trap: 'algw-rate-inverted', why: `dividing the unit rate by $${y}$ instead of multiplying` },
       ];
       stem = st.text(n, x, y);
-      explanation = `Find the amount for one unit, then multiply. One unit corresponds to $\\frac{${x}}{${n}}$, so $${y}$ units correspond to $\\frac{${x}}{${n}} \\cdot ${y} = \\frac{${x}${y}}{${n}}$.
-
-Check the units: (amount per unit) × (number of units) = amount. Plugging in numbers also works: with $${n} = 2$, $${x} = 6$, $${y} = 5$, the answer must be 15, and only $\\frac{${x}${y}}{${n}}$ gives 15.`;
+      method = `Find the amount for one unit, then multiply by the number of units. One unit corresponds to $\\frac{${x}}{${n}}$, so $${y}$ units correspond to $\\frac{${x}}{${n}} \\cdot ${y} = \\frac{${x}${y}}{${n}}$.`;
+      rule = 'amount per unit times number of units gives the amount.';
+      envs = [{ [n]: 2, [x]: 6, [y]: 5 }, { [n]: 4, [x]: 6, [y]: 10 }, { [n]: 3, [x]: 12, [y]: 7 }];
     } else if (mode === 'unit-rate-hours') {
-      const [p, m, h] = rng.pick([
-        ['p', 'm', 'h'],
-        ['c', 's', 't'],
-      ]);
+      const [p, m, h] = rng.pick([['p', 'm', 'h'], ['c', 's', 't'], ['a', 'b', 'k']]);
       vars = [p, m, h];
       const [P, M, H] = [V(p), V(m), V(h)];
       correct = div(mul(N(60), mul(P, H)), M);
       wrong = [
-        { e: div(mul(P, H), M), trap: 'algw-units-mismatch' },
-        { e: div(mul(N(60), mul(M, H)), P), trap: 'algw-rate-inverted' },
-        { e: div(mul(P, H), mul(N(60), M)), trap: 'algw-units-mismatch' },
-        { e: div(mul(N(60), P), mul(M, H)) },
+        { e: div(mul(P, H), M), trap: 'algw-units-mismatch', why: `forgetting to convert $${h}$ hours to $60${h}$ minutes` },
+        { e: div(mul(N(60), mul(M, H)), P), trap: 'algw-rate-inverted', why: 'inverting the rate' },
+        { e: div(mul(P, H), mul(N(60), M)), trap: 'algw-units-mismatch', why: `dividing by 60 where hours must be turned into minutes by multiplying` },
+        { e: div(mul(N(60), P), mul(M, H)), trap: 'algw-wrong-pairing', why: `putting $${h}$ in the denominator` },
       ];
-      stem = `A printer prints $${p}$ pages every $${m}$ minutes. At this rate, how many pages does it print in $${h}$ hours?`;
-      explanation = `The rate is $\\frac{${p}}{${m}}$ pages per minute, and $${h}$ hours is $60${h}$ minutes. Pages $= \\frac{${p}}{${m}} \\cdot 60${h} = \\frac{60${p}${h}}{${m}}$.
-
-Forgetting to convert hours to minutes gives $\\frac{${p}${h}}{${m}}$, which is 60 times too small.`;
+      stem = rng.pick(HOUR_STORIES)(p, m, h);
+      method = `The rate is $\\frac{${p}}{${m}}$ per minute, and $${h}$ hours is $60${h}$ minutes. The amount is $\\frac{${p}}{${m}} \\cdot 60${h} = \\frac{60${p}${h}}{${m}}$.`;
+      rule = 'put the time in the unit of the rate before multiplying.';
+      envs = [{ [p]: 3, [m]: 2, [h]: 4 }, { [p]: 5, [m]: 10, [h]: 2 }];
     } else if (mode === 'exactly-one') {
-      const total = rng.pick([800, 1200, 1500, 2000, 2400, 3000]);
-      const pct = rng.pick([20, 25, 30, 35, 40, 45]);
+      const total = rng.pick([800, 1200, 1500, 2000, 2400, 3000, 3600, 4000]);
+      const pct = rng.pick([20, 25, 30, 35, 40, 45, 15, 12]);
       const ex = (total * pct) / 100;
       nums = [total, pct];
       vars = ['r'];
       const r = V('r');
       correct = subE(N(ex), r);
       wrong = [
-        { e: subE(N(total), r), trap: 'algw-exactly-one-total' },
-        { e: mul(N(frac(pct, 100), true), subE(N(total), r)), trap: 'algw-percent-of-wrong-base' },
-        { e: subE(r, N(ex)) },
-        { e: add(N(ex), r) },
+        { e: subE(N(total), r), trap: 'algw-exactly-one-total', why: `using all ${num(total).replace('{,}', ',')} people instead of the ${pct} percent who own exactly one` },
+        { e: mul(N(frac(pct, 100), true), subE(N(total), r)), trap: 'algw-percent-of-wrong-base', why: `taking ${pct} percent of what remains after $r$ is removed` },
+        { e: subE(r, N(ex)), trap: 'alg-sign-slip', why: 'subtracting in the wrong order' },
+        { e: add(N(ex), r), trap: 'algw-added-subtracted', why: 'adding $r$ where the people already counted must be taken away' },
       ];
       const [s1, s2] = rng.pick([
         ['a cat', 'a dog'],
         ['a bicycle', 'a car'],
         ['a savings account', 'a retirement account'],
+        ['a tablet', 'a laptop'],
       ]);
       stem = `In a survey, ${num(total).replace('{,}', ',')} people were asked whether they own ${s1} and whether they own ${s2}. Of those surveyed, ${pct} percent own exactly one of the two. If $r$ of the people surveyed own ${s1} but not ${s2}, which of the following represents the number who own ${s2} but not ${s1}?`;
-      explanation = `Exactly one of the two: ${pct} percent of ${num(total).replace('{,}', ',')}, that is, ${num(ex).replace('{,}', ',')} people. They split into "${s1} only" ($r$ people) and "${s2} only", so the second group has $${num(ex)} - r$ people.
-
-$${num(total)} - r$ ignores the fact that only ${pct} percent own exactly one of the two.`;
+      method = `Exactly one of the two: ${pct} percent of ${num(total).replace('{,}', ',')}, that is, ${num(ex).replace('{,}', ',')} people. They split into "${s1} only" ($r$ people) and "${s2} only", so the second group has $${num(ex)} - r$ people.`;
+      rule = 'find the size of the group that is split before naming its parts.';
+      envs = [{ r: Math.floor(ex / 4) }, { r: Math.floor(ex / 2) }];
     } else if (mode === 'twice-more') {
       const k = rng.int(2, 12);
+      const sg = rng.chance(0.65) ? 1 : -1;
       const [na, nb] = rng.sample(NAMES, 2);
       const a = rng.pick(['a', 'b', 'n', 's']);
       vars = [a];
-      nums = [k];
+      nums = [sg * k];
       const A = V(a);
-      correct = add(mul(N(3), A), N(k));
+      correct = sg > 0 ? add(mul(N(3), A), N(k)) : subE(mul(N(3), A), N(k));
+      const flipSign = (c: number) => (sg > 0 ? subE(mul(N(3), A), N(c * k)) : add(mul(N(3), A), N(c * k)));
       wrong = [
-        { e: add(mul(N(2), A), N(k)), trap: 'algw-answered-other-unknown' },
-        { e: add(mul(N(3), A), N(2 * k)), trap: 'algw-more-than-order' },
-        { e: subE(mul(N(3), A), N(k)) },
-        { e: add(mul(N(2), A), N(2 * k)) },
+        { e: sg > 0 ? add(mul(N(2), A), N(k)) : subE(mul(N(2), A), N(k)), trap: 'algw-answered-other-unknown', why: `giving ${na}'s number alone and leaving out ${nb}'s` },
+        { e: sg > 0 ? add(mul(N(3), A), N(2 * k)) : subE(mul(N(3), A), N(2 * k)), trap: 'algw-more-than-order', why: `reading the phrase as $2(${a} ${sg > 0 ? '+' : '-'} ${k})$` },
+        { e: flipSign(1), trap: 'algw-more-than-direction', why: `adding where the phrase says ${sg > 0 ? 'more' : 'fewer'} (the wrong sign on ${k})` },
+        { e: sg > 0 ? add(mul(N(2), A), N(2 * k)) : subE(mul(N(2), A), N(2 * k)), trap: 'algw-more-than-order', why: `reading the phrase as $2(${a} ${sg > 0 ? '+' : '-'} ${k})$ and forgetting ${nb}'s number` },
       ];
-      const thing = rng.pick(['stamps', 'baseball cards', 'books', 'coins']);
-      stem = `${na} has ${k} more than twice as many ${thing} as ${nb}. If ${nb} has $${a}$ ${thing}, how many ${thing} do ${na} and ${nb} have together, in terms of $${a}$?`;
-      explanation = `${na} has "${k} more than twice $${a}$": $2${a} + ${k}$. Together: $${a} + (2${a} + ${k}) = 3${a} + ${k}$.
-
-$2${a} + ${k}$ is ${na}'s number alone, and reading the phrase as $2(${a} + ${k})$ gives $3${a} + ${2 * k}$ for the total.`;
+      const thing = rng.pick(['stamps', 'baseball cards', 'books', 'coins', 'stickers']);
+      stem = `${na} has ${k} ${sg > 0 ? 'more' : 'fewer'} than twice as many ${thing} as ${nb}. If ${nb} has $${a}$ ${thing}, how many ${thing} do ${na} and ${nb} have together, in terms of $${a}$?`;
+      method = `${na} has "${k} ${sg > 0 ? 'more' : 'fewer'} than twice $${a}$": $2${a} ${sg > 0 ? '+' : '-'} ${k}$. Together: $${a} + (2${a} ${sg > 0 ? '+' : '-'} ${k}) = 3${a} ${sg > 0 ? '+' : '-'} ${k}$.`;
+      rule = 'twice first, then the "more than" or "fewer than"; and the question may ask for both people.';
+      envs = [{ [a]: 5 }, { [a]: 10 }];
     } else {
-      // fare: d dollars for the first mile, c cents for each additional quarter mile, trip of m miles
-      vars = ['d', 'c', 'm'];
-      const [Dd, C, M] = [V('d'), V('c'), V('m')];
+      // fare: d dollars for the first mile, c cents for each additional 1/q mile, trip of m miles
+      const q = rng.pick([2, 4, 5, 10, 20]);
+      const [dn, cn, mn] = rng.pick([['d', 'c', 'm'], ['f', 'p', 'k'], ['a', 'r', 'n']]);
+      vars = [dn, cn, mn];
+      nums = [q];
+      const [Dd, C, M] = [V(dn), V(cn), V(mn)];
       const m1 = subE(M, N(1));
-      correct = add(Dd, div(mul(C, m1), N(25)));
+      const g = gcd(q, 100);
+      const per = (e: E) => (q / g === 1 ? div(e, N(100 / g)) : div(mul(N(q / g), e), N(100 / g)));
+      correct = add(Dd, per(mul(C, m1)));
       wrong = [
-        { e: add(Dd, mul(N(4), mul(C, m1))), trap: 'algw-units-cents' },
-        { e: add(Dd, div(mul(C, M), N(25))), trap: 'algw-first-unit-twice' },
-        { e: add(Dd, div(mul(C, m1), N(100))), trap: 'algw-units-mismatch' },
-        { e: div(add(Dd, mul(N(4), mul(C, m1))), N(100)) },
+        { e: add(Dd, mul(N(q), mul(C, m1))), trap: 'algw-units-cents', why: `adding cents to dollars without dividing by 100` },
+        { e: add(Dd, per(mul(C, M))), trap: 'algw-first-unit-twice', why: `charging the first mile at the extra rate too, with $${mn}$ instead of $${mn} - 1$` },
+        { e: add(Dd, div(mul(C, m1), N(100))), trap: 'algw-units-mismatch', why: `treating $${cn}$ cents as the price of a whole mile instead of ${q === 2 ? 'a half' : `one ${q}th of a`} mile` },
+        { e: div(add(Dd, mul(N(q), mul(C, m1))), N(100)), trap: 'algw-units-cents', why: `dividing the dollars $${dn}$ by 100 as well` },
       ];
-      stem = `A taxi charges $d$ dollars for the first mile of a trip and $c$ cents for each additional $\\frac{1}{4}$ mile. Which of the following represents the charge, in dollars, for a trip of $m$ miles, where $m$ is an integer greater than 1?`;
-      explanation = `After the first mile there are $m - 1$ miles, that is, $4(m - 1)$ quarter miles, each costing $c$ cents: $4c(m - 1)$ cents, or $\\frac{4c(m - 1)}{100} = \\frac{c(m - 1)}{25}$ dollars. The total is $d + \\frac{c(m - 1)}{25}$ dollars.
-
-Adding $4c(m - 1)$ directly to $d$ mixes cents with dollars, and using $m$ instead of $m - 1$ charges the first mile twice.`;
+      stem = `A taxi charges $${dn}$ dollars for the first mile of a trip and $${cn}$ cents for each additional $\\frac{1}{${q}}$ mile. Which of the following represents the charge, in dollars, for a trip of $${mn}$ miles, where $${mn}$ is an integer greater than 1?`;
+      method = `After the first mile there are $${mn} - 1$ miles, that is, $${q}(${mn} - 1)$ pieces of $\\frac{1}{${q}}$ mile, each costing $${cn}$ cents: $${q}${cn}(${mn} - 1)$ cents, or $\\frac{${q}${cn}(${mn} - 1)}{100}$ dollars${g > 1 || q / g === 1 ? ` $= \\frac{${q / g === 1 ? '' : q / g}${cn}(${mn} - 1)}{${100 / g}}$` : ''}. The total is $${tex(correct)}$ dollars.`;
+      rule = 'convert cents to dollars once, and count only the miles after the first.';
+      envs = [{ [dn]: 3, [cn]: 50, [mn]: 3 }, { [dn]: 4, [cn]: 25, [mn]: 5 }];
     }
     const all = [{ e: correct, ok: true }, ...wrong.map((w) => ({ ...w, ok: false }))];
     const { choices, answer } = textChoices(
       rng,
       `$${tex(correct)}$`,
-      wrong.map((w): Choice => ({ text: `$${tex(w.e)}$`, ...(w.trap ? { trap: w.trap } : {}) })),
+      wrong.map((w): Choice => ({ text: `$${tex(w.e)}$`, trap: w.trap })),
       'random',
     );
     const exprs = choices.map((c) => all.find((a) => `$${tex(a.e)}$` === c.text)!.e);
-    return { params: { mode, vars, nums, exprs }, q: { format: 'mcs', stem, choices, answer, explanation } };
+    // A numeric example that separates the right expression from the first wrong one.
+    const cited = wrong[0];
+    const env = envs.find((en) => !evalE(cited.e, Object.fromEntries(Object.entries(en).map(([k, v]) => [k, frac(v)]))).eq(evalE(correct, Object.fromEntries(Object.entries(en).map(([k, v]) => [k, frac(v)])))));
+    const fr = (en: Record<string, number>) => Object.fromEntries(Object.entries(en).map(([k, v]) => [k, frac(v)]));
+    const envTex = env ? Object.entries(env).map(([k, v]) => `$${k} = ${num(v)}$`).join(', ') : '';
+    const check = env
+      ? `Check with ${envTex}: the story gives $${num(evalE(correct, fr(env)))}$, and $${tex(correct)}$ agrees. The choice $${tex(cited.e)}$ gives $${num(evalE(cited.e, fr(env)))}$.`
+      : '';
+    return {
+      params: { mode, vars, nums, exprs },
+      q: {
+        format: 'mcs',
+        stem,
+        choices,
+        answer,
+        explanation: `${method}
+
+${check}
+
+Trap: $${tex(cited.e)}$ comes from ${cited.why}.
+
+Rule: ${rule}`,
+      },
+    };
   },
   check(q, { mode, vars, nums, exprs }, rng) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -917,11 +956,11 @@ Adding $4c(m - 1)$ directly to $d$ mixes cents with dollars, and using $m$ inste
         const dd = frac(rng.int(100, 900), 100);
         const c = rng.int(10, 90);
         const m = rng.int(2, 30);
-        vals.d = dd;
-        vals.c = frac(c);
-        vals.m = frac(m);
+        vals[vars[0]] = dd;
+        vals[vars[1]] = frac(c);
+        vals[vars[2]] = frac(m);
         let centsTotal = 0;
-        for (let qm = 0; qm < 4 * (m - 1); qm++) centsTotal += c;
+        for (let qm = 0; qm < nums[0] * (m - 1); qm++) centsTotal += c;
         truth = dd.add(frac(centsTotal, 100));
       }
       exprs.forEach((e, i) => {
