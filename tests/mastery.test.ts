@@ -6,6 +6,7 @@ import {
   DAY,
   isOnPace,
   newSkillState,
+  nextCriteria,
   requirementsFor,
   stylesForMastered,
   type AttemptInput,
@@ -144,6 +145,14 @@ describe('mastery model', () => {
     expect(aided.state.level).toBe(3); // the full strategy card cancels the credit
     // The checklist is complete, so the very next credited answer promotes.
     expect(applyAttempt(aided.state, ans('t3', at18 + 1), REQ).state.level).toBe(4);
+  });
+
+  it('explains the retention clock once, in the label before the first credit and in the detail after it', () => {
+    const retention = (s: SkillState) => nextCriteria(s, REQ, T0 + H).find((c) => c.key === 'retention')!;
+    const none = retention({ ...proficient({}), firstCreditAt: undefined });
+    expect(none.label).toBe('Back 18 h after the first credit');
+    expect(none.detail).toBeUndefined();
+    expect(retention(proficient({ t1: 3 })).detail).toBe('18 h after the first credit');
   });
 
   it('cancels the credit only for the full strategy card', () => {

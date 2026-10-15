@@ -258,7 +258,8 @@ export function nextCriteria(s: SkillState, req: SkillRequirements, now: number)
           ? 'Back after 18 h'
           : `Back ${dayKey(back) === dayKey(now) ? '' : 'tomorrow '}after ${clockTime(back)}`,
     done: back !== undefined && now >= back,
-    detail: '18 h after the first credit',
+    // The label already says it while no time is known.
+    detail: back === undefined ? undefined : '18 h after the first credit',
   });
   return out;
 }
