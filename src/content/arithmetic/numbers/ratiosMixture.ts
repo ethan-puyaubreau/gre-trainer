@@ -125,7 +125,7 @@ const mixtureRatio: Template<RMParams> = {
           ? `${ctx.cont} X holds ${x} ${u} of a mixture of ${PA} and ${PB} in the ratio ${a} to ${b}. Then ${y} ${u} of pure ${pure === 1 ? PA : PB} are poured into ${ctx.cont} X. What is the ratio of ${PA} to ${PB} in the new mixture?`
           : diff === 2
             ? `${ctx.cont} X holds ${x} ${u} of a mixture of ${PA} and ${PB} in the ratio ${a} to ${b}. ${ctx.cont} Y holds ${y} ${u} of a mixture of ${PA} and ${PB} in the ratio ${c} to ${d}. The contents of both are poured together. What is the ratio of ${PA} to ${PB} in the combined mixture?`
-            : `Mixture X contains ${PA} and ${PB} in the ratio ${a} to ${b}. Mixture Y contains ${PA} and ${PB} in the ratio ${c} to ${d}. X and Y are combined so that the volume of X to the volume of Y is ${m} to ${n}. What is the ratio of ${PA} to ${PB} in the combined mixture?`;
+            : `Mixture X contains ${PA} and ${PB} in the ratio ${a} to ${b}. Mixture Y contains ${PA} and ${PB} in the ratio ${c} to ${d}. All ratios are measured in ${u}, and X and Y are combined so that the amount of X to the amount of Y is ${m} to ${n}. What is the ratio of ${PA} to ${PB} in the combined mixture?`;
       const vol = diff === 3 ? `Take ${num(x)} ${u} of X and ${num(y)} ${u} of Y, which keeps the volume ratio ${m} to ${n}. ` : '';
       const amounts =
         diff === 1
