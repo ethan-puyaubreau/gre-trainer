@@ -177,7 +177,7 @@ Rule: the surplus of one part is balanced by the deficit of the rest, weighted b
         ];
         citeId = 'stat-rest-mirror';
         stem = `${ctx.stemAvg(N, ctx.val(A.toNumber()))} The average ${ctx.noun} of ${N - k1} of them is ${ctx.amt(R)}. What is the average ${ctx.noun} of the other ${k1} ${ctx.members}?`;
-        steps = `The total of all ${N} is $${N} \\times ${fTex(A)} = ${fTex(total)}$. The ${N - k1} others hold $${N - k1} \\times ${num(R)} = ${num((N - k1) * R)}$, so the other ${k1} hold $${fTex(total)} - ${num((N - k1) * R)} = ${num(k1 * B1)}$, an average of $${num(k1 * B1)} \\div ${k1} = ${num(B1)}$.`;
+        steps = `The total of all ${N} is $${N} \\times ${fTex(A)} = ${fTex(total)}$. Those ${N - k1} hold $${N - k1} \\times ${num(R)} = ${num((N - k1) * R)}$, so the other ${k1} hold $${fTex(total)} - ${num((N - k1) * R)} = ${num(k1 * B1)}$, an average of $${num(k1 * B1)} \\div ${k1} = ${num(B1)}$.`;
         trapOf = (v) => `reflecting ${num(R)} about the overall average gives $${fTex(v)}$, but groups of different sizes balance unequally.`;
       } else if (mode === 'two') {
         answer = frac(R);
