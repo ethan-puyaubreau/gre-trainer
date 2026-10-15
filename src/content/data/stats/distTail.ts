@@ -158,10 +158,13 @@ const tailCompare: Template<TailParams> = {
           ? 'Recognize: both are normal, so measure each window in standard deviations. The share inside a window around the mean grows with the number of standard deviations it spans.'
           : `Recognize: both are normal with one cut-off, so locate the cut-off in standard deviations from each mean. ${mode === 'above' ? 'The cut-off that sits lower relative to its mean, in standard deviations, leaves the larger share above it.' : 'The cut-off that sits higher relative to its mean, in standard deviations, leaves the larger share below it.'}`;
       const verdict = ans === 'D' ? 'The comparison changes inside the allowed range of $s$, so the relationship cannot be determined.' : `So ${QC_WORDS[ans]}.`;
-      const trapLine =
-        mode === 'window'
-          ? 'Trap: a larger standard deviation does not put more values near the mean; it puts fewer inside the same window.'
-          : 'Trap: comparing only the means ignores the spreads. A mean that is higher does not by itself give a larger share above the cut-off.';
+      const TRAP_LINES: Record<string, string> = {
+        'stat-dist-sd-reversed': 'Trap: a larger standard deviation does not put more values near the mean; it puts fewer inside the same window.',
+        'stat-dist-mean-only': 'Trap: comparing only the means ignores the spreads. A mean that is higher does not by itself give a larger share on the side asked about.',
+        'stat-dist-range-ignored': 'Trap: an unknown standard deviation does not always mean D. Here both ends of the allowed range give the same comparison, so every value in between does too.',
+        'stat-dist-one-sd': 'Trap: testing one value of $s$ shows one relation, and the other end of the range shows the opposite.',
+      };
+      const trapLine = TRAP_LINES[Object.values(tr)[0] as string] ?? 'Trap: comparing raw numbers instead of standard units.';
       const rule = mode === 'window' ? 'Window width over standard deviation is what decides.' : 'Convert cut-offs to standard units before comparing.';
       return {
         params: { mode, mx, sx, my, syLo, syHi, wx, wy },
