@@ -40,7 +40,7 @@ const clockHands: Template<P> = {
   generate(rng, d) {
     const h = rng.int(1, 12);
     const m = d === 1 ? 10 * rng.int(0, 5) : d === 2 ? 5 + 10 * rng.int(0, 5) : rng.int(1, 59);
-    if (d === 3 && m % 5 === 0) throw new Redraw('multiple of 5');
+    if (d === 3 && (m % 5 === 0 || h === 12)) throw new Redraw('multiple of 5 or 12 o\'clock');
     const larger = d === 3 && rng.chance(0.5);
     const H2 = 60 * (h % 12) + m; // hour hand in half-degrees
     const M2 = 12 * m; // minute hand in half-degrees
@@ -59,12 +59,12 @@ const clockHands: Template<P> = {
     const time = clock((h % 12) * 60 + m + (rng.chance(0.5) ? 720 : 0), 'short');
     const word = larger ? 'larger' : 'smaller';
     const stem = rng.chance(0.5)
-      ? `A clock shows ${time}. What is the degree measure of the ${word} angle formed by the hour hand and the minute hand?`
+      ? `A clock shows ${time}${time.endsWith('.') ? '' : '.'} What is the degree measure of the ${word} angle formed by the hour hand and the minute hand?`
       : `At ${time}, the hour hand and the minute hand of an analog clock form two angles. What is the degree measure of the ${word} one?`;
     const Hd = new Frac(H2, 2);
     const Md = new Frac(M2, 2);
     const diff = new Frac(Math.abs(H2 - M2), 2);
-    const hourTxt = h % 12 === 0 ? `0.5 \\times ${m}` : `30 \\times ${h} + 0.5 \\times ${m}`;
+    const hourTxt = h % 12 === 0 ? `30 \\times 0 + 0.5 \\times ${m} \\text{ (12 counts as 0)}` : `30 \\times ${h} + 0.5 \\times ${m}`;
     const gap = diff.gt(180)
       ? `their difference is $${dec(diff)}^\\circ$, more than a half turn, so the smaller angle is $360 - ${dec(diff)} = ${dec(new Frac(s2, 2))}^\\circ$`
       : `their difference is $${dec(diff)}^\\circ$, at most a half turn, so it is the smaller angle`;
