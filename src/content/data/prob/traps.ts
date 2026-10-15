@@ -305,6 +305,22 @@ export const probTraps: Record<string, Trap> = {
     label: 'Miscounted the rows that satisfy the condition',
     fix: 'Test every row separately against the condition, then count the rows that pass.',
   },
+  'prob-di-no-divide': {
+    label: 'Gave the total change instead of the average per year',
+    fix: 'An average per year divides the total change by the number of years it took.',
+  },
+  'prob-di-one-interval': {
+    label: 'Used one interval instead of the whole span',
+    fix: 'An average over a span uses the first and last values of the span, not one interval inside it.',
+  },
+  'prob-di-no-subtract': {
+    label: 'Divided the final value without subtracting the starting value',
+    fix: 'An increase is the final value minus the starting value; divide that difference by the years.',
+  },
+  'prob-di-wrong-fraction': {
+    label: 'Used the wrong fraction in the comparison',
+    fix: 'Compare with exactly the fraction stated in the question, for example one fifth of the other column.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

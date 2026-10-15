@@ -1,13 +1,4 @@
 {
-  "data.interpretation.decades-how-many": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.decades-per-year": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.decades-percent": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.homes-combined-mean": {
     "distractors.trapped": "baseline"
   },
