@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calculator } from '../components/Calculator';
+import { Modal } from '../components/Modal';
 import { QuestionView } from '../components/QuestionView';
 import { Rich } from '../components/Rich';
 import { formatClock } from '../components/Timer';
@@ -198,6 +199,7 @@ function Exam({
   const [idx, setIdx] = useState(0);
   const [review, setReview] = useState(false);
   const [calc, setCalc] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const [hideClock, setHideClock] = useState(!useProgress.getState().settings.showTimer);
   const [now, setNow] = useState(Date.now());
   const enteredAt = useRef(Date.now());
@@ -282,6 +284,7 @@ function Exam({
   }, [review, q, idx, sec.responses]);
 
   const answered = sec.responses.filter((r) => isAnswered(r)).length;
+  const missing = sec.questions.length - answered;
   const low = remaining < 5 * 60_000;
 
   return (
@@ -349,16 +352,23 @@ function Exam({
             </table>
             <div className="row" style={{ marginTop: 16 }}>
               <span className="spacer" />
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  const missing = sec.questions.length - answered;
-                  if (missing === 0 || window.confirm(`${missing} question${missing > 1 ? 's are' : ' is'} not answered. End the section anyway?`)) end();
-                }}
-              >
+              <button className="btn btn-primary" onClick={() => (missing === 0 ? end() : setConfirmEnd(true))}>
                 End section
               </button>
             </div>
+            <Modal open={confirmEnd} title="End this section?" onClose={() => setConfirmEnd(false)}>
+              <p>
+                {missing} question{missing > 1 ? 's are' : ' is'} not answered. Once the section has ended you cannot go back to it.
+              </p>
+              <div className="modal-actions">
+                <button className="btn" onClick={() => setConfirmEnd(false)}>
+                  Keep working
+                </button>
+                <button className="btn btn-primary" onClick={end}>
+                  End section
+                </button>
+              </div>
+            </Modal>
           </div>
         ) : (
           <>

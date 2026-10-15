@@ -937,3 +937,40 @@ details summary {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ---- modal */
+.modal {
+  width: min(440px, calc(100% - 32px));
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(10, 5, 20, 0.3);
+}
+.modal::backdrop {
+  background: rgba(10, 5, 20, 0.45);
+}
+.modal[open] {
+  animation: modal-in var(--dur) var(--ease-out);
+}
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.modal p {
+  margin: 0;
+  color: var(--muted);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
