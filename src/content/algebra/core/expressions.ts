@@ -414,6 +414,12 @@ interface PowParams {
   sign: 1 | -1;
 }
 
+/** True when v = b^k for an integer k >= 0. An exact integer loop: a floating-point logarithm is not exactly an integer (log 9 / log 3 is not 2). */
+const isPowerOf = (v: number, b: number) => {
+  for (let p = 1; p <= v; p *= b) if (p === v) return true;
+  return false;
+};
+
 const powerFactorNE: Template<PowParams> = {
   id: 'alg.expressions.power-factor-ne',
   skill: 'alg.expressions',
@@ -432,7 +438,7 @@ const powerFactorNE: Template<PowParams> = {
     let sign: 1 | -1 = -1;
     if (kind === 'value') {
       do v = rng.int(3, d === 1 ? 12 : 20);
-      while (Math.log(v) / Math.log(b) === Math.round(Math.log(v) / Math.log(b)));
+      while (isPowerOf(v, b));
       m = rng.int(1, b === 5 ? 2 : 3);
       n = d === 3 ? rng.int(0, m - 1) : 0;
       sign = d === 1 ? -1 : rng.pick([1, -1]);
@@ -468,7 +474,7 @@ Do not subtract exponents across a difference: $${b}^{n + ${m}} - ${b}^{n}$ is n
       traps = [{ value: frac(b ** (m - 1)), trap: 'alg-power-difference' }];
     } else {
       do v = rng.int(3, 15);
-      while (Math.log(v) / Math.log(b) === Math.round(Math.log(v) / Math.log(b)));
+      while (isPowerOf(v, b));
       m = 1;
       answer = v * v + b * v;
       stem = `If $${b}^{x} = ${v}$, what is the value of $${b * b}^{x} + ${b}^{x + 1}$?`;

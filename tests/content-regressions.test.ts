@@ -78,3 +78,25 @@ describe('arith.number-line.farthest', () => {
     expect(bad).toEqual([]);
   });
 });
+
+/** True when v is b^k for some integer k >= 0 (exact integer loop, no floating-point logarithm). */
+const isIntegerPower = (v: number, b: number) => {
+  for (let p = 1; p <= v; p *= b) if (p === v) return true;
+  return false;
+};
+
+describe('alg.expressions.power-factor-ne', () => {
+  it('b^x = v is never an exact power, so "x is not an integer" is true', () => {
+    const bad: string[] = [];
+    let n = 0;
+    for (const { seed, d, q, params } of bodies('alg.expressions.power-factor-ne')) {
+      const { kind, b, v } = params as { kind: string; b: number; v: number };
+      if (kind !== 'value' && kind !== 'square') continue;
+      n++;
+      if (isIntegerPower(v, b)) bad.push(`seed ${seed} d${d}: ${b}^x = ${v} has the integer solution x`);
+      if (q.format === 'ne' && /not an integer/.test(q.explanation ?? '') && isIntegerPower(v, b)) bad.push(`seed ${seed} d${d}: explanation says x is not an integer`);
+    }
+    expect(n).toBeGreaterThan(300);
+    expect(bad).toEqual([]);
+  });
+});
