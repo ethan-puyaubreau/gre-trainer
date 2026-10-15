@@ -7,6 +7,7 @@ import type { GeometryFigure, QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, RAD, add, angleAt, bisect, dir, dist, fromSides, intersect, lerp, mul, near, rot, shoelace, sub, type Pt } from './fig';
 import { mulberry } from './lines';
 import { checkMcm, checkMcs, intChoices, positioned, qcTraps, QC_SAY } from './util';
+import { retryAll } from '../redraw';
 
 const SKILL = 'geo.similarity';
 const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
@@ -843,4 +844,4 @@ ${stmts.map((s) => `- ${text(s).t.replace(/\.$/, '')}: ${why[s.key]} ${s.truth ?
   },
 };
 
-export const similarTemplates = [parallelSegment, areaRatioQC, scaleMCS, statementsMCM];
+export const similarTemplates = retryAll([parallelSegment, areaRatioQC, scaleMCS, statementsMCM]);

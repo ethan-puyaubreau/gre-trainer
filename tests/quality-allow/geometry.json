@@ -18,9 +18,6 @@
   "geo.composite.inscribed": {
     "distractors.trapped": "baseline"
   },
-  "geo.composite.shaded": {
-    "distractors.trapped": "baseline"
-  },
   "geo.lines-angles.around-point": {
     "artifacts.frac-1": "baseline"
   },
@@ -43,19 +40,6 @@
   "geo.polygons.rectangles": {
     "distractors.trapped": "baseline"
   },
-  "geo.right-triangles.compare-qc": {
-    "qc.d-share": "baseline"
-  },
-  "geo.right-triangles.pythagorean-ne": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "geo.right-triangles.special-mcs": {
-    "distractors.trapped": "baseline"
-  },
-  "geo.right-triangles.two-step-mcs": {
-    "distractors.trapped": "baseline"
-  },
   "geo.similarity.parallel-segment-ne": {
     "artifacts.frac-1": "baseline"
   },
@@ -65,25 +49,6 @@
   },
   "geo.similarity.statements-mcm": {
     "artifacts.frac-1": "baseline"
-  },
-  "geo.solids.compare-qc": {
-    "artifacts.plural-1": "baseline",
-    "bank.difficulty": "baseline",
-    "figures.scale": "baseline"
-  },
-  "geo.solids.measures": {
-    "distractors.trapped": "baseline",
-    "figures.scale": "baseline"
-  },
-  "geo.solids.pour": {
-    "artifacts.plural-1": "baseline",
-    "figures.scale": "baseline"
-  },
-  "geo.solids.scaling": {
-    "distractors.trapped": "baseline"
-  },
-  "geo.triangles.angle-sum": {
-    "distractors.trapped": "baseline"
   },
   "geo.triangles.iso-inequality-qc": {
     "qc.d-share": "baseline"

@@ -19,6 +19,7 @@ import {
   type Pt,
 } from './fig';
 import { angleLabel, checkMcm, checkMcs, evalTex, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
+import { retryAll } from '../redraw';
 
 const SKILL = 'geo.lines-angles';
 const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
@@ -996,4 +997,4 @@ ${why}`,
   },
 };
 
-export const linesTemplates = [parallelAlgebra, aroundPoint, zigzagQC, eightAngles];
+export const linesTemplates = retryAll([parallelAlgebra, aroundPoint, zigzagQC, eightAngles]);

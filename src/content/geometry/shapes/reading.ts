@@ -3,6 +3,7 @@ import type { QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, add, angleAt, bisect, dir, dist, foot, fromSides, intersect, mul, near, shoelace, sub, unit, type Pt } from './fig';
 import { drawPhi, isPhiType, measureAt, measured, mulberry, POSITIONS, transversalFigure, type At, type Pos } from './lines';
 import { checkMcm, qcTraps, QC_SAY } from './util';
+import { retryAll } from '../redraw';
 
 const SKILL = 'geo.figure-reasoning';
 const flip = (c: QCChoice): QCChoice => (c === 'A' ? 'B' : c === 'B' ? 'A' : c);
@@ -777,4 +778,4 @@ ${answer === 'B' ? `Every possible value of $AB$ is less than $${N}$. (B)` : ans
   },
 };
 
-export const readingTemplates = [pointOnSide, linesLookQC, mustBeTrue, rightAngleQC];
+export const readingTemplates = retryAll([pointOnSide, linesLookQC, mustBeTrue, rightAngleQC]);

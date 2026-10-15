@@ -5,6 +5,7 @@ import { lin, num, paren, plain } from '../../../engine/tex';
 import type { Choice, MCSQuestion, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, type ExData } from './ex';
 import { Fig, onCircle, type P2 } from './fig';
+import { retryAll } from '../redraw';
 
 const deg = (v: number | string) => `${v}^\\circ`;
 const relText = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -1064,5 +1065,5 @@ Equal areas do not mean equal perimeters: for a given area, the square has the s
   },
 };
 
-export const polygonTemplates = [angleSum, rectangles, fence, compareQC, perimeterFraction];
+export const polygonTemplates = retryAll([angleSum, rectangles, fence, compareQC, perimeterFraction]);
 

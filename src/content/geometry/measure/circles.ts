@@ -5,6 +5,7 @@ import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, dist, pathLength, shoelace, unitCircle } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
+import { retryAll } from '../redraw';
 
 const deg = (v: number | string) => `${v}^\\circ`;
 const relText = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -823,5 +824,5 @@ The leg is half the chord (${half}), not the whole chord.`;
   },
 };
 
-export const circleTemplates = [ratio, arcSector, compareQC, lengths];
+export const circleTemplates = retryAll([ratio, arcSector, compareQC, lengths]);
 
