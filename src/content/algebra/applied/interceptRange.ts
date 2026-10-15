@@ -77,7 +77,7 @@ The slope is $\\frac{${num(q2)} - ${paren(q)}}{${num(p2)} - ${paren(p)}} = ${num
 
 Compare $${num(X)}$ with $${num(N)}$. ${qcEnd(answer)}
 
-Trap: ${wrongAns !== answer ? `adding $\\frac{q}{m}$ instead of subtracting gives $${num(wrong)}$, which would point to ${wrongAns}` : 'a sign slip can still move the intercept to the other side of the point'}. Rule: x-intercept = $x_0 - \\frac{y_0}{m}$.`,
+Trap: ${wrongAns !== answer ? `adding $\\frac{${num(q)}}{${num(m)}} = ${num(frac(q).div(m))}$ to $${num(p)}$ instead of subtracting it gives $${num(wrong)}$, which would point to ${wrongAns}` : 'a sign slip can still move the intercept to the other side of the point'}. Rule: x-intercept = $x_0 - \\frac{y_0}{m}$.`,
           },
         };
       }
