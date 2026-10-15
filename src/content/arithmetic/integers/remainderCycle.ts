@@ -37,8 +37,8 @@ const remainderCycle: Template<RemParams> = {
       let c = 1;
       let s = 0;
       if (diff === 1) {
-        b = rng.pick([6, 7, 8, 9, 10, 12]);
-        a = b * rng.int(2, 6);
+        b = rng.pick([6, 8, 10, 12, 14]);
+        a = (b / 2) * rng.pick([3, 5, 7]);
       } else {
         a = rng.int(10, 45);
         b = rng.int(8, 30);
@@ -48,9 +48,9 @@ const remainderCycle: Template<RemParams> = {
         }
       }
       const g = gcd(c * a, b);
-      if (diff === 1 ? g !== b : g === 1 || g === b) continue;
+      if (diff === 1 ? g !== b / 2 : g === 1 || g === b) continue;
       const r = rng.int(1, a - 1);
-      if (diff === 1 && (r < b || r % b === 0)) continue;
+      if (diff === 1 && r < b) continue;
       const start = mod(c * r + s, b);
       const step = mod(c * a, b);
       const poss = (v: number) => (v - start) % g === 0;
@@ -61,7 +61,7 @@ const remainderCycle: Template<RemParams> = {
         else bad.push({ v, trap: v === mod(-start, b) ? 'int-remainder-complement' : v === step ? 'int-used-divisor-remainder' : 'int-remainder-any-possible' });
       }
       const count = diff === 1 ? 5 : 6;
-      const nGood = diff === 1 ? 1 : rng.int(1, Math.min(3, good.length));
+      const nGood = diff === 1 ? 2 : rng.int(1, Math.min(3, good.length));
       if (bad.length < count - nGood) continue;
       const items = [...rng.sample(good, nGood).map((v) => ({ v, correct: true, trap: undefined as string | undefined })), ...rng.sample(bad, count - nGood).map((x) => ({ ...x, correct: false }))].sort((x, y) => x.v - y.v);
       if (items.length !== count) continue;
