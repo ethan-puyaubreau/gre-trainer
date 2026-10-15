@@ -5,20 +5,6 @@
   "arith.exponents.common-base-qc": {
     "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
   },
-  "arith.ratios.change-ne": {
-    "artifacts.frac-1": "baseline",
-    "artifacts.plural-1": "baseline"
-  },
-  "arith.ratios.combine-mcs": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.ratios.ratio-qc": {
-    "artifacts.frac-1": "baseline"
-  },
-  "arith.real-numbers.extreme-mcs": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline"
-  },
   "arith.roots.combine-qc": {
     "qc.never-d": "Both quantities are fixed numbers, so D (cannot be determined) is impossible."
   }

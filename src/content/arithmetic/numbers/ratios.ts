@@ -2,6 +2,7 @@ import { qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { num, plain, usd } from '../../../engine/tex';
+import { plural } from '../../../engine/text';
 import type { Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { expectMCS, expectNE, expectQC, F, numChoices, pickWeighted, qcEnd, swapQC } from './util';
 
@@ -211,14 +212,20 @@ const combineRatios: Template<CRParams> = {
         // naive: p : q : t
         const naiveParts = p + q + t;
         const traps: { value: Frac; trap: string }[] = [];
-        if ((total * t) % naiveParts === 0) traps.push({ value: F((total * t) / naiveParts), trap: 'num-ratio-chain' });
+        const chainVal = (total * t) % naiveParts === 0 ? F((total * t) / naiveParts) : null;
+        if (chainVal) traps.push({ value: chainVal, trap: 'num-ratio-chain' });
         traps.push({ value: F(m), trap: 'num-ratio-parts' });
+        traps.push({ value: F(A * m), trap: 'num-ratio-wrong-part' }, { value: F(B * m), trap: 'num-ratio-wrong-part' });
+        if ((total * t) % (s + t) === 0) traps.push({ value: F((total * t) / (s + t)), trap: 'num-ratio-chain' });
+        traps.push({ value: ans.add(m), trap: 'num-ratio-part-count' }, { value: ans.sub(m), trap: 'num-ratio-part-count' });
         const { choices, answer, values } = numChoices(rng, {
           correct: ans,
-          traps,
-          fillers: [F(A * m), F(B * m), F(Math.round((total * t) / (s + t))), ans.add(m), ans.sub(m)],
+          traps: traps.filter((t2) => t2.value.sign() > 0),
+          fillers: [],
           format: (v) => `$${num(v.toNumber())}$`,
+          order: 'shuffled',
         });
+        const shownV = (v: Frac) => !v.eq(ans) && values.some((x) => x.eq(v));
         return {
           params: { mode, p, q, s, t, total, values },
           q: {
@@ -230,7 +237,16 @@ const combineRatios: Template<CRParams> = {
 
 There are $${A} + ${B} + ${C} = ${parts}$ parts, so one part is $${plain(total)} \\div ${parts} = ${m}$ ${ctx.noun}, and the ${nc} ${ctx.noun} are $${C} \\times ${m} = ${C * m}$.
 
-Writing the ratio as $${p} : ${q} : ${t}$ mixes two different scales for the ${nb} ${ctx.noun}.`,
+Check: $${A} \\times ${m} + ${B} \\times ${m} + ${C} \\times ${m} = ${plain(total)}$.
+
+Trap: ${[
+              chainVal && shownV(chainVal) ? `writing the ratio as $${p} : ${q} : ${t}$ mixes two different scales for the ${nb} ${ctx.noun}` : '',
+              shownV(F(m)) ? `${m} is the size of one part, not the number of ${nc} ${ctx.noun}` : '',
+              shownV(F(A * m)) || shownV(F(B * m)) ? `${shownV(F(A * m)) ? A * m : B * m} is the share of another group` : '',
+            ]
+              .filter(Boolean)
+              .slice(0, 2)
+              .join('; ')}.`,
           },
         };
       }
@@ -239,10 +255,19 @@ Writing the ratio as $${p} : ${q} : ${t}$ mixes two different scales for the ${n
       const fmt = (v: Frac) => `$${v.n} \\text{ to } ${v.d}$`;
       const { choices, answer, values } = numChoices(rng, {
         correct,
-        traps: [{ value: F(p, t), trap: 'num-ratio-chain' }],
-        fillers: [F(C, A), F(p * q, s * t), F(p + s, q + t), F(A, B), F(B, C)],
+        traps: [
+          { value: F(p, t), trap: 'num-ratio-chain' },
+          { value: F(C, A), trap: 'num-ratio-order' },
+          { value: F(p * q, s * t), trap: 'num-ratio-chain' },
+          { value: F(p + s, q + t), trap: 'num-ratio-chain' },
+          { value: F(A, B), trap: 'num-ratio-wrong-part' },
+          { value: F(B, C), trap: 'num-ratio-wrong-part' },
+        ],
+        fillers: [],
         format: fmt,
+        order: 'shuffled',
       });
+      const shownR = (v: Frac) => !v.eq(correct) && values.some((x) => x.eq(v));
       return {
         params: { mode, p, q, s, t, total: 0, values },
         q: {
@@ -252,7 +277,16 @@ Writing the ratio as $${p} : ${q} : ${t}$ mixes two different scales for the ${n
           answer,
           explanation: `${combine}
 
-So the ratio of ${na} to ${nc} is $${A} \\text{ to } ${C}$. Reading $${p}$ and $${t}$ off the two given ratios ignores that the ${nb} terms ($${q}$ and $${s}$) are different.`,
+So the ratio of ${na} to ${nc} is $${A} \\text{ to } ${C}$.
+
+Check: with ${nb} $= ${B}$ parts, ${na} $= ${A}$ parts and ${nc} $= ${C}$ parts, both given ratios hold.
+
+Trap: ${[
+            shownR(F(p, t)) ? `reading $${p}$ and $${t}$ off the two given ratios ignores that the ${nb} terms, $${q}$ and $${s}$, are different` : '',
+            shownR(F(C, A)) ? `$${C} \\text{ to } ${A}$ has the order reversed` : '',
+          ]
+            .filter(Boolean)
+            .join('; ') || 'the ratio must be built on one common value of the middle term'}.`,
         },
       };
     }
@@ -292,9 +326,9 @@ interface RCParams {
 }
 
 const RC_CTX = [
-  { g: ['boys', 'girls'], where: 'In a class', join: (n: number) => `${n} more boys join the class`, leave: (n: number) => `${n} boys leave the class`, unit: ['boys', 'girls'] },
-  { g: ['red marbles', 'blue marbles'], where: 'In a bag', join: (n: number) => `${n} red marbles are added to the bag`, leave: (n: number) => `${n} red marbles are removed from the bag`, unit: ['red marbles', 'blue marbles'] },
-  { g: ['cats', 'dogs'], where: 'At an animal shelter', join: (n: number) => `${n} more cats arrive at the shelter`, leave: (n: number) => `${n} cats are adopted`, unit: ['cats', 'dogs'] },
+  { g: ['boys', 'girls'], sing: ['boy', 'girl'], where: 'In a class', join: (n: number) => `${n} more boys join the class`, leave: (n: number) => `${n} boys leave the class`, unit: ['boys', 'girls'] },
+  { g: ['red marbles', 'blue marbles'], sing: ['red marble', 'blue marble'], where: 'In a bag', join: (n: number) => `${n} red marbles are added to the bag`, leave: (n: number) => `${n} red marbles are removed from the bag`, unit: ['red marbles', 'blue marbles'] },
+  { g: ['cats', 'dogs'], sing: ['cat', 'dog'], where: 'At an animal shelter', join: (n: number) => `${n} more cats arrive at the shelter`, leave: (n: number) => `${n} cats are adopted`, unit: ['cats', 'dogs'] },
 ];
 
 const ratioChange: Template<RCParams> = {
@@ -341,9 +375,9 @@ const ratioChange: Template<RCParams> = {
           answer: F(ans),
           suffix: ask === 'other' ? ctx.unit[1] : ask === 'changed-after' ? ctx.unit[0] : `${n1} and ${n2}`,
           traps: traps.filter((t) => !t.value.eq(ans)),
-          explanation: `Write the counts with one unknown: ${n1} $= ${cm(p)}$ and ${n2} $= ${cm(q)}$. After the change, $\\frac{${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}}{${cm(q)}} = \\frac{${r}}{${s}}$, so $${s}(${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}) = ${cm(r * q)}$, that is, $${cm(s * p)} ${change > 0 ? '+' : '-'} ${s * Math.abs(change)} = ${cm(r * q)}$, which gives $m = ${m}$.
+          explanation: `Write the counts with one unknown: ${n1} $= ${cm(p)}$ and ${n2} $= ${cm(q)}$. After the change, $\\frac{${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}}{${cm(q)}} = ${s === 1 ? r : `\\frac{${r}}{${s}}`}$, so ${s === 1 ? `$${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)} = ${cm(r * q)}$` : `$${s}(${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}) = ${cm(r * q)}$, that is, $${cm(s * p)} ${change > 0 ? '+' : '-'} ${s * Math.abs(change)} = ${cm(r * q)}$`}, which gives $m = ${m}$.
 
-So there were ${p * m} ${n1} and ${q * m} ${n2}${ask === 'changed-after' ? `, and after the change there are ${g1} ${n1}` : ''}. Check: $${g1} : ${g2} = ${r} : ${s}$. The answer is ${ans}${ask === 'other' ? '' : ''}, not $m = ${m}$ (the size of one part).`,
+So there were ${p * m} ${n1} and ${q * m} ${n2}${ask === 'changed-after' ? `, and after the change there are ${plural(g1, ctx.sing[0], n1)}` : ''}. Check: $${g1} : ${g2} = ${r} : ${s}$. The answer is ${ans}, not $m = ${m}$ (the size of one part).`,
         },
       };
     }
@@ -401,7 +435,7 @@ const ratioQC: Template<RQParams> = {
     let p: number;
     let q: number;
     do [p, q] = [rng.int(1, 9), rng.int(1, 9)];
-    while (p === q || gcd(p, q) !== 1);
+    while (p === q || gcd(p, q) !== 1 || (mode !== 'count' && q === 1));
     if (mode === 'sign') {
       const cond = pickWeighted<RQParams['cond']>(rng, [
         ['nonzero', 4],

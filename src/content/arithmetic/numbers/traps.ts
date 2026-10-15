@@ -205,6 +205,14 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Combined two ratios without a common middle term',
     fix: 'Rescale both ratios so the shared quantity has the same number: $a : b = 2 : 3$ and $b : c = 4 : 5$ become $8 : 12$ and $12 : 15$, so $a : b : c = 8 : 12 : 15$.',
   },
+  'num-ratio-part-count': {
+    label: 'Counted one part too many or too few',
+    fix: 'The number of parts is the sum of the terms of the combined ratio ($A + B + C$). Check that the three shares add up to the total.',
+  },
+  'num-ratio-order': {
+    label: 'Wrote the ratio in the wrong order',
+    fix: '"The ratio of $a$ to $c$" puts $a$ first: $a : c$, not $c : a$.',
+  },
   'num-ratio-parts': {
     label: 'Gave the size of one part instead of the quantity',
     fix: 'After finding one part ($m$), multiply by the number of parts the quantity has.',

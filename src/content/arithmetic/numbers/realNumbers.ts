@@ -1,7 +1,7 @@
 import { flaggedChoices, qcFromSamples } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import type { Choice, Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { expectMCM, expectMCS, expectNE, expectQC, F, pickWeighted, qcEnd, qcFromFloatSamples, swapQC } from './util';
+import { expectMCM, expectMCS, expectNE, expectQC, F, pickWeighted, QC_REL, qcEnd, qcFromFloatSamples, swapQC } from './util';
 
 /* ------------------------------------------------------------------ intervals */
 
@@ -167,7 +167,7 @@ const mustBeTrue: Template<MustParams> = {
       const choices: (Choice & { correct: boolean })[] = [];
       for (const [k, { s }] of picked.entries()) {
         if (truth[k]) {
-          lines.push(`- $${s.tex}$ holds exactly when $${setTex(s.set, 'z')}$, and every allowed $z$ is in that range ✓`);
+          lines.push(`- $${s.tex}$ holds when $${setTex(s.set, 'z')}$, which covers every allowed $z$ ✓`);
           choices.push({ text: `$${s.tex}$`, correct: true });
           continue;
         }
@@ -175,7 +175,7 @@ const mustBeTrue: Template<MustParams> = {
         if (!cx) throw new Error(`no counterexample for ${s.tex} under ${cond.tex}`);
         const endpoint = cond.set.some((I) => (I.lo && I.loC && I.lo.eq(cx)) || (I.hi && I.hiC && I.hi.eq(cx)));
         const trap = s.recip ? 'reciprocal-direction' : cx.sign() < 0 ? 'negative-fraction-sign' : endpoint ? 'num-boundary-value' : 'tested-one-value';
-        lines.push(`- $${s.tex}$ fails for $z = ${fracTex(cx)}$${endpoint ? ' (an allowed endpoint)' : ''}: ${evalText(s.tex, cx)} ✗`);
+        lines.push(`- $${s.tex}$ fails for $z = ${fracTex(cx)}$${endpoint ? ' (an endpoint)' : ''}: ${evalText(s.tex, cx)} ✗`);
         choices.push({ text: `$${s.tex}$`, correct: false, trap });
       }
       const { choices: ch, answer } = flaggedChoices(choices);
@@ -188,7 +188,7 @@ const mustBeTrue: Template<MustParams> = {
           instruction: 'Indicate all such statements.',
           choices: ch,
           answer,
-          explanation: `The allowed values are $${setTex(cond.set, 'z')}$. A statement must be true only if it holds for EVERY allowed $z$, so test ${tests}, and remember that one counterexample is enough to rule a statement out.
+          explanation: `The allowed values are $${setTex(cond.set, 'z')}$. A statement must hold for EVERY allowed $z$, so test ${tests}: one counterexample rules a statement out.
 ${lines.join('\n')}`,
         },
       };
@@ -279,6 +279,7 @@ const EXPRS: Ex[] = [
   { tex: '|x|', f: (x) => x.abs(), num: (x) => Math.abs(x) },
   { tex: '\\sqrt{x}', f: (x) => (x.sign() < 0 ? null : sqrtFrac(x)), num: (x) => Math.sqrt(x), nonneg: true },
   { tex: '-x^3', f: (x) => x.pow(3).neg(), num: (x) => -(x ** 3) },
+  { tex: 'x^6', f: (x) => x.pow(6), num: (x) => x ** 6 },
 ];
 const CONSTS: Ex[] = [
   { tex: '0', f: () => F(0), num: () => 0 },
@@ -388,14 +389,11 @@ const orderQC: Template<OrderParams> = {
       if (traps && Object.keys(traps).includes(answer)) traps = undefined;
       const sym = (r: QCChoice) => (r === 'A' ? '>' : r === 'B' ? '<' : '=');
       const lines = rows
-        .map(
-          (r) =>
-            `- $x = ${r.x.toTex()}$${r.endpoint ? ' (endpoint)' : ''}: Quantity A is $${r.va.toTex()}$ and Quantity B is $${r.vb.toTex()}$, so A $${sym(r.rel)}$ B`,
-        )
+        .map((r) => `- $x = ${r.x.toTex()}$${r.endpoint ? ' (endpoint)' : ''}: $A = ${r.va.toTex()}$, $B = ${r.vb.toTex()}$, so A $${sym(r.rel)}$ B`)
         .join('\n');
       // The conclusion must follow from what is shown. D: two cited cases that disagree. C: the identity |x| = +-x on the range.
       // A or B: the quantities can only be equal at the points of {-1, 0, 1} listed (and where |x| = +-x), none of them allowed,
-      // so the comparison cannot change inside the range and the tested values decide it.
+      // so they never switch order inside the range and the tested values settle it.
       const nonneg = cond.set.every((I) => I.lo && !I.lo.lt(0));
       const nonpos = cond.set.every((I) => I.hi && !I.hi.gt(0));
       const absPair = [A, B].some((e) => e.tex === '|x|') ? [A, B].find((e) => e.tex === 'x' || e.tex === '-x') : undefined;
@@ -410,19 +408,27 @@ const orderQC: Template<OrderParams> = {
       const reason =
         answer === 'D'
           ? other
-            ? `${at(rows[0])}, but ${at(other)}, so the comparison changes with $x$.`
+            ? `${at(rows[0])}, but ${at(other)}: the comparison flips inside the range.`
             : 'The comparison changes with $x$.'
           : answer === 'C' && absPair && (nonneg || nonpos)
-            ? `The absolute value of a number that is ${nonneg ? 'not negative' : 'not positive'} is ${nonneg ? 'the number itself' : 'its opposite'}, so $|x| = ${nonneg ? 'x' : '-x'}$ for every allowed $x$ and the two quantities are the same number.`
+            ? `For a number that is ${nonneg ? 'not negative' : 'not positive'}, $|x| = ${nonneg ? 'x' : '-x'}$: the two quantities are the same number.`
             : answer === 'A' || answer === 'B'
               ? `${
                   absPair
-                    ? `$|x| = ${absPair.tex}$ exactly when $x ${absPair.tex === 'x' ? '\\ge' : '\\le'} 0$, and no allowed $x$ does that`
+                    ? `$|x| = ${absPair.tex}$ only when $x ${absPair.tex === 'x' ? '\\ge' : '\\le'} 0$, which no allowed $x$ satisfies`
                     : eqPts.length === 0
-                      ? 'Quantity A and Quantity B are never equal'
-                      : `Quantity A and Quantity B are equal only when ${ptTex.length > 1 ? `${ptTex.slice(0, -1).join(', ')} or ${ptTex[ptTex.length - 1]}` : ptTex[0]}, and ${ptTex.length > 1 ? 'none of these values is' : 'this value is not'} allowed here`
-                }, so the comparison cannot change inside the allowed range and ${rows.length > 1 ? 'the values' : 'the value'} above ${rows.length > 1 ? 'decide' : 'decides'} it for every allowed $x$.`
+                      ? 'A and B are never equal'
+                      : `A and B can be equal only at ${ptTex.length > 1 ? `${ptTex.slice(0, -1).join(', ')} or ${ptTex[ptTex.length - 1]}` : ptTex[0]}, and ${ptTex.length > 1 ? 'none of these is' : 'it is not'} allowed`
+                }, so they never switch order inside the range: ${rows.length > 1 ? 'the values' : 'the value'} above settle${rows.length > 1 ? '' : 's'} it.`
               : 'The two quantities are equal for every allowed $x$.';
+      const trapLine =
+        answer === 'D'
+          ? 'Trap: one test value, or the endpoints alone, can hide the flip; test every part of the range.'
+          : traps
+            ? `Trap: ${Object.entries(traps)
+                .map(([k]) => `reasoning with a value outside this range (such as $x = 2$) points to ${QC_REL[k as QCChoice]}`)
+                .join('; ')}.`
+            : '';
       return {
         params: { cond: ci, a: A.tex, b: B.tex },
         q: {
@@ -432,12 +438,10 @@ const orderQC: Template<OrderParams> = {
           quantityB: `$${B.tex}$`,
           answer,
           traps,
-          explanation: `Test a value from each part of the allowed range${
-            rows.some((r) => r.endpoint) ? ' and the endpoints that are allowed' : rows.some((r) => r.boundary) ? ', including the special values $-1$, $0$ and $1$ when they are allowed' : ''
-          }:
+          explanation: `Compare the quantities on every part of the allowed range${rows.some((r) => r.endpoint) ? ', endpoints included' : ''}:
 ${lines}
 
-${reason} ${qcEnd(answer)}`,
+${reason} ${qcEnd(answer)}${trapLine ? `\n\n${trapLine}` : ''}`,
         },
       };
     }
@@ -470,6 +474,18 @@ const REGIONS: { tex: string; set: Iv[]; lo: number; hi: number }[] = [
   { tex: 'x < -1', set: [iv(null, -1, false, false)], lo: -30, hi: -1 },
 ];
 
+const REGION_WORDS = ['between $0$ and $1$', 'between $-1$ and $0$', 'greater than $1$', 'less than $-1$'];
+const D1_EXPRS = ['x', 'x^2', 'x^3', '\\frac{1}{x}', '\\sqrt{x}', 'x^4', 'x^5', 'x^6', '\\frac{1}{x^2}'];
+
+/** Mistake behind an answer that is right in region `other` but not in `region`. */
+function regionSlip(region: number, other: number): string {
+  const neg = (r: number) => r === 1 || r === 3;
+  if (neg(region) !== neg(other)) return 'negative-fraction-sign';
+  if (region === 0 && other === 2) return 'fraction-power-grows';
+  if (region === 2 && other === 0) return 'reciprocal-direction';
+  return 'tested-one-value';
+}
+
 const extremeMCS: Template<ExtremeParams> = {
   id: 'arith.real-numbers.extreme-mcs',
   skill: 'arith.real-numbers',
@@ -477,15 +493,12 @@ const extremeMCS: Template<ExtremeParams> = {
   style: 'greatest or least of x, x², x³, 1/x on an interval',
   generate(rng, d) {
     for (;;) {
-      const region = d === 1 ? 0 : d === 2 ? rng.pick([0, 1, 2, 3]) : rng.pick([1, 1, 3, 0]);
+      const region = d === 1 ? rng.pick([0, 2, 0, 2, 1, 3]) : d === 2 ? rng.pick([0, 1, 2, 3]) : rng.pick([1, 1, 3, 0]);
       const R = REGIONS[region];
       const kind = rng.pick(['greatest', 'least'] as const);
       const positive = region === 0 || region === 2;
       const pool = EXPRS.filter(
-        (e) =>
-          usable(e, R.set) &&
-          !(positive && (e.tex === '-x' || e.tex === '-x^3' || e.tex === '|x|')) &&
-          (d > 1 || ['x', 'x^2', 'x^3', '\\frac{1}{x}', '\\sqrt{x}', 'x^4'].includes(e.tex)),
+        (e) => usable(e, R.set) && !(positive && (e.tex === '-x' || e.tex === '-x^3' || e.tex === '|x|')) && (d > 1 || D1_EXPRS.includes(e.tex)),
       );
       const picked = rng.sample(pool, 5);
       const rep = repPoints(R.set)[0].x;
@@ -496,33 +509,38 @@ const extremeMCS: Template<ExtremeParams> = {
       if (new Set(vs.map((v) => v.toString())).size < 5) continue;
       const order = picked.map((e) => EXPRS.indexOf(e));
       const sorted = picked.map((e, i) => ({ e, v: vs[i], k: order[i] })).sort((a, b) => a.k - b.k);
-      const best = sorted.reduce((bi, it, i) => ((kind === 'greatest' ? it.v.gt(sorted[bi].v) : it.v.lt(sorted[bi].v)) ? i : bi), 0);
-      // Trap: the answer you get by pretending x is a large positive number (or ignoring the sign).
-      const fake = region === 1 || region === 3 ? rep.abs() : F(2);
-      const fv = sorted.map((it) => it.e.f(fake));
-      let trapIdx = -1;
-      if (fv.every((v) => v !== null)) {
-        trapIdx = (fv as Frac[]).reduce((bi, v, i, arr) => ((kind === 'greatest' ? v.gt(arr[bi]) : v.lt(arr[bi])) ? i : bi), 0);
-        if (trapIdx === best) trapIdx = -1;
-      }
-      if (d > 1 && trapIdx < 0) continue;
-      const trapId = region === 1 || region === 3 ? 'negative-fraction-sign' : region === 0 ? 'fraction-power-grows' : 'reciprocal-direction';
-      const choices = sorted.map((it, i) => ({ text: `$${it.e.tex}$`, ...(i === trapIdx ? { trap: trapId } : {}) }));
+      const pickBest = (xs: Frac[]) => xs.reduce((bi, v, i, arr) => ((kind === 'greatest' ? v.gt(arr[bi]) : v.lt(arr[bi])) ? i : bi), 0);
+      const best = pickBest(sorted.map((it) => it.v));
+      // Wrong choices that would be right in another region: each is a real slip (a wrong guess about where x lies).
+      const slips = new Map<number, { id: string; other: number }>();
+      REGIONS.forEach((R2, other) => {
+        if (other === region) return;
+        const fv = sorted.map((it) => it.e.f(repPoints(R2.set)[0].x));
+        if (fv.some((v) => v === null)) return;
+        const idx = pickBest(fv as Frac[]);
+        if (idx !== best && !slips.has(idx)) slips.set(idx, { id: regionSlip(region, other), other });
+      });
+      if (slips.size < 2) continue;
+      const choices = sorted.map((it, i) => ({ text: `$${it.e.tex}$`, ...(slips.has(i) ? { trap: slips.get(i)!.id } : {}) }));
       const values = sorted.map((it) => `$${it.e.tex} = ${it.v.toTex()}$`).join(', ');
+      const frames = [
+        [`If $${R.tex}$, which of the following is ${kind}?`, `Which of the following is ${kind} when $${R.tex}$?`, `Of the following, which is ${kind} if $${R.tex}$?`],
+        [`For $${R.tex}$, which of the following expressions has the ${kind} value?`, `Suppose $${R.tex}$. Which of the following has the ${kind} value?`, `Which of the following is ${kind} for every $x$ with $${R.tex}$?`],
+        [`Given that $${R.tex}$, which of the following is ${kind}?`, `If $x$ satisfies $${R.tex}$, which of the following is the ${kind} of the five expressions?`, `If $${R.tex}$, which of the five expressions is ${kind}?`],
+      ][d - 1];
+      const notes = [...slips].slice(0, 2).map(([i, s]) => `$${sorted[i].e.tex}$ is the ${kind} only if $x$ is ${REGION_WORDS[s.other]}`);
       return {
         params: { region, kind, exprs: sorted.map((it) => it.e.tex) },
         q: {
           format: 'mcs',
-          stem: `If $${R.tex}$, which of the following is ${kind}?`,
+          stem: frames[rng.int(0, 2)],
           choices,
           answer: best,
           explanation: `Pick a convenient value in the range, $x = ${rep.toTex()}$: ${values}. The ${kind} is $${sorted[best].e.tex}$.
 
-On this interval the order of these expressions never changes (they can only trade places at $-1$, $0$ and $1$), so one test value is enough.${
-            trapIdx >= 0
-              ? ` Choosing $${sorted[trapIdx].e.tex}$ means reasoning as if $x$ were ${region === 1 || region === 3 ? 'positive' : 'greater than 1'}.`
-              : ''
-          }`,
+Check: on this interval the order of these expressions never changes (they can only trade places at $-1$, $0$ and $1$), so one test value is enough.
+
+Trap: ${notes.join('; ')}, not here.`,
         },
       };
     }
