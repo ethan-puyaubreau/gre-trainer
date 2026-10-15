@@ -2,7 +2,12 @@ import type { Template, Trap } from '../../../engine/types';
 import { barEntryTemplates, barEntryTraps } from './barEntry';
 import { chainEvalTemplates, chainEvalTraps } from './chainEval';
 import { consecutiveTemplates } from './consecutive';
+import { countMultiplesTemplates, countMultiplesTraps } from './countMultiples';
+import { recurrenceTemplates } from './cycleRecurrence';
+import { patternCountTemplates, cycleCountTraps } from './cycleCount';
+import { cycleUnitsCompareTemplates, cycleUnitsCompareTraps } from './cycleUnitsCompare';
 import { divisibilityTemplates } from './divisibility';
+import { divisorKindsTemplates, divisorKindsTraps } from './divisorKinds';
 import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
 import { exponentsFactorSumTemplates, exponentsFactorSumTraps } from './exponentsFactorSum';
@@ -14,8 +19,11 @@ import { groupingCompareTemplates, groupingCompareTraps } from './groupingCompar
 import { functionEvalTemplates, functionEvalTraps } from './functionEval';
 import { gcdLcmPairTemplates, gcdLcmPairTraps } from './gcdLcmPair';
 import { lcmGcdTemplates } from './lcm-gcd';
+import { missingDigitTemplates, missingDigitTraps } from './missingDigit';
 import { populationTemplates, populationTraps } from './populationTotals';
+import { primeExpressionTemplates, primeExpressionTraps } from './primeExpressions';
 import { primesTemplates } from './primes';
+import { remainderLcmTemplates, remainderLcmTraps } from './remainderLcm';
 import { remainderCycleTemplates, remainderCycleTraps } from './remainderCycle';
 import { integerTraps } from './traps';
 
@@ -39,4 +47,12 @@ export const integersTemplates: Template<any>[] = [
   ...chainEvalTemplates,
   ...functionEvalTemplates,
 ];
-export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps};
+export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps};
+  ...missingDigitTemplates,
+  ...countMultiplesTemplates,
+  ...primeExpressionTemplates,
+  ...divisorKindsTemplates,
+  ...remainderLcmTemplates,
+  ...cycleUnitsCompareTemplates,
+  ...patternCountTemplates,
+  ...recurrenceTemplates,
