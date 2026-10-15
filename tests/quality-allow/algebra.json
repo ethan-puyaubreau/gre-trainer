@@ -1,0 +1,127 @@
+{
+  "alg.coordinate.above-below-qc": {
+    "qc.never-d": "baseline"
+  },
+  "alg.coordinate.parallel-perpendicular": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.coordinate.points-on-line": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.coordinate.quadrants": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.exponent-equations.equivalent-mcs": {
+    "bank.size": "baseline"
+  },
+  "alg.expressions.expand-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.expressions.power-factor-ne": {
+    "artifacts.frac-1": "baseline",
+    "artifacts.exp-1": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.functions.table-mcs": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.graphs.intersection": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.graphs.line-meets-graph": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.graphs.read-graph": {
+    "degenerate.trivial": "baseline"
+  },
+  "alg.inequalities.integer-count-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.inequalities.order-mcs": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.inequalities.range-ne": {
+    "degenerate.trivial": "baseline"
+  },
+  "alg.inequalities.solve-mcm": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.linear-equations.fraction-qc": {
+    "qc.never-d": "baseline"
+  },
+  "alg.linear-equations.literal-mcs": {
+    "artifacts.coef-1": "baseline",
+    "artifacts.frac-1": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.linear-equations.solve-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.mixtures-interest.growth": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.mixtures-interest.interest-qc": {
+    "artifacts.exp-1": "baseline"
+  },
+  "alg.quadratics.factor-mcs": {
+    "artifacts.coef-1": "baseline",
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.quadratics.solutions-mcm": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.rate-work.alone-time": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.rate-work.combined": {
+    "artifacts.frac-1": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.rate-work.meet-catch": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.sequences.compare-qc": {
+    "artifacts.coef-1": "baseline",
+    "artifacts.exp-1": "baseline"
+  },
+  "alg.sequences.nth-term": {
+    "artifacts.frac-1": "baseline",
+    "artifacts.exp-1": "baseline"
+  },
+  "alg.sequences.sum": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.sequences.terms-mcm": {
+    "artifacts.sign": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.systems.compare-qc": {
+    "artifacts.coef-1": "baseline"
+  },
+  "alg.systems.product-mcs": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "alg.systems.solution-count-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "alg.word-problems.in-terms-of": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "alg.word-problems.setup-solve": {
+    "artifacts.plural-1": "baseline"
+  },
+  "alg.word-problems.translate-qc": {
+    "artifacts.plural-1": "baseline"
+  },
+  "alg.word-problems.two-types": {
+    "distractors.trapped": "baseline"
+  }
+}

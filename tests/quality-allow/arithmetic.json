@@ -1,0 +1,199 @@
+{
+  "arith.consecutive.count-expression": {
+    "bank.size": "baseline"
+  },
+  "arith.consecutive.find-term": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.consecutive.possible-sums": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.consecutive.sum-function": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.cycles.day-of-week": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.cycles.decimal-digit": {
+    "qc.never-d": "baseline"
+  },
+  "arith.cycles.units-digit": {
+    "distractors.trapped": "baseline",
+    "degenerate.trivial": "baseline"
+  },
+  "arith.decimals.percent-power-ten": {
+    "artifacts.exp-1": "baseline",
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.decimals.repeating-qc": {
+    "qc.never-d": "baseline"
+  },
+  "arith.decimals.sci-notation": {
+    "artifacts.exp-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "arith.decimals.terminating": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.divisibility.could-be-n": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.divisibility.must-divide": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.divisibility.power-remainder-qc": {
+    "qc.d-share": "baseline"
+  },
+  "arith.divisibility.remainder-transform": {
+    "degenerate.trivial": "baseline"
+  },
+  "arith.exponents.common-base-qc": {
+    "artifacts.exp-1": "baseline",
+    "qc.never-d": "baseline"
+  },
+  "arith.exponents.powers-of-ten-percent": {
+    "artifacts.exp-1": "baseline",
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.exponents.product-interval": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.exponents.same-base-equation": {
+    "artifacts.coef-1": "baseline",
+    "artifacts.exp-1": "baseline"
+  },
+  "arith.factors.count-divisors": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.factors.divisor-count-qc": {
+    "artifacts.exp-1": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.factors.greatest-prime-factor": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.factors.quotient-integer": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.factors.square-multiplier": {
+    "artifacts.exp-1": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.fractions.compare-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.lcm-gcd.multiples-select": {
+    "artifacts.exp-1": "baseline"
+  },
+  "arith.lcm-gcd.rest-overlap": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.lcm-gcd.schedule": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.number-line.farthest": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.number-line.segment-ratio": {
+    "artifacts.coef-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "arith.number-line.signs-mcm": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.number-line.tick-marks": {
+    "bank.size": "baseline"
+  },
+  "arith.order-of-operations.custom-operation": {
+    "artifacts.coef-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "arith.order-of-operations.evaluate-ne": {
+    "bank.size": "baseline"
+  },
+  "arith.order-of-operations.sign-select": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.order-of-operations.substitute-qc": {
+    "qc.never-d": "baseline"
+  },
+  "arith.percent.expression-mcs": {
+    "bank.size": "baseline"
+  },
+  "arith.percent.percent-of-qc": {
+    "artifacts.coef-1": "baseline",
+    "qc.never-d": "baseline"
+  },
+  "arith.percent.rate-change-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.percent.weighted-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.primes.cannot-sum": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.primes.odd-sum": {
+    "artifacts.so-the": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.primes.parity-power-qc": {
+    "bank.size": "baseline"
+  },
+  "arith.primes.prime-bounds-qc": {
+    "artifacts.plural-1": "baseline",
+    "qc.never-d": "baseline"
+  },
+  "arith.rates.approx-cost-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.rates.compound-ne": {
+    "bank.size": "baseline"
+  },
+  "arith.rates.equivalent-rates-mcm": {
+    "artifacts.plural-1": "baseline"
+  },
+  "arith.rates.unit-convert-qc": {
+    "qc.never-d": "baseline"
+  },
+  "arith.rates.unit-rate-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.ratios.change-ne": {
+    "artifacts.frac-1": "baseline",
+    "artifacts.plural-1": "baseline"
+  },
+  "arith.ratios.combine-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.ratios.ratio-qc": {
+    "artifacts.frac-1": "baseline"
+  },
+  "arith.real-numbers.extreme-mcs": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "arith.roots.combine-qc": {
+    "qc.never-d": "baseline"
+  },
+  "arith.roots.equal-forms": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.roots.simplify-sum": {
+    "distractors.trapped": "baseline"
+  },
+  "arith.roots.value-ne": {
+    "artifacts.coef-1": "baseline"
+  },
+  "arith.successive-percent.final-value-mcs": {
+    "distractors.trapped": "baseline",
+    "distractors.cited": "baseline"
+  },
+  "arith.successive-percent.overall-ne": {
+    "bank.size": "baseline"
+  }
+}

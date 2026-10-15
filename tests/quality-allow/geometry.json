@@ -1,0 +1,96 @@
+{
+  "geo.circles.compare-qc": {
+    "qc.d-share": "baseline"
+  },
+  "geo.circles.lengths": {
+    "bank.size": "baseline"
+  },
+  "geo.circles.ratio": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.composite.combined": {
+    "artifacts.plural-1": "baseline"
+  },
+  "geo.composite.compare-qc": {
+    "qc.never-d": "baseline"
+  },
+  "geo.composite.inscribed": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.composite.shaded": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.lines-angles.around-point": {
+    "artifacts.frac-1": "baseline"
+  },
+  "geo.lines-angles.bent-line-qc": {
+    "qc.d-share": "baseline"
+  },
+  "geo.lines-angles.eight-angles": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.lines-angles.parallel-algebra": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.polygons.angle-sum": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.polygons.fence": {
+    "distractors.trapped": "baseline",
+    "bank.size": "baseline"
+  },
+  "geo.polygons.rectangles": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.right-triangles.compare-qc": {
+    "qc.d-share": "baseline"
+  },
+  "geo.right-triangles.pythagorean-ne": {
+    "bank.size": "baseline"
+  },
+  "geo.right-triangles.special-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.right-triangles.two-step-mcs": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.similarity.parallel-segment-ne": {
+    "artifacts.frac-1": "baseline"
+  },
+  "geo.similarity.scale-mcs": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "geo.similarity.statements-mcm": {
+    "artifacts.frac-1": "baseline"
+  },
+  "geo.solids.compare-qc": {
+    "artifacts.plural-1": "baseline",
+    "figures.scale": "baseline"
+  },
+  "geo.solids.measures": {
+    "distractors.trapped": "baseline",
+    "figures.scale": "baseline"
+  },
+  "geo.solids.pour": {
+    "figures.scale": "baseline"
+  },
+  "geo.solids.scaling": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.triangles.angle-sum": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.triangles.iso-inequality-qc": {
+    "qc.d-share": "baseline"
+  },
+  "geo.triangles.side-angle-qc": {
+    "qc.d-share": "baseline"
+  },
+  "geo.triangles.third-side": {
+    "distractors.trapped": "baseline"
+  },
+  "geo.triangles.third-vertex": {
+    "distractors.trapped": "baseline"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "data.center.consecutive-lists": {
+    "distractors.trapped": "baseline"
+  },
+  "data.center.extreme-value": {
+    "distractors.trapped": "baseline"
+  },
+  "data.center.which-values": {
+    "distractors.trapped": "baseline"
+  },
+  "data.counting.codes": {
+    "distractors.trapped": "baseline",
+    "distractors.cited": "baseline",
+    "bank.size": "baseline"
+  },
+  "data.counting.committees": {
+    "artifacts.plural-1": "baseline",
+    "distractors.trapped": "baseline",
+    "distractors.cited": "baseline"
+  },
+  "data.counting.outcomes-qc": {
+    "qc.never-d": "baseline"
+  },
+  "data.counting.pairs": {
+    "bank.size": "baseline"
+  },
+  "data.distributions.normal": {
+    "distractors.trapped": "baseline"
+  },
+  "data.distributions.sd-units": {
+    "distractors.trapped": "baseline"
+  },
+  "data.distributions.within-sd": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.decades-how-many": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.decades-per-year": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.decades-percent": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.homes-combined-mean": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.homes-median-change": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.homes-tax": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.mixed-growth": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.mixed-select": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.mixed-times": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.pct-change-count": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.pct-change-must": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.pct-change-value": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.pie-remove": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.region-must": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.region-other-percent": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.region-range": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.region-times": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.season-fraction": {
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.season-least-sd": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.season-mean": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.worktime-conversion": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.worktime-longest": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.worktime-more-units": {
+    "distractors.trapped": "baseline"
+  },
+  "data.interpretation.worktime-price": {
+    "distractors.trapped": "baseline"
+  },
+  "data.probability.choose-k": {
+    "distractors.trapped": "baseline"
+  },
+  "data.probability.single-draw": {
+    "distractors.trapped": "baseline"
+  },
+  "data.probability.without-replacement": {
+    "distractors.trapped": "baseline"
+  },
+  "data.sets.percent-of-group": {
+    "distractors.trapped": "baseline"
+  },
+  "data.sets.venn-diagram": {
+    "distractors.trapped": "baseline"
+  },
+  "data.spread.percentile": {
+    "distractors.trapped": "baseline"
+  },
+  "data.spread.sd-compare-qc": {
+    "artifacts.doubled-word": "baseline"
+  },
+  "data.spread.sd-linear": {
+    "distractors.trapped": "baseline"
+  },
+  "data.weighted.group-size": {
+    "artifacts.coef-1": "baseline",
+    "artifacts.frac-1": "baseline",
+    "distractors.trapped": "baseline",
+    "distractors.cited": "baseline"
+  },
+  "data.weighted.grouped-ne": {
+    "artifacts.coef-1": "baseline"
+  }
+}
