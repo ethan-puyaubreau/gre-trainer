@@ -6,6 +6,7 @@ import { Rich, RichInline } from '../components/Rich';
 import { SessionRecap } from '../components/SessionRecap';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
 import { AREA_NAMES, SKILLS, skillById, templateById, templatesBySkill, TRAPS } from '../content';
+import { LESSONS } from '../content/lessons';
 import { generateQuestion, poolSeed } from '../engine/generate';
 import { grade, isAnswered, type GradeResult, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
@@ -46,8 +47,10 @@ const REASON: Record<Pick['reason'], [string, string]> = {
   focus: ['Skill focus', 'chip'],
 };
 
-const HINT_LABEL = ['Hint', 'Another hint', 'Show full card', 'Full card shown'] as const;
-const FULL_CARD_COST = 'Full card: this answer will not count toward mastery';
+/** The last hint step: the skill's worked example with the full card, or the full card alone when it has no lesson. */
+const lastHint = (skillId: string) => (LESSONS[skillId] ? 'Worked example' : 'Full card');
+const hintLabel = (level: HintLevel, last: string) => ['Hint', 'Another hint', `Show ${last.toLowerCase()}`, `${last} shown`][level];
+const lastHintCost = (last: string) => `${last}: this answer will not count toward mastery`;
 
 interface Result {
   grade: GradeResult;
@@ -237,8 +240,9 @@ export function Practice({ route }: { route: string[] }) {
   const reveal = mixed ? ' label-reveal' : '';
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
   const stepHint = () => setHintLevel((l) => Math.min(l + 1, FULL_CARD) as HintLevel);
+  const last = lastHint(skill.id);
   // One panel: the hint steps before the answer, the free full card after the result.
-  const panelText = result ? (cardOpen ? skill.strategy : '') : hintText(skill.strategy, hintLevel);
+  const panelText = result ? (cardOpen ? skill.strategy : '') : hintText(skill.strategy, hintLevel, LESSONS[skill.id]?.example);
 
   return (
     <div className="practice-fx">
@@ -293,13 +297,13 @@ export function Practice({ route }: { route: string[] }) {
               onClick={stepHint}
               disabled={hintLevel === FULL_CARD}
               aria-describedby={hintLevel === FULL_CARD - 1 ? 'hint-cost' : undefined}
-              title="Three steps: the first line, the bullets, then the full card. Only the full card costs the mastery credit."
+              title={`Three steps: the first line, the bullets, then ${last === 'Full card' ? 'the full card' : 'a worked example with the full card'}. Only the last step costs the mastery credit.`}
             >
-              {HINT_LABEL[hintLevel]}
+              {hintLabel(hintLevel, last)}
             </button>
             {hintLevel === FULL_CARD - 1 && (
               <span id="hint-cost" className="hint-cost small">
-                {FULL_CARD_COST}
+                {lastHintCost(last)}
               </span>
             )}
             <span className="spacer" />
@@ -327,7 +331,7 @@ export function Practice({ route }: { route: string[] }) {
           <div className="strategy-box">
             {!result && (
               <p className={`small hint-note${hintLevel === FULL_CARD ? ' hint-cost' : ' muted'}`}>
-                {hintLevel === FULL_CARD ? FULL_CARD_COST : `Hint ${hintLevel} of ${FULL_CARD}`}
+                {hintLevel === FULL_CARD ? lastHintCost(last) : `Hint ${hintLevel} of ${FULL_CARD}`}
               </p>
             )}
             <Rich text={panelText} />
@@ -423,7 +427,7 @@ function Feedback({
   // Why a correct answer may not move the skill. Credit rule: the model (a style needs difficulty 2 or 3 and no full card; only the pace gates Mastered).
   const creditNote =
     hintLevel === FULL_CARD
-      ? 'Correct, but with the full card open this answer does not count toward mastery.'
+      ? `Correct, but with the ${lastHint(question.skillId).toLowerCase()} open this answer does not count toward mastery.`
       : question.difficulty < 2
         ? 'Correct. Easy questions do not count toward mastery.'
         : judged && !onPace

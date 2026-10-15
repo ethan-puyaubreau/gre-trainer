@@ -2,6 +2,7 @@
 
 import { grade, type Response } from '../engine/grade';
 import type { Difficulty, QuestionBody } from '../engine/types';
+import type { Lesson } from '../content/lessons';
 import { isOnPace, type AttemptInput, type Level } from './model';
 
 /** Speed is judged from Proficient on; below that only accuracy counts and the pace bar stays neutral. */
@@ -11,18 +12,24 @@ export function paceJudged(level: Level): boolean {
 
 export type HintLevel = AttemptInput['hintLevel'];
 
-/** The step that shows the whole strategy card and is the only one that cancels the mastery credit. */
+/** The last step (worked example and full card): the only one that cancels the mastery credit. */
 export const FULL_CARD: HintLevel = 3;
 
 const isBullets = (para: string) => para.split('\n').every((l) => /^\s*- /.test(l));
 
+/** A lesson's worked example as Rich text: problem, steps as bullets, answer. */
+function workedExample(e: Lesson['example']): string {
+  return ['**Worked example**', e.problem, e.steps.map((st) => `- ${st}`).join('\n'), `**Answer:** ${e.answer}`].join('\n\n');
+}
+
 /**
  * What a hint step shows of a skill strategy (a first line, then bullets): step 1 the first line,
- * step 2 the bullets alone, step 3 the whole card. A card without bullets repeats its first line at step 2.
+ * step 2 the bullets alone, step 3 the skill's worked example followed by the whole card (the card alone
+ * when there is no example). A card without bullets repeats its first line at step 2.
  */
-export function hintText(strategy: string, level: HintLevel): string {
+export function hintText(strategy: string, level: HintLevel, example?: Lesson['example']): string {
   if (level === 0) return '';
-  if (level === FULL_CARD) return strategy;
+  if (level === FULL_CARD) return example ? `${workedExample(example)}\n\n**Strategy card**\n\n${strategy}` : strategy;
   const paras = strategy
     .split(/\n\s*\n/)
     .map((p) => p.trim())

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { LESSONS } from '../src/content/lessons';
 import { Frac } from '../src/engine/frac';
+import { parseRich } from '../src/engine/rich';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
 import { dodgedTraps, earnsReward, hintText, paceJudged, summarize, type RewardInput, type SessionOutcome } from '../src/mastery/session';
@@ -81,9 +83,12 @@ describe('summarize', () => {
 
 describe('hintText', () => {
   const strategy = 'Write the equation first.\n\n- Test $k = 0$.\n- Plug in $n = 1, 2$.';
+  const example = { problem: 'Find $n$.', steps: ['Write $n = 4k$ because 4 divides it.', 'Test $k = 1$.'], answer: '$n = 4$' };
+  const workedExample = '**Worked example**\n\nFind $n$.\n\n- Write $n = 4k$ because 4 divides it.\n- Test $k = 1$.\n\n**Answer:** $n = 4$';
 
   it('shows nothing before the first hint', () => {
     expect(hintText(strategy, 0)).toBe('');
+    expect(hintText(strategy, 0, example)).toBe('');
   });
 
   it('starts with the first line only', () => {
@@ -94,11 +99,20 @@ describe('hintText', () => {
     expect(hintText(strategy, 2)).toBe('- Test $k = 0$.\n- Plug in $n = 1, 2$.');
   });
 
-  it('shows the whole card at the third step', () => {
+  it('keeps the first two steps free of the worked example', () => {
+    expect(hintText(strategy, 1, example)).toBe(hintText(strategy, 1));
+    expect(hintText(strategy, 2, example)).toBe(hintText(strategy, 2));
+  });
+
+  it('adds the worked example before the whole card at the third step', () => {
+    expect(hintText(strategy, 3, example)).toBe(`${workedExample}\n\n**Strategy card**\n\n${strategy}`);
+  });
+
+  it('shows the whole card alone at the third step when the skill has no example', () => {
     expect(hintText(strategy, 3)).toBe(strategy);
   });
 
-  it('leaves any other paragraph for the full card', () => {
+  it('leaves any other paragraph for the last step', () => {
     const long = 'Idea.\n\n- one\n- two\n\nA closing remark.';
     expect(hintText(long, 2)).toBe('- one\n- two');
     expect(hintText(long, 3)).toBe(long);
@@ -108,6 +122,13 @@ describe('hintText', () => {
     expect(hintText('Just a line.', 1)).toBe('Just a line.');
     expect(hintText('Just a line.', 2)).toBe('Just a line.');
     expect(hintText('Just a line.', 3)).toBe('Just a line.');
+  });
+
+  it('turns every lesson of the app into rich text with the steps and the card bullets', () => {
+    for (const [id, lesson] of Object.entries(LESSONS)) {
+      const blocks = parseRich(hintText('Idea.\n\n- one', 3, lesson.example));
+      expect(blocks.filter((b) => b.type === 'ul'), id).toHaveLength(2);
+    }
   });
 });
 
