@@ -4,7 +4,7 @@ import { Frac } from '../src/engine/frac';
 import { parseRich } from '../src/engine/rich';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
-import { dodgedTraps, earnsReward, hintText, paceJudged, summarize, type RewardInput, type SessionOutcome } from '../src/mastery/session';
+import { dodgedTraps, earnsReward, hintText, paceJudged, stemPreview, summarize, type RewardInput, type SessionOutcome } from '../src/mastery/session';
 
 const explanation = '';
 const mcs: QuestionBody = {
@@ -53,7 +53,16 @@ describe('dodgedTraps', () => {
 });
 
 describe('summarize', () => {
-  const o = (skillId: string, from: Level, to: Level, correct: boolean, dodged = 0): SessionOutcome => ({ skillId, from, to, correct, dodged });
+  const o = (skillId: string, from: Level, to: Level, correct: boolean, dodged = 0, traps: string[] = []): SessionOutcome => ({
+    skillId,
+    from,
+    to,
+    correct,
+    dodged,
+    questionId: `${skillId}.t#1#2`,
+    response: { format: 'mcs', choice: 0 },
+    traps,
+  });
 
   it('counts answers, accuracy and dodged traps', () => {
     const s = summarize([o('a', 0, 2, true, 2), o('a', 2, 2, true), o('b', 3, 2, false), o('c', 1, 1, false)]);
@@ -73,11 +82,65 @@ describe('summarize', () => {
   });
 
   it('handles an empty session', () => {
-    expect(summarize([])).toEqual({ answered: 0, correct: 0, accuracy: 0, up: [], down: [], dodged: 0 });
+    expect(summarize([])).toEqual({ answered: 0, correct: 0, accuracy: 0, up: [], down: [], dodged: 0, missed: [] });
   });
 
   it('rounds accuracy to a whole percent', () => {
     expect(summarize([o('a', 2, 2, true), o('a', 2, 2, false), o('a', 2, 2, false)]).accuracy).toBe(33);
+  });
+});
+
+describe('summarize: missed questions', () => {
+  const o = (questionId: string, correct: boolean, traps: string[] = []): SessionOutcome => ({
+    skillId: 'a',
+    from: 2,
+    to: 2,
+    correct,
+    dodged: 0,
+    questionId,
+    response: { format: 'mcs', choice: 1 },
+    traps,
+  });
+
+  it('keeps the wrong answers, in order, with the id, the response and the traps hit', () => {
+    const wrong1 = o('a.x#7#2', false, ['tA']);
+    const wrong2 = o('a.y#9#3', false);
+    const { missed } = summarize([wrong1, o('a.z#1#1', true), wrong2]);
+    expect(missed).toEqual([wrong1, wrong2]);
+  });
+
+  it('is empty when every answer is right', () => {
+    expect(summarize([o('a.x#1#1', true), o('a.y#2#2', true)]).missed).toEqual([]);
+  });
+});
+
+describe('stemPreview', () => {
+  const mcsStem = (stem: string): QuestionBody => ({ ...mcs, stem });
+
+  it('returns a short stem whole', () => {
+    expect(stemPreview(mcsStem('What is $x$ if  $2x = 6$?'))).toBe('What is $x$ if $2x = 6$?');
+  });
+
+  it('cuts between words and adds an ellipsis', () => {
+    expect(stemPreview(mcsStem('one two three four five six'), 14)).toBe('one two three…');
+    expect(stemPreview(mcsStem('one two three four five six'), 16)).toBe('one two three…');
+  });
+
+  it('never cuts a formula in two', () => {
+    expect(stemPreview(mcsStem('The sum is $\\frac{1}{2} + \\frac{3}{4} + \\frac{5}{6}$ exactly.'), 20)).toBe('The sum is…');
+  });
+
+  it('keeps a literal dollar sign escaped and reads display math inline', () => {
+    expect(stemPreview(mcsStem('Costs \\$5.\n\n$$x^2$$'))).toBe('Costs \\$5. $x^2$');
+  });
+
+  it('puts the two quantities of a comparison side by side', () => {
+    expect(stemPreview({ ...qc, quantityA: '$x$', quantityB: '$y$' })).toBe('A: $x$ B: $y$');
+    expect(stemPreview({ ...qc, info: 'Let $x > 0$.', quantityA: '$x$', quantityB: '$y$' })).toBe('Let $x > 0$. A: $x$ B: $y$');
+  });
+
+  it('keeps every preview parseable', () => {
+    for (let max = 1; max < 60; max++) expect(() => parseRich(stemPreview(mcsStem('Is $a_1 + b$ **very** big? Costs \\$3 for 4 items.'), max))).not.toThrow();
   });
 });
 

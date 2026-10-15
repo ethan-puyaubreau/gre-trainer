@@ -134,7 +134,7 @@ export function Practice({ route }: { route: string[] }) {
   }, [next]);
 
   const submit = useCallback(() => {
-    if (!current || result || !isAnswered(response)) return;
+    if (!current || result || !response || !isAnswered(response)) return;
     const g = grade(current.question, response);
     const timeMs = elapsed;
     const outcome = store.recordAttempt({
@@ -158,7 +158,19 @@ export function Practice({ route }: { route: string[] }) {
     });
     const dodged = earned ? dodgedTraps(current.question, response) : [];
     setResult({ grade: g, outcome, timeMs, dodged });
-    setOutcomes((o) => [...o, { skillId: current.question.skillId, from: outcome.from, to: outcome.to, correct: g.correct, dodged: dodged.length }]);
+    setOutcomes((o) => [
+      ...o,
+      {
+        skillId: current.question.skillId,
+        from: outcome.from,
+        to: outcome.to,
+        correct: g.correct,
+        dodged: dodged.length,
+        questionId: current.question.id,
+        response,
+        traps: g.traps,
+      },
+    ]);
     setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: !g.correct ? 0 : earned ? s.streak + 1 : s.streak }));
   }, [current, result, response, elapsed, hintLevel, store]);
 

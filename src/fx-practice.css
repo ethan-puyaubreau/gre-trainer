@@ -263,7 +263,13 @@
 
 /* ---------------------------------------------------------------- session recap */
 .practice-fx .session-recap {
+  --stagger: 40ms;
   animation: fx-rise var(--dur) var(--ease-out) backwards;
+}
+/* Cascade: each counter and row sets its place as --i; the delay stops growing after the twelfth. */
+.practice-fx .recap-in {
+  --delay: calc(min(var(--i, 0), 12) * var(--stagger));
+  animation: fx-rise var(--dur) var(--ease-out) var(--delay) backwards;
 }
 .practice-fx .session-recap h2 {
   margin-top: 0;
@@ -291,7 +297,6 @@
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
-  animation: fx-rise var(--dur) var(--ease-out) backwards;
 }
 .practice-fx .recap-row:last-child {
   border-bottom: none;
@@ -311,10 +316,10 @@
   height: 16px;
 }
 .practice-fx .recap-arrow {
-  animation: fx-fade var(--dur) var(--ease-out) backwards;
+  animation: fx-fade var(--dur) var(--ease-out) calc(var(--delay) + 80ms) backwards;
 }
 .practice-fx .recap-to {
-  animation: fx-pop var(--dur) var(--ease-spring) backwards;
+  animation: fx-pop var(--dur) var(--ease-spring) calc(var(--delay) + 140ms) backwards;
 }
 @keyframes fx-fade {
   from {
@@ -329,4 +334,41 @@
   .practice-fx .recap-names {
     display: none;
   }
+}
+
+/* Missed questions: preview, trap picked, and the explanation opening in place. */
+.practice-fx .recap-miss {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.practice-fx .recap-miss:last-child {
+  border-bottom: none;
+}
+.practice-fx .recap-miss-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 14px;
+}
+.practice-fx .recap-trap {
+  color: var(--warn);
+}
+.practice-fx .recap-stem {
+  margin: 2px 0 6px;
+  overflow-wrap: anywhere;
+}
+.practice-fx .recap-miss summary {
+  width: fit-content;
+  color: var(--accent);
+  cursor: pointer;
+}
+.practice-fx .recap-miss summary:hover {
+  color: var(--accent-2);
+}
+.practice-fx .recap-detail {
+  margin-top: 10px;
+  animation: fx-rise var(--dur) var(--ease-out) backwards;
+}
+.practice-fx .recap-detail h4 {
+  margin: 14px 0 4px;
 }

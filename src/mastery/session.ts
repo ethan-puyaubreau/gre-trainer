@@ -1,6 +1,7 @@
 // Pure helpers for the practice page: what a session did, kept apart from React.
 
 import { grade, type Response } from '../engine/grade';
+import { parseInline } from '../engine/rich';
 import type { Difficulty, QuestionBody } from '../engine/types';
 import type { Lesson } from '../content/lessons';
 import { isOnPace, type AttemptInput, type Level } from './model';
@@ -81,6 +82,11 @@ export interface SessionOutcome {
   correct: boolean;
   /** How many traps this answer dodged. */
   dodged: number;
+  /** The question answered: the recap regenerates it from this id. */
+  questionId: string;
+  response: Response;
+  /** Ids of the traps the response hit (wrong answers only). */
+  traps: string[];
 }
 
 /** Net level change of one skill over the session: first `from` to last `to`. */
@@ -98,6 +104,8 @@ export interface SessionSummary {
   up: SkillMove[];
   down: SkillMove[];
   dodged: number;
+  /** The questions answered wrong, in order. */
+  missed: SessionOutcome[];
 }
 
 export function summarize(outcomes: SessionOutcome[]): SessionSummary {
@@ -116,5 +124,30 @@ export function summarize(outcomes: SessionOutcome[]): SessionSummary {
     up: all.filter((m) => m.to > m.from),
     down: all.filter((m) => m.to < m.from),
     dodged: outcomes.reduce((n, o) => n + o.dodged, 0),
+    missed: outcomes.filter((o) => !o.correct),
   };
+}
+
+/** The start of a question as Rich text, cut between words (or before a formula) once it passes `max` characters. */
+export function stemPreview(q: QuestionBody, max = 90): string {
+  const src = (q.format === 'qc' ? [q.info, `A: ${q.quantityA}`, `B: ${q.quantityB}`] : [q.stem]).filter(Boolean).join(' ');
+  const esc = (t: string) => t.replace(/\$/g, '\\$');
+  let out = '';
+  let len = 0;
+  for (const seg of parseInline(src)) {
+    const text = seg.type === 'text' ? seg.value.replace(/\s+/g, ' ') : seg.value;
+    const room = max - len;
+    if (text.length > room) {
+      if (seg.type === 'text') {
+        let cut = text.slice(0, room);
+        if (/\S/.test(text[room])) cut = cut.replace(/\S*$/, ''); // no half word
+        cut = cut.trimEnd();
+        if (cut) out += seg.bold ? `**${esc(cut)}**` : esc(cut);
+      }
+      return `${out.trimEnd()}…`;
+    }
+    out += seg.type !== 'text' ? `$${text}$` : seg.bold ? `**${esc(text)}**` : esc(text);
+    len += text.length;
+  }
+  return out.trim();
 }
