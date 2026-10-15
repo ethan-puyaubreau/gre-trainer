@@ -12,7 +12,7 @@ import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
 import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
-import { dodgedTraps, summarize, type SessionOutcome } from '../mastery/session';
+import { dodgedTraps, FULL_CARD, hintText, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -46,6 +46,9 @@ const REASON: Record<Pick['reason'], [string, string]> = {
   focus: ['Skill focus', 'chip'],
 };
 
+const HINT_LABEL = ['Hint', 'Another hint', 'Show full card', 'Full card shown'] as const;
+const FULL_CARD_COST = 'Full card: this answer will not count toward mastery';
+
 interface Result {
   grade: GradeResult;
   outcome: AttemptOutcome;
@@ -64,8 +67,10 @@ export function Practice({ route }: { route: string[] }) {
   const store = useProgress();
   const [current, setCurrent] = useState<Current | null>(null);
   const [response, setResponse] = useState<Response | undefined>();
-  const [hinted, setHinted] = useState(false);
-  const [showHint, setShowHint] = useState(false);
+  // Hint steps taken before the answer; the attempt records this level.
+  const [hintLevel, setHintLevel] = useState<HintLevel>(0);
+  // After the result the full card is free: this only shows or hides it.
+  const [cardOpen, setCardOpen] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [session, setSession] = useState({ answered: 0, correct: 0, streak: 0 });
   const [outcomes, setOutcomes] = useState<SessionOutcome[]>([]);
@@ -107,8 +112,8 @@ export function Practice({ route }: { route: string[] }) {
     setEmpty(false);
     setCurrent({ pick, question });
     setResponse(undefined);
-    setHinted(false);
-    setShowHint(false);
+    setHintLevel(0);
+    setCardOpen(false);
     setResult(null);
   }, [scope]);
 
@@ -127,7 +132,7 @@ export function Practice({ route }: { route: string[] }) {
       question: current.question,
       correct: g.correct,
       timeMs,
-      hintLevel: hinted ? 3 : 0,
+      hintLevel,
       traps: g.traps,
       mode: 'practice',
       response,
@@ -136,7 +141,7 @@ export function Practice({ route }: { route: string[] }) {
     setResult({ grade: g, outcome, timeMs, dodged });
     setOutcomes((o) => [...o, { skillId: current.question.skillId, from: outcome.from, to: outcome.to, correct: g.correct, dodged: dodged.length }]);
     setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: g.correct ? s.streak + 1 : 0 }));
-  }, [current, result, response, elapsed, hinted, store]);
+  }, [current, result, response, elapsed, hintLevel, store]);
 
   // Keyboard: letters / digits pick a choice, Enter submits or goes to the next question.
   useEffect(() => {
@@ -219,11 +224,9 @@ export function Practice({ route }: { route: string[] }) {
   const showLabels = !mixed || !!result;
   const reveal = mixed ? ' label-reveal' : '';
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
-  // Before the answer, opening the strategy card is a hint (penalised); after the result it is free.
-  const toggleStrategy = () => {
-    setShowHint((v) => !v);
-    if (!result) setHinted(true);
-  };
+  const stepHint = () => setHintLevel((l) => Math.min(l + 1, FULL_CARD) as HintLevel);
+  // One panel: the hint steps before the answer, the free full card after the result.
+  const panelText = result ? (cardOpen ? skill.strategy : '') : hintText(skill.strategy, hintLevel);
 
   return (
     <div className="practice-fx">
@@ -270,11 +273,18 @@ export function Practice({ route }: { route: string[] }) {
           <div className="row" style={{ marginTop: 18 }}>
             <button
               className="btn btn-ghost"
-              onClick={toggleStrategy}
-              title="Showing the strategy card means this answer will not count toward mastery"
+              onClick={stepHint}
+              disabled={hintLevel === FULL_CARD}
+              aria-describedby={hintLevel === FULL_CARD - 1 ? 'hint-cost' : undefined}
+              title="Three steps: the first line, the bullets, then the full card. Only the full card costs the mastery credit."
             >
-              {showHint ? 'Hide strategy' : 'Show strategy (hint)'}
+              {HINT_LABEL[hintLevel]}
             </button>
+            {hintLevel === FULL_CARD - 1 && (
+              <span id="hint-cost" className="hint-cost small">
+                {FULL_CARD_COST}
+              </span>
+            )}
             <span className="spacer" />
             <span className="muted small">
               <span className="kbd">Enter</span> to check
@@ -291,15 +301,19 @@ export function Practice({ route }: { route: string[] }) {
             question={question}
             paceSec={paceSec}
             skillName={skill.name}
-            hinted={hinted}
-            strategy={skill.strategy}
+            hintLevel={hintLevel}
             onNext={next}
             nextStepText={nextStep(result.outcome.state)}
           />
         )}
-        {showHint && (
+        {panelText && (
           <div className="strategy-box">
-            <Rich text={skill.strategy} />
+            {!result && (
+              <p className={`small hint-note${hintLevel === FULL_CARD ? ' hint-cost' : ' muted'}`}>
+                {hintLevel === FULL_CARD ? FULL_CARD_COST : `Hint ${hintLevel} of ${FULL_CARD}`}
+              </p>
+            )}
+            <Rich text={panelText} />
           </div>
         )}
       </div>
@@ -327,15 +341,15 @@ export function Practice({ route }: { route: string[] }) {
             <span className="kbd">{nChoices}</span> to pick,{' '}
           </>
         )}
-        <span className="kbd">Enter</span> to check / next. <a href={href('')}>Back to dashboard</a> ·{' '}
-        <button
-          className="btn btn-ghost"
-          onClick={toggleStrategy}
-          aria-expanded={showHint}
-          title={result ? undefined : 'Opening the strategy card means this answer will not count toward mastery'}
-        >
-          Strategy card
-        </button>
+        <span className="kbd">Enter</span> to check / next. <a href={href('')}>Back to dashboard</a>
+        {result && (
+          <>
+            {' · '}
+            <button type="button" className="link-btn" onClick={() => setCardOpen((v) => !v)} aria-expanded={cardOpen}>
+              {cardOpen ? 'Hide strategy card' : 'Show strategy card'}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -370,8 +384,7 @@ function Feedback({
   question,
   paceSec,
   skillName,
-  hinted,
-  strategy,
+  hintLevel,
   onNext,
   nextStepText,
 }: {
@@ -379,8 +392,7 @@ function Feedback({
   question: Question;
   paceSec: number;
   skillName: string;
-  hinted: boolean;
-  strategy: string;
+  hintLevel: HintLevel;
   onNext: () => void;
   nextStepText: string;
 }) {
@@ -397,7 +409,7 @@ function Feedback({
         <span className={`chip ${slow ? 'chip-warn' : 'chip-good'}`}>
           {formatClock(timeMs)} {slow ? `(over the ${formatClock(paceSec * 1000)} pace)` : '(on pace)'}
         </span>
-        {hinted && <span className="chip chip-warn">hint used</span>}
+        {hintLevel === FULL_CARD && <span className="chip chip-warn">hint used</span>}
         <span className="spacer" />
         <button ref={nextBtn} className="btn btn-primary" onClick={onNext}>
           Next question →
@@ -437,13 +449,6 @@ function Feedback({
 
       <h3>Explanation</h3>
       <Rich className="explanation" text={question.explanation} />
-
-      <details style={{ marginTop: 12 }}>
-        <summary>Strategy card for this skill</summary>
-        <div className="strategy-box">
-          <Rich text={strategy} />
-        </div>
-      </details>
     </div>
   );
 }

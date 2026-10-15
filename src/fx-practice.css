@@ -179,6 +179,31 @@
   }
 }
 
+/* ---------------------------------------------------------------- hints and strategy card */
+/* The cost of the full card, in words: next to the step that triggers it, then in the panel. */
+.practice-fx .hint-cost {
+  padding-left: 8px;
+  border-left: 3px solid var(--warn);
+  color: var(--text);
+}
+.practice-fx .hint-note {
+  margin: 0 0 6px;
+}
+
+/* A button that reads as a link, for the strategy card toggle inside the footer sentence. */
+.practice-fx .link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.practice-fx .link-btn:hover {
+  color: var(--accent-2);
+}
+
 /* ---------------------------------------------------------------- trap dodged */
 .practice-fx .trap-dodged {
   margin: 10px 0 0;

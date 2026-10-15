@@ -2,7 +2,28 @@
 
 import { grade, type Response } from '../engine/grade';
 import type { QuestionBody } from '../engine/types';
-import type { Level } from './model';
+import type { AttemptInput, Level } from './model';
+
+export type HintLevel = AttemptInput['hintLevel'];
+/** The step that shows the whole strategy card and is the only one that cancels the mastery credit. */
+export const FULL_CARD: HintLevel = 3;
+
+const isBullets = (para: string) => para.split('\n').every((l) => /^\s*- /.test(l));
+
+/**
+ * What a hint step shows of a skill strategy (a first line, then bullets): step 1 the first line,
+ * step 2 the bullets alone, step 3 the whole card. A card without bullets repeats its first line at step 2.
+ */
+export function hintText(strategy: string, level: HintLevel): string {
+  if (level === 0) return '';
+  if (level === FULL_CARD) return strategy;
+  const paras = strategy
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const bullets = paras.slice(1).filter(isBullets).join('\n\n');
+  return level === 2 && bullets ? bullets : (paras[0] ?? '');
+}
 
 /**
  * Trap ids carried by the wrong choices the user did not pick. Only for a correct answer on a

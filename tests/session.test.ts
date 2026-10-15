@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Frac } from '../src/engine/frac';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
-import { dodgedTraps, summarize, type SessionOutcome } from '../src/mastery/session';
+import { dodgedTraps, hintText, summarize, type SessionOutcome } from '../src/mastery/session';
 
 const explanation = '';
 const mcs: QuestionBody = {
@@ -76,5 +76,37 @@ describe('summarize', () => {
 
   it('rounds accuracy to a whole percent', () => {
     expect(summarize([o('a', 2, 2, true), o('a', 2, 2, false), o('a', 2, 2, false)]).accuracy).toBe(33);
+  });
+});
+
+describe('hintText', () => {
+  const strategy = 'Write the equation first.\n\n- Test $k = 0$.\n- Plug in $n = 1, 2$.';
+
+  it('shows nothing before the first hint', () => {
+    expect(hintText(strategy, 0)).toBe('');
+  });
+
+  it('starts with the first line only', () => {
+    expect(hintText(strategy, 1)).toBe('Write the equation first.');
+  });
+
+  it('shows the bullets alone at the second step', () => {
+    expect(hintText(strategy, 2)).toBe('- Test $k = 0$.\n- Plug in $n = 1, 2$.');
+  });
+
+  it('shows the whole card at the third step', () => {
+    expect(hintText(strategy, 3)).toBe(strategy);
+  });
+
+  it('leaves any other paragraph for the full card', () => {
+    const long = 'Idea.\n\n- one\n- two\n\nA closing remark.';
+    expect(hintText(long, 2)).toBe('- one\n- two');
+    expect(hintText(long, 3)).toBe(long);
+  });
+
+  it('falls back to the first line when the card has no bullets', () => {
+    expect(hintText('Just a line.', 1)).toBe('Just a line.');
+    expect(hintText('Just a line.', 2)).toBe('Just a line.');
+    expect(hintText('Just a line.', 3)).toBe('Just a line.');
   });
 });
