@@ -1,8 +1,8 @@
 // Pure helpers for the practice page: what a session did, kept apart from React.
 
 import { grade, type Response } from '../engine/grade';
-import type { QuestionBody } from '../engine/types';
-import type { AttemptInput, Level } from './model';
+import type { Difficulty, QuestionBody } from '../engine/types';
+import { isOnPace, type AttemptInput, type Level } from './model';
 
 /** Speed is judged from Proficient on; below that only accuracy counts and the pace bar stays neutral. */
 export function paceJudged(level: Level): boolean {
@@ -10,6 +10,7 @@ export function paceJudged(level: Level): boolean {
 }
 
 export type HintLevel = AttemptInput['hintLevel'];
+
 /** The step that shows the whole strategy card and is the only one that cancels the mastery credit. */
 export const FULL_CARD: HintLevel = 3;
 
@@ -28,6 +29,25 @@ export function hintText(strategy: string, level: HintLevel): string {
     .filter(Boolean);
   const bullets = paras.slice(1).filter(isBullets).join('\n\n');
   return level === 2 && bullets ? bullets : (paras[0] ?? '');
+}
+
+export interface RewardInput {
+  correct: boolean;
+  hintLevel: HintLevel;
+  difficulty: Difficulty;
+  timeMs: number;
+  paceSec: number;
+  /** The skill's level before this answer: it decides whether speed is judged. */
+  level: Level;
+}
+
+/**
+ * Whether an answer earns the session rewards (trap dodged, streak): correct, with at most the first-line
+ * hint, on pace where speed is judged (from Proficient on), and hard enough to credit a style. Difficulty 1
+ * credits nothing in the model, so it earns nothing here either.
+ */
+export function earnsReward(a: RewardInput): boolean {
+  return a.correct && a.hintLevel <= 1 && a.difficulty >= 2 && (!paceJudged(a.level) || isOnPace(a.timeMs, a.difficulty, a.paceSec));
 }
 
 /**

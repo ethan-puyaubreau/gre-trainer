@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Frac } from '../src/engine/frac';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
-import { dodgedTraps, hintText, paceJudged, summarize, type SessionOutcome } from '../src/mastery/session';
+import { dodgedTraps, earnsReward, hintText, paceJudged, summarize, type RewardInput, type SessionOutcome } from '../src/mastery/session';
 
 const explanation = '';
 const mcs: QuestionBody = {
@@ -114,5 +114,44 @@ describe('hintText', () => {
 describe('paceJudged', () => {
   it('judges speed from Proficient on', () => {
     expect(([0, 1, 2, 3, 4] as Level[]).map(paceJudged)).toEqual([false, false, false, true, true]);
+  });
+});
+
+describe('earnsReward', () => {
+  // A Proficient skill, medium question, 105 s pace: the strictest case.
+  const base: RewardInput = { correct: true, hintLevel: 0, difficulty: 2, timeMs: 60_000, paceSec: 105, level: 3 };
+  const earns = (patch: Partial<RewardInput>) => earnsReward({ ...base, ...patch });
+
+  it('rewards a correct, unhinted, on-pace answer', () => {
+    expect(earns({})).toBe(true);
+  });
+
+  it('never rewards a wrong answer', () => {
+    expect(earns({ correct: false })).toBe(false);
+  });
+
+  it('allows the first-line hint only', () => {
+    expect([0, 1, 2, 3].map((hintLevel) => earns({ hintLevel: hintLevel as RewardInput['hintLevel'] }))).toEqual([true, true, false, false]);
+  });
+
+  it('does not reward difficulty 1, which credits nothing', () => {
+    expect(earns({ difficulty: 1 })).toBe(false);
+    expect(earns({ difficulty: 3 })).toBe(true);
+  });
+
+  it('judges pace from Proficient on, at the pace limit', () => {
+    expect(earns({ timeMs: 105_000 })).toBe(true);
+    expect(earns({ timeMs: 105_001 })).toBe(false);
+    expect(earns({ timeMs: 105_001, level: 4 })).toBe(false);
+  });
+
+  it('gives hard questions 1.5x the time', () => {
+    expect(earns({ difficulty: 3, timeMs: 157_500 })).toBe(true);
+    expect(earns({ difficulty: 3, timeMs: 157_501 })).toBe(false);
+  });
+
+  it('ignores pace below Proficient', () => {
+    expect(earns({ timeMs: 600_000, level: 2 })).toBe(true);
+    expect(earns({ timeMs: 600_000, level: 0 })).toBe(true);
   });
 });

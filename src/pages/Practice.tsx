@@ -12,7 +12,7 @@ import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
 import { isOnPace, LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
-import { dodgedTraps, FULL_CARD, hintText, paceJudged, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
+import { dodgedTraps, earnsReward, FULL_CARD, hintText, paceJudged, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -53,7 +53,7 @@ interface Result {
   grade: GradeResult;
   outcome: AttemptOutcome;
   timeMs: number;
-  /** Trap ids carried by wrong choices the user left alone (correct answers only). */
+  /** Trap ids carried by wrong choices the user left alone (clean correct answers only, see earnsReward). */
   dodged: string[];
 }
 
@@ -137,10 +137,19 @@ export function Practice({ route }: { route: string[] }) {
       mode: 'practice',
       response,
     });
-    const dodged = dodgedTraps(current.question, response);
+    // Rewards (traps dodged, streak) go to clean answers only; an unclean correct answer neither earns nor breaks the streak.
+    const earned = earnsReward({
+      correct: g.correct,
+      hintLevel,
+      difficulty: current.question.difficulty,
+      timeMs,
+      paceSec: store.settings.paceSec,
+      level: outcome.from,
+    });
+    const dodged = earned ? dodgedTraps(current.question, response) : [];
     setResult({ grade: g, outcome, timeMs, dodged });
     setOutcomes((o) => [...o, { skillId: current.question.skillId, from: outcome.from, to: outcome.to, correct: g.correct, dodged: dodged.length }]);
-    setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: g.correct ? s.streak + 1 : 0 }));
+    setSession((s) => ({ answered: s.answered + 1, correct: s.correct + (g.correct ? 1 : 0), streak: !g.correct ? 0 : earned ? s.streak + 1 : s.streak }));
   }, [current, result, response, elapsed, hintLevel, store]);
 
   // Keyboard: letters / digits pick a choice, Enter submits or goes to the next question.
