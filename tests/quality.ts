@@ -85,12 +85,72 @@ function splitRich(s: string): { math: string[]; prose: string[] } {
 
 /* -------------------------------------------------------------------------- 1. artifacts */
 
-/** Words ending in "s" that may follow "1" without being a plural noun. */
-const NOT_PLURAL = new Set(
-  'is was has does as its this thus plus minus less unless yes his us times gives means makes equals remains leaves goes grows shrinks holds answers divides appears belongs comes lies works fails counts stays becomes represents contains satisfies exceeds follows occurs results uses lands sits falls ends starts gets needs takes keeps puts sets wins loses adds subtracts multiplies always perhaps'.split(
-    ' ',
-  ),
-);
+/** Words ending in "s" that may follow "1" without being a plural noun. One per line, sorted. */
+const NOT_PLURAL = new Set([
+  'adds',
+  'always',
+  'answers',
+  'appears',
+  'as',
+  'becomes',
+  'belongs',
+  'comes',
+  'contains',
+  'counts',
+  'divides',
+  'does',
+  'ends',
+  'equals',
+  'exceeds',
+  'fails',
+  'falls',
+  'follows',
+  'gets',
+  'gives',
+  'goes',
+  'grows',
+  'has',
+  'his',
+  'holds',
+  'is',
+  'its',
+  'keeps',
+  'lands',
+  'leaves',
+  'less',
+  'lies',
+  'loses',
+  'makes',
+  'means',
+  'minus',
+  'multiplies',
+  'needs',
+  'occurs',
+  'perhaps',
+  'plus',
+  'puts',
+  'remains',
+  'represents',
+  'results',
+  'satisfies',
+  'sets',
+  'shrinks',
+  'sits',
+  'starts',
+  'stays',
+  'subtracts',
+  'takes',
+  'this',
+  'thus',
+  'times',
+  'unless',
+  'us',
+  'uses',
+  'was',
+  'wins',
+  'works',
+  'yes',
+]);
 
 const ARTIFACTS: { gate: Gate; math?: RegExp; prose?: RegExp; skip?: (m: RegExpExecArray) => boolean }[] = [
   // "1x", "-1y", "1\pi", "1\sqrt{2}": a coefficient 1 that should be hidden. Not "0.1x", "21x", "x_1y".
@@ -101,10 +161,10 @@ const ARTIFACTS: { gate: Gate; math?: RegExp; prose?: RegExp; skip?: (m: RegExpE
   { gate: 'artifacts.exp-1', math: /\^\{1\}|\^1(?![\d.])/ },
   // "5 - -3", "5 + -3", "5 −− 3": subtracting or adding a negative written without parentheses
   { gate: 'artifacts.sign', math: /-\s*-|\+\s*-|−\s*−/ },
-  // "1 years", "1 inches"
+  // "1 years", "1 inches", and irregular plurals: "1 feet", "1 people"
   {
     gate: 'artifacts.plural-1',
-    prose: /(?<![\w.,$\-−])1 ([a-z]+s)\b/,
+    prose: /(?<![\w.,$\-−])1 ([a-z]+s|feet|people|children|men|women|mice|teeth|geese|dice)\b/,
     skip: (m) => NOT_PLURAL.has(m[1]),
   },
   // "the the", "is is"

@@ -73,6 +73,7 @@
     "figures.scale": "baseline"
   },
   "geo.solids.pour": {
+    "artifacts.plural-1": "baseline",
     "figures.scale": "baseline"
   },
   "geo.solids.scaling": {

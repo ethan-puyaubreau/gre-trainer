@@ -24,6 +24,8 @@ describe('quality gate matchers', () => {
     expect(hits('$x^{1}$')).toEqual(['artifacts.exp-1']);
     expect(hits('$5 - -3$')).toEqual(['artifacts.sign']);
     expect(hits('after $1$ years')).toEqual(['artifacts.plural-1']);
+    expect(hits('a depth of 1 feet')).toEqual(['artifacts.plural-1']);
+    expect(hits('1 people')).toEqual(['artifacts.plural-1']);
     expect(hits('1 is odd, 1 has one divisor, 11 years, \\$1 bills')).toEqual([]);
     expect(hits('the the end. So The answer')).toEqual(['artifacts.doubled-word', 'artifacts.so-the']);
   });
