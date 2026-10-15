@@ -111,7 +111,9 @@ export const mxBlendQc: Template<BlendParams> = {
           ? `Both outcomes are possible: ${word(w1)}; ${word(w2!)}. ${qcEnd('D')}`
           : answer === 'C'
             ? `The mixture is exactly ${dx(c)} percent. ${qcEnd('C')}`
-            : `Every allowed mixture is ${answer === 'A' ? 'above' : 'below'} ${dx(c)} percent. ${qcEnd(answer)}`;
+            : R.hi && R.lo.eq(R.hi)
+              ? `The mixture is ${dx(conc(p, q, R.lo))} percent, which is ${answer === 'A' ? 'greater' : 'less'} than ${dx(c)} percent. ${qcEnd(answer)}`
+              : `Every allowed mixture is ${answer === 'A' ? 'above' : 'below'} ${dx(c)} percent. ${qcEnd(answer)}`;
       const detail =
         cond === 'none'
           ? `With no restriction the mixture can be anywhere strictly between ${p} and ${q} percent.`
