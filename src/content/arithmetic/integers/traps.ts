@@ -28,6 +28,14 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Did not cancel the given factor first',
     fix: 'Cancel the known part of the denominator first. The unknown factor must divide what is LEFT of the numerator, not the whole numerator.',
   },
+  'int-remainder-complement': {
+    label: 'Counted the remainder from the next multiple',
+    fix: 'A remainder $r$ means $n$ is $r$ ABOVE a multiple of the divisor: $n = dk + r$, not $dk - r$. For remainder 2 on division by 7, 9 works ($7 + 2$) and 12 does not ($14 - 2$).',
+  },
+  'int-remainder-ignored': {
+    label: 'Picked a multiple of the divisor',
+    fix: 'A multiple of the divisor leaves remainder 0. The remainder in the question tells you how far above a multiple $n$ sits.',
+  },
   'int-one-condition-only': {
     label: 'Checked only one of the conditions',
     fix: 'A value must satisfy every condition in the question. Test each candidate against all of them.',

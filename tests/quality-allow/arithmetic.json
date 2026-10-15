@@ -32,18 +32,6 @@
   "arith.decimals.terminating": {
     "distractors.trapped": "baseline"
   },
-  "arith.divisibility.could-be-n": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.divisibility.must-divide": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.divisibility.power-remainder-qc": {
-    "qc.d-share": "baseline"
-  },
-  "arith.divisibility.remainder-transform": {
-    "degenerate.trivial": "baseline"
-  },
   "arith.exponents.common-base-qc": {
     "artifacts.exp-1": "baseline",
     "qc.never-d": "baseline"

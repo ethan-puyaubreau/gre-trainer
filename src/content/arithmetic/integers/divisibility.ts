@@ -35,16 +35,16 @@ const mustDivide: Template<MustDivideParams> = {
       const r = target - s;
       if (r < 2 || r >= d) continue;
       if (s > 0 && gcd(d, r) % g === 0) continue; // the shift must matter
-      const divs = (x: number) => range(2, 20).filter((v) => x % v === 0);
+      const divs = (x: number) => range(2, 60).filter((v) => x % v === 0);
       const remOnly = divs(target).filter((v) => d % v !== 0);
       const divOnly = divs(d).filter((v) => target % v !== 0);
-      if (!remOnly.length || !divOnly.length) continue;
-      const fillers = rng.shuffle(range(2, 20).filter((v) => d % v !== 0 && target % v !== 0));
-      if (fillers.length < 3) continue;
+      if (remOnly.length < 2 || divOnly.length < 2) continue;
+      // Four wrong choices, each a real mistake: a divisor of the remainder only, or of the divisor only.
       const pool = [
-        ...rng.sample(remOnly, Math.min(2, remOnly.length)).map((v) => ({ v, trap: 'int-divides-remainder-only' })),
-        ...rng.sample(divOnly, Math.min(2, divOnly.length)).map((v) => ({ v, trap: 'int-divides-divisor-only' })),
-        ...fillers.map((v) => ({ v })),
+        ...rng.sample(remOnly, 2).map((v) => ({ v, trap: 'int-divides-remainder-only' })),
+        ...rng.sample(divOnly, 2).map((v) => ({ v, trap: 'int-divides-divisor-only' })),
+        ...rng.sample(remOnly, Math.min(3, remOnly.length)).map((v) => ({ v, trap: 'int-divides-remainder-only' })),
+        ...rng.sample(divOnly, Math.min(3, divOnly.length)).map((v) => ({ v, trap: 'int-divides-divisor-only' })),
       ];
       let built: ReturnType<typeof spreadChoices>;
       try {
@@ -52,9 +52,11 @@ const mustDivide: Template<MustDivideParams> = {
       } catch {
         continue;
       }
-      const { choices, answer } = built;
-      const ro = Number((choices.find((c) => c.trap === 'int-divides-remainder-only') ?? { text: `$${remOnly[0]}$` }).text.slice(1, -1));
-      const dOnly = Number((choices.find((c) => c.trap === 'int-divides-divisor-only') ?? { text: `$${divOnly[0]}$` }).text.slice(1, -1));
+      // The key is the smallest of the five most of the time (it is a gcd): shuffle so it does not sit in A.
+      const choices = rng.shuffle(built.choices);
+      const answer = choices.findIndex((c) => c.text === built.choices[built.answer].text);
+      const ro = choices.find((c) => c.trap === 'int-divides-remainder-only')?.text.slice(1, -1);
+      const dOnly = choices.find((c) => c.trap === 'int-divides-divisor-only')?.text.slice(1, -1);
       const values = choices.map((c) => Number(c.text.slice(1, -1)));
 
       // Counterexamples for the wrong choices, from the smallest values of n.
@@ -73,8 +75,13 @@ const mustDivide: Template<MustDivideParams> = {
         .join('; ');
       const kList = ks.map((k) => `$k = ${k}$ gives $${subject} = ${nOf(k)}$`).join(' and ');
       const setup = s
-        ? `Write $n = ${d}k + ${r}$ for some integer $k \\ge 0$. Then $n + ${s} = ${d}k + ${target} = ${g}(${d / g}k + ${target / g})$, so ${g} divides $n + ${s}$ for every possible $n$.`
-        : `Write $n = ${d}k + ${r}$ for some integer $k \\ge 0$. Both terms are multiples of ${g}: $n = ${g}(${d / g}k + ${r / g})$, so ${g} divides every possible $n$.`;
+        ? `Then $n + ${s} = ${d}k + ${target} = ${g}(${d / g}k + ${target / g})$, so ${g} divides $n + ${s}$ for every possible $n$.`
+        : `Both terms are multiples of ${g}: $n = ${g}(${d / g}k + ${r / g})$, so ${g} divides every possible $n$.`;
+      const small = s ? target : r;
+      const trapBits = [
+        ...(ro ? [`${ro} divides ${small} but not ${d}`] : []),
+        ...(dOnly ? [`${dOnly} divides ${d} but not ${small}`] : []),
+      ];
       return {
         params: { d, r, s, values },
         q: {
@@ -82,11 +89,11 @@ const mustDivide: Template<MustDivideParams> = {
           stem: `The positive integer $n$ leaves a remainder of ${r} when it is divided by ${d}. Which of the following must be a factor of $${subject}$?`,
           choices,
           answer,
-          explanation: `${setup}
+          explanation: `Remainder problem: write $n = ${d}k + ${r}$ for an integer $k \\ge 0$. ${setup}
 
-The other choices fail for some $n$: ${kList}, and ${counter}.
+Check: ${kList}, and ${counter}.
 
-A divisor of ${s ? `$${r} + ${s} = ${target}$` : `the remainder ${r}`} alone (such as ${ro}) or of ${d} alone (such as ${dOnly}) is not enough: it has to divide both, so it has to divide their greatest common divisor, ${g}.`,
+${trapBits.length ? `Trap: ${trapBits.join('; ')}, so a number that fits only one of them fails for some $n$. ` : ''}A number divides every such value only if it divides both ${d} and ${s ? `$${r} + ${s} = ${target}$` : `the remainder ${r}`}, that is, their greatest common divisor, ${g}.`,
         },
       };
     }
@@ -173,7 +180,7 @@ const remainderTransform: Template<TransformParams> = {
         raw = r * r2;
         if (raw < d) continue;
       }
-      if (mod(raw, p.e) === 0 && rng.chance(0.7)) continue; // remainder 0 only sometimes
+      if (mod(raw, p.e) <= 1 && rng.chance(0.85)) continue; // remainder 0 or 1 only sometimes
       break;
     }
     const { d, r, c, m, e } = p;
@@ -224,6 +231,10 @@ Quick check with $n = ${r}$: $${c} \\cdot ${r} + ${m} = ${raw}$. Remember to red
 Quick check with $x = ${r}$, $y = ${c}$: $xy = ${raw}$. Do not stop at ${raw}, which is larger than ${d}.`;
         break;
     }
+    const rule =
+      kind === 'mod-factor'
+        ? `Rule: when ${e} divides ${d}, a remainder on division by ${d} reduces further on division by ${e}.`
+        : 'Rule: replace each number by its remainder, do the arithmetic, then reduce again.';
     return {
       params: p,
       q: {
@@ -231,7 +242,11 @@ Quick check with $x = ${r}$, $y = ${c}$: $xy = ${raw}$. Do not stop at ${raw}, w
         stem,
         answer: frac(answer),
         traps: [{ value: frac(raw), trap: 'int-remainder-not-reduced' }],
-        explanation,
+        explanation: `Remainders carry through the arithmetic, so replace the unknown by multiple-plus-remainder.
+
+${explanation}
+
+${rule}`,
       },
     };
   },
@@ -443,7 +458,10 @@ const couldBeN: Template<CouldBeParams> = {
       const pool = range(lo, hi);
       const good = pool.filter(ok);
       const half = conds.length > 1 ? pool.filter((n) => okCount(n) === 1) : [];
-      const none = pool.filter((n) => okCount(n) === 0 && conds.some(([dv, r]) => Math.abs((n % dv) - r) === 1));
+      // Wrong values with no condition met, each a real slip: a multiple of a divisor, or r counted below the next multiple.
+      const slipOf = (n: number): string | null =>
+        conds.some(([dv]) => n % dv === 0) ? 'int-remainder-ignored' : conds.some(([dv, r]) => r !== dv - r && n % dv === dv - r) ? 'int-remainder-complement' : null;
+      const none = pool.filter((n) => okCount(n) === 0 && slipOf(n));
       const nChoices = diff === 1 ? 5 : 6;
       const nGood = rng.int(1, diff === 1 ? 2 : 3);
       const nHalf = conds.length > 1 ? Math.min(nChoices - nGood - 1, rng.int(2, 3)) : 0;
@@ -452,7 +470,11 @@ const couldBeN: Template<CouldBeParams> = {
       const h = pickDistinct(rng, half, nHalf, taken);
       const z = pickDistinct(rng, none, nChoices - g.length - h.length, taken);
       if (g.length !== nGood || h.length !== nHalf || g.length + h.length + z.length !== nChoices) continue;
-      const items = [...g.map((v) => ({ v, correct: true })), ...h.map((v) => ({ v, correct: false, trap: 'int-one-condition-only' })), ...z.map((v) => ({ v, correct: false }))].sort(
+      const items = [
+        ...g.map((v) => ({ v, correct: true })),
+        ...h.map((v) => ({ v, correct: false, trap: 'int-one-condition-only' })),
+        ...z.map((v) => ({ v, correct: false, trap: slipOf(v)! })),
+      ].sort(
         (x, y) => x.v - y.v,
       );
       const { choices, answer } = flaggedChoices(
@@ -464,25 +486,26 @@ const couldBeN: Template<CouldBeParams> = {
       const first = range(1, 200).filter(ok).slice(0, 4);
       const pattern =
         conds.length === 1
-          ? `The possible values are $n = ${conds[0][0]}k + ${conds[0][1]}$: ${first.join(', ')}, and so on, going up by ${conds[0][0]}.`
-          : `List the numbers that leave remainder ${conds[0][1]} when divided by ${conds[0][0]} (${range(0, 5)
+          ? `Numbers with remainder ${conds[0][1]} on division by ${conds[0][0]} are $n = ${conds[0][0]}k + ${conds[0][1]}$: ${first.join(', ')}, and so on, going up by ${conds[0][0]}.`
+          : `Numbers with remainder ${conds[0][1]} on division by ${conds[0][0]} are ${range(0, 4)
               .map((k) => conds[0][0] * k + conds[0][1])
-              .join(', ')}, ...) and keep those that leave remainder ${conds[1][1]} when divided by ${conds[1][0]}. The first is ${first[0]}, and the solutions repeat every lcm$(${conds[0][0]}, ${conds[1][0]}) = ${L}$: ${first.join(', ')}, ...${
-              diff === 3 ? ` (not every ${conds[0][0] * conds[1][0]}: ${conds[0][0]} and ${conds[1][0]} share a factor).` : ''
-            }`;
-      const lines = items
-        .map((it) => {
-          const parts = conds.map(([dv, r]) => {
-            const q0 = Math.floor(it.v / dv);
-            const rr = it.v % dv;
-            return `$${it.v} = ${dv} \\cdot ${q0} + ${rr}$${rr === r ? '' : ` (not ${r})`}`;
-          });
-          return `- ${it.v}: ${parts.join(', ')} ${it.correct ? '✓' : '✗'}`;
-        })
-        .join('\n');
-      const trapLine = h.length
-        ? `\n\nSome choices satisfy only one of the two conditions; a value of $n$ must satisfy both.`
-        : '';
+              .join(', ')}, ...; the first that also leaves remainder ${conds[1][1]} on division by ${conds[1][0]} is ${first[0]}, and the pattern repeats every $\\operatorname{lcm}(${conds[0][0]}, ${conds[1][0]}) = ${L}$: ${first.slice(0, 3).join(', ')}, ...${
+              diff === 3 ? ` (not every ${conds[0][0] * conds[1][0]}, since ${conds[0][0]} and ${conds[1][0]} share a factor)` : ''
+            }.`;
+      const need = conds.map(([, r]) => r).join(' and ');
+      const lines = items.map((it) => `${it.v}: ${conds.map(([dv]) => it.v % dv).join(' and ')}${it.correct ? ' ✓' : ''}`).join('; ');
+      const ex = (trap: string) => items.find((it) => 'trap' in it && it.trap === trap)?.v;
+      const bits: string[] = [];
+      const one = ex('int-one-condition-only');
+      if (one !== undefined) bits.push(`${one} fits only one condition`);
+      const comp = ex('int-remainder-complement');
+      if (comp !== undefined) {
+        const [dv, r] = conds.find(([dv, r]) => r !== dv - r && comp % dv === dv - r)!;
+        bits.push(`${comp} is ${r} below a multiple of ${dv} (remainder ${dv - r}, not ${r})`);
+      }
+      const ign = ex('int-remainder-ignored');
+      if (ign !== undefined) bits.push(`${ign} is a multiple of ${conds.find(([dv]) => ign % dv === 0)![0]} (remainder 0)`);
+      const trapLine = bits.length ? `\n\nTrap: ${bits.slice(0, 2).join('; ')}.` : '';
       return {
         params: { conds, values },
         q: {
@@ -493,8 +516,9 @@ const couldBeN: Template<CouldBeParams> = {
           answer,
           explanation: `${pattern}
 
-Check each choice:
-${lines}${trapLine}`,
+Remainders of each choice (${need} needed): ${lines}.${trapLine}
+
+Rule: $n$ must leave the stated remainder for every divisor.`,
         },
       };
     }
@@ -532,8 +556,9 @@ const powerRemainderQC: Template<PowRemParams> = {
   style: 'remainder of 10^k plus or minus a constant',
   generate(rng, diff) {
     for (;;) {
-      const d = rng.pick(diff === 1 ? [9, 3, 4] : diff === 2 ? [9, 11, 4, 8] : [11, 11, 9, 8]);
-      const kInfo: PowRemParams['kInfo'] = d === 11 && diff >= 2 ? rng.pick(['given', 'even', 'any'] as const) : 'given';
+      const d = rng.pick(diff === 1 ? [9, 3, 4] : diff === 2 ? [9, 11, 11, 4, 8] : [11, 11, 11, 9, 8]);
+      const kInfo: PowRemParams['kInfo'] =
+        d === 11 && diff >= 2 ? rng.pick(diff === 2 ? (['given', 'even', 'any', 'any'] as const) : (['given', 'even', 'any', 'any', 'any'] as const)) : 'given';
       const k = kInfo === 'given' ? rng.int(d === 8 ? 6 : 10, 40) : 0;
       const sign: 1 | -1 = diff >= 2 && d !== 4 && d !== 8 && rng.chance(0.35) ? -1 : 1;
       const c = sign < 0 ? rng.int(1, d === 11 ? 9 : d - 1) : rng.int(1, diff === 1 ? 8 : 20);
@@ -599,7 +624,7 @@ ${answer === 'D' ? `Since ${ev} and ${od} compare differently with ${bv}, the re
           quantityB: `$${bv}$`,
           answer,
           traps: Object.keys(traps).length ? traps : undefined,
-          explanation: `${why}. ${body}${answer !== 'D' ? `\n\n$m$ is far too large to compute, but its remainder follows the pattern of the powers of 10.` : ''}`,
+          explanation: `${why}. ${body}${answer !== 'D' ? `\n\nTrap: $m$ is too large to compute, which tempts D, but its remainder follows the pattern of the powers of 10.` : `\n\nRule: when the parity of $k$ changes the remainder, test one even and one odd $k$.`}`,
         },
       };
     }
