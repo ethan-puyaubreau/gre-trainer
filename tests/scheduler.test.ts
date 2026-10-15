@@ -149,6 +149,89 @@ describe('bringing a missed skill back', () => {
   });
 });
 
+describe('introducing new skills', () => {
+  const fresh = (n: number) => ({ ...base, skills: skills.slice(0, n) });
+
+  it('asks the first question of a new skill at difficulty 1, whatever the scope', () => {
+    for (const scope of [SMART, { kind: 'skill', skillId: 's1' }, { kind: 'unit', area: 'arithmetic', unit: 'U' }] as const) {
+      const pick = nextPick(createRng(4), fresh(3), scope)!;
+      expect(pick.difficulty).toBe(1);
+    }
+    const second = nextPick(createRng(4), { ...fresh(3), states: { s1: at(2, { attempts: 1, difficulty: 2 }) } }, { kind: 'skill', skillId: 's1' })!;
+    expect(second.difficulty).toBe(2); // from the second question on, the skill's own difficulty
+  });
+
+  it('serves a second question right after the first, even with a review due', () => {
+    const states = { s1: at(2, { attempts: 1 }), s2: at(4, { dueAt: T0 - DAY }) };
+    for (let i = 0; i < 50; i++) {
+      const pick = nextPick(createRng(i), { ...fresh(3), states, lastSkill: 's1' }, SMART)!;
+      expect(pick).toMatchObject({ skillId: 's1', reason: 'new' });
+    }
+  });
+
+  it('serves a third question on a coin flip, never a fourth', () => {
+    const states = { s1: at(2, { attempts: 2 }) };
+    const input = { ...fresh(3), states, lastSkill: 's1' };
+    expect(nextPick(constRng(0.4), input, SMART)).toMatchObject({ skillId: 's1', reason: 'new' });
+    expect(nextPick(constRng(0.6), input, SMART)!.skillId).not.toBe('s1');
+    const third = { ...input, states: { s1: at(2, { attempts: 3 }) } };
+    expect(picks(50, third).some((p) => p.skillId === 's1')).toBe(false);
+  });
+
+  it('only continues the skill just answered', () => {
+    const states = { s1: at(2, { attempts: 1 }) }; // started in an earlier run, not the last question
+    expect(picks(60, { ...fresh(3), states }).some((p) => p.skillId !== 's1')).toBe(true);
+    expect(picks(60, { ...fresh(3), states, lastSkill: 's2' }).some((p) => p.skillId !== 's1')).toBe(true);
+  });
+
+  it('plays out as runs of 2 or 3 questions on each new skill', () => {
+    const lengths = new Set<number>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const rng = createRng(seed);
+      const reqs = new Map(skills.map((s) => [s.id, requirementsFor(templatesBySkill.get(s.id)!)]));
+      let states: Record<string, SkillState> = {};
+      let last: string | undefined;
+      const seen: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        const pick = nextPick(rng, { ...fresh(4), states, lastSkill: last, now: T0 + i * 1000, seq: i }, SMART)!;
+        const prev = states[pick.skillId] ?? newSkillState();
+        states = {
+          ...states,
+          [pick.skillId]: applyAttempt(
+            prev,
+            { templateId: pick.templateId, format: 'mcs', difficulty: pick.difficulty, correct: true, timeMs: 60_000, at: T0 + i * 1000, hintLevel: 0 },
+            reqs.get(pick.skillId)!,
+          ).state,
+        };
+        last = pick.skillId;
+        seen.push(pick.skillId);
+      }
+      const run = seen.findIndex((id) => id !== seen[0]);
+      lengths.add(run);
+      expect(run).toBeGreaterThanOrEqual(2);
+      expect(run).toBeLessThanOrEqual(3);
+    }
+    expect([...lengths].sort()).toEqual([2, 3]);
+  });
+
+  it('starts no new skill while 4 skills are Attempted or Familiar', () => {
+    const states = { s1: at(1), s2: at(1), s3: at(2), s4: at(2), s5: at(4) }; // s6 and s7 are not started
+    const crowded = { ...base, states };
+    const served = picks(300, crowded);
+    expect(served.some((p) => p.reason === 'new' || p.skillId === 's6' || p.skillId === 's7')).toBe(false);
+    // With only 3 of them, a new skill gets in.
+    const room = { ...base, states: { ...states, s4: at(3) } };
+    expect(picks(300, room).some((p) => p.reason === 'new' && p.skillId === 's6')).toBe(true);
+  });
+
+  it('still starts a new skill when nothing else can be served in the scope', () => {
+    const algebra = skills.map((s) => (s.id === 's6' ? { ...s, area: 'algebra' as const } : s));
+    const states = { s1: at(1), s2: at(1), s3: at(2), s4: at(2) };
+    const pick = nextPick(createRng(1), { ...base, skills: algebra, states }, { kind: 'smart', areas: ['algebra'] })!;
+    expect(pick).toMatchObject({ skillId: 's6', reason: 'new', difficulty: 1 });
+  });
+});
+
 describe('scheduler basics', () => {
   it('prefers styles that are not credited yet', () => {
     const states = { s1: at(2, { styles: { 's1.a': 2, 's1.b': 3 } }) };

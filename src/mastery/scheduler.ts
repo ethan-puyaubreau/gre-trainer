@@ -42,6 +42,8 @@ export interface SchedulerInput {
 
 /** Chance that a due review jumps the queue ahead of the interleaved buckets. */
 const DUE_FIRST = 0.6;
+/** Skills at Attempted or Familiar from which no new skill is started: finish those first. */
+const MAX_STARTED = 4;
 
 export interface Pick {
   skillId: string;
@@ -93,14 +95,15 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
   if (!playable.length) return null;
   const stateOf = (id: string) => input.states[id] ?? newSkillState();
   /**
-   * `same` forces a template (when it still exists), `avoid` keeps one out. The difficulty is the skill's own:
-   * a miss has already lowered it by one, which is the "one below the missed question" of a stage 1 comeback.
+   * `same` forces a template (when it still exists), `avoid` keeps one out. The first question of a new skill
+   * is easy (difficulty 1); after that the difficulty is the skill's own: a miss has already lowered it by one,
+   * which is the "one below the missed question" of a stage 1 comeback.
    */
   const make = (skill: Skill, reason: Pick['reason'], o: { same?: string; avoid?: string; remediation?: Remediation } = {}): Pick => {
     const st = stateOf(skill.id);
     const templates = input.templatesBySkill.get(skill.id)!;
     const t = templates.find((x) => x.id === o.same) ?? pickTemplate(rng, templates, st, input.recentTemplates, o.avoid);
-    return { skillId: skill.id, templateId: t.id, difficulty: st.difficulty, reason, remediation: o.remediation };
+    return { skillId: skill.id, templateId: t.id, difficulty: st.level === 0 ? 1 : st.difficulty, reason, remediation: o.remediation };
   };
   const byId = new Map(playable.map((s) => [s.id, s]));
 
@@ -123,6 +126,13 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
     return mastered.length ? make(rng.pick(mastered), 'review') : null;
   }
 
+  // Mini block: a skill just started gets a second question, and a third on a coin flip, before interleaving.
+  const started = input.lastSkill ? byId.get(input.lastSkill) : undefined;
+  if (started) {
+    const answered = stateOf(started.id).attempts;
+    if (answered === 1 || (answered === 2 && rng.chance(0.5))) return make(started, 'new');
+  }
+
   // Due reviews first: the most overdue one most of the time, the interleaved buckets below otherwise.
   if (due.length && rng.chance(DUE_FIRST)) {
     return make(due.reduce((a, b) => (stateOf(b.id).dueAt! < stateOf(a.id).dueAt! ? b : a)), 'review');
@@ -136,6 +146,9 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
     // weakest first
     .sort((a, b) => stateOf(a.id).level - stateOf(b.id).level);
   const fresh = playable.filter((s) => stateOf(s.id).level === 0 && notLast(s));
+  // No new skill while MAX_STARTED are barely started (any skill of the syllabus, not only this scope's).
+  const crowded = input.skills.filter((s) => [1, 2].includes(stateOf(s.id).level)).length >= MAX_STARTED;
+  const open = crowded ? [] : fresh;
 
   // Interleave: reviews 30%, in-progress 50%, new 20% (falling back when a bucket is empty).
   const roll = rng.next();
@@ -144,16 +157,16 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
       ? [
           [due, 'review'],
           [inProgress, 'practice'],
-          [fresh, 'new'],
+          [open, 'new'],
         ]
       : roll < 0.8
         ? [
             [inProgress, 'practice'],
             [due, 'review'],
-            [fresh, 'new'],
+            [open, 'new'],
           ]
         : [
-            [fresh, 'new'],
+            [open, 'new'],
             [inProgress, 'practice'],
             [due, 'review'],
           ];
@@ -167,6 +180,8 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
     if (reason === 'new') return make(bucket[0], reason); // syllabus order
     return make(rng.pick(bucket), reason);
   }
+  // Nothing else to serve in this scope: a new skill is better than repeating a mastered one.
+  if (fresh.length) return make(fresh[0], 'new');
   // Everything mastered and nothing due: keep practicing mastered skills.
   const any = playable.filter(notLast);
   return make(rng.pick(any.length ? any : playable), 'review');
