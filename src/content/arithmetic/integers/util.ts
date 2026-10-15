@@ -221,6 +221,8 @@ export function plainToTex(plain: string): string {
 /**
  * Numeric choices (ascending) with the correct answer at a random feasible position: picks how many
  * wrong values go below and above the answer, preferring candidates tagged with a trap.
+ * With order 'shuffled' the trapped candidates are taken first whatever side they are on and the
+ * five choices are shuffled: use it when the real mistakes all fall on one side of the key.
  */
 export function spreadChoices(
   rng: Rng,
@@ -228,6 +230,7 @@ export function spreadChoices(
   cands: { v: number; trap?: string }[],
   format: (v: number) => string = (v) => `$${v}$`,
   count = 5,
+  order: 'asc' | 'shuffled' = 'asc',
 ): { choices: Choice[]; answer: number } {
   const seen = new Set<number>([correct]);
   const uniq: { v: number; trap?: string }[] = [];
@@ -239,6 +242,15 @@ export function spreadChoices(
   const below = uniq.filter((c) => c.v < correct);
   const above = uniq.filter((c) => c.v > correct);
   const need = count - 1;
+  if (order === 'shuffled') {
+    const picked = [...rng.shuffle(uniq.filter((c) => c.trap)), ...rng.shuffle(uniq.filter((c) => !c.trap))].slice(0, need);
+    if (picked.length < need) throw new Error(`spreadChoices: not enough candidates around ${correct}`);
+    const all = rng.shuffle([{ v: correct, ok: true as boolean, trap: undefined as string | undefined }, ...picked.map((c) => ({ v: c.v, ok: false, trap: c.trap }))]);
+    return {
+      choices: all.map((it) => ({ text: format(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
+      answer: all.findIndex((it) => it.ok),
+    };
+  }
   const feasible: number[] = [];
   for (let k = 0; k <= need; k++) if (below.length >= k && above.length >= need - k) feasible.push(k);
   if (!feasible.length) throw new Error(`spreadChoices: not enough candidates around ${correct}`);

@@ -49,25 +49,6 @@
     "artifacts.coef-1": "baseline",
     "artifacts.exp-1": "baseline"
   },
-  "arith.factors.count-divisors": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.factors.divisor-count-qc": {
-    "artifacts.exp-1": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.factors.greatest-prime-factor": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.factors.quotient-integer": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.factors.square-multiplier": {
-    "artifacts.exp-1": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
   "arith.fractions.compare-mcs": {
     "distractors.trapped": "baseline"
   },

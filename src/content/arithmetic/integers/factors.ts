@@ -110,8 +110,9 @@ interface DivQCParams {
   k: number;
 }
 
-const COMPARE_M = [12, 16, 18, 20, 24, 28, 30, 32, 36, 40, 42, 45, 48, 50, 54, 60, 64, 72, 80, 81, 90, 96, 100];
+const COMPARE_M = [12, 14, 15, 16, 18, 20, 21, 24, 26, 27, 28, 30, 32, 33, 35, 36, 40, 42, 44, 45, 48, 50, 52, 54, 56, 60, 63, 64, 66, 70, 72, 75, 80, 81, 84, 88, 90, 96, 98, 100, 108, 120];
 const RECT_N = [24, 30, 36, 40, 48, 60, 64, 72, 80, 90, 96, 100, 120, 144];
+const RECT_N3 = [48, 60, 72, 84, 90, 96, 108, 120, 126, 132, 144, 150, 160, 168, 180, 192, 196, 200, 210, 216, 224, 240, 252, 256, 280, 288, 300, 324, 360];
 const powTex = (v: string, e: number) => (e === 1 ? v : `${v}^{${e}}`);
 
 /** Fixed statements about an unknown positive integer n. */
@@ -128,7 +129,7 @@ const N_STATEMENTS: Partial<Record<DivQCKind, { info: string; A: string; B: stri
     A: 'The number of positive divisors of $2n$',
     B: 'Twice the number of positive divisors of $n$',
     answer: 'C',
-    why: 'Since $n$ is odd, $2n = 2^1 \\cdot n$ and 2 does not appear in $n$. Each divisor of $2n$ is a divisor $d$ of $n$ or $2d$, so $2n$ has exactly twice as many divisors as $n$. For example, $n = 15$: 15 has 4 divisors and 30 has 8. (C)',
+    why: 'Since $n$ is odd, $2n = 2 \\cdot n$ and 2 does not appear in $n$. Each divisor of $2n$ is a divisor $d$ of $n$ or $2d$, so $2n$ has exactly twice as many divisors as $n$. For example, $n = 15$: 15 has 4 divisors and 30 has 8. (C)',
   },
   'any-2n': {
     info: '$n$ is a positive integer.',
@@ -182,7 +183,7 @@ const divisorCountQC: Template<DivQCParams> = {
         ? ['distinct-vs-number', 'n-vs-2n', 'rect-perimeters', 'prime-vs-2d']
         : diff === 2
           ? ['distinct-vs-number', 'maybe-equal', 'odd-2n', 'rect-perimeters', 'n-vs-2d']
-          : ['maybe-equal', 'any-2n', 'square-n', 'rect-perimeters', 'n-vs-2d', 'square-odd'];
+          : ['maybe-equal', 'maybe-equal', 'rect-perimeters', 'rect-perimeters', 'any-2n', 'square-n', 'n-vs-2d', 'square-odd'];
     const kind = rng.pick(kinds);
     for (;;) {
       let i = 0;
@@ -196,11 +197,14 @@ const divisorCountQC: Template<DivQCParams> = {
       let traps: QCQuestion['traps'];
       let explanation: string;
       if (kind === 'distinct-vs-number' || kind === 'maybe-equal') {
-        i = rng.int(1, diff === 1 ? 2 : 3);
-        j = rng.int(1, 3);
+        i = diff === 3 ? rng.int(2, 4) : rng.int(1, diff === 1 ? 2 : 3);
+        j = diff === 3 ? rng.int(1, 4) : rng.int(1, 3);
         const distinctCount = (i + 1) * (j + 1);
         const equalCount = i + j + 1;
-        const A = `The number of positive divisors of $${powTex('p', i)}${powTex('q', j)}$`;
+        const A =
+          diff === 3
+            ? `The number of positive integers that divide $${powTex('p', i)}${powTex('q', j)}$`
+            : `The number of positive divisors of $${powTex('p', i)}${powTex('q', j)}$`;
         if (kind === 'distinct-vs-number') {
           M = rng.pick(COMPARE_M);
           const fm = factorize(M);
@@ -240,7 +244,7 @@ ${
           }`;
         }
       } else if (kind === 'rect-perimeters') {
-        M = rng.pick(RECT_N);
+        M = rng.pick(diff === 3 ? RECT_N3 : RECT_N);
         const pairs = range(1, Math.floor(Math.sqrt(M))).filter((a) => M % a === 0);
         const count = pairs.length;
         const dM = countDivisorsBrute(M);
@@ -250,7 +254,7 @@ ${
         answer = qcCompare(count, k);
         const trapAns = qcCompare(dM, k);
         traps = trapAns !== answer ? { [trapAns]: 'int-counted-ordered-pairs' } : undefined;
-        info = `Each side of rectangle $R$ has an integer length, and the area of $R$ is ${M}.`;
+        info = diff === 3 ? `Rectangle $R$ has sides of integer length and an area of ${M} square units.` : `Each side of rectangle $R$ has an integer length, and the area of $R$ is ${M}.`;
         quantityA = 'The number of different possible perimeters of $R$';
         quantityB = `$${k}$`;
         explanation = `The side lengths form a factor pair of ${M}: ${listAnd(pairs.map((a) => `$${a} \\times ${M / a}$`))}. That is ${count} rectangles${
@@ -318,8 +322,6 @@ interface CountDivParams {
   kind: 'all' | 'even' | 'odd';
 }
 
-const D1_N = [24, 36, 40, 48, 54, 56, 60, 72, 80, 84, 90, 96, 100];
-
 const countDivisorsMC: Template<CountDivParams> = {
   id: 'arith.factors.count-divisors',
   skill: 'arith.factors',
@@ -329,8 +331,11 @@ const countDivisorsMC: Template<CountDivParams> = {
     let N: number;
     let kind: CountDivParams['kind'] = 'all';
     for (;;) {
-      if (diff === 1) N = rng.pick(D1_N);
-      else {
+      if (diff === 1) {
+        N = rng.int(24, 120);
+        // two different primes, so there is more to count than a single exponent
+        if (factorize(N).length < 2) continue;
+      } else {
         const a = rng.int(diff === 3 ? 1 : 0, diff === 3 ? 5 : 4);
         const b = rng.int(0, 3);
         const c = rng.int(0, 2);
@@ -347,45 +352,73 @@ const countDivisorsMC: Template<CountDivParams> = {
     const total = fac.reduce((s, [, e]) => s * (e + 1), 1);
     const odd = fac.filter(([p]) => p !== 2).reduce((s, [, e]) => s * (e + 1), 1);
     const answer = kind === 'all' ? total : kind === 'odd' ? odd : total - odd;
+    const sumPlus = fac.reduce((acc, [, e]) => acc + e + 1, 0);
     const traps: { value: number; trap: string }[] = [];
     if (kind === 'all') {
       traps.push({ value: fac.reduce((s, [, e]) => s * e, 1), trap: 'int-divisors-exponents' });
       traps.push({ value: total - 2, trap: 'int-divisors-missed-ends' });
       traps.push({ value: fac.reduce((s, [, e]) => s + e, 0), trap: 'int-divisors-exponents' });
+      traps.push({ value: Math.ceil(total / 2), trap: 'int-counted-ordered-pairs' });
+      traps.push({ value: sumPlus, trap: 'int-divisors-add' });
     } else {
+      const e2 = fac.find(([pp]) => pp === 2)![1];
+      const oddFac = fac.filter(([pp]) => pp !== 2);
+      const oddExpProduct = oddFac.reduce((acc, [, e]) => acc * e, 1);
       traps.push({ value: total, trap: 'int-divisors-parity' });
       traps.push({ value: kind === 'odd' ? total - odd : odd, trap: 'int-divisors-parity' });
+      if (kind === 'even') {
+        traps.push({ value: (e2 - 1) * odd, trap: 'int-divisors-parity' });
+        traps.push({ value: e2 * oddExpProduct, trap: 'int-divisors-exponents' });
+        traps.push({ value: e2 * oddFac.reduce((acc, [, e]) => acc + e + 1, 0), trap: 'int-divisors-add' });
+      } else {
+        traps.push({ value: oddExpProduct, trap: 'int-divisors-exponents' });
+        traps.push({ value: oddFac.reduce((acc, [, e]) => acc + e + 1, 0), trap: 'int-divisors-add' });
+        traps.push({ value: odd - 1, trap: 'int-divisors-missed-ends' });
+      }
     }
-    const { choices, answer: idx } = spreadChoices(rng, answer, [
-      ...traps.filter((t) => t.value > 0 && t.value !== answer).map((t) => ({ v: t.value, trap: t.trap })),
-      ...range(Math.max(1, answer - 6), 2 * answer + 4).map((v) => ({ v })),
-    ]);
-    const shown = diff === 3 ? `$${factorTex(fac)}$` : `${num(N)}`;
+    const { choices, answer: idx } = spreadChoices(
+      rng,
+      answer,
+      [
+        ...rng.shuffle(traps.filter((t) => t.value > 0 && t.value !== answer)).map((t) => ({ v: t.value, trap: t.trap })),
+        ...range(Math.max(1, answer - 6), 2 * answer + 4).map((v) => ({ v })),
+      ],
+      undefined,
+      5,
+      'shuffled',
+    );
+    const valueOf = (id: string) => choices.find((c) => c.trap === id)?.text;
     const shownMath = diff === 3 ? factorTex(fac) : num(N);
     const stem =
       kind === 'all'
-        ? `How many positive divisors does ${diff === 3 ? shown : `$${shownMath}$`} have?`
+        ? [
+            `How many positive divisors does $${shownMath}$ have?`,
+            `The positive integer $${shownMath}$ is divisible by how many different positive integers?`,
+            `How many positive integers divide $${shownMath}$ with no remainder?`,
+          ][rng.int(0, 2)]
         : `How many positive divisors of $${shownMath}$ are ${kind}?`;
     const formula = fac.map(([, e]) => `(${e} + 1)`).join('');
-    let explanation = `${diff === 3 ? '' : `Factor: $${num(N)} = ${factorTex(fac)}$. `}A divisor is a product $${fac.map(([p], t) => `${p}^{${'abcd'[t]}}`).join(' \\cdot ')}$ where each exponent ranges from 0 up to its value in $${shownMath}$, so there are $${formula} = ${total}$ positive divisors.`;
-    if (kind === 'odd')
-      explanation += `
+    const oddFormula = fac
+      .filter(([p]) => p !== 2)
+      .map(([, e]) => `(${e} + 1)`)
+      .join('');
+    const bits: string[] = [];
+    if (valueOf('int-divisors-exponents')) bits.push(`${valueOf('int-divisors-exponents')} comes from using the exponents themselves, but each exponent allows one more choice, 0`);
+    if (valueOf('int-divisors-add')) bits.push(`${valueOf('int-divisors-add')} adds the counts instead of multiplying them`);
+    if (valueOf('int-divisors-missed-ends')) bits.push(`${valueOf('int-divisors-missed-ends')} leaves out 1 or the number itself`);
+    if (valueOf('int-counted-ordered-pairs')) bits.push(`${valueOf('int-counted-ordered-pairs')} counts divisor pairs, not divisors`);
+    if (valueOf('int-divisors-parity')) bits.push(`${valueOf('int-divisors-parity')} counts the wrong set of divisors (all of them, or the other parity)`);
+    const steps =
+      kind === 'all'
+        ? ''
+        : kind === 'odd'
+          ? ` An odd divisor has exponent 0 for the prime 2, so only the other primes count: $${oddFormula} = ${odd}$.`
+          : ` The odd divisors have exponent 0 for the prime 2: $${oddFormula} = ${odd}$ of them, so $${total} - ${odd} = ${answer}$ are even. (The exponent of 2 may also be only 1 to ${fac[0][1]}: $${fac[0][1]}${oddFormula} = ${answer}$.)`;
+    const explanation = `Counting divisors: each prime's exponent can be anything from 0 up to its power, and the choices are independent.
 
-An odd divisor uses no factor of 2 (exponent of 2 equal to 0), so there are $${fac
-        .filter(([p]) => p !== 2)
-        .map(([, e]) => `(${e} + 1)`)
-        .join('') || '1'} = ${odd}$ odd divisors.`;
-    if (kind === 'even')
-      explanation += `
+${diff === 3 ? '' : `$${num(N)} = ${factorTex(fac)}$. `}A divisor is $${fac.map(([p], t) => `${p}^{${'abcd'[t]}}`).join(' \\cdot ')}$, so there are $${formula} = ${total}$ positive divisors.${steps}
 
-The odd divisors use no factor of 2: there are $${fac
-        .filter(([p]) => p !== 2)
-        .map(([, e]) => `(${e} + 1)`)
-        .join('') || '1'} = ${odd}$ of them. The rest are even: $${total} - ${odd} = ${answer}$. (Equivalently, the exponent of 2 ranges from 1 to ${fac[0][1]}: $${fac[0][1]}${fac
-        .filter(([p]) => p !== 2)
-        .map(([, e]) => `(${e} + 1)`)
-        .join('')} = ${answer}$.)`;
-    if (kind === 'all') explanation += ` The formula already includes 1 and the number itself; do not multiply the exponents themselves.`;
+Check on a small case: $12 = 2^2 \\cdot 3$ has $(2 + 1)(1 + 1) = 6$ divisors: 1, 2, 3, 4, 6, 12.${bits.length ? `\n\nTrap: ${bits.slice(0, 2).join('; ')}.` : ''}`;
     return {
       params: { N, kind },
       q: { format: 'mcs', stem, choices, answer: idx, explanation },
@@ -470,6 +503,8 @@ const gpfMC: Template<GpfParams> = {
         p = { mode, b: 0, m: big, n: small, sign: -1 };
         const fs = primeFactorsBig(valueOf(p));
         if (Math.max(...fs) < 11) continue;
+        // at least one of the two factors must be composite, so that stopping early is a real slip
+        if (isPrime(big - small) && isPrime(big + small)) continue;
       } else {
         const [b, k, sign] = rng.pick(diff === 1 ? POWER_TABLE.filter(([bb, kk]) => bb === 2 && kk <= 6) : POWER_TABLE);
         const n = rng.int(b === 10 ? 3 : 5, b === 10 ? 9 : 20);
@@ -489,7 +524,14 @@ const gpfMC: Template<GpfParams> = {
       stemExpr = num(N);
       const f = factorize(N);
       explanation = `Divide out the smallest primes first: $${num(N)} = ${factorTex(f)}$. The greatest prime factor is ${answer}.`;
-      fillers.push(...fs.filter((x) => x !== answer), ...primesUpTo(answer + 12).filter((x) => x > answer).slice(0, 2), N / answer > 1 && isPrime(N / answer) ? N / answer : answer + 2);
+      traps.push(...fs.filter((x) => x !== answer).slice(-2).map((value) => ({ value, trap: 'int-smaller-prime-factor' })));
+      traps.push(
+        ...rng
+          .shuffle(fs.map((x) => N / x).filter((c) => c !== answer && !isPrime(c)))
+          .slice(0, 2)
+          .map((value) => ({ value, trap: 'int-stopped-factoring' })),
+      );
+      fillers.push(...primesUpTo(answer + 12).filter((x) => x > answer).slice(0, 2));
     } else if (mode === 'squares') {
       const { m, n } = p;
       stemExpr = n === 1 ? `${m}^2 - 1` : `${m}^2 - ${n * n}`;
@@ -500,7 +542,9 @@ const gpfMC: Template<GpfParams> = {
 $${lo} = ${factorTex(factorize(lo))}$ and $${hi} = ${factorTex(factorize(hi))}$, so the greatest prime factor is ${answer}.
 
 Multiplying out $${m}^2$ first works too, but factoring is much faster.`;
-      fillers.push(...fs.filter((x) => x !== answer), ...[lo, hi].filter((x) => !isPrime(x)), ...primesUpTo(answer + 20).filter((x) => x > answer).slice(0, 2));
+      traps.push(...[lo, hi].filter((x) => x > 1 && !isPrime(x) && x !== answer).map((value) => ({ value, trap: 'int-stopped-factoring' })));
+      traps.push(...fs.filter((x) => x !== answer).slice(-2).map((value) => ({ value, trap: 'int-smaller-prime-factor' })));
+      fillers.push(...primesUpTo(answer + 20).filter((x) => x > answer).slice(0, 2));
     } else {
       const { b, m, n, sign } = p;
       const op = sign > 0 ? '+' : '-';
@@ -528,20 +572,33 @@ So the number is $${allF}$. ${
 
 $${b}^{${m}} ${op} ${b}^{${n}}$ is not $${b}^{${m - n}}$, and the prime factors of $${b}^{${m - n}} ${op} 1$ count too.`;
       if (mode === 'count') {
+        const mult = [...factorize(b).map(([, e]) => e * n), ...innerF.map(([, e]) => e)].reduce((acc, e) => acc + e, 0);
         traps.push({ value: bp.length, trap: 'int-factor-common-power' });
-        fillers.push(answer + 1, answer + 2, answer - 1, fs.length + bp.length);
+        traps.push({ value: innerF.length, trap: 'int-factor-common-power' });
+        traps.push({ value: mult, trap: 'int-count-with-multiplicity' });
+        traps.push({ value: bp.length + innerF.length, trap: 'int-count-with-multiplicity' });
+        fillers.push(answer + 1, answer + 2, answer - 1);
       } else {
         traps.push({ value: Math.max(...bp), trap: 'int-factor-common-power' });
-        if (inner > answer && !isPrime(inner)) fillers.push(inner);
-        fillers.push(...fs.filter((x) => x !== answer), ...primesUpTo(answer + 20).filter((x) => x > answer).slice(0, 2), ...primesUpTo(answer).filter((x) => x < answer).slice(-2));
+        if (inner > answer && !isPrime(inner)) traps.push({ value: inner, trap: 'int-stopped-factoring' });
+        // the sign inside the parentheses flipped
+        const flipped = b ** (m - n) - sign;
+        if (flipped > 1) {
+          const ff = primeFactorsBig(BigInt(flipped));
+          traps.push({ value: Math.max(...ff), trap: 'int-sign-slip' });
+        }
+        // an exponent mistaken for a prime factor
+        traps.push(...[m, n].filter((e) => isPrime(e) && e !== answer).map((value) => ({ value, trap: 'int-exponent-as-prime' })));
+        traps.push(...fs.filter((x) => x !== answer).slice(-2).map((value) => ({ value, trap: 'int-smaller-prime-factor' })));
+        fillers.push(...primesUpTo(answer + 20).filter((x) => x > answer).slice(0, 2), ...primesUpTo(answer).filter((x) => x < answer).slice(-2));
       }
     }
     const extra = mode === 'count' ? range(1, 7) : primesUpTo(answer + 40);
     const { choices, answer: idx } = spreadChoices(rng, answer, [
-      ...traps.filter((t) => t.value !== answer && t.value > 0).map((t) => ({ v: t.value, trap: t.trap })),
+      ...rng.shuffle(traps.filter((t) => t.value !== answer && t.value > 0)).map((t) => ({ v: t.value, trap: t.trap })),
       ...rng.shuffle(fillers.filter((x) => x > 0)).slice(0, 2).map((v) => ({ v })),
       ...extra.map((v) => ({ v })),
-    ]);
+    ], undefined, 5, 'shuffled');
     const stem = mode === 'count' ? `How many different prime numbers are factors of $${stemExpr}$?` : `What is the greatest prime factor of $${stemExpr}$?`;
     return { params: p, q: { format: 'mcs', stem, choices, answer: idx, explanation } };
   },
@@ -570,8 +627,6 @@ interface MultParams {
   power: 2 | 3;
 }
 
-const D1_SQ = [12, 18, 20, 24, 27, 28, 32, 44, 45, 48, 50, 54, 63, 72, 75, 80, 98];
-
 const squareMultiplier: Template<MultParams> = {
   id: 'arith.factors.square-multiplier',
   skill: 'arith.factors',
@@ -583,7 +638,7 @@ const squareMultiplier: Template<MultParams> = {
     let k: number;
     let fac: [number, number][];
     for (;;) {
-      if (diff === 1) N = rng.pick(D1_SQ);
+      if (diff === 1) N = rng.int(12, 150);
       else {
         const ps = rng.sample([2, 3, 5, 7], rng.int(2, 3));
         N = ps.reduce((s, x) => s * x ** rng.int(1, power === 3 ? 4 : 3), 1);
@@ -591,7 +646,7 @@ const squareMultiplier: Template<MultParams> = {
       fac = factorize(N);
       k = fac.reduce((s, [p, e]) => s * p ** ((power - (e % power)) % power), 1);
       const rad = fac.reduce((s, [p]) => s * p, 1);
-      if (k === 1 || N > (diff === 1 ? 100 : 3000) || N < 12) continue;
+      if (k === 1 || N > (diff === 1 ? 150 : 3000) || N < 12 || (diff === 1 && k > 40)) continue;
       if (diff >= 2 && (k === rad || k === N)) continue; // make the shortcut answers wrong
       if (k > 500) continue;
       break;
@@ -607,7 +662,7 @@ const squareMultiplier: Template<MultParams> = {
       .filter(([, e]) => e % power !== 0)
       .map(([p, e]) => {
         const add = (power - (e % power)) % power;
-        return `$${p}^{${e}}$ needs ${add === 1 ? `one more ${p}` : `${add} more factors of ${p}`}`;
+        return `$${e === 1 ? p : `${p}^{${e}}`}$ needs ${add === 1 ? `one more ${p}` : `${add} more factors of ${p}`}`;
       });
     const okList = fac.filter(([, e]) => e % power === 0).map(([p, e]) => `$${p}^{${e}}$`);
     const root = Math.round((N * k) ** (1 / power));
@@ -624,7 +679,21 @@ const squareMultiplier: Template<MultParams> = {
       params: { N, power },
       q: {
         format: 'ne',
-        stem: `What is the least positive integer $k$ such that $${num(N)}k$ is the ${word} of an integer?`,
+        stem:
+          diff === 1
+            ? [
+                `What is the least positive integer $k$ such that $${num(N)}k$ is the ${word} of an integer?`,
+                `What is the smallest positive integer $k$ for which $${num(N)}k$ is a perfect ${word}?`,
+              ][rng.int(0, 1)]
+            : diff === 2
+              ? [
+                  `If $k$ is a positive integer and $${num(N)}k$ is the ${word} of an integer, what is the least possible value of $k$?`,
+                  `The product of $${num(N)}$ and a positive integer $k$ is a perfect ${word}. What is the least possible value of $k$?`,
+                ][rng.int(0, 1)]
+              : [
+                  `$k$ is a positive integer, and $${num(N)}k$ equals the ${word} of some integer. What is the least value $k$ can have?`,
+                  `For what least positive integer $k$ is $${num(N)}k$ a perfect ${word}?`,
+                ][rng.int(0, 1)],
         prefix: '$k =$',
         answer: frac(k),
         traps,
@@ -687,13 +756,13 @@ const quotientInteger: Template<QuotParams> = {
       for (const y of range(2, 120)) if (N % y === 0 && R % y !== 0) cands.push({ v: y, trap: 'int-cancel-first' });
       // a prime that is not available
       const missing = [11, 13, 17, 19, 23].filter((p) => N % p !== 0);
-      for (const p of missing) for (const m of [1, 2, 3, 5]) if (p * m < 120) cands.push({ v: p * m });
+      for (const p of missing) for (const m of [1, 2, 3, 5]) if (p * m < 120) cands.push({ v: p * m, trap: 'int-missing-prime' });
       // one power too many
-      for (const [p, e] of fR) if (p ** (e + 1) < 150) cands.push({ v: p ** (e + 1) });
+      for (const [p, e] of fR) if (p ** (e + 1) < 150) cands.push({ v: p ** (e + 1), trap: 'int-power-too-many' });
       const bad = cands.filter((x) => R % x.v !== 0);
       let built: ReturnType<typeof spreadChoices>;
       try {
-        built = spreadChoices(rng, correct, [...rng.shuffle(bad.filter((x) => x.trap)).slice(0, 2), ...rng.shuffle(bad.filter((x) => !x.trap))]);
+        built = spreadChoices(rng, correct, rng.shuffle(bad));
       } catch {
         continue;
       }

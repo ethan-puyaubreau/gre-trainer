@@ -66,6 +66,38 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Counted divisors from the exponents the wrong way',
     fix: '$p^a q^b$ has $(a + 1)(b + 1)$ positive divisors: the exponent of $p$ can be any of $0, 1, \\ldots, a$. Do not multiply or add the exponents themselves.',
   },
+  'int-divisors-add': {
+    label: 'Added the (exponent + 1) terms instead of multiplying them',
+    fix: 'The choices for each prime are independent, so the counts MULTIPLY: $2^3 \\cdot 3^2$ has $(3 + 1)(2 + 1) = 12$ divisors, not $4 + 3 = 7$.',
+  },
+  'int-stopped-factoring': {
+    label: 'Stopped factoring before the factors were prime',
+    fix: 'Keep dividing until every factor is prime. A factor like 15 or 21 is not prime: $15 = 3 \\cdot 5$, so the prime factors are 3 and 5.',
+  },
+  'int-sign-slip': {
+    label: 'Flipped the sign inside the parentheses',
+    fix: 'After factoring out the common power, keep the original sign: $2^{13} + 2^{9} = 2^{9}(2^{4} + 1)$, not $2^{9}(2^{4} - 1)$.',
+  },
+  'int-exponent-as-prime': {
+    label: 'Took an exponent for a prime factor',
+    fix: 'An exponent says how many times a prime is used; it is not a factor of the number. Factor the expression, then read off its primes.',
+  },
+  'int-smaller-prime-factor': {
+    label: 'Named a prime factor that is not the greatest',
+    fix: 'List all the prime factors, then pick the greatest. The first prime you find is usually the smallest.',
+  },
+  'int-count-with-multiplicity': {
+    label: 'Counted repeated prime factors more than once',
+    fix: '"Different prime factors" counts each prime once, however many times it divides: $2^5 \\cdot 3^2$ has two different prime factors, 2 and 3.',
+  },
+  'int-missing-prime': {
+    label: 'Chose a value with a prime that is not in the numerator',
+    fix: 'After cancelling, $y$ can only use the primes (with at most the powers) that are left in the numerator. A prime that is not there cannot cancel.',
+  },
+  'int-power-too-many': {
+    label: 'Chose a value with more copies of a prime than are left',
+    fix: 'Count each prime: if only $2^2$ is left after cancelling, then 8 ($2^3$) does not divide it.',
+  },
   'int-divisors-missed-ends': {
     label: 'Left out 1 or the number itself',
     fix: '1 and $N$ are divisors of $N$. The formula $(a + 1)(b + 1)$ already counts them.',
