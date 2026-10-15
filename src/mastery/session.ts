@@ -4,6 +4,11 @@ import { grade, type Response } from '../engine/grade';
 import type { QuestionBody } from '../engine/types';
 import type { AttemptInput, Level } from './model';
 
+/** Speed is judged from Proficient on; below that only accuracy counts and the pace bar stays neutral. */
+export function paceJudged(level: Level): boolean {
+  return level >= 3;
+}
+
 export type HintLevel = AttemptInput['hintLevel'];
 /** The step that shows the whole strategy card and is the only one that cancels the mastery credit. */
 export const FULL_CARD: HintLevel = 3;

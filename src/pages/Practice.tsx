@@ -10,9 +10,9 @@ import { generateQuestion, poolSeed } from '../engine/generate';
 import { grade, isAnswered, type GradeResult, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
-import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
+import { isOnPace, LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
-import { dodgedTraps, FULL_CARD, hintText, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
+import { dodgedTraps, FULL_CARD, hintText, paceJudged, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -218,6 +218,9 @@ export function Practice({ route }: { route: string[] }) {
   const st = store.skills[skill.id];
   const level = st?.level ?? 0;
   const paceSec = store.settings.paceSec;
+  // Speed is judged from Proficient on, at the level the answer was given (the result has already moved the skill).
+  const judged = paceJudged(result ? result.outcome.from : level);
+  const shownMs = result ? result.timeMs : elapsed;
   const [reasonText, reasonCls] = REASON[pick.reason];
   // Mixed practice hides the skill and the style until the result: naming them would give the topic away.
   const mixed = scope.kind !== 'skill';
@@ -261,7 +264,12 @@ export function Practice({ route }: { route: string[] }) {
           <span className="chip">{'●'.repeat(question.difficulty) + '○'.repeat(3 - question.difficulty)}</span>
           <span className="spacer" />
           {store.settings.showTimer || result ? (
-            <PaceBar elapsedMs={result ? result.timeMs : elapsed} paceSec={paceSec} />
+            <PaceBar
+              elapsedMs={shownMs}
+              paceSec={paceSec}
+              neutral={!judged}
+              over={judged ? !isOnPace(shownMs, question.difficulty, paceSec) : undefined}
+            />
           ) : (
             <span className="muted small">Timer hidden</span>
           )}
@@ -397,17 +405,30 @@ function Feedback({
   nextStepText: string;
 }) {
   const { grade: g, outcome, timeMs } = result;
-  const slow = timeMs > paceSec * 1000;
+  const judged = paceJudged(outcome.from);
+  const onPace = isOnPace(timeMs, question.difficulty, paceSec);
   const traps = g.traps.map((id) => TRAPS[id]).filter(Boolean);
   const dodged = result.dodged.filter((id) => TRAPS[id]);
   const nextBtn = useRef<HTMLButtonElement>(null);
   useEffect(() => nextBtn.current?.focus(), []);
+  // Why a correct answer may not move the skill. Credit rule: the model (a style needs difficulty 2 or 3 and no full card; only the pace gates Mastered).
+  const creditNote =
+    hintLevel === FULL_CARD
+      ? 'Correct, but with the full card open this answer does not count toward mastery.'
+      : question.difficulty < 2
+        ? 'Correct. Easy questions do not count toward mastery.'
+        : judged && !onPace
+          ? outcome.from === 4
+            ? 'Correct, but over the pace: a Mastered skill is confirmed only by answers on pace.'
+            : 'Correct, and this style counts. It was over the pace, though, and Mastered needs an answer on pace.'
+          : '';
   return (
     <div className={`feedback ${g.correct ? 'ok' : 'ko'}`}>
       <div className="feedback-title">
         <span style={{ color: g.correct ? 'var(--good)' : 'var(--bad)' }}>{g.correct ? 'Correct' : g.invalid ? 'Not a valid answer' : 'Not quite'}</span>
-        <span className={`chip ${slow ? 'chip-warn' : 'chip-good'}`}>
-          {formatClock(timeMs)} {slow ? `(over the ${formatClock(paceSec * 1000)} pace)` : '(on pace)'}
+        <span className={`chip ${judged ? (onPace ? 'chip-good' : 'chip-warn') : ''}`}>
+          {formatClock(timeMs)}
+          {judged && (onPace ? ' (on pace)' : ' (over the pace)')}
         </span>
         {hintLevel === FULL_CARD && <span className="chip chip-warn">hint used</span>}
         <span className="spacer" />
@@ -419,11 +440,7 @@ function Feedback({
       <p className="small" style={{ margin: '10px 0 0' }}>
         <strong>{skillName}</strong>:{' '}
         {outcome.from !== outcome.to ? <LevelChange from={outcome.from} to={outcome.to} /> : <span className="chip">{LEVEL_NAMES[outcome.to]}</span>}{' '}
-        {!g.correct
-          ? 'This skill comes back in a different style within a few questions, and again tomorrow.'
-          : !outcome.clean
-            ? 'Correct, but it only counts as practice: answer on pace without hints to move toward mastery.'
-            : nextStepText}
+        {g.correct ? `${creditNote} ${nextStepText}`.trim() : 'This skill comes back in a different style within a few questions, and again tomorrow.'}
       </p>
 
       {dodged.length > 0 && (

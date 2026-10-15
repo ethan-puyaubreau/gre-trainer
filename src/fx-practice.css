@@ -179,6 +179,12 @@
   }
 }
 
+/* ---------------------------------------------------------------- pace */
+/* Below Proficient the bar only shows the time: grey, no green / orange / red. */
+.practice-fx .pace-neutral .bar > div {
+  background: var(--muted);
+}
+
 /* ---------------------------------------------------------------- hints and strategy card */
 /* The cost of the full card, in words: next to the step that triggers it, then in the panel. */
 .practice-fx .hint-cost {

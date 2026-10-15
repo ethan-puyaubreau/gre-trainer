@@ -44,12 +44,30 @@ export function useStopwatch(running: boolean, key: unknown): number {
   return elapsed;
 }
 
-/** Per-question pace bar: green, then orange after 75% of the pace, red after the pace. */
-export function PaceBar({ elapsedMs, paceSec, hidden }: { elapsedMs: number; paceSec: number; hidden?: boolean }) {
+/**
+ * Per-question pace bar: green, then orange after 75% of the pace, red once over. `over` lets the caller decide what
+ * "over" means (the model gives hard questions more time); `neutral` greys the bar out, with no judgment.
+ */
+export function PaceBar({
+  elapsedMs,
+  paceSec,
+  hidden,
+  neutral,
+  over,
+}: {
+  elapsedMs: number;
+  paceSec: number;
+  hidden?: boolean;
+  neutral?: boolean;
+  over?: boolean;
+}) {
   const ratio = elapsedMs / (paceSec * 1000);
-  const cls = ratio > 1 ? 'pace-red' : ratio > 0.75 ? 'pace-orange' : 'pace-green';
+  const cls = neutral ? 'pace-neutral' : (over ?? ratio > 1) ? 'pace-red' : ratio > 0.75 ? 'pace-orange' : 'pace-green';
+  const title = neutral
+    ? `Reference pace: ${formatClock(paceSec * 1000)} per question. Speed counts once the skill is Proficient.`
+    : `GRE pace: ${formatClock(paceSec * 1000)} per question, with extra time on hard questions`;
   return (
-    <div className={`pace ${cls}`} title={`GRE pace: ${formatClock(paceSec * 1000)} per question`}>
+    <div className={`pace ${cls}`} title={title}>
       <div className="bar">
         <div style={{ width: `${Math.min(100, ratio * 100)}%` }} />
       </div>

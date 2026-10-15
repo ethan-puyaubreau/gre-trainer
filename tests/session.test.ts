@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Frac } from '../src/engine/frac';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
-import { dodgedTraps, hintText, summarize, type SessionOutcome } from '../src/mastery/session';
+import { dodgedTraps, hintText, paceJudged, summarize, type SessionOutcome } from '../src/mastery/session';
 
 const explanation = '';
 const mcs: QuestionBody = {
@@ -108,5 +108,11 @@ describe('hintText', () => {
     expect(hintText('Just a line.', 1)).toBe('Just a line.');
     expect(hintText('Just a line.', 2)).toBe('Just a line.');
     expect(hintText('Just a line.', 3)).toBe('Just a line.');
+  });
+});
+
+describe('paceJudged', () => {
+  it('judges speed from Proficient on', () => {
+    expect(([0, 1, 2, 3, 4] as Level[]).map(paceJudged)).toEqual([false, false, false, true, true]);
   });
 });
