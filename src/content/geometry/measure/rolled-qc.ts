@@ -84,8 +84,8 @@ const rolled: Template<Params> = {
       dif === 1
         ? rng.pick(['volume', 'radius', 'total', 'lateral'] as const)
         : dif === 2
-          ? rng.pick(['volume', 'radius', 'total', 'lateral', 'volume', 'total'] as const)
-          : rng.pick(['ratio-volume', 'ratio-total', 'ratio-total'] as const);
+          ? rng.pick(['volume', 'radius', 'total', 'lateral', 'volume', 'total', 'ratio-volume'] as const)
+          : 'ratio-total';
     let x = 0;
     let y = 0;
     let ord: 1 | -1 | 0 = 0;
