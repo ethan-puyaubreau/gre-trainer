@@ -119,7 +119,7 @@ const quadraticExtremumNE: Template<Params> = {
       } else {
         const ends = dom === 1 ? [L, R] : [L];
         if (!inside) trapList.push({ value: frac(q), trap: 'alg-quad-vertex-outside', why: `$${num(q)}$ is the value at the vertex $x = ${pTex}$, which is not in the interval.` });
-        else for (const e of ends) trapList.push({ value: frac(f(e)), trap: 'alg-quad-endpoints-only', why: `$f(${num(e)}) = ${num(f(e))}$ is an endpoint value, but the vertex $x = ${pTex}$ is inside the interval and goes beyond it.` });
+        else for (const e of ends) trapList.push({ value: frac(f(e)), trap: 'alg-quad-endpoints-only', why: `$f(${num(e)}) = ${num(f(e))}$ is an endpoint value, but the vertex $x = ${pTex}$ is inside the interval and gives a ${a > 0 ? 'lower' : 'higher'} value, $${num(q)}$.` });
         if (dom === 1 && !inside) trapList.push({ value: frac(a > 0 ? Math.max(f(L), f(R)) : Math.min(f(L), f(R))), trap: 'alg-quad-wrong-endpoint', why: `The endpoint farther from the vertex gives $${num(a > 0 ? Math.max(f(L), f(R)) : Math.min(f(L), f(R)))}$, the opposite extreme.` });
         trapList.push({ value: frac(c), trap: 'alg-quad-constant', why: `$${num(c)}$ is the value at $x = 0$.` });
         trapList.push({ value: frac(f(-p)), trap: 'alg-quad-vertex-sign', why: `Using the vertex at $x = ${num(-p)}$ gives $${num(f(-p))}$.` });
