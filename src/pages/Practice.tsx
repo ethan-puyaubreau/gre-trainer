@@ -22,6 +22,8 @@ import {
   paceJudged,
   replayIds,
   replaySeed,
+  replayStep,
+  resumeReplay,
   summarize,
   type HintLevel,
   type SessionOutcome,
@@ -106,13 +108,15 @@ export function Practice({ route }: { route: string[] }) {
 
   const next = useCallback(() => {
     // A replay ends on the recap once its queue is served.
-    if (replay.current && replay.current.length === 0) {
+    const step = replayStep(replay.current);
+    if (step.kind === 'end') {
       replay.current = null;
       setRecap(true);
       return;
     }
+    if (step.kind === 'serve') replay.current = step.rest;
     // The same template and difficulty as the miss, with new numbers.
-    const old = replay.current ? parseQuestionId(replay.current.shift()!) : null;
+    const old = step.kind === 'serve' ? parseQuestionId(step.id) : null;
     const s = useProgress.getState();
     const rng = createRng(randomSeed());
     const recentTemplates = [...s.history.slice(-12).map((h) => h.templateId), ...recent.current].slice(-12);
@@ -236,7 +240,9 @@ export function Practice({ route }: { route: string[] }) {
     setOutcomes([]);
     setRecap(false);
   };
+  // After End session a replay with questions left resumes; one already served in full is over and the scheduler takes back.
   const keepPracticing = () => {
+    replay.current = resumeReplay(replay.current);
     restart();
     if (result) next();
   };

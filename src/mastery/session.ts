@@ -164,6 +164,21 @@ export function replayIds(missed: SessionOutcome[]): string[] {
   });
 }
 
+/** What the next question is, given the replay queue (null: no replay is running). */
+export type ReplayStep = { kind: 'scheduler' } | { kind: 'end' } | { kind: 'serve'; id: string; rest: string[] };
+
+/** One step: no replay hands over to the scheduler, a queue served in full is over, otherwise its head is served. */
+export function replayStep(queue: string[] | null): ReplayStep {
+  if (!queue) return { kind: 'scheduler' };
+  if (queue.length === 0) return { kind: 'end' };
+  return { kind: 'serve', id: queue[0], rest: queue.slice(1) };
+}
+
+/** "Keep practicing" after End session: a replay with questions left resumes, one already served in full is dropped. */
+export function resumeReplay(queue: string[] | null): string[] | null {
+  return queue?.length ? queue : null;
+}
+
 /** A seed for the replayed question: new numbers, never the missed question again. `draw` is injectable for tests. */
 export function replaySeed(missedSeed: number, draw: () => number = poolSeed): number {
   const seed = draw();

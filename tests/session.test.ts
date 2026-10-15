@@ -13,6 +13,8 @@ import {
   paceJudged,
   replayIds,
   replaySeed,
+  replayStep,
+  resumeReplay,
   stemPreview,
   summarize,
   type RewardInput,
@@ -146,6 +148,43 @@ describe('replayIds', () => {
   it('is empty with nothing missed and skips ids that cannot be read', () => {
     expect(replayIds([])).toEqual([]);
     expect(replayIds([miss('broken')])).toEqual([]);
+  });
+});
+
+describe('replay queue', () => {
+  const ids = ['a.x#7#2', 'b.y#9#3'];
+
+  it('hands over to the scheduler when no replay runs', () => {
+    expect(replayStep(null)).toEqual({ kind: 'scheduler' });
+  });
+
+  it('serves the questions in order, then ends the run', () => {
+    let queue: string[] | null = ids;
+    const served: string[] = [];
+    for (let step = replayStep(queue); step.kind === 'serve'; step = replayStep(queue)) {
+      served.push(step.id);
+      queue = step.rest;
+    }
+    expect(served).toEqual(ids);
+    expect(queue).toEqual([]);
+    expect(replayStep(queue)).toEqual({ kind: 'end' });
+  });
+
+  it('resumes a replay with questions left after End session then Keep practicing', () => {
+    const left = ['b.y#9#3'];
+    expect(resumeReplay(left)).toBe(left);
+    expect(replayStep(resumeReplay(left))).toEqual({ kind: 'serve', id: 'b.y#9#3', rest: [] });
+  });
+
+  it('goes back to the scheduler, not to an empty recap, when End session came after the last replay question', () => {
+    // The last question has been served: the queue is [] but the user has not clicked Next yet.
+    expect(replayStep(['b.y#9#3'])).toEqual({ kind: 'serve', id: 'b.y#9#3', rest: [] });
+    expect(resumeReplay([])).toBeNull();
+    expect(replayStep(resumeReplay([]))).toEqual({ kind: 'scheduler' });
+  });
+
+  it('leaves no replay as it is', () => {
+    expect(resumeReplay(null)).toBeNull();
   });
 });
 
