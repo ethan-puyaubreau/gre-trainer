@@ -4,6 +4,7 @@ import { divisibilityTemplates } from './divisibility';
 import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
 import { factorsTemplates } from './factors';
+import { factorsSelectTemplates, factorsSelectTraps } from './factorsSelect';
 import { lcmGcdTemplates } from './lcm-gcd';
 import { populationTemplates, populationTraps } from './populationTotals';
 import { primesTemplates } from './primes';
@@ -14,6 +15,7 @@ export const integersTemplates: Template<any>[] = [
   ...divisibilityTemplates,
   ...primesTemplates,
   ...factorsTemplates,
+  ...factorsSelectTemplates,
   ...lcmGcdTemplates,
   ...populationTemplates,
   ...remainderCycleTemplates,
@@ -21,4 +23,4 @@ export const integersTemplates: Template<any>[] = [
   ...exponentTemplates,
   ...evaluateTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps };
