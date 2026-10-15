@@ -231,7 +231,7 @@ const altitude: Template<Params> = {
 
 ${steps}
 
-Check: the pieces and the altitude fit the right angle at ${nC}, since $${nC}${nD}^2 = ${nA}${nD} \\cdot ${nD}${nB}$.
+Check: ${mode === 'mean' || mode === 'hyp' ? `in triangle ${nA}${nD}${nC}, $${mm}^2 + ${hh}^2 = ${mm * mm + hh * hh}$, which equals $${nA}${nD} \\cdot ${nA}${nB} = ${mm} \\cdot ${c}$, as it must since $${nA}${nC}^2 = ${nA}${nD} \\cdot ${nA}${nB}$.` : `$${p}^2 + ${q}^2 = ${p * p + q * q} = ${c}^2$, so the sides fit the right angle at ${nC}.`}
 
 ${notes}
 
