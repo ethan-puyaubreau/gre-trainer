@@ -71,6 +71,8 @@ function build(p: OddParams): { q: QCQuestion; answer: QCChoice } {
   const cf = (c: number) => (c === 1 ? '' : c === -1 ? '-' : num(c));
   const odd = poly(co[0] ? [co[0], 0, co[2], 0] : [co[2], 0], k);
   const oddTerms = co[0] ? `$${cf(co[0])}x^3$ and $${cf(co[2])}x$` : `$${cf(co[2])}x$`;
+  const evenParts = [co[1] ? 'the square term' : '', co[3] ? 'the constant' : ''].filter(Boolean);
+  const evenTerms = evenParts.length ? evenParts.join(' and ') : 'none here';
   const traps: QCQuestion['traps'] = {};
   let tail: string;
   let body: string;
@@ -91,7 +93,7 @@ function build(p: OddParams): { q: QCQuestion; answer: QCChoice } {
     traps.D = 'alg-fnodd-unknown-sign';
     traps[answer === 'A' ? 'B' : 'A'] = 'alg-fnodd-even-assumed';
   }
-  const explanation = `Compare $${f}(${k})$ with $${f}(-${k})$: the even terms (the square term and the constant) take the same value at ${'$'}${k}${'$'} and $-${k}$, so they cancel.
+  const explanation = `Compare $${f}(${k})$ with $${f}(-${k})$: the even terms (${evenTerms}) take the same value at ${'$'}${k}${'$'} and $-${k}$, so they cancel.
 
 Only the odd terms ${oddTerms} matter: $${f}(${k}) - ${f}(-${k}) = 2(${odd})$. ${body} ${tail}
 
