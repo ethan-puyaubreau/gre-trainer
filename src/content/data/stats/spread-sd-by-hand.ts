@@ -69,6 +69,7 @@ const sdByHand: Template<Params> = {
       const r = exactSd(values, counts);
       if (!r) continue;
       const { mean, sd, variance, n } = r;
+      if ((d === 1 && sd > 3) || (d === 2 && sd < 4)) continue; // a real step between d1 and d2
       const mad = new Frac(values.reduce((s, v, i) => s + counts[i] * Math.abs(v - mean), 0), n);
       const traps = [
         { value: frac(variance), trap: 'stat-sd-variance-for-sd' },
@@ -80,11 +81,11 @@ const sdByHand: Template<Params> = {
       if (d < 3) {
         stem = `${ctx.lead(n)} $${listTex(values)}$.
 
-What is the standard deviation of the ${ctx.ask}?`;
+What is the standard deviation of the ${ctx.ask}? Treat the list as the whole population.`;
       } else {
         stem = `The table shows how many times each value occurs in a data set of ${n} values.
 
-What is the standard deviation of the data set?`;
+What is the standard deviation of the data set? Treat it as the whole population.`;
         figure = {
           kind: 'table',
           title: 'DATA SET',
