@@ -8,9 +8,10 @@ import { originDiameterTemplates, originDiameterTraps } from './origin-diameter'
 import { polygonArcTemplates, polygonArcTraps } from './polygon-arcs';
 import { polygonTemplates } from './polygons';
 import { solidTemplates } from './solids';
+import { tangentQcTemplates, tangentQcTraps } from './tangent-qc';
 import { measureSkills as skills } from './skills';
 import { measureTraps as traps } from './traps';
 
 export const measureSkills: Skill[] = skills;
-export const measureTemplates: Template<any>[] = [...polygonTemplates, ...circleTemplates, ...compositeTemplates, ...solidTemplates, ...polygonArcTemplates, ...equalPerimeterTemplates, ...originDiameterTemplates, ...packingTemplates, ...insidePointsTemplates];
-export const measureTraps: Record<string, Trap> = { ...traps, ...polygonArcTraps, ...equalPerimeterTraps, ...originDiameterTraps, ...packingTraps, ...insidePointsTraps };
+export const measureTemplates: Template<any>[] = [...polygonTemplates, ...circleTemplates, ...compositeTemplates, ...solidTemplates, ...polygonArcTemplates, ...equalPerimeterTemplates, ...originDiameterTemplates, ...packingTemplates, ...insidePointsTemplates, ...tangentQcTemplates];
+export const measureTraps: Record<string, Trap> = { ...traps, ...polygonArcTraps, ...equalPerimeterTraps, ...originDiameterTraps, ...packingTraps, ...insidePointsTraps, ...tangentQcTraps };
