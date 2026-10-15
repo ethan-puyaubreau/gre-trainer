@@ -457,9 +457,12 @@
     flex: 1 1 100%;
     order: -1;
   }
-  /* Whatever scrolls into view (a new hint, the result) clears the bar. */
+  /* Whatever scrolls into view (a new hint, the result) clears the bar, which grows to about 121 px when the cost line shows. */
+  .practice-fx {
+    --action-bar-h: 140px;
+  }
   .practice-fx .strategy-box,
   .practice-fx .feedback {
-    scroll-margin-bottom: 100px;
+    scroll-margin-bottom: var(--action-bar-h);
   }
 }

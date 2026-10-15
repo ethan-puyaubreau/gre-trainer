@@ -57,6 +57,8 @@ const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
 /** Same breakpoint as the small-screen rules in styles.css and fx-practice.css. */
 const SMALL = '(max-width: 640px)';
+/** On a phone Check and Next share one spot: a tap this soon after the result is the second half of a double tap, not "next". */
+const NEXT_GUARD_MS = 500;
 function useSmallScreen(): boolean {
   return useSyncExternalStore(
     (onChange) => {
@@ -124,6 +126,7 @@ export function Practice({ route }: { route: string[] }) {
   // On a phone the Hint and Check buttons are a bar pinned to the bottom; a new hint opens above it, so bring it into view.
   const small = useSmallScreen();
   const panel = useRef<HTMLDivElement>(null);
+  const resultAt = useRef(0);
   useEffect(() => {
     if (small && hintLevel > 0) panel.current?.scrollIntoView({ block: 'nearest' });
   }, [small, hintLevel]);
@@ -173,6 +176,8 @@ export function Practice({ route }: { route: string[] }) {
     setHintLevel(0);
     setCardOpen(false);
     setResult(null);
+    // The new card starts at the top: after a deep scroll the old one left the viewport above it.
+    if (window.matchMedia(SMALL).matches) window.scrollTo({ top: 0 });
   }, [scope]);
 
   useEffect(() => {
@@ -207,6 +212,7 @@ export function Practice({ route }: { route: string[] }) {
       level: outcome.from,
     });
     const dodged = earned ? dodgedTraps(current.question, response) : [];
+    resultAt.current = Date.now();
     setResult({ grade: g, outcome, timeMs, dodged });
     setOutcomes((o) => [
       ...o,
@@ -356,7 +362,15 @@ export function Practice({ route }: { route: string[] }) {
   const actions = result ? (
     small && (
       <div key="next" className="row action-bar">
-        <button autoFocus className="btn btn-primary btn-big" onClick={next}>
+        {/* detail is 0 for a click from the keyboard or a screen reader, which cannot double tap: only touch and mouse wait. */}
+        <button
+          autoFocus
+          className="btn btn-primary btn-big"
+          onClick={(e) => {
+            if (e.detail > 0 && Date.now() - resultAt.current < NEXT_GUARD_MS) return;
+            next();
+          }}
+        >
           Next question →
         </button>
       </div>
