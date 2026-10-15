@@ -106,7 +106,7 @@ const averageSpeed: Template<ASParams> = {
         if (avg.eq(value)) continue;
         rel = avg.gt(value) ? 'A' : 'B';
         info = `${ctx.who} drives ${dist[0]} ${ctx.len} at ${v1} ${ctx.unit} and then ${dist[1]} ${ctx.len} at ${v2} ${ctx.unit}.`;
-        why = `The total distance is ${dist[0]} + ${dist[1]} = ${dist[0] + dist[1]} ${ctx.len}. The time is $\\frac{${dist[0]}}{${v1}} + \\frac{${dist[1]}}{${v2}} = ${decOrFrac(F(dist[0], v1).add(F(dist[1], v2)))}$ hours. The average speed is ${T(avg)}, ${avg.gt(value) ? 'above' : 'below'} the mean of the speeds ${T(value)}, because ${dist[0] > dist[1] === v1 > v2 ? 'more of the distance is covered at the faster speed' : 'more of the distance is covered at the slower speed'}.`;
+        why = `The total distance is ${dist[0]} + ${dist[1]} = ${dist[0] + dist[1]} ${ctx.len}. The time is $\\frac{${dist[0]}}{${v1}} + \\frac{${dist[1]}}{${v2}} = ${decOrFrac(F(dist[0], v1).add(F(dist[1], v2)))}$ hours. The average speed is ${T(avg)}${avg.isTerminating() ? '' : ` (about ${avg.toNumber().toFixed(2)})`}, ${avg.gt(value) ? 'above' : 'below'} the mean of the speeds ${T(value)}, because more time is spent at the ${avg.gt(value) ? 'faster' : 'slower'} speed ($\\frac{${dist[0]}}{${v1}}$ hours at ${v1} versus $\\frac{${dist[1]}}{${v2}}$ hours at ${v2}).`;
       } else {
         // equal one-way distances
         const D = v.reduce(lcm, 1);
