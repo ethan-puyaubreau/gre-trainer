@@ -52,13 +52,13 @@ export const rwThresholdQc: Template<ThresholdParams> = {
   style: 'time together versus a fraction of one time, second time unknown',
   generate(rng, d) {
     const J = rng.pick(JOBS);
-    const want = rng.pick<QCChoice>(d === 1 ? ['A', 'A', 'B', 'B', 'D', 'D'] : ['A', 'A', 'B', 'B', 'C', 'D', 'D']);
+    const want = rng.pick<QCChoice>(d === 2 ? ['A', 'A', 'B', 'B', 'C', 'D', 'D'] : ['A', 'A', 'B', 'B', 'D', 'D']);
     for (;;) {
       const k = d === 1 ? 2 : d === 2 ? rng.int(2, 4) : rng.int(3, 5);
       const m = rng.int(1, d === 1 ? 4 : 3);
       const a = k * (k - 1) * m;
       const t0 = k * m;
-      const cond = rng.pick<Cond>(d === 1 ? ['gt', 'lt', 'none'] : d === 2 ? ['gt', 'lt', 'none', 'eq'] : ['gt', 'lt', 'range', 'eq', 'none']);
+      const cond = rng.pick<Cond>(d === 1 ? ['gt', 'lt', 'none'] : d === 2 ? ['gt', 'lt', 'none', 'eq'] : ['gt', 'lt', 'range', 'none']);
       const c = Math.max(1, t0 + rng.int(-Math.floor(t0 * 0.7), 7));
       const hi = c + rng.int(3, 10);
       if (analytic(cond, c, hi, t0) !== want) continue;
@@ -94,7 +94,7 @@ export const rwThresholdQc: Template<ThresholdParams> = {
           quantityB: Bt,
           answer,
           traps,
-          explanation: `Rates add: the time together is $T = \\frac{${a}t}{${a} + t}$. Compare it with ${B}: $T > ${B}$ exactly when $${a}t > ${B === 1 ? '' : B}(${a} + t)$, that is, $${a - B === 1 ? '' : a - B}t > ${a * B}$, so when $t > ${t0}$; $T < ${B}$ when $t < ${t0}$, and $T = ${B}$ at $t = ${t0}$.
+          explanation: `Let $t$ be the hours ${J.B} needs alone. Rates add: the time together is $T = \\frac{${a}t}{${a} + t}$. Compare it with ${B}: $T > ${B}$ exactly when $${a}t > ${B === 1 ? '' : B}(${a} + t)$, that is, $${a - B === 1 ? '' : a - B}t > ${a * B}$, so when $t > ${t0}$; $T < ${B}$ when $t < ${t0}$, and $T = ${B}$ at $t = ${t0}$.
 
 ${why}
 
