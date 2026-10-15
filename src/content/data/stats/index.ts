@@ -1,4 +1,5 @@
 import type { Template } from '../../../engine/types';
+import { spreadWhichListTemplates, spreadWhichListTraps } from './spread-which-list';
 import { spreadSdByHandTemplates, spreadSdByHandTraps } from './spread-sd-by-hand';
 import { spreadAddValueTemplates, spreadAddValueTraps } from './spread-add-value';
 import { weightedRestTemplates, weightedRestTraps } from './weighted-rest';
@@ -17,7 +18,7 @@ import { spreadTemplates } from './spread';
 import { weightedTemplates } from './weighted';
 
 export { statsSkills };
-export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps, ...spreadSdByHandTraps, ...spreadAddValueTraps, ...weightedRestTraps, ...weightedTransferTraps, ...weightedPercentTraps, ...weightedSpeedTraps, ...centerFilteredTraps, ...centerOverlapTraps };
+export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps, ...spreadWhichListTraps, ...spreadSdByHandTraps, ...spreadAddValueTraps, ...weightedRestTraps, ...weightedTransferTraps, ...weightedPercentTraps, ...weightedSpeedTraps, ...centerFilteredTraps, ...centerOverlapTraps };
 
 export const statsTemplates: Template<any>[] = [
   ...centerTemplates.slice(0, 1),
@@ -34,5 +35,6 @@ export const statsTemplates: Template<any>[] = [
   ...weightedRestTemplates,
   ...spreadAddValueTemplates,
   ...spreadSdByHandTemplates,
+  ...spreadWhichListTemplates,
   ...distributionTemplates,
 ];
