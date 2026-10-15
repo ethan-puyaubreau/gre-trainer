@@ -7,7 +7,8 @@ import { rateWorkTemplates } from './rateWork';
 import { mixtureTemplates } from './mixtures';
 import { appliedSkillList } from './skills';
 import { appliedTrapMap } from './traps';
+import { telescopeTemplates, telescopeTraps } from './telescope';
 
 export const appliedSkills: Skill[] = appliedSkillList;
-export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates, ...mixtureTemplates];
-export const appliedTraps: Record<string, Trap> = appliedTrapMap;
+export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates, ...mixtureTemplates, ...telescopeTemplates];
+export const appliedTraps: Record<string, Trap> = { ...appliedTrapMap, ...telescopeTraps };
