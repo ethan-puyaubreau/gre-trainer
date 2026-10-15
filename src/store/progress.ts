@@ -6,7 +6,7 @@ import type { Difficulty, Question } from '../engine/types';
 import { templatesBySkill } from '../content';
 import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, requirementsFor, type AttemptInput, type AttemptOutcome, type SkillState } from '../mastery/model';
 import { scheduleRepair, type Remediation } from '../mastery/scheduler';
-import { dropWeakFlags } from './migrate';
+import { dropWeakFlags, migrateProgress, migrateStyleCredits } from './migrate';
 
 export type Mode = 'practice' | 'section';
 
@@ -186,7 +186,8 @@ export const useProgress = create<ProgressData & Actions>()(
 
       importData(data) {
         if (!isProgressData(data)) throw new Error(NOT_AN_EXPORT);
-        set({ ...initialData(), ...dropWeakFlags(data), settings: { ...initialData().settings, ...data.settings } });
+        // Both migrations leave data already in the current shape untouched.
+        set({ ...initialData(), ...migrateStyleCredits(dropWeakFlags(data)), settings: { ...initialData().settings, ...data.settings } });
       },
 
       reset() {
@@ -195,8 +196,8 @@ export const useProgress = create<ProgressData & Actions>()(
     }),
     {
       name: PROGRESS_KEY,
-      version: 2,
-      migrate: (persisted, version) => (version < 2 ? dropWeakFlags(persisted as ProgressData) : persisted) as ProgressData & Actions,
+      version: 3,
+      migrate: (persisted, version) => migrateProgress(persisted, version) as ProgressData & Actions,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         version: s.version,
