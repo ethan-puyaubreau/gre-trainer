@@ -19,7 +19,8 @@ import { linearWordTemplates, linearWordTraps } from './linearWordMcs';
 import { systemSymmetricTemplates, systemSymmetricTraps } from './systemSymmetricQc';
 import { systemTicketsTemplates, systemTicketsTraps } from './systemTicketsMcs';
 import { quadraticDiscriminantTemplates, quadraticDiscriminantTraps } from './quadraticDiscriminantQc';
+import { quadraticExtremumTemplates, quadraticExtremumTraps } from './quadraticExtremumNe';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates, ...linearWordTemplates, ...systemSymmetricTemplates, ...systemTicketsTemplates, ...quadraticDiscriminantTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps, ...linearWordTraps, ...systemSymmetricTraps, ...systemTicketsTraps, ...quadraticDiscriminantTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates, ...linearWordTemplates, ...systemSymmetricTemplates, ...systemTicketsTemplates, ...quadraticDiscriminantTemplates, ...quadraticExtremumTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps, ...linearWordTraps, ...systemSymmetricTraps, ...systemTicketsTraps, ...quadraticDiscriminantTraps, ...quadraticExtremumTraps };
