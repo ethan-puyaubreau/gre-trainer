@@ -29,3 +29,6 @@ Object.assign(coreTraps, sumProductTraps);
 import { identityArithmeticTemplate, identityArithmeticTraps } from './identityArithmetic';
 coreTemplates.push(identityArithmeticTemplate);
 Object.assign(coreTraps, identityArithmeticTraps);
+import { comparePowersTemplate, comparePowersTraps } from './comparePowers';
+coreTemplates.push(comparePowersTemplate);
+Object.assign(coreTraps, comparePowersTraps);
