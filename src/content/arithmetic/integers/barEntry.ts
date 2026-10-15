@@ -110,7 +110,7 @@ const SHAPES: Record<string, Shape> = {
   timesFraction: {
     tex: ({ a, b, c, d }) => `\\frac{${a}}{${b} + ${c}} \\cdot ${d}`,
     value: ({ a, b, c, d }) => frac(a).div(b + c).mul(d),
-    correct: ({ a, b, c, d }) => `${a}/(${b}+${c})*${d}`,
+    correct: ({ a, b, c, d }) => `${d}*${a}/(${b}+${c})`,
     wrongs: ({ a, b, c, d }) => [
       { plain: `${a}/((${b}+${c})*${d})`, trap: 'oo-multiplier-in-denominator' },
       { plain: `${a}/(${b}+${c}*${d})`, trap: 'oo-multiplier-in-denominator' },

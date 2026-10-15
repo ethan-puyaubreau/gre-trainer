@@ -17,6 +17,14 @@ export const partToWholeTraps: Record<string, Trap> = {
     label: 'Multiplied by the fraction where the problem needs a division, or the reverse',
     fix: '"$\\frac{3}{8}$ of the whole is 45" means whole $\\times \\frac{3}{8} = 45$, so whole $= 45 \\div \\frac{3}{8} = 45 \\times \\frac{8}{3} = 120$, not $45 \\times \\frac{3}{8}$.',
   },
+  'fr-fractions-added': {
+    label: 'Added the two fractions as if both were taken from the original amount',
+    fix: 'The second fraction applies to what is LEFT after the first, so the two fractions cannot be added. Multiply the remaining fractions: $\\left(1 - \\frac{1}{4}\\right)\\left(1 - \\frac{1}{3}\\right)$, not $1 - \\frac{1}{4} - \\frac{1}{3}$.',
+  },
+  'fr-undid-one-step': {
+    label: 'Undid only one of the two steps',
+    fix: 'Work backward through every step: divide the final amount by the second remaining fraction to get the amount before Tuesday, then divide again by the first remaining fraction to get the original amount.',
+  },
 };
 
 type Mode = 'part-other' | 'less' | 'more' | 'two-step';
@@ -110,16 +118,15 @@ const partToWhole: Template<Params> = {
         const total = n.sub(K);
         ask = pickWeighted<Ask>(rng, [['total', 2], ['second', 1.5], ['whole', 1]]);
         key = ask === 'total' ? total : ask === 'second' ? second : n;
-        const spentVerb = 'sold';
         stem = `A shop sold ${tx(a, b)} of its ${unit} on Monday and ${tx(c, d)} of the ${unit} that were left on Tuesday. After Tuesday, ${num(K.toNumber())} ${unit} remained. ${
-          ask === 'total' ? `How many ${unit} did the shop ${spentVerb} in all?` : ask === 'second' ? `How many ${unit} did the shop sell on Tuesday?` : `How many ${unit} did the shop have before Monday?`
+          ask === 'total' ? `How many ${unit} did the shop sell in all?` : ask === 'second' ? `How many ${unit} did the shop sell on Tuesday?` : `How many ${unit} did the shop have before Monday?`
         }`;
         const wrongKeep = F(1).sub(fa).sub(fc);
         cand = [
-          ...(wrongKeep.sign() > 0 ? [{ v: K.div(wrongKeep), trap: 'num-fraction-of-whole' }] : []),
-          ...(ask === 'total' ? [{ v: n, trap: 'fr-answered-other-quantity' }, { v: n.mul(fa.add(fc)), trap: 'num-fraction-of-whole' }, { v: second, trap: 'fr-answered-other-quantity' }] : []),
+          ...(wrongKeep.sign() > 0 ? [{ v: K.div(wrongKeep), trap: 'fr-fractions-added' }] : []),
+          ...(ask === 'total' ? [{ v: n, trap: 'fr-answered-other-quantity' }, { v: n.mul(fa.add(fc)), trap: 'fr-fractions-added' }, { v: second, trap: 'fr-answered-other-quantity' }] : []),
           ...(ask === 'second' ? [{ v: n.mul(fc), trap: 'num-fraction-of-whole' }, { v: total, trap: 'fr-answered-other-quantity' }, { v: n, trap: 'fr-answered-other-quantity' }] : []),
-          ...(ask === 'whole' ? [{ v: K.div(keep2), trap: 'fr-fraction-of-part' }, { v: total, trap: 'fr-answered-other-quantity' }] : []),
+          ...(ask === 'whole' ? [{ v: K.div(keep2), trap: 'fr-undid-one-step' }, { v: total, trap: 'fr-answered-other-quantity' }] : []),
         ];
         steps = `After Monday, $1 - ${fa.toTex()} = ${keep1.toTex()}$ of the ${unit} are left; after Tuesday, $${keep2.toTex()}$ of those. So $${keep1.toTex()} \\cdot ${keep2.toTex()} = ${keep1.mul(keep2).toTex()}$ of the original number remains, and the original number is $${num(K.toNumber())} \\div ${keep1.mul(keep2).toTex()} = ${num(N)}$. Tuesday's sales were ${tx(c, d)} of $${num(keep1.mul(n).toNumber())}$, which is $${num(second.toNumber())}$, and the total sold is $${num(N)} - ${num(K.toNumber())} = ${num(total.toNumber())}$.`;
       }
@@ -139,6 +146,8 @@ const partToWhole: Template<Params> = {
         'fr-fraction-of-part': 'taking the fraction of the given part instead of the whole gives',
         'fr-answered-other-quantity': 'answering a different quantity gives',
         'fr-inverse-operation': 'multiplying where a division is needed (or the reverse) gives',
+        'fr-fractions-added': 'adding the two fractions and applying the sum to the whole, although the second fraction is taken from what was left, gives',
+        'fr-undid-one-step': 'undoing only the Tuesday sale, and not the Monday one, gives',
         'num-fraction-of-whole': 'taking the second fraction of the original number, not of what was left, gives',
       };
       const seen = new Set<string>();

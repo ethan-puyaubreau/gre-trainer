@@ -91,6 +91,7 @@ const populationTotals: Template<PopParams> = {
         'int-gcd-lcm-swapped': `${trapPick.v} is a multiple of the common divisor ${g}, which is too weak`,
         'int-remainder-fraction-of-total': `${trapPick.v} makes the second fraction whole only if it applies to the total, but it applies to the remainder`,
       };
+      const tests = `Test each choice against ${L}: ${items.map((x) => (x.correct ? `${x.v} = ${x.v / L} \u00d7 ${L} works` : `${x.v} = ${Math.floor(x.v / L)} \u00d7 ${L} + ${x.v % L} does not`)).join('; ')}.`;
       const explanation = chain
         ? `Recognize: groups of people are whole numbers, so every count must be an integer.
 
@@ -98,12 +99,16 @@ ${f(0)} of the total is whole only for a multiple of ${fr[0][1]}. Then the remai
 
 Check with ${T}: ${x1} people in the first group, ${T - x1} remain, and ${f(1)} of ${T - x1} is ${((T - x1) * fr[1][0]) / fr[1][1]}.
 
+${tests}
+
 Trap: ${trapText[trapPick.trap!]}. Chain the conditions in order; do not read all fractions off the total.`
         : `Recognize: a fraction of a group of people must be a whole number, so every fraction must work at the same time.
 
 Each fraction is in lowest terms, so its denominator must divide the total. The total is a multiple of ${listAnd(dens.map(String))}, that is, of lcm$(${dens.join(', ')}) = ${L}$.
 
 Check with ${T}: ${listAnd(fr.map(([a, p]) => `${f(fr.findIndex((z) => z[1] === p))} of ${T} is ${(T * a) / p}`))}.
+
+${tests}
 
 Trap: ${trapText[trapPick.trap!]}. A total must be a multiple of the LCM of the denominators, not of one of them.`;
       return {

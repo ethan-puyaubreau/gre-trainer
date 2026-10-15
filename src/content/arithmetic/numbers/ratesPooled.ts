@@ -106,6 +106,7 @@ const pooled: Template<PRParams> = {
       // the plain mean of the rates
       const rateVals = r.map((x) => (mode === 'price' ? F(x, 100) : F(x)));
       const meanRate = rateVals.reduce((a, x) => a.add(x), F(0)).div(n);
+      if (meanRate.eq(ans)) continue; // equal weights would hide the plain-mean misconception
       const traps: { value: Frac; trap: string }[] = [{ value: meanRate, trap: 'rate-mean-of-rates' }];
       if (mode === 'speed' && extra) {
         traps.push({ value: num_.div(den), trap: 'rate-stop-ignored' }, { value: num_.div(den.add(extra)), trap: 'rate-stop-units' });

@@ -106,7 +106,7 @@ const unordered: Template<Params> = {
           quantityB: swap ? qa : qb,
           answer,
           ...(naiveLetter !== answer ? { traps: { [naiveLetter]: 'nl-order-assumed' } } : {}),
-          explanation: `Recognize: the letters do not fix the order of the points, so the distance can change with the arrangement.
+          explanation: `Recognize: the letters do not fix the order of the points, so ${vals.length > 1 ? 'the distance can change with the arrangement' : 'each arrangement has to be checked, even if the condition ends up allowing only one distance'}.
 
 Put $${L[0]}$ at 0 and move from point to point by the given distances, to the right or to the left. ${sentenceCond} Allowed arrangements: ${examples.join('; ')}. ${verdict}${
             naiveLetter !== answer ? ` Trap: adding all the distances, $${naive}$, assumes the points are in order and suggests ${naiveLetter}.` : ''

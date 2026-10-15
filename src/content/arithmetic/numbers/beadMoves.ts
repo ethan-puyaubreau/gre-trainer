@@ -109,10 +109,10 @@ const beadMoves: Template<Params> = {
         'farthest-start': `Compare the distances from the start of all the positions: ${path.map((x) => decimal(x.sub(start).abs())).join(', ')}. The greatest is ${decimal(farStart)}.`,
       };
       const trapSentence: Record<string, string> = {
-        'nl-net-for-total': `Trap: the net change (${decimal(net)}) ignores the back-and-forth travel.`,
+        'nl-net-for-total': `Trap: the size of the net move (${decimal(net)}) ignores the back-and-forth travel.`,
         'nl-total-for-net': `Trap: the total (${decimal(total)}) counts moves that partly cancel.`,
         'nl-final-for-extreme': `Trap: looking only at the end, or at the start, misses a point in the middle of the path.`,
-        'nl-start-forgotten': `Trap: the net move (${decimal(netSigned.abs())}) alone forgets the starting coordinate.`,
+        'nl-start-forgotten': `Trap: the size of the net move (${decimal(netSigned.abs())}) alone forgets the starting coordinate.`,
       };
       return {
         params: { start, steps, ask },

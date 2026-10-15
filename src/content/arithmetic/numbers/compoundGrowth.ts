@@ -96,7 +96,7 @@ const compoundMCS: Template<Params> = {
         .slice(0, 2)
         .map((t) =>
           t.trap === 'sp-simple-not-compound'
-            ? `${fmt(t.value)} adds the same amount each period, but each change is taken on the new amount`
+            ? `${fmt(t.value)} ${phases.length === 1 ? 'adds the same amount each period' : 'adds the same amount each year within each stretch'}, but each change is taken on the new amount`
             : t.trap === 'num-stopped-early'
               ? `${fmt(t.value)} leaves out the last period`
               : t.trap === 'num-add-percents'

@@ -91,7 +91,7 @@ const patternCount: Template<P> = {
       }
       let res;
       try {
-        res = spreadChoices(rng, answer, rng.shuffle(cands.filter((x) => x.v >= 0)), (v) => `$${v}$`, 5, 'shuffled');
+        res = spreadChoices(rng, answer, cands.filter((x) => x.v >= 0), (v) => `$${v}$`, 5, 'shuffled');
       } catch {
         continue;
       }
@@ -118,7 +118,7 @@ const patternCount: Template<P> = {
         ? `A strip of lights begins with ${listAnd(intro)}. After those, the colors follow a repeating order: ${list}, and then it starts over. How many of the lights numbered ${a} through ${b}, inclusive, are ${target}?`
         : `A strip of lights follows a repeating color order: ${list}, and then it starts over with ${cycle[0]}. How many of the first ${b} lights are ${target}?`;
       const explanation = range
-        ? `Count the ${target} lights up to light ${b}, then remove those before light ${a}. The opening ${I} lights are not part of the blocks, so ${b} lights leave $${b} - ${I} = ${rest}$ in blocks of ${L}: ${q} full blocks (${q * per}) plus ${rem} leftover lights, which are the first ${rem} of the block (${cnt(cycle.slice(0, rem), target)} ${target}), plus ${cnt(intro, target)} in the opening: ${upTo(intro, cycle, target, b, 'true')} up to ${b}.
+        ? `Count the ${target} lights up to light ${b}, then remove those before light ${a}. The opening ${I} lights are not part of the blocks, so ${b} lights leave $${b} - ${I} = ${rest}$ in blocks of ${L}: ${q} full blocks (${q * per}) ${rem ? `plus ${rem} leftover lights, which are the first ${rem} of the block (${cnt(cycle.slice(0, rem), target)} ${target}), ` : 'and no leftover lights, '}plus ${cnt(intro, target)} in the opening: ${upTo(intro, cycle, target, b, 'true')} up to ${b}.
 
 Up to light ${a - 1} the same method gives ${upTo(intro, cycle, target, a - 1, 'true')}, so the answer is $${upTo(intro, cycle, target, b, 'true')} - ${upTo(intro, cycle, target, a - 1, 'true')} = ${answer}$.
 

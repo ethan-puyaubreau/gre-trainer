@@ -146,7 +146,7 @@ Trap: stopping after $r = ${w1.x}$ would suggest that ${word(w1.rel)} every time
 A single ${rTex} discount leaves ${usd(price)} $\\times ${dec(mult(r))} = ${nPrice(single)}$.
 
 ${rel === 'C' ? 'The prices are equal.' : two.gt(single) ? `${nPrice(two)} is more than ${nPrice(single)}.` : `${nPrice(two)} is less than ${nPrice(single)}.`}${
-            naive !== rel ? ` Trap: adding the discounts to $${sum}\\%$ and comparing that with ${rTex} would suggest that ${naive === 'A' ? 'the first price is greater' : naive === 'B' ? 'the second price is greater' : 'the prices are equal'}.` : ''
+            naive !== rel ? ` Trap: adding the discounts to $${sum}\\%$ and comparing that with ${rTex} would suggest that ${naive === 'A' ? 'the price after the successive discounts is greater' : naive === 'B' ? 'the single-discount price is greater' : 'the prices are equal'}.` : ''
           }
 
 ${qcEnd(fix(rel))}`,

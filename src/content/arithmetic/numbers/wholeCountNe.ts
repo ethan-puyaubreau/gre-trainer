@@ -42,10 +42,10 @@ interface Params {
 }
 
 const CTX = [
-  { group: 'members', xp: 'are juniors', yp: 'are seniors', rp: 'are adults', head: 'A club' },
-  { group: 'marbles', xp: 'are red', yp: 'are blue', rp: 'are green', head: 'A bag' },
-  { group: 'students', xp: 'play soccer', yp: 'play chess', rp: 'do neither', head: 'A school group' },
-  { group: 'cars', xp: 'are white', yp: 'are black', rp: 'have another color', head: 'A parking lot' },
+  { group: 'members', xp: 'are juniors', yp: 'are seniors', rp: 'are adults', head: 'A club', has: 'has' },
+  { group: 'marbles', xp: 'are red', yp: 'are blue', rp: 'are green', head: 'A bag', has: 'contains' },
+  { group: 'students', xp: 'play soccer', yp: 'play chess', rp: 'do neither', head: 'A school group', has: 'has' },
+  { group: 'cars', xp: 'are white', yp: 'are black', rp: 'have another color', head: 'A parking lot', has: 'has' },
 ];
 const DENS = [4, 6, 8, 9, 10, 12, 14, 15, 18, 20];
 const tx = (a: number, b: number) => `$\\frac{${a}}{${b}}$`;
@@ -90,7 +90,7 @@ const wholeCount: Template<Params> = {
       const lcmLine = `The total must be a multiple of ${b} (so that $\\frac{${a}}{${b}}$ of it is a whole number) and a multiple of ${d}, so it is a multiple of $\\text{lcm}(${b}, ${d}) = ${m}$.`;
       if (mode === 'least') {
         key = F(m);
-        stem = `${ctx.head} has ${ctx.group}. ${fa} of them ${ctx.xp} and ${fc} of them ${ctx.yp}. What is the least possible number of ${ctx.group} in all?`;
+        stem = `${ctx.head} ${ctx.has} ${ctx.group}. ${fa} of them ${ctx.xp} and ${fc} of them ${ctx.yp}. What is the least possible number of ${ctx.group} in all?`;
         if (b * d !== m) traps.push({ value: F(b * d), trap: 'fr-product-of-denominators' });
         traps.push({ value: F(b + d), trap: 'fr-sum-of-denominators' }, { value: F(Math.max(b, d)), trap: 'fr-one-denominator-only' });
         explanation = `Recognize: a fraction of a group of people or objects must be a whole number, so the total is limited by the denominators.
@@ -106,7 +106,7 @@ ${b * d !== m ? `Trap: multiplying the denominators gives $${b * d}$, which work
         L = k * m - rng.int(1, Math.max(1, m - 1));
         U = k * m + rng.int(1, Math.max(1, m - 1));
         ask = 'least';
-        stem = `${ctx.head} has more than ${num(L)} and fewer than ${num(U)} ${ctx.group}. Exactly ${fa} of them ${ctx.xp} and exactly ${fc} of them ${ctx.yp}. How many ${ctx.group} are there in all?`;
+        stem = `${ctx.head} ${ctx.has} more than ${num(L)} and fewer than ${num(U)} ${ctx.group}. Exactly ${fa} of them ${ctx.xp} and exactly ${fc} of them ${ctx.yp}. How many ${ctx.group} are there in all?`;
         const onlyB = [];
         for (let n = L + 1; n < U; n++) if (n % b === 0 && n !== k * m) onlyB.push(n);
         const onlyD = [];
@@ -130,7 +130,7 @@ ${traps.length ? `Trap: a total such as $${traps[0].value.toNumber()}$ is in the
           const floorNaive = F(Math.floor(naive.toNumber()));
           if (!naive.isInt()) traps.push({ value: floorNaive, trap: 'fr-limit-not-multiple' });
           traps.push({ value: F(n), trap: 'fr-total-instead-of-part' });
-          stem = `${ctx.head} has at most ${num(M)} ${ctx.group}. Exactly ${fa} of them ${ctx.xp}, exactly ${fc} ${ctx.yp}, and the rest ${ctx.rp}. What is the greatest possible number of ${ctx.group} in the last group?`;
+          stem = `${ctx.head} ${ctx.has} at most ${num(M)} ${ctx.group}. Exactly ${fa} of them ${ctx.xp}, exactly ${fc} ${ctx.yp}, and the rest ${ctx.rp}. What is the greatest possible number of ${ctx.group} in the last group?`;
           explanation = `Recognize: the total must keep both counts whole, so it is not just any number up to the limit.
 
 ${lcmLine} The greatest multiple of ${m} that does not exceed ${num(M)} is $${n}$. The last group is the rest: $1 - \\frac{${a}}{${b}} - \\frac{${c}}{${d}} = ${green.toTex()}$ of the total, so $${green.toTex()} \\cdot ${n} = ${key.toNumber()}$.
@@ -141,7 +141,7 @@ Trap: using the limit ${num(M)} itself as the total fails, because it does not k
         } else {
           key = green.mul(m);
           traps.push({ value: green.mul(b * d), trap: 'fr-product-of-denominators' }, { value: green.mul(Math.max(b, d)), trap: 'fr-one-denominator-only' });
-          stem = `${ctx.head} has ${ctx.group}. Exactly ${fa} of them ${ctx.xp}, exactly ${fc} ${ctx.yp}, and the rest ${ctx.rp}. What is the least possible number of ${ctx.group} in the last group?`;
+          stem = `${ctx.head} ${ctx.has} ${ctx.group}. Exactly ${fa} of them ${ctx.xp}, exactly ${fc} ${ctx.yp}, and the rest ${ctx.rp}. What is the least possible number of ${ctx.group} in the last group?`;
           explanation = `Recognize: the total must keep both counts whole, so its smallest value comes from the denominators.
 
 ${lcmLine} The least total is $${m}$. The last group is $1 - \\frac{${a}}{${b}} - \\frac{${c}}{${d}} = ${green.toTex()}$ of the total, so it has $${green.toTex()} \\cdot ${m} = ${key.toNumber()}$ members at least.

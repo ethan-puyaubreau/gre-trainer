@@ -123,7 +123,7 @@ const percentLink: Template<RPParams> = {
       const ratioNums = `$${num(A[ask[0]])} : ${num(A[ask[1]])}$`;
       const slips = [
         shown(fixed[1].value) && d === 1
-          ? `$${p} : 100$ uses only the change and forgets the $100\%$ that is already there`
+          ? `$${p} : 100$ uses only the change and forgets the $100\\%$ that is already there`
           : shown(fixed[1].value)
             ? `adding the percents ignores that the second percent is taken of a different quantity`
             : '',
