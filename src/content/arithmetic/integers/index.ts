@@ -13,6 +13,7 @@ import { missingDigitTemplates, missingDigitTraps } from './missingDigit';
 import { populationTemplates, populationTraps } from './populationTotals';
 import { primeExpressionTemplates, primeExpressionTraps } from './primeExpressions';
 import { primesTemplates } from './primes';
+import { remainderLcmTemplates, remainderLcmTraps } from './remainderLcm';
 import { remainderCycleTemplates, remainderCycleTraps } from './remainderCycle';
 import { integerTraps } from './traps';
 
@@ -32,5 +33,6 @@ export const integersTemplates: Template<any>[] = [
   ...countMultiplesTemplates,
   ...primeExpressionTemplates,
   ...divisorKindsTemplates,
+  ...remainderLcmTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps };
