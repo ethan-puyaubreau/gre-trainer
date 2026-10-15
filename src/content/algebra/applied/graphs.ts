@@ -3,7 +3,7 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { num, poly } from '../../../engine/tex';
 import type { Choice, GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dots, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, plot, ptTex, qcEnd, uniqueIndex, type Window } from './util';
+import { choiceValuesMatch, dots, expectMcm, expectMcs, expectNe, expectQc, plot, ptTex, qcEnd, trapChoices, uniqueIndex, type Window } from './util';
 
 type Pt = [number, number];
 
@@ -47,7 +47,7 @@ const lineMeetsV: Template<VParams> = {
     for (let m = -a; m <= a; m++)
       for (let drop = 1; drop <= 5; drop++) {
         const c = k - drop - m * h;
-        pool.push({ m, c, trap: Math.abs(m) === a ? 'algw-parallel-meet' : m !== 0 ? 'algw-line-eventually-meets' : undefined });
+        pool.push({ m, c, trap: Math.abs(m) === a ? 'algw-parallel-meet' : 'algw-line-eventually-meets' });
       }
     const wrong: typeof pool = [];
     const parallel = rng.shuffle(pool.filter((p) => Math.abs(p.m) === a && Math.sign(p.m) === Math.sign(correct.m || 1)));
@@ -577,7 +577,7 @@ const readGraph: Template<ReadParams> = {
         a = rng.pick(cands);
         const fa = f(a);
         answer = f(fa);
-        if (!Number.isInteger(answer)) continue;
+        if (!Number.isInteger(answer) || answer === 0 || answer === 1) continue;
         if (fa !== answer) traps = [{ value: frac(fa), trap: 'algw-composite-once' }];
         stem = `The graph of the function $f$, defined for $-4 \\le x \\le 4$, is shown in the $xy$-plane above. What is the value of $f(f(${num(a)}))$?`;
         explanation = `Work from the inside out. The graph passes through $${ptTex(a, fa)}$, so $f(${num(a)}) = ${num(fa)}$.
@@ -618,6 +618,7 @@ So there are ${cnt} values of $x$ with $f(x) = ${num(c)}$. Look at the whole gra
         a = rng.pick(cands);
         const inner = a - s;
         answer = f(inner) + v;
+        if (answer === 0 || answer === 1) continue;
         traps = [{ value: frac(f(a + s) + v), trap: 'algw-shift-direction' }];
         const gDef = `f(x ${s > 0 ? '-' : '+'} ${Math.abs(s)}) ${v > 0 ? '+' : '-'} ${Math.abs(v)}`;
         stem = `The graph of the function $f$, defined for $-4 \\le x \\le 4$, is shown in the $xy$-plane above. The function $g$ is defined by $g(x) = ${gDef}$. What is the value of $g(${num(a)})$?`;
@@ -697,12 +698,11 @@ const intersectionPoints: Template<MeetParams> = {
     let Q: [number, number, number];
     let correct: Frac;
     let traps: { value: Frac; trap: string }[] = [];
-    let extra: Frac[] = [];
     let stem: string;
     let explanation: string;
     if (kind === 'horizontal') {
-      const k0 = rng.int(-9, 3);
-      const half = rng.int(2, 6);
+      const k0 = rng.int(-12, 4);
+      const half = rng.int(2, 8);
       const c = k0 + half * half;
       P = [1, 0, k0];
       Q = [0, 0, c];
@@ -710,8 +710,13 @@ const intersectionPoints: Template<MeetParams> = {
       traps = [
         { value: frac(half), trap: 'algw-one-intersection' },
         { value: frac(half * half), trap: 'algw-distance-no-root' },
+        { value: frac(2 * half * half), trap: 'algw-distance-no-root' },
+        { value: frac(c), trap: 'algw-answered-line-height' },
+        { value: frac(4 * half * half), trap: 'algw-distance-no-root' },
       ];
-      stem = `In the $xy$-plane, the line $y = ${num(c)}$ intersects the graph of $y = ${poly([1, 0, k0])}$ at two points. What is the distance between these two points?`;
+      stem = rng.chance(0.5)
+        ? `In the $xy$-plane, the line $y = ${num(c)}$ intersects the graph of $y = ${poly([1, 0, k0])}$ at two points. What is the distance between these two points?`
+        : `In the $xy$-plane, the graph of $y = ${poly([1, 0, k0])}$ meets the horizontal line $y = ${num(c)}$ at two points. How far apart are these two points?`;
       explanation = `At an intersection, $${poly([1, 0, k0])} = ${num(c)}$, so $x^2 = ${half * half}$ and $x = ${half}$ or $x = -${half}$.
 
 The two points are $${ptTex(-half, c)}$ and $${ptTex(half, c)}$, on the same horizontal line, so the distance between them is $${half} - (-${half}) = ${2 * half}$.
@@ -739,8 +744,13 @@ Keeping only $x = ${half}$ gives half the distance.`;
       const line = poly([m, k]);
       if (kind === 'sum-x') {
         correct = frac(r1 + r2);
-        traps = [{ value: frac(-b), trap: 'algw-intercepts-not-intersection' }];
-        extra = [frac(-(r1 + r2))];
+        traps = [
+          { value: frac(-b), trap: 'algw-intercepts-not-intersection' },
+          { value: frac(-(r1 + r2)), trap: 'alg-sign-slip' },
+          { value: frac(r1 * r2), trap: 'alg-product-for-sum' },
+          { value: frac(b), trap: 'alg-coefficient-as-root' },
+          { value: frac(m), trap: 'alg-coefficient-as-root' },
+        ];
         stem = `In the $xy$-plane, the graph of $y = ${parab}$ and the line $y = ${line}$ intersect at two points. What is the sum of the $x$-coordinates of the two points?`;
         explanation = `Set the expressions equal: $${parab} = ${line}$, so $${poly([1, b - m, c0 - k])} = 0$, which factors as $${fac(r1)}${fac(r2)} = 0$.
 
@@ -750,7 +760,13 @@ The sum of the $x$-intercepts of the parabola, $${num(-b)}$, answers a different
       } else {
         const yv = m * r2 + k;
         correct = frac(yv);
-        traps = [{ value: frac(r2), trap: 'algw-gave-x-not-y' }, { value: frac(m * r1 + k), trap: 'algw-answered-other-unknown' }];
+        traps = [
+          { value: frac(r2), trap: 'algw-gave-x-not-y' },
+          { value: frac(m * r1 + k), trap: 'algw-answered-other-unknown' },
+          { value: frac(r1), trap: 'algw-gave-x-not-y' },
+          { value: frac(m * r2), trap: 'alg-dropped-term' },
+          { value: frac(r2 * r2 + b * r2), trap: 'alg-dropped-term' },
+        ];
         stem = `In the $xy$-plane, the graph of $y = ${parab}$ and the line $y = ${line}$ intersect at two points. What is the $y$-coordinate of the point of intersection that has the greater $x$-coordinate?`;
         explanation = `Set the expressions equal: $${parab} = ${line}$, so $${poly([1, b - m, c0 - k])} = 0$, which factors as $${fac(r1)}${fac(r2)} = 0$. The $x$-coordinates are $${num(r1)}$ and $${num(r2)}$.
 
@@ -777,7 +793,13 @@ $${num(r2)}$ is the $x$-coordinate, not the $y$-coordinate.`;
       Q = [-1, b2, c2];
       const yv = r2 * r2 + b1 * r2 + c1;
       correct = frac(yv);
-      traps = [{ value: frac(r2), trap: 'algw-gave-x-not-y' }, { value: frac(r1 * r1 + b1 * r1 + c1), trap: 'algw-answered-other-unknown' }];
+      traps = [
+        { value: frac(r2), trap: 'algw-gave-x-not-y' },
+        { value: frac(r1 * r1 + b1 * r1 + c1), trap: 'algw-answered-other-unknown' },
+        { value: frac(r1), trap: 'algw-gave-x-not-y' },
+        { value: frac(r2 * r2 + b1 * r2), trap: 'alg-dropped-term' },
+        { value: frac(-(r2 * r2) + b2 * r2 + c2 - 2 * (r2 * r2)), trap: 'alg-sign-slip' },
+      ];
       stem = `In the $xy$-plane, the graphs of $y = ${poly(P)}$ and $y = ${poly(Q)}$ intersect at two points. What is the $y$-coordinate of the point of intersection that has the greater $x$-coordinate?`;
       explanation = `Set the expressions equal: $${poly(P)} = ${poly(Q)}$, so $${poly([2, b1 - b2, c1 - c2])} = 0$, that is, $2(${poly([1, -(r1 + r2), r1 * r2])}) = 0$, which gives $x = ${num(r1)}$ or $x = ${num(r2)}$.
 
@@ -785,10 +807,33 @@ The greater is $x = ${num(r2)}$. Substitute into the first equation: $y = ${subs
 
 $${num(r2)}$ is the $x$-coordinate, not the $y$-coordinate.`;
     }
-    const dir = rng.sign();
-    const fillers = [...extra, correct.add(dir), correct.add(2 * dir), correct.add(3 * dir), correct.sub(dir), correct.sub(2 * dir)];
-    const { choices, answer, values } = valuedChoices(rng, { correct, traps, fillers, format: fmtV, positive: kind === 'horizontal' });
-    return { params: { kind, P, Q, values }, q: { format: 'mcs', stem, choices, answer, explanation } };
+    const WHY: Record<string, string> = {
+      'algw-one-intersection': 'keeping only one of the two intersection points',
+      'algw-distance-no-root': 'forgetting a square root, or squaring a distance',
+      'algw-intercepts-not-intersection': 'using the x-intercepts of the parabola instead of the intersection points',
+      'algw-gave-x-not-y': 'giving an x-coordinate instead of the y-coordinate',
+      'algw-answered-other-unknown': 'finding y at the other intersection point',
+      'alg-sign-slip': 'a sign error',
+      'alg-product-for-sum': 'giving the product of the solutions instead of their sum',
+      'alg-coefficient-as-root': 'using a coefficient of the equation as the answer',
+      'alg-dropped-term': 'leaving out a term when substituting',
+      'algw-answered-line-height': 'giving the height of the line instead of the distance',
+    };
+    const res = trapChoices(
+      rng,
+      correct,
+      traps.filter((t) => kind !== 'horizontal' || t.value.sign() > 0),
+      fmtV,
+    );
+    if (!res) return intersectionPoints.generate(rng, d);
+    const { choices, answer, values } = res;
+    const cited = res.kept[0];
+    return {
+      params: { kind, P, Q, values },
+      q: { format: 'mcs', stem, choices, answer, explanation: `${explanation}
+
+Trap: $${num(cited.value)}$ comes from ${WHY[cited.trap]}.` },
+    };
   },
   check(q, { kind, P, Q, values }) {
     const err = choiceValuesMatch(q, values, fmtV);

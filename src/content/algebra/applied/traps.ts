@@ -62,6 +62,14 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Used run over rise for the slope',
     fix: 'Slope is rise over run: $\\frac{y_2 - y_1}{x_2 - x_1}$ (change in $y$ divided by change in $x$).',
   },
+  'algw-answered-line-height': {
+    label: 'Gave the height of the line instead of the distance',
+    fix: 'The line $y = c$ is only where the two points are; the question asks how far apart they are, which uses their $x$-coordinates.',
+  },
+  'alg-product-for-sum': {
+    label: 'Gave the product of the solutions instead of their sum',
+    fix: 'For $x^2 + px + q = 0$ the solutions add up to $-p$ and multiply to $q$. Check which one the question asks for.',
+  },
   'algw-point-as-intercept': {
     label: 'Gave a coordinate of the given point instead of the intercept',
     fix: 'The point is on the line, but it is not where the line meets an axis. Find the equation first, then set $x = 0$ or $y = 0$.',
@@ -104,7 +112,7 @@ export const appliedTrapMap: Record<string, Trap> = {
     fix: 'Two parallel lines with different intercepts never meet. A line below the vertex of a V-shaped graph meets it only if it is steeper than the branches.',
   },
   'algw-line-eventually-meets': {
-    label: 'Assumed any slanted line eventually crosses the graph',
+    label: 'Assumed any line eventually crosses the graph',
     fix: 'A line that passes below the vertex of $y = a|x - h| + k$ crosses it only if its slope is steeper than $a$ in absolute value. Otherwise the V rises faster and the line stays below.',
   },
   'algw-strict-vs-nonstrict': {

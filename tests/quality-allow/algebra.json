@@ -1,13 +1,4 @@
 {
-  "alg.graphs.intersection": {
-    "distractors.trapped": "baseline"
-  },
-  "alg.graphs.line-meets-graph": {
-    "distractors.trapped": "baseline"
-  },
-  "alg.graphs.read-graph": {
-    "degenerate.trivial": "baseline"
-  },
   "alg.mixtures-interest.growth": {
     "distractors.trapped": "baseline"
   },
