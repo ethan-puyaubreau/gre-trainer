@@ -132,7 +132,7 @@ const regionQc: Template<Params> = {
       hi = lo;
       answer = at(lo);
       cond = `Here $s = ${lo}$.`;
-      verdict = `At $s = ${lo}$, $A \approx ${fmt(cs(lo))}$ and $B = ${fmt(k * lo)}$, so Quantity ${answer} is greater.`;
+      verdict = `At $s = ${lo}$, $A \\approx ${fmt(cs(lo))}$ and $B = ${fmt(k * lo)}$, so Quantity ${answer} is greater.`;
     } else if (dif === 2) {
       mode = 'range';
       if (want === 'A') {
@@ -148,7 +148,7 @@ const regionQc: Template<Params> = {
       }
       answer = at(lo) === at(hi) ? at(lo) : 'D';
       if (answer !== want) throw new Redraw('range does not give the planned relation');
-      cond = `Here $s$ is an integer with $${lo} \le s \le ${hi}$.`;
+      cond = `Here $s$ is an integer with $${lo} \\le s \\le ${hi}$.`;
       verdict =
         answer === 'D'
           ? `The allowed integers lie on both sides of $${fmt(T)}$: ${vals(lo)}, but ${vals(hi)}. Two allowed values give opposite orders.`
