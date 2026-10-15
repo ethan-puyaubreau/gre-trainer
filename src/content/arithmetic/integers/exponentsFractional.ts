@@ -43,7 +43,7 @@ const fractional: Template<Params> = {
     const q = rng.pick(d === 3 ? [2, 3] : [2, 3, 4]);
     const m = rng.int(1, d === 3 ? 3 : 5);
     if (gcd(m, q) !== 1) return fractional.generate(rng, d);
-    const frame = rng.pick(['What is the value of', 'Evaluate', 'Compute']);
+    const frame = rng.pick(['What is the value of', 'What is the numerical value of', 'What number is equal to']);
     if (d < 3) {
       const r = rng.int(2, q === 2 ? 9 : q === 3 ? 6 : 5);
       const B = r ** q;
@@ -100,7 +100,7 @@ Rule: the denominator is the root, the numerator is the power${neg ? ', and a ne
         ],
         explanation: `A negative exponent flips the fraction, and the fractional part takes a root and a power.
 
-The expression becomes $\\left(\\frac{${num(bottom)}}{${num(top)}}\\right)^{${m}/${q}}$. The ${q === 2 ? 'square' : 'cube'} root of each part is $${rt(q, bottom)} = ${s}$ and $${rt(q, top)} = ${r}$, so the value is $\\left(\\frac{${s}}{${r}}\\right)${m === 1 ? '' : `^{${m}}`} = \\frac{${num(s ** m)}}{${num(r ** m)}}$.
+The expression becomes $\\left(\\frac{${num(bottom)}}{${num(top)}}\\right)^{${m}/${q}}$. The ${q === 2 ? 'square' : 'cube'} root of each part is $${rt(q, bottom)} = ${s}$ and $${rt(q, top)} = ${r}$, so the value is $${m === 1 ? `\\frac{${s}}{${r}}` : `\\left(\\frac{${s}}{${r}}\\right)^{${m}} = \\frac{${num(s ** m)}}{${num(r ** m)}}`}$.
 
 Check: $${s}^{${q}} = ${num(bottom)}$ and $${r}^{${q}} = ${num(top)}$.
 
