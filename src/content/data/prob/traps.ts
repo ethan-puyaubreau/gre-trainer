@@ -58,6 +58,34 @@ export const probTraps: Record<string, Trap> = {
     label: 'Filled an unrestricted position before a restricted one',
     fix: 'Fill the most restricted positions first (the units digit of an odd number, the first digit), then the free ones.',
   },
+  'prob-wrong-positions': {
+    label: 'Used the wrong number of positions',
+    fix: 'Count the digits (or places) of the number asked for, and use exactly that many factors.',
+  },
+  'prob-double-count': {
+    label: 'Counted every outcome twice',
+    fix: 'Check whether two ways of building an outcome really give different outcomes; if not, the count is not doubled.',
+  },
+  'prob-half-count': {
+    label: 'Counted only half of the outcomes',
+    fix: 'Do not halve a count unless two outcomes are really the same; a restriction usually removes some cases, not exactly half.',
+  },
+  'prob-over-exclude': {
+    label: 'Removed a digit from every position',
+    fix: 'A restriction such as "no leading 0" applies to one position only. Remove 0 from the first digit, and keep it for the others.',
+  },
+  'prob-half-parity': {
+    label: 'Assumed half of the numbers are odd (or even)',
+    fix: 'Odd and even numbers are equally many only when no restriction treats the digits differently. Here the leading digit cannot be 0, so count them directly.',
+  },
+  'prob-wrong-set': {
+    label: 'Counted a different set than the one asked',
+    fix: 'Reread the condition (odd or even, with or without a digit) and count exactly that set.',
+  },
+  'prob-palindrome-free': {
+    label: 'Counted the wrong number of free digits in a palindrome',
+    fix: 'In a palindrome of $k$ digits, only the first $\\lceil k/2 \\rceil$ digits can be chosen; the others copy them.',
+  },
   'prob-case-split': {
     label: 'Used one product where cases were needed',
     fix: 'When one choice changes the number of options of another (a units digit of 0 frees the first digit), split into cases and add.',
@@ -73,6 +101,18 @@ export const probTraps: Record<string, Trap> = {
   'prob-exactly-vs-at-least': {
     label: 'Mixed up "exactly one" and "at least one"',
     fix: '"At least one" also includes the cases where two or more happen. Exactly one of two events: $p(1 - q) + (1 - p)q$; at least one: $1 - (1 - p)(1 - q)$.',
+  },
+  'prob-wrong-size': {
+    label: 'Used a committee of the wrong size',
+    fix: 'Use the number of members the committee has, in every factor: the sizes of the parts must add up to it.',
+  },
+  'prob-swapped-groups': {
+    label: 'Swapped the numbers taken from the two groups',
+    fix: 'Match each group with its own count: choose $i$ from the first group and $j$ from the second, not the other way round.',
+  },
+  'prob-excluded-one': {
+    label: 'Left one of the two people out entirely',
+    fix: 'Only committees with both are forbidden. Either person may serve alone, so neither is excluded altogether.',
   },
   'prob-excluded-both': {
     label: 'Left both people out entirely',

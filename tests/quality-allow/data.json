@@ -1,22 +1,4 @@
 {
-  "data.counting.codes": {
-    "distractors.trapped": "baseline",
-    "distractors.cited": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "data.counting.committees": {
-    "artifacts.plural-1": "baseline",
-    "distractors.trapped": "baseline",
-    "distractors.cited": "baseline"
-  },
-  "data.counting.outcomes-qc": {
-    "qc.never-d": "baseline"
-  },
-  "data.counting.pairs": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
   "data.interpretation.decades-how-many": {
     "distractors.trapped": "baseline"
   },

@@ -1,9 +1,10 @@
-import { numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac, type Frac } from '../../../engine/frac';
 import { factorial, nCr, nPr } from '../../../engine/math';
 import { num } from '../../../engine/tex';
+import { plural } from '../../../engine/text';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { countCombinations, countSequences, forEachCombination, forEachPermutation, mcsCheck, neCheck, word } from './util';
+import { countCombinations, countSequences, forEachCombination, forEachPermutation, mcsCheck, neCheck, trapOnlyChoices, word } from './util';
 
 const SKILL = 'data.counting';
 const bin = (n: number | string, k: number | string) => `\\binom{${n}}{${k}}`;
@@ -367,7 +368,8 @@ $${num(f(n - 2))}$ forgets the order inside the block.`;
         answer = spots * f(n - 2);
         const place = where === 'middle' ? 'in the middle position' : 'in the first position';
         stem = `The ${n} letters ${list} are to be arranged in a row, with each letter used exactly once. If ${fx} must be ${place} and ${other} must ${near ? '' : 'not '}be next to ${fx}, how many different arrangements are possible?`;
-        traps.push({ value: frac(f(n - 1)), trap: 'prob-ignored-restriction' }, { value: frac(f(n - 2)), trap: 'prob-missed-case' });
+        traps.push({ value: frac(f(n - 1)), trap: 'prob-ignored-restriction' });
+        if (spots > 1) traps.push({ value: frac(f(n - 2)), trap: 'prob-missed-case' });
         const nearSpots = where === 'middle' ? 2 : 1;
         explanation = `Place the restricted letters first. ${fx} goes ${place} (1 way). ${
           near
@@ -396,9 +398,11 @@ $${num(f(w.length))}$ counts the same string several times.`;
         break;
       }
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((t) => t.value.eq(answer))) return arrangements.generate(rng, d);
     return {
       params: { kind, n, word: w, where, near },
-      q: { format: 'ne', stem, answer: frac(answer), traps: traps.filter((t) => !t.value.eq(answer)), explanation },
+      q: { format: 'ne', stem, answer: frac(answer), traps, explanation },
     };
   },
   check(q, { kind, n, word: w, where, near }) {
@@ -435,7 +439,7 @@ $${num(f(w.length))}$ counts the same string several times.`;
 
 /* ================================================================== 3. Codes and digit strings (MCS) */
 
-type CodeKind = 'code' | 'distinct' | 'odd-distinct' | 'even-distinct' | 'no-digit' | 'all-even';
+type CodeKind = 'code' | 'distinct' | 'odd-distinct' | 'even-distinct' | 'no-digit' | 'all-even' | 'palindrome' | 'at-least-one';
 interface CodeParams {
   kind: CodeKind;
   letters: number;
@@ -443,10 +447,17 @@ interface CodeParams {
   D: number;
   repeat: boolean;
   digits: number;
+  /** no-digit: the banned digit; at-least-one: the required digit. */
   banned: number;
 }
 
 const LETTERS = 'ABCDEFGH';
+const DIGIT_WORDS = ['', '', 'two', 'three', 'four', 'five', 'six'];
+const CODE_KINDS: Record<1 | 2 | 3, CodeKind[]> = {
+  1: ['code', 'code', 'no-digit', 'all-even'],
+  2: ['code', 'distinct', 'odd-distinct', 'palindrome', 'no-digit', 'all-even'],
+  3: ['even-distinct', 'odd-distinct', 'distinct', 'at-least-one', 'at-least-one', 'palindrome'],
+};
 
 const codes: Template<CodeParams> = {
   id: 'data.counting.codes',
@@ -454,96 +465,199 @@ const codes: Template<CodeParams> = {
   format: 'mcs',
   style: 'codes and digit strings with the multiplication principle',
   generate(rng, d) {
-    const kind: CodeKind = rng.pick(
-      d === 1 ? (['code', 'code', 'no-digit', 'all-even'] as const) : d === 2 ? (['code', 'distinct', 'odd-distinct', 'no-digit', 'all-even'] as const) : (['distinct', 'odd-distinct', 'even-distinct', 'even-distinct'] as const),
-    );
-    const p: CodeParams = { kind, letters: 0, L: 0, D: 0, repeat: true, digits: 3, banned: -1 };
-    let stem = '';
-    let correct = 0;
-    const traps: { value: number; trap: string }[] = [];
-    const fillers: number[] = [];
-    let explanation = '';
-    if (kind === 'code') {
-      [p.L, p.D] = rng.pick([
-        [1, 3],
-        [2, 2],
-        [3, 1],
-        [2, 1],
-        [1, 2],
-      ] as [number, number][]);
-      p.letters = rng.int(4, 8);
-      p.repeat = rng.chance(0.5);
-      const letterList = LETTERS.slice(0, p.letters).split('').join(', ');
-      const rep = p.repeat ? 'Letters and digits may be repeated.' : 'No letter and no digit may appear more than once in a code.';
-      stem = `A security code consists of ${word(p.L)} letter${p.L > 1 ? 's' : ''} followed by ${word(p.D)} digit${p.D > 1 ? 's' : ''}. Each letter is one of ${letterList}, and each digit is one of the digits 0 through 9. ${rep} How many different codes are possible?`;
-      const withRep = p.letters ** p.L * 10 ** p.D;
-      const noRep = nPr(p.letters, p.L) * nPr(10, p.D);
-      correct = p.repeat ? withRep : noRep;
-      traps.push({ value: p.repeat ? noRep : withRep, trap: 'prob-repetition' }, { value: p.L * p.letters + p.D * 10, trap: 'prob-add-not-multiply' });
-      fillers.push(p.letters ** p.L + 10 ** p.D, nCr(p.letters, p.L) * nCr(10, p.D), correct * 2, Math.round(correct / 2));
-      const slots = [
-        ...Array.from({ length: p.L }, (_, i) => (p.repeat ? p.letters : p.letters - i)),
-        ...Array.from({ length: p.D }, (_, i) => (p.repeat ? 10 : 10 - i)),
-      ];
-      explanation = `Fill the ${p.L + p.D} positions one at a time and multiply the numbers of choices: $${slots.join(' \\times ')} = ${num(correct)}$.${
-        p.repeat ? '' : ' Each letter or digit used is unavailable for the next position.'
+    const P = nPr;
+    const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
+    for (;;) {
+      const kind = rng.pick(CODE_KINDS[d]);
+      const p: CodeParams = { kind, letters: 0, L: 0, D: 0, repeat: true, digits: 3, banned: -1 };
+      let stem = '';
+      let correct = 0;
+      let traps: ReturnType<typeof mk>[] = [];
+      let head = '';
+      let check = '';
+      let rule = '';
+      if (kind === 'code') {
+        [p.L, p.D] = rng.pick([
+          [1, 3],
+          [2, 2],
+          [3, 1],
+          [2, 1],
+          [1, 2],
+        ] as [number, number][]);
+        p.letters = rng.int(4, 8);
+        p.repeat = d === 1;
+        const letterList = LETTERS.slice(0, p.letters).split('').join(', ');
+        const rep = p.repeat ? 'Letters and digits may be repeated.' : 'No letter and no digit may appear more than once in a code.';
+        stem = `A security code consists of ${word(p.L)} letter${p.L > 1 ? 's' : ''} followed by ${word(p.D)} digit${p.D > 1 ? 's' : ''}. Each letter is one of ${letterList}, and each digit is one of the digits 0 through 9. ${rep} How many different codes are possible?`;
+        const letterStrings = p.repeat ? p.letters ** p.L : P(p.letters, p.L);
+        const digitStrings = p.repeat ? 10 ** p.D : P(10, p.D);
+        correct = letterStrings * digitStrings;
+        const other = p.repeat ? P(p.letters, p.L) * P(10, p.D) : p.letters ** p.L * 10 ** p.D;
+        traps = [
+          mk(other, 'prob-repetition', (v) => `${p.repeat ? 'forbidding' : 'allowing'} repeats gives $${v}$, but repeats are ${p.repeat ? 'allowed' : 'not allowed'}`),
+          mk(p.L * p.letters + p.D * 10, 'prob-add-not-multiply', (v) => `adding the numbers of choices gives $${v}$, but choices for successive positions multiply`),
+          mk(letterStrings + digitStrings, 'prob-add-not-multiply', (v) => `adding the number of letter strings and digit strings gives $${v}$, but every letter string goes with every digit string`),
+          mk(nCr(p.letters, p.L) * nCr(10, p.D), 'prob-order-ignored', (v) => `choosing sets of symbols gives $${v}$, but the same symbols in a different order are a different code`),
+          mk(letterStrings, 'prob-ignored-restriction', (v) => `counting only the letter part gives $${v}$, but each of them goes with every digit string`),
+          mk(digitStrings, 'prob-ignored-restriction', (v) => `counting only the digit part gives $${v}$, but each of them goes with every letter string`),
+        ];
+        const slots = [
+          ...Array.from({ length: p.L }, (_, i) => (p.repeat ? p.letters : p.letters - i)),
+          ...Array.from({ length: p.D }, (_, i) => (p.repeat ? 10 : 10 - i)),
+        ];
+        head = `A code is filled position by position, so multiply the numbers of choices: $${slots.join(' \\times ')} = ${num(correct)}$.${p.repeat ? '' : ' Each letter or digit already used is not available for the next position.'}`;
+        check = `${num(letterStrings)} letter strings, each followed by any of ${num(digitStrings)} digit strings: $${num(letterStrings)} \\times ${num(digitStrings)} = ${num(correct)}$.`;
+        rule = 'Choices made one after another multiply; they never add.';
+      } else if (kind === 'distinct') {
+        p.digits = d === 2 ? 3 : rng.pick([4, 5]);
+        const k = p.digits;
+        stem = `How many ${k}-digit positive integers have ${DIGIT_WORDS[k]} different digits?`;
+        correct = 9 * P(9, k - 1);
+        traps = [
+          mk(P(10, k), 'prob-leading-zero', (v) => `allowing 0 first gives $${v}$, but a leading 0 does not make a ${k}-digit number`),
+          mk(9 * 10 ** (k - 1), 'prob-repetition', (v) => `allowing repeated digits gives $${v}$, but the digits must be different`),
+          mk(P(9, k), 'prob-over-exclude', (v) => `never using 0 gives $${v}$, but 0 may appear after the first digit`),
+          mk(9 ** k, 'prob-repetition', (v) => `9 choices for every digit gives $${v}$, but each later digit has one choice fewer than the one before`),
+        ];
+        head = `The first digit cannot be 0: 9 choices. Each later digit is any digit not used yet, 0 included: $9 \\times ${Array.from({ length: k - 1 }, (_, i) => 9 - i).join(' \\times ')} = ${num(correct)}$.`;
+        check = `with all ${k} positions free, $${Array.from({ length: k }, (_, i) => 10 - i).join(' \\times ')} = ${num(P(10, k))}$ counts the strings that start with 0, ${num(P(9, k - 1))} of them, and $${num(P(10, k))} - ${num(P(9, k - 1))} = ${num(correct)}$.`;
+        rule = 'Fill the position with the restriction first, then the freer ones.';
+      } else if (kind === 'odd-distinct' || kind === 'even-distinct') {
+        const odd = kind === 'odd-distinct';
+        p.digits = d === 2 ? 3 : rng.pick([3, 4]);
+        const k = p.digits;
+        stem = `How many ${k}-digit positive integers are ${odd ? 'odd' : 'even'} and have ${DIGIT_WORDS[k]} different digits?`;
+        const mid = P(8, k - 2);
+        const oddCount = 5 * 8 * mid;
+        const evenCount = 9 * mid + 4 * 8 * mid;
+        correct = odd ? oddCount : evenCount;
+        const allDistinct = 9 * P(9, k - 1);
+        traps = [
+          mk(9 * mid * 5, odd ? 'prob-restricted-first' : 'prob-case-split', (v) => `${odd ? 'choosing the first digit before the units digit' : 'one product with 5 choices for the units digit'} gives $${v}$, which ${odd ? 'counts numbers whose units digit repeats an earlier digit' : 'ignores that a units digit of 0 leaves more choices for the first digit'}`),
+          mk(9 * 10 ** (k - 2) * 5, 'prob-repetition', (v) => `allowing repeated digits gives $${v}$, but the digits must be different`),
+          mk(allDistinct / 2, 'prob-half-parity', (v) => `half of the ${num(allDistinct)} numbers with different digits gives $${v}$, but the odd and even ones are not equally many`),
+          mk(odd ? evenCount : oddCount, 'prob-wrong-set', (v) => `$${v}$ counts the ${odd ? 'even' : 'odd'} numbers instead`),
+          ...(odd
+            ? [mk(5 * 9 ** (k - 1), 'prob-repetition', (v) => `9 choices for each other digit gives $${v}$, but digits already used are not available`)]
+            : [
+                mk(9 * mid, 'prob-missed-case', (v) => `counting only the numbers that end in 0 gives $${v}$, but 2, 4, 6 and 8 can end the number too`),
+                mk(4 * 8 * mid, 'prob-missed-case', (v) => `leaving out the numbers that end in 0 gives $${v}$, but they count too`),
+              ]),
+        ];
+        head = odd
+          ? `Fill the most restricted digits first. Units digit: odd, 5 choices. First digit: not 0 and not the units digit, 8 choices. ${k === 3 ? 'The middle digit' : `The other ${k - 2} digits`}: $${Array.from({ length: k - 2 }, (_, i) => 8 - i).join(' \\times ')}$ choices. Total: $5 \\times 8 \\times ${Array.from({ length: k - 2 }, (_, i) => 8 - i).join(' \\times ')} = ${num(correct)}$.`
+          : `Split on the units digit, because 0 as a units digit changes the choices for the first digit. Units digit 0: $9 \\times ${Array.from({ length: k - 2 }, (_, i) => 8 - i).join(' \\times ')} = ${num(9 * mid)}$. Units digit 2, 4, 6 or 8: $4 \\times 8 \\times ${Array.from({ length: k - 2 }, (_, i) => 8 - i).join(' \\times ')} = ${num(4 * 8 * mid)}$. Total: $${num(9 * mid)} + ${num(4 * 8 * mid)} = ${num(correct)}$.`;
+        check = `the ${num(oddCount)} odd and ${num(evenCount)} even numbers add up to ${num(allDistinct)}, the count of all ${k}-digit numbers with different digits.`;
+        rule = 'Start with the restricted position, and split into cases when one choice changes the others.';
+      } else if (kind === 'no-digit') {
+        p.banned = rng.int(1, 9);
+        p.digits = d === 1 ? 3 : 4;
+        const k = p.digits;
+        stem = `How many ${k}-digit positive integers do not contain the digit ${p.banned}?`;
+        correct = 8 * 9 ** (k - 1);
+        traps = [
+          mk(9 ** k, 'prob-leading-zero', (v) => `9 choices for every position gives $${v}$, but the first digit cannot be 0`),
+          mk(8 ** k, 'prob-over-exclude', (v) => `removing both 0 and ${p.banned} from every position gives $${v}$, but only the first digit cannot be 0`),
+          mk(9 * 10 ** (k - 1) - k * 10 ** (k - 1), 'prob-overlap-subtract', (v) => `taking away ${k} lots of $10^{${k - 1}}$ numbers, one per position, gives $${v}$, but numbers with ${p.banned} twice are taken away twice`),
+          mk(8 * 10 ** (k - 1), 'prob-ignored-restriction', (v) => `checking only the first digit gives $${v}$, but every position must avoid ${p.banned}`),
+        ];
+        head = `First digit: any of 1 through 9 except ${p.banned}, so 8 choices. Each other digit: any of 0 through 9 except ${p.banned}, so 9 choices. Total: $8 \\times ${Array.from({ length: k - 1 }, () => 9).join(' \\times ')} = ${num(correct)}$.`;
+        check = `9 choices for every position would give $9^{${k}} = ${num(9 ** k)}$ strings, and $9^{${k - 1}} = ${num(9 ** (k - 1))}$ of them start with 0: $${num(9 ** k)} - ${num(9 ** (k - 1))} = ${num(correct)}$.`;
+        rule = 'Count the choices for each position separately, remembering which positions have extra limits.';
+      } else if (kind === 'all-even') {
+        p.digits = d === 1 ? 3 : 4;
+        const k = p.digits;
+        stem = `How many ${k}-digit positive integers have only even digits?`;
+        correct = 4 * 5 ** (k - 1);
+        traps = [
+          mk(5 ** k, 'prob-leading-zero', (v) => `5 choices for every digit gives $${v}$, but the first digit cannot be 0`),
+          mk(4 ** k, 'prob-over-exclude', (v) => `4 choices for every digit gives $${v}$, but only the first digit cannot be 0`),
+          mk(4 + 5 * (k - 1), 'prob-add-not-multiply', (v) => `adding the numbers of choices gives $${v}$, but choices for successive digits multiply`),
+          mk(9 * 10 ** (k - 2) * 5, 'prob-ignored-restriction', (v) => `making only the units digit even gives $${v}$, but every digit must be even`),
+        ];
+        head = `The even digits are 0, 2, 4, 6, 8. The first digit cannot be 0, so it has 4 choices; each other digit has 5: $4 \\times ${Array.from({ length: k - 1 }, () => 5).join(' \\times ')} = ${num(correct)}$.`;
+        check = `5 choices for every position would give $5^{${k}} = ${num(5 ** k)}$ strings, and $5^{${k - 1}} = ${num(5 ** (k - 1))}$ of them start with 0: $${num(5 ** k)} - ${num(5 ** (k - 1))} = ${num(correct)}$.`;
+        rule = 'The leading digit has its own count when 0 is among the allowed digits.';
+      } else if (kind === 'palindrome') {
+        p.digits = d === 2 ? rng.pick([3, 4, 5]) : rng.pick([5, 6]);
+        const k = p.digits;
+        const free = Math.ceil(k / 2);
+        stem = `How many ${k}-digit positive integers read the same forward and backward (such as ${k === 3 ? '474' : k === 4 ? '3553' : k === 5 ? '20502' : '718817'})?`;
+        correct = 9 * 10 ** (free - 1);
+        traps = [
+          mk(10 ** free, 'prob-leading-zero', (v) => `allowing 0 as the first digit gives $${v}$, but a leading 0 does not make a ${k}-digit number`),
+          mk(9 * 10 ** (k - 1), 'prob-ignored-restriction', (v) => `letting every digit be free gives $${v}$, but the last digits must copy the first ones`),
+          mk(9 * 10 ** free, 'prob-palindrome-free', (v) => `treating ${free + 1} digits as free gives $${v}$, but only the first ${free} can be chosen`),
+          mk(9 * 10 ** (free - 2), 'prob-palindrome-free', (v) => `treating ${plural(free - 1, 'digit')} as free gives $${v}$, but the first ${free} can all be chosen`),
+          mk(9 * P(9, free - 1), 'prob-repetition', (v) => `requiring different digits gives $${v}$, but a palindrome may repeat digits`),
+        ];
+        head = `The first ${free} digit${free === 1 ? '' : 's'} decide${free === 1 ? 's' : ''} the number: the last ${k - free} copy the first ones in reverse. The first digit has 9 choices (not 0), each other free digit has 10: $9 \\times ${Array.from({ length: free - 1 }, () => 10).join(' \\times ')} = ${num(correct)}$.`;
+        check = `for ${k === 3 ? '3' : k === 4 ? '4' : '5'} digits the first half ${free === 2 ? 'ab' : 'abc'} fixes the whole number, so the count equals the number of such halves.`;
+        rule = 'In a palindrome only the first half of the digits is free.';
+      } else {
+        // at-least-one
+        p.banned = rng.int(1, 9);
+        p.digits = rng.pick([3, 4]);
+        const k = p.digits;
+        const total = 9 * 10 ** (k - 1);
+        stem = `How many ${k}-digit positive integers contain at least one digit ${p.banned}?`;
+        correct = total - 8 * 9 ** (k - 1);
+        traps = [
+          mk(total - 9 ** k, 'prob-leading-zero', (v) => `counting the numbers without ${p.banned} as $9^{${k}}$ lets the first digit be 0, which gives $${v}$`),
+          mk(k * 10 ** (k - 1), 'prob-at-least-one-overcount', (v) => `putting ${p.banned} in one position and leaving the others free gives $${v}$, but a number with ${p.banned} twice is counted twice`),
+          mk(8 * 9 ** (k - 1), 'prob-answered-complement', (v) => `$${v}$ counts the numbers WITHOUT the digit ${p.banned}`),
+          mk(total - 8 ** k, 'prob-over-exclude', (v) => `removing 0 and ${p.banned} from every position gives $${v}$ for the numbers without ${p.banned}, but only the first digit cannot be 0`),
+          mk(10 ** (k - 1), 'prob-missed-case', (v) => `counting only the numbers that start with ${p.banned} gives $${v}$, but ${p.banned} can be in any position`),
+        ];
+        head = `Use the complement. All ${k}-digit numbers: $9 \\times 10^{${k - 1}} = ${num(total)}$. Those with no ${p.banned}: first digit 8 choices, each other digit 9: $8 \\times 9^{${k - 1}} = ${num(8 * 9 ** (k - 1))}$. So at least one ${p.banned}: $${num(total)} - ${num(8 * 9 ** (k - 1))} = ${num(correct)}$.`;
+        check = `the numbers with and without ${p.banned} add up to ${num(total)}: $${num(correct)} + ${num(8 * 9 ** (k - 1))}$.`;
+        rule = '"At least one" is easiest as everything minus "none".';
       }
+      // mistakes that apply to every kind: another number of positions, a factor of 2
+      const calc: Partial<Record<CodeKind, (kk: number) => number>> = {
+        distinct: (kk) => 9 * P(9, kk - 1),
+        'odd-distinct': (kk) => 5 * 8 * P(8, kk - 2),
+        'even-distinct': (kk) => 41 * P(8, kk - 2),
+        'no-digit': (kk) => 8 * 9 ** (kk - 1),
+        'all-even': (kk) => 4 * 5 ** (kk - 1),
+        palindrome: (kk) => 9 * 10 ** (Math.ceil(kk / 2) - 1),
+        'at-least-one': (kk) => 9 * 10 ** (kk - 1) - 8 * 9 ** (kk - 1),
+      };
+      const f = calc[kind];
+      if (f) {
+        traps.push(mk(f(p.digits + 1), 'prob-wrong-positions', (v) => `working with ${p.digits + 1} digits gives $${v}$, but the numbers have ${p.digits} digits`));
+        if (p.digits > 3) traps.push(mk(f(p.digits - 1), 'prob-wrong-positions', (v) => `working with ${p.digits - 1} digits gives $${v}$, but the numbers have ${p.digits} digits`));
+      } else {
+        const orders = p.L + p.D === 2 ? 2 : p.L + p.D === 3 ? 3 : 4;
+        traps.push(mk(correct * orders, 'prob-ignored-restriction', (v) => `letting the letters and digits come in any order gives $${v}$, but the letters come first`));
+      }
+      if (rng.chance(0.5)) traps.push(mk(2 * correct, 'prob-double-count', (v) => `doubling gives $${v}$, as if each ${kind === 'code' ? 'code' : 'number'} could be counted in two ways`));
+      if (correct % 2 === 0 && rng.chance(0.5)) traps.push(mk(correct / 2, 'prob-half-count', (v) => `halving gives $${v}$, as if only half of the ${kind === 'code' ? 'codes' : 'numbers'} qualified`));
+      const built = trapOnlyChoices(
+        rng,
+        correct,
+        rng.shuffle(traps.filter((t) => t.value > 0 && Number.isInteger(t.value))),
+        (v) => `$${num(v.n)}$`,
+      );
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      return {
+        params: p,
+        q: {
+          format: 'mcs',
+          stem,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `${head}
 
-Adding the choices ($${p.L * p.letters + p.D * 10}$) is the classic slip: successive choices multiply.`;
-    } else if (kind === 'distinct') {
-      p.digits = rng.chance(d === 3 ? 0.5 : 0.25) ? 4 : 3;
-      const k = p.digits;
-      stem = `How many ${k}-digit positive integers have ${k === 3 ? 'three' : 'four'} different digits?`;
-      correct = 9 * nPr(9, k - 1);
-      traps.push({ value: nPr(10, k), trap: 'prob-leading-zero' }, { value: 9 * 10 ** (k - 1), trap: 'prob-repetition' });
-      fillers.push(nPr(9, k), 9 ** k, 10 ** k - 10 ** (k - 1) - 9);
-      explanation = `Fill the first digit first: it cannot be 0, so 9 choices. Each later digit can be anything not used yet, including 0: $9 \\times ${Array.from({ length: k - 1 }, (_, i) => 9 - i).join(' \\times ')} = ${num(correct)}$.
+Check: ${check}
 
-$${Array.from({ length: k }, (_, i) => 10 - i).join(' \\times ')} = ${num(nPr(10, k))}$ allows a leading 0, which does not give a ${k}-digit number.`;
-    } else if (kind === 'odd-distinct') {
-      stem = 'How many 3-digit positive integers are odd and have three different digits?';
-      correct = 5 * 8 * 8;
-      traps.push({ value: 9 * 8 * 5, trap: 'prob-restricted-first' }, { value: 9 * 10 * 5, trap: 'prob-repetition' });
-      fillers.push(5 * 9 * 9, 9 * 9 * 8 / 2, 10 * 9 * 5);
-      explanation = `Fill the most restricted digits first. Units digit: odd, so 5 choices (1, 3, 5, 7, 9). Hundreds digit: not 0 and not the units digit, so 8 choices. Tens digit: any of the 8 digits not used yet. Total: $5 \\times 8 \\times 8 = 320$.
+Trap: ${cite.why(num(cite.value))}.
 
-Starting with the hundreds digit (9 choices) and then giving the units digit 5 choices gives 360, which counts numbers like 353 whose units digit repeats the hundreds digit.`;
-    } else if (kind === 'even-distinct') {
-      stem = 'How many 3-digit positive integers are even and have three different digits?';
-      correct = 9 * 8 + 4 * 8 * 8;
-      traps.push({ value: 9 * 8 * 5, trap: 'prob-case-split' }, { value: 9 * 10 * 5, trap: 'prob-repetition' });
-      fillers.push(5 * 8 * 8, 4 * 8 * 8, 9 * 9 * 5);
-      explanation = `Split on the units digit, because a units digit of 0 changes the choices for the hundreds digit.
-
-- Units digit 0: hundreds digit 9 choices, tens digit 8 choices: $9 \\times 8 = 72$.
-- Units digit 2, 4, 6 or 8 (4 choices): hundreds digit not 0 and not the units digit, 8 choices; tens digit 8 choices: $4 \\times 8 \\times 8 = 256$.
-
-Total: $72 + 256 = 328$. The one-line product $9 \\times 8 \\times 5 = 360$ ignores that when the units digit is 0, the hundreds digit has more choices.`;
-    } else if (kind === 'no-digit') {
-      p.banned = rng.int(1, 9);
-      stem = `How many 3-digit positive integers do not contain the digit ${p.banned}?`;
-      correct = 8 * 9 * 9;
-      traps.push({ value: 9 * 9 * 9, trap: 'prob-leading-zero' }, { value: 900 - 3 * 100, trap: 'prob-overlap-subtract' });
-      fillers.push(8 * 8 * 8, 8 * 9 * 8, 9 * 9 * 10);
-      explanation = `Hundreds digit: any of 1 through 9 except ${p.banned}, so 8 choices. Tens and units digits: any of 0 through 9 except ${p.banned}, so 9 choices each. Total: $8 \\times 9 \\times 9 = 648$.
-
-$9 \\times 9 \\times 9 = 729$ forgets that the hundreds digit cannot be 0.`;
-    } else {
-      stem = 'How many 3-digit positive integers have only even digits?';
-      correct = 4 * 5 * 5;
-      traps.push({ value: 5 * 5 * 5, trap: 'prob-leading-zero' }, { value: 4 + 5 + 5, trap: 'prob-add-not-multiply' });
-      fillers.push(4 * 4 * 4, 4 * 5 * 4, 450);
-      explanation = `The even digits are 0, 2, 4, 6, 8. The hundreds digit cannot be 0, so it has 4 choices; the tens and units digits have 5 each: $4 \\times 5 \\times 5 = 100$.
-
-$5^3 = 125$ allows a leading 0.`;
+${rule}`,
+        },
+      };
     }
-    const { choices, answer } = numericChoices(rng, {
-      correct,
-      traps: traps.filter((t) => t.value !== correct && t.value > 0),
-      fillers: fillers.filter((v) => Number.isInteger(v) && v > 0),
-      format: (v) => `$${num(v)}$`,
-    });
-    return { params: p, q: { format: 'mcs', stem, choices, answer, explanation } };
   },
   check(q, p) {
     let count = 0;
@@ -557,19 +671,26 @@ $5^3 = 125$ allows a leading 0.`;
       } else letterParts = strings(p.letters, p.L);
       const digitParts = p.repeat ? 10 ** p.D : countSequences(10, p.D);
       count = letterParts * digitParts;
+    } else if (p.kind === 'palindrome') {
+      // reverse each number with integer arithmetic
+      const lo = 10 ** (p.digits - 1);
+      for (let v = lo; v < lo * 10; v++) {
+        let r = 0;
+        for (let x = v; x > 0; x = Math.floor(x / 10)) r = r * 10 + (x % 10);
+        if (r === v) count++;
+      }
     } else {
       const lo = 10 ** (p.digits - 1);
       for (let v = lo; v < lo * 10; v++) {
-        const ds: number[] = [];
-        for (let x = v; x > 0; x = Math.floor(x / 10)) ds.push(x % 10);
-        let distinct = true;
-        for (let a = 0; a < ds.length; a++) for (let b = a + 1; b < ds.length; b++) if (ds[a] === ds[b]) distinct = false;
+        const ds = String(v).split('').map(Number);
+        const distinct = new Set(ds).size === ds.length;
         let ok = false;
         if (p.kind === 'distinct') ok = distinct;
         else if (p.kind === 'odd-distinct') ok = distinct && v % 2 === 1;
         else if (p.kind === 'even-distinct') ok = distinct && v % 2 === 0;
         else if (p.kind === 'no-digit') ok = !ds.includes(p.banned);
-        else ok = ds.every((x) => x % 2 === 0);
+        else if (p.kind === 'all-even') ok = ds.every((x) => x % 2 === 0);
+        else ok = ds.includes(p.banned);
         if (ok) count++;
       }
     }
@@ -596,77 +717,123 @@ const GROUPS = [
   ['women', 'men', 'woman', 'man'],
 ] as const;
 
+const others = (m: number) => (m === 1 ? '1 other' : `${m} others`);
+
 const committees: Template<CommParams> = {
   id: 'data.counting.committees',
   skill: SKILL,
   format: 'mcs',
   style: 'committees with a condition (exactly, at least one, not both)',
   generate(rng, d) {
-    const kind: CommKind = rng.pick(d === 1 ? (['mix', 'mix', 'exactly'] as const) : d === 2 ? (['at-least-one', 'exactly', 'mix'] as const) : (['not-both', 'each-group', 'at-least-one'] as const));
-    const [p1, p2, s1, s2] = rng.pick(GROUPS);
-    const g1 = rng.int(4, d === 1 ? 6 : 7);
-    const g2 = rng.int(3, d === 1 ? 5 : 6);
-    const n = g1 + g2;
-    const k = kind === 'mix' ? rng.int(3, 4) : rng.int(3, Math.min(5, n - 3));
-    let j = kind === 'mix' || kind === 'exactly' ? rng.int(1, Math.min(g2, k - 1)) : 0;
-    if (kind === 'mix') j = Math.min(j, g2, k - 1);
-    const intro = `A committee of ${k} is to be chosen from a group of ${g1} ${p1} and ${g2} ${p2}.`;
-    let stem = '';
-    let correct = 0;
-    const traps: { value: number; trap: string }[] = [];
-    const fillers: number[] = [];
-    let explanation = '';
-    const all = nCr(n, k);
-    if (kind === 'mix' || kind === 'exactly') {
-      const i = k - j;
-      correct = nCr(g1, i) * nCr(g2, j);
-      stem =
-        kind === 'mix'
-          ? `${intro} How many different committees are possible if the committee must consist of ${i} ${i === 1 ? s1 : p1} and ${j} ${j === 1 ? s2 : p2}?`
-          : `${intro} How many different committees include exactly ${j} ${j === 1 ? s2 : p2}?`;
-      traps.push({ value: nCr(g1, i) + nCr(g2, j), trap: 'prob-add-not-multiply' }, { value: all, trap: 'prob-ignored-restriction' });
-      if (nPr(g1, i) * nPr(g2, j) <= 20 * correct) traps.push({ value: nPr(g1, i) * nPr(g2, j), trap: 'prob-order-matters' });
-      fillers.push(nCr(g1, i) * nCr(g2, j + 1 > g2 ? j : j + 1), nCr(n, j), correct * 2);
-      explanation = `Choose the ${p1} and the ${p2} separately and multiply: $${bin(g1, i)} \\times ${bin(g2, j)} = ${nCr(g1, i)} \\times ${nCr(g2, j)} = ${num(correct)}$.
-
-Adding the two counts ($${nCr(g1, i) + nCr(g2, j)}$) is wrong: every choice of ${p1} can be paired with every choice of ${p2}.`;
-    } else if (kind === 'at-least-one') {
-      correct = all - nCr(g1, k);
-      stem = `${intro} How many different committees include at least one of the ${p2}?`;
-      traps.push(
-        { value: g2 * nCr(n - 1, k - 1), trap: 'prob-at-least-one-overcount' },
-        { value: g2 * nCr(g1, k - 1), trap: 'prob-exactly-vs-at-least' },
-        { value: all, trap: 'prob-ignored-restriction' },
+    const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
+    for (;;) {
+      const kind: CommKind = rng.pick(d === 1 ? (['mix', 'mix', 'exactly'] as const) : d === 2 ? (['at-least-one', 'exactly', 'mix'] as const) : (['not-both', 'each-group', 'at-least-one'] as const));
+      const [p1, p2, s1, s2] = rng.pick(GROUPS);
+      const g1 = rng.int(4, d === 1 ? 6 : 7);
+      const g2 = rng.int(3, d === 1 ? 5 : 6);
+      const n = g1 + g2;
+      const k = kind === 'mix' ? rng.int(3, 4) : rng.int(3, Math.min(5, n - 3));
+      let j = kind === 'mix' || kind === 'exactly' ? rng.int(1, Math.min(g2, k - 1)) : 0;
+      if (kind === 'mix') j = Math.min(j, g2, k - 1);
+      const intro = `A committee of ${k} is to be chosen from a group of ${g1} ${p1} and ${g2} ${p2}.`;
+      let stem = '';
+      let correct = 0;
+      let traps: ReturnType<typeof mk>[] = [];
+      let explanation = '';
+      let check = '';
+      const all = nCr(n, k);
+      if (kind === 'mix' || kind === 'exactly') {
+        const i = k - j;
+        correct = nCr(g1, i) * nCr(g2, j);
+        stem =
+          kind === 'mix'
+            ? `${intro} How many different committees are possible if the committee must consist of ${i} ${i === 1 ? s1 : p1} and ${j} ${j === 1 ? s2 : p2}?`
+            : `${intro} How many different committees include exactly ${j} ${j === 1 ? s2 : p2}?`;
+        let atLeast = 0;
+        for (let t = j; t <= Math.min(g2, k); t++) atLeast += nCr(g1, k - t) * nCr(g2, t);
+        traps = [
+          mk(nCr(g1, i) + nCr(g2, j), 'prob-add-not-multiply', (v) => `adding the two counts gives $${v}$, but every choice of ${p1} can be paired with every choice of ${p2}`),
+          mk(all, 'prob-ignored-restriction', (v) => `ignoring the condition gives $${v}$, which counts all the committees of ${k}`),
+          mk(nPr(g1, i) * nPr(g2, j), 'prob-order-matters', (v) => `counting ordered selections gives $${v}$, but a committee has no order`),
+          mk(nCr(g1, j) * nCr(g2, i), 'prob-swapped-groups', (v) => `swapping the numbers of ${p1} and ${p2} gives $${v}$`),
+          mk(atLeast, 'prob-exactly-vs-at-least', (v) => `counting committees with at least ${j} ${j === 1 ? s2 : p2} gives $${v}$, which includes those with more`),
+          mk(nCr(n, j), 'prob-ignored-restriction', (v) => `choosing only the ${j} ${j === 1 ? s2 : p2} from everyone gives $${v}$ and leaves out the rest of the committee`),
+        ];
+        explanation = `Choose the ${p1} and the ${p2} separately and multiply: $${bin(g1, i)} \\times ${bin(g2, j)} = ${nCr(g1, i)} \\times ${nCr(g2, j)} = ${num(correct)}$.`;
+        check = `${i} + ${j} = ${k} members, as required; and ${num(correct)} is one part of the ${num(all)} possible committees.`;
+      } else if (kind === 'at-least-one') {
+        correct = all - nCr(g1, k);
+        stem = `${intro} How many different committees include at least one of the ${p2}?`;
+        traps = [
+          mk(g2 * nCr(n - 1, k - 1), 'prob-at-least-one-overcount', (v) => `picking one ${s2} first and then any ${others(k - 1)} gives $${v}$, which counts committees with two or more ${p2} several times`),
+          mk(g2 * nCr(g1, k - 1), 'prob-exactly-vs-at-least', (v) => `counting committees with exactly one ${s2} gives $${v}$ and leaves out those with more`),
+          mk(all, 'prob-ignored-restriction', (v) => `ignoring the condition gives $${v}$, which includes committees with no ${s2}`),
+          mk(nCr(g1, k), 'prob-answered-complement', (v) => `$${v}$ counts the committees with no ${s2}`),
+          mk(all - nCr(g2, k), 'prob-wrong-set', (v) => `subtracting the committees made only of ${p2} gives $${v}$ instead of those made only of ${p1}`),
+        ];
+        explanation = `Use the complement: all committees minus the committees with no ${s2} (all ${p1}): $${bin(n, k)} - ${bin(g1, k)} = ${num(all)} - ${num(nCr(g1, k))} = ${num(correct)}$.`;
+        check = `the committees with at least one ${s2} and those with none add up to ${num(all)}: $${num(correct)} + ${num(nCr(g1, k))}$.`;
+      } else if (kind === 'not-both') {
+        const [x, y] = rng.sample(NAMES, 2);
+        const both = nCr(n - 2, k - 2);
+        correct = all - both;
+        stem = `${intro} Two of the ${n} people, ${x} and ${y}, refuse to serve on the committee together. How many different committees are possible?`;
+        traps = [
+          mk(nCr(n - 2, k), 'prob-excluded-both', (v) => `leaving both of them out gives $${v}$, but each may serve without the other`),
+          mk(all, 'prob-ignored-restriction', (v) => `ignoring the condition gives $${v}$, which includes committees with both of them`),
+          mk(both, 'prob-answered-complement', (v) => `$${v}$ counts the committees that contain both of them`),
+          mk(all - 2 * both, 'prob-overlap-subtract', (v) => `subtracting the committees with both of them twice gives $${v}$`),
+          mk(nCr(n - 1, k), 'prob-excluded-one', (v) => `leaving one of them out gives $${v}$, but the other may serve, with or without the first`),
+        ];
+        explanation = `Count the committees that contain both ${x} and ${y}: the other ${plural(k - 2, 'member')} come${k - 2 === 1 ? 's' : ''} from the remaining ${n - 2} people, $${bin(n - 2, k - 2)} = ${num(both)}$. Subtract from the total: $${bin(n, k)} - ${num(both)} = ${num(all)} - ${num(both)} = ${num(correct)}$.`;
+        check = `committees with neither, only ${x} or only ${y}: $${num(nCr(n - 2, k))} + 2 \\times ${num(nCr(n - 2, k - 1))} = ${num(correct)}$.`;
+      } else {
+        correct = all - nCr(g1, k) - nCr(g2, k);
+        stem = `${intro} How many different committees include at least one ${s1} and at least one ${s2}?`;
+        traps = [
+          mk(g1 * g2 * nCr(n - 2, k - 2), 'prob-at-least-one-overcount', (v) => `picking one ${s1} and one ${s2} first and then any ${others(k - 2)} gives $${v}$, which counts many committees several times`),
+          mk(all - nCr(g1, k), 'prob-missed-case', (v) => `removing only the all-${p1} committees gives $${v}$ and keeps the all-${p2} ones`),
+          mk(all - nCr(g2, k), 'prob-missed-case', (v) => `removing only the all-${p2} committees gives $${v}$ and keeps the all-${p1} ones`),
+          mk(all, 'prob-ignored-restriction', (v) => `ignoring the condition gives $${v}$, which includes committees of one kind only`),
+          mk(nCr(g1, k) + nCr(g2, k), 'prob-answered-complement', (v) => `$${v}$ counts the committees made of one kind only`),
+        ];
+        explanation = `Subtract the committees made of one kind only: $${bin(n, k)} - ${bin(g1, k)} - ${bin(g2, k)} = ${num(all)} - ${num(nCr(g1, k))} - ${num(nCr(g2, k))} = ${num(correct)}$.`;
+        check = `the mixed committees and the one-kind committees add up to ${num(all)}: $${num(correct)} + ${num(nCr(g1, k) + nCr(g2, k))}$.`;
+      }
+      // the same count for a committee one member bigger or smaller
+      const forSize = (kk: number): number => {
+        if (kind === 'mix' || kind === 'exactly') return kk - j >= 0 ? nCr(g1, kk - j) * nCr(g2, j) : 0;
+        if (kind === 'at-least-one') return nCr(n, kk) - nCr(g1, kk);
+        if (kind === 'not-both') return nCr(n, kk) - (kk >= 2 ? nCr(n - 2, kk - 2) : 0);
+        return nCr(n, kk) - nCr(g1, kk) - nCr(g2, kk);
+      };
+      for (const kk of [k + 1, k - 1])
+        if (kk >= 2) traps.push(mk(forSize(kk), 'prob-wrong-size', (v) => `a committee of ${kk} gives $${v}$, but the committee has ${k} members`));
+      const built = trapOnlyChoices(
+        rng,
+        correct,
+        rng.shuffle(traps.filter((t) => t.value > 0 && Number.isInteger(t.value))),
+        (v) => `$${num(v.n)}$`,
       );
-      fillers.push(nCr(g2, k) > 0 ? all - nCr(g2, k) : all - 1, correct - 1);
-      explanation = `Use the complement: all committees minus the committees with no ${s2} (all ${p1}): $${bin(n, k)} - ${bin(g1, k)} = ${num(all)} - ${num(nCr(g1, k))} = ${num(correct)}$.
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      return {
+        params: { kind, g1, g2, k, j },
+        q: {
+          format: 'mcs',
+          stem,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `${explanation}
 
-Picking "one ${s2}" first and then any ${k - 1} others ($${g2} \\times ${bin(n - 1, k - 1)}$) counts committees with two or more ${p2} several times.`;
-    } else if (kind === 'not-both') {
-      const [x, y] = rng.sample(NAMES, 2);
-      correct = all - nCr(n - 2, k - 2);
-      stem = `${intro} Two of the ${n} people, ${x} and ${y}, refuse to serve on the committee together. How many different committees are possible?`;
-      traps.push({ value: nCr(n - 2, k), trap: 'prob-excluded-both' }, { value: all, trap: 'prob-ignored-restriction' }, { value: nCr(n - 2, k - 2), trap: 'prob-answered-complement' });
-      fillers.push(nCr(n - 1, k), all - 2 * nCr(n - 2, k - 2));
-      explanation = `Count the committees that contain both ${x} and ${y}: the other ${k - 2} members come from the remaining ${n - 2} people, $${bin(n - 2, k - 2)} = ${num(nCr(n - 2, k - 2))}$. Subtract from the total: $${bin(n, k)} - ${num(nCr(n - 2, k - 2))} = ${num(all)} - ${num(nCr(n - 2, k - 2))} = ${num(correct)}$.
+Check: ${check}
 
-$${bin(n - 2, k)}$ leaves both of them out, but each of them may serve without the other.`;
-    } else {
-      correct = all - nCr(g1, k) - nCr(g2, k);
-      stem = `${intro} How many different committees include at least one ${s1} and at least one ${s2}?`;
-      traps.push({ value: g1 * g2 * nCr(n - 2, k - 2), trap: 'prob-at-least-one-overcount' }, { value: all - nCr(g1, k), trap: 'prob-missed-case' }, { value: all, trap: 'prob-ignored-restriction' });
-      fillers.push(correct - 1, correct + nCr(g1, k));
-      explanation = `Subtract the committees made of one kind only: $${bin(n, k)} - ${bin(g1, k)} - ${bin(g2, k)} = ${num(all)} - ${num(nCr(g1, k))} - ${num(nCr(g2, k))} = ${num(correct)}$.
+Trap: ${cite.why(num(cite.value))}.
 
-Removing only the all-${s1} committees leaves the all-${s2} ones in the count.`;
+A condition on a committee is easiest as a product of separate choices, or as everything minus the cases that break it.`,
+        },
+      };
     }
-    const { choices, answer } = numericChoices(rng, {
-      correct,
-      traps: traps.filter((t) => t.value !== correct && t.value > 0),
-      fillers: fillers.filter((v) => v > 0 && v !== correct),
-      format: (v) => `$${num(v)}$`,
-    });
-    return { params: { kind, g1, g2, k, j }, q: { format: 'mcs', stem, choices, answer, explanation } };
   },
   check(q, { kind, g1, g2, k, j }) {
     const n = g1 + g2;
@@ -691,7 +858,7 @@ Removing only the all-${s1} committees leaves the all-${s2} ones in the count.`;
 
 /* ================================================================== 5. Handshakes, games, pairs (NE) */
 
-type PairKind = 'once' | 'twice' | 'reverse' | 'triangles' | 'two-groups';
+type PairKind = 'once' | 'twice' | 'reverse' | 'triangles' | 'two-groups' | 'diagonals';
 interface PairParams {
   kind: PairKind;
   n: number;
@@ -706,10 +873,25 @@ const pairs: Template<PairParams> = {
   format: 'ne',
   style: 'handshakes, round-robin games and pairs (also solved backward)',
   generate(rng, d) {
-    const kind: PairKind = rng.pick(d === 1 ? (['once', 'once', 'twice'] as const) : d === 2 ? (['twice', 'reverse', 'once'] as const) : (['reverse', 'triangles', 'two-groups'] as const));
-    const n = kind === 'reverse' ? rng.int(8, d === 3 ? 25 : 16) : kind === 'triangles' ? rng.int(6, 10) : rng.int(d === 1 ? 5 : 7, d === 1 ? 12 : 15);
+    const kind: PairKind = rng.pick(
+      d === 1 ? (['once', 'once', 'twice'] as const) : d === 2 ? (['twice', 'reverse', 'once'] as const) : (['reverse', 'triangles', 'two-groups', 'diagonals'] as const),
+    );
+    const n =
+      kind === 'reverse'
+        ? d === 2
+          ? rng.int(8, 16)
+          : rng.int(12, 30)
+        : kind === 'triangles'
+          ? rng.int(6, 14)
+          : kind === 'two-groups'
+            ? rng.int(4, 12)
+            : kind === 'diagonals'
+              ? rng.int(6, 20)
+              : d === 1
+                ? rng.int(4, 10)
+                : rng.int(11, kind === 'twice' ? 16 : 19);
     const t = kind === 'twice' ? rng.int(2, 3) : 1;
-    const b = kind === 'two-groups' ? rng.int(4, 9) : 0;
+    const b = kind === 'two-groups' ? rng.int(4, 12) : 0;
     let stem = '';
     let answer = 0;
     let total = 0;
@@ -723,7 +905,15 @@ const pairs: Template<PairParams> = {
       const ctx = rng.pick([
         `In a chess tournament, each of the ${n} players played each of the other players ${times}. How many games were played in all?`,
         `In a soccer league of ${n} teams, each team played each of the other teams ${times} during the season. How many games were played in all?`,
-        ...(t === 1 ? [`At a conference, each of the ${n} participants shook hands exactly once with each of the other participants. How many handshakes took place?`] : []),
+        `In a debate league of ${n} teams, each team debated each of the other teams ${times}. How many debates took place in all?`,
+        `Each of the ${n} members of a tennis club played each of the other members ${times}. How many matches were played in all?`,
+        `At a board-game night, each of the ${n} guests played one game against each of the other guests ${t === 1 ? 'exactly once' : times}. How many games were played in all?`,
+        ...(t === 1
+          ? [
+              `At a conference, each of the ${n} participants shook hands exactly once with each of the other participants. How many handshakes took place?`,
+              `At a reunion, each of the ${n} guests greeted each of the other guests with exactly one hug. How many hugs were exchanged in all?`,
+            ]
+          : []),
       ]);
       stem = ctx;
       traps.push({ value: frac(t * n * (n - 1)), trap: 'prob-handshake-double' });
@@ -739,14 +929,22 @@ $${n} \\times ${n - 1}$ counts every pair twice, once from each side.`;
       const ctx = rng.pick([
         { s: `At a party, each guest shook hands exactly once with each of the other guests. If there were ${plainNum(total)} handshakes in all, how many guests were at the party?`, suffix: 'guests' },
         { s: `In a tennis tournament, each player played exactly one match against each of the other players. If ${plainNum(total)} matches were played in all, how many players were in the tournament?`, suffix: 'players' },
+        { s: `In a chess club, every member played exactly one game against every other member. If ${plainNum(total)} games were played in all, how many members does the club have?`, suffix: 'members' },
+        { s: `At a reunion, each person greeted every other person exactly once with a handshake. If there were ${plainNum(total)} handshakes in all, how many people were at the reunion?`, suffix: 'people' },
       ]);
       stem = ctx.s;
       suffix = ctx.suffix;
-      const wrong = Math.round(Math.sqrt(total));
-      if (wrong !== n && wrong * (wrong - 1) !== total * 2) traps.push({ value: frac(wrong), trap: 'prob-handshake-double' });
+      traps.push({ value: frac(Math.round(Math.sqrt(total))), trap: 'prob-handshake-double' });
       explanation = `With $n$ people there are $\\frac{n(n-1)}{2}$ handshakes, so $n(n-1) = 2 \\times ${num(total)} = ${num(2 * total)}$. Two consecutive integers with product ${num(2 * total)}: $${n} \\times ${n - 1}$. So $n = ${n}$.
 
 Forgetting to double (solving $n(n-1) = ${num(total)}$ or taking $\\sqrt{${num(total)}}$) misses the fact that each handshake involves two people.`;
+    } else if (kind === 'diagonals') {
+      answer = (n * (n - 3)) / 2;
+      stem = `A convex polygon has ${n} sides. A diagonal is a segment that joins two vertices that are not next to each other. How many diagonals does the polygon have?`;
+      traps.push({ value: frac(pairsN), trap: 'prob-ignored-restriction' }, { value: frac(n * (n - 3)), trap: 'prob-handshake-double' }, { value: frac(pairsN - n - 1), trap: 'prob-missed-case' });
+      explanation = `Every pair of vertices is joined by a segment, $${bin(n, 2)} = ${num(pairsN)}$ of them, but ${n} of these segments are sides of the polygon, not diagonals: $${num(pairsN)} - ${n} = ${num(answer)}$.
+
+Equivalently each vertex has $${n} - 3$ diagonals and every diagonal is counted from both ends: $\\frac{${n}(${n - 3})}{2}$. Taking all $${num(pairsN)}$ segments counts the sides too.`;
     } else if (kind === 'triangles') {
       answer = nCr(n, 3);
       stem = `${word(n).replace(/^./, (c) => c.toUpperCase())} different points lie on a circle. How many different triangles have all three of their vertices among these ${n} points?`;
@@ -762,9 +960,11 @@ $${n} \\times ${n - 1} \\times ${n - 2} = ${num(nPr(n, 3))}$ counts each triangl
 
 Counting the members' handshakes as $${n} \\times ${n - 1}$ counts each of them twice.`;
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((x) => x.value.eq(answer))) return pairs.generate(rng, d);
     return {
       params: { kind, n, t, b, total },
-      q: { format: 'ne', stem, answer: frac(answer), ...(suffix ? { suffix } : {}), traps: traps.filter((x) => !x.value.eq(answer)), explanation },
+      q: { format: 'ne', stem, answer: frac(answer), ...(suffix ? { suffix } : {}), traps, explanation },
     };
   },
   check(q, { kind, n, t, b, total }) {
@@ -785,6 +985,11 @@ Counting the members' handshakes as $${n} \\times ${n - 1}$ counts each of them 
       let c = 0;
       forEachCombination(n, 3, () => c++);
       expected = c;
+    } else if (kind === 'diagonals') {
+      // vertices 0..n-1 around the polygon; count the pairs that are not neighbours
+      let c = 0;
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (j - i !== 1 && !(i === 0 && j === n - 1)) c++;
+      expected = c;
     } else {
       // People 0..n-1 are committee members, n..n+b-1 guests. Count pairs that shake hands.
       let c = 0;
@@ -799,7 +1004,7 @@ Counting the members' handshakes as $${n} \\times ${n - 1}$ counts each of them 
 
 type DigitCond = 'different' | 'both-odd' | 'both-even' | 'sum' | 'units-greater' | 'palindrome';
 interface OutcomeParams {
-  kind: 'digits' | 'products' | 'sums';
+  kind: 'digits' | 'products' | 'sums' | 'sum-range';
   cond: DigitCond;
   s: number;
   S: number[];
@@ -847,7 +1052,7 @@ const outcomesQC: Template<OutcomeParams> = {
   format: 'qc',
   style: 'count integers with a digit condition, or distinct products of two sets, against a number',
   generate(rng, d) {
-    const kind = rng.pick(d === 1 ? (['digits', 'digits', 'products'] as const) : (['digits', 'products', 'sums'] as const));
+    const kind = rng.pick(d === 1 ? (['digits', 'digits', 'products'] as const) : (['digits', 'products', 'sums', 'sum-range', 'sum-range'] as const));
     const p: OutcomeParams = { kind, cond: 'different', s: 0, S: [], T: [], k: 0 };
     let info: string | undefined;
     let qa = '';
@@ -867,6 +1072,42 @@ const outcomesQC: Template<OutcomeParams> = {
       else if (roll < 0.8) p.k = count - rng.int(1, 2);
       else p.k = count + rng.int(1, 2);
       if (r.trap !== undefined) traps = { [qcCompare(r.trap, p.k)]: r.trapId! };
+    } else if (kind === 'sum-range') {
+      // the count depends on an unknown digit sum s, so the comparison can depend on s
+      p.cond = 'sum';
+      const count = (sum: number) => (sum <= 9 ? sum : 19 - sum);
+      const lo = rng.int(2, 12);
+      const hi = lo + rng.int(2, 6);
+      p.T = [lo, hi];
+      const counts = Array.from({ length: hi - lo + 1 }, (_, i) => count(lo + i));
+      p.k = rng.chance(0.6) ? rng.int(Math.min(...counts), Math.max(...counts)) : rng.chance(0.5) ? Math.min(...counts) - rng.int(1, 2) : Math.max(...counts) + rng.int(1, 2);
+      if (p.k < 1) p.k = 1;
+      info = `$s$ is an integer with $${lo} \\le s \\le ${hi}$.`;
+      qa = DIGIT_TEXT.sum(0).replace('a sum of 0', 'a sum of $s$');
+      const rels = new Set(counts.map((c) => qcCompare(c, p.k)));
+      const ansRange: QCChoice = rels.size > 1 ? 'D' : [...rels][0];
+      why = `The number of two-digit integers with digit sum $s$ is $s$ when $s \\le 9$ and $19 - s$ when $s \\ge 10$. For $s = ${lo}, \\ldots, ${hi}$ the counts are $${counts.join(',\\ ')}$, compared with $${p.k}$.`;
+      if (ansRange !== 'D') traps = { D: 'prob-unknown-means-d' };
+      return {
+        params: p,
+        q: {
+          format: 'qc',
+          info,
+          quantityA: qa,
+          quantityB: `$${num(p.k)}$`,
+          answer: ansRange,
+          ...(traps ? { traps } : {}),
+          explanation: `${why} ${
+            ansRange === 'D'
+              ? `The count is ${[...rels]
+                  .sort()
+                  .map((r) => (r === 'A' ? `greater than $${p.k}$` : r === 'B' ? `less than $${p.k}$` : `equal to $${p.k}$`))
+                  .map((t, i, all) => (i === 0 ? `${t} for some values of $s$` : i === all.length - 1 ? `${all.length > 2 ? ', and ' : ' and '}${t} for ${all.length > 2 ? 'others still' : 'others'}` : `, ${t} for others`))
+                  .join('')}, so the relationship cannot be determined. (D)`
+              : `Every count is ${ansRange === 'A' ? 'greater' : 'less'} than $${p.k}$, so ${rel(ansRange)}. (${ansRange})`
+          }`,
+        },
+      };
     } else {
       const m = rng.int(2, d === 1 ? 3 : 4);
       const n = rng.int(3, 4);
@@ -913,6 +1154,17 @@ Compare $${num(count)}$ with $${num(p.k)}$: ${rel(answer)}. (${answer})`,
   },
   check(q, p) {
     let count = 0;
+    if (p.kind === 'sum-range') {
+      // for every s in the range, count the two-digit integers with that digit sum
+      const samples: [number, number][] = [];
+      for (let sum = p.T[0]; sum <= p.T[1]; sum++) {
+        let c = 0;
+        for (let v = 10; v <= 99; v++) if (Math.floor(v / 10) + (v % 10) === sum) c++;
+        samples.push([c, p.k]);
+      }
+      const expectedRange = qcFromSamples(samples);
+      return q.format === 'qc' && q.answer === expectedRange ? null : `expected ${expectedRange}`;
+    }
     if (p.kind === 'digits') {
       const [lo, hi] = p.cond === 'palindrome' ? [100, 999] : [10, 99];
       for (let v = lo; v <= hi; v++) {
