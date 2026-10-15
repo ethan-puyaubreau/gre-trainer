@@ -177,6 +177,7 @@ describe('alg.inequalities.abs-qc', () => {
     const bad: string[] = [];
     let linear = 0;
     let restricted = 0;
+    let dAnswers = 0;
     for (const { seed, d, q, params } of bodies('alg.inequalities.abs-qc')) {
       const { kind, k, cond } = params as { kind: string; k: number[]; cond: string };
       if (q.format !== 'qc' || kind !== 'abs-vs-linear' || k[2] === 2) continue; // 'same' form: no values tried
@@ -196,10 +197,13 @@ describe('alg.inequalities.abs-qc', () => {
       }
       const rel = new Set(shown.map((s) => (s.a > s.b ? 'A' : s.a < s.b ? 'B' : 'C')));
       if (rel.size > 1 && q.answer !== 'D') bad.push(`${where}: the cases disagree but the answer is ${q.answer}`);
+      if (q.answer === 'D' && rel.size < 2) bad.push(`${where}: the answer is D but the cases shown do not disagree (${[...rel]})`);
+      if (q.answer === 'D') dAnswers++;
       if (rel.size === 1 && q.answer !== 'D' && !rel.has(q.answer)) bad.push(`${where}: the case shown gives ${[...rel]} but the answer is ${q.answer}`);
     }
     expect(linear).toBeGreaterThan(100);
     expect(restricted).toBeGreaterThan(50);
+    expect(dAnswers).toBeGreaterThan(10);
     expect(bad).toEqual([]);
   });
 });
