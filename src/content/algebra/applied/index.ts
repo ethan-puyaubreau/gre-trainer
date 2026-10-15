@@ -10,8 +10,9 @@ import { appliedTrapMap } from './traps';
 import { telescopeTemplates, telescopeTraps } from './telescope';
 import { interceptTemplates, interceptTraps } from './intercepts';
 import { interceptRangeTemplates, interceptRangeTraps } from './interceptRange';
+import { parabolaShiftTemplates, parabolaShiftTraps } from './parabolaShift';
 import { triangleAreaTemplates, triangleAreaTraps } from './triangleArea';
 
 export const appliedSkills: Skill[] = appliedSkillList;
-export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates, ...mixtureTemplates, ...telescopeTemplates, ...interceptTemplates, ...interceptRangeTemplates, ...triangleAreaTemplates];
-export const appliedTraps: Record<string, Trap> = { ...appliedTrapMap, ...telescopeTraps, ...interceptTraps, ...interceptRangeTraps, ...triangleAreaTraps };
+export const appliedTemplates: Template<any>[] = [...coordinateTemplates, ...graphTemplates, ...sequenceTemplates, ...wordProblemTemplates, ...rateWorkTemplates, ...mixtureTemplates, ...telescopeTemplates, ...interceptTemplates, ...interceptRangeTemplates, ...parabolaShiftTemplates, ...triangleAreaTemplates];
+export const appliedTraps: Record<string, Trap> = { ...appliedTrapMap, ...telescopeTraps, ...interceptTraps, ...interceptRangeTraps, ...parabolaShiftTraps, ...triangleAreaTraps };
