@@ -89,6 +89,7 @@ const overlapMcs: Template<Params> = {
       const tot = k * a + k * b - o * c;
       const outsideSum = k * a + k * b - 2 * o * c;
       const outN = n - o;
+      if (k * a - o * c <= 0 || k * b - o * c <= 0) continue; // every non-shared part must stay positive
       if (ask === 'outside' && outsideSum <= 0) continue;
       const right = ask === 'all' ? new Frac(tot, n) : new Frac(outsideSum, outN);
       if (!right.isTerminating() || right.lt(10)) continue;
@@ -142,7 +143,7 @@ const overlapMcs: Template<Params> = {
       const used = rng.pick(ch.choices.filter((c) => c.trap)).trap!;
       const steps =
         ask === 'all'
-          ? `The first ${k} days total $${k} \\times ${a} = ${k * a}$ and the last ${k} days total $${k} \\times ${b} = ${k * b}$. The shared ${days} ${o === 1 ? 'is' : 'are'} in both totals and add up to $${o} \\times ${c} = ${sharedTot}$, so take that away once: $${k * a} + ${k * b} - ${sharedTot} = ${tot}$ for ${n} days. The average is $${tot} \\div ${n} = ${fTex(right)}$.`
+          ? `The first ${k} days total $${k} \\times ${a} = ${k * a}$ and the last ${k} days total $${k} \\times ${b} = ${k * b}$. The shared ${days} ${o === 1 ? 'is' : 'are'} in both totals and ${o === 1 ? 'is' : 'are'} worth $${o} \\times ${c} = ${sharedTot}$, so take that away once: $${k * a} + ${k * b} - ${sharedTot} = ${tot}$ for ${n} days. The average is $${tot} \\div ${n} = ${fTex(right)}$.`
           : `The first ${k} days total $${k * a}$ and the last ${k} days total $${k * b}$. The shared ${days} (total $${sharedTot}$) ${o === 1 ? 'is' : 'are'} in both, so the sum over all ${n} days is $${k * a} + ${k * b} - ${sharedTot} = ${tot}$. Remove the shared ${days} once more: $${tot} - ${sharedTot} = ${outsideSum}$ over $${outN}$ days, an average of $${fTex(right)}$.`;
       return {
         params: { n, k, o, a, b, c, ask },
