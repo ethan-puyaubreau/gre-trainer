@@ -289,37 +289,44 @@ function Exam({
 
   return (
     <div>
+      {/* One flat row on a wide screen; on a phone the bar sticks to the top in two rows (display: contents, see styles.css). */}
       <div className="exam-bar">
-        <strong>
-          Section {sec.index + 1} of {total}
-        </strong>
-        <span>{review ? 'Review' : `Question ${idx + 1} of ${sec.questions.length}`}</span>
-        <span className="spacer" />
-        <span className={`exam-clock ${low ? 'low' : ''}`}>{hideClock ? '' : formatClock(remaining)}</span>
-        <button className="btn" onClick={() => setHideClock((v) => !v)}>
-          {hideClock ? 'Show time' : 'Hide time'}
-        </button>
-        <button className={`btn ${calc ? 'on' : ''}`} onClick={() => setCalc((v) => !v)}>
-          Calculator
-        </button>
-        {!review && (
-          <button className={`btn ${sec.marked[idx] ? 'on' : ''}`} onClick={toggleMark}>
-            {sec.marked[idx] ? 'Marked' : 'Mark'}
+        <div className="exam-head">
+          <div className="exam-info">
+            <strong>
+              Section {sec.index + 1} of {total}
+            </strong>
+            <span>{review ? 'Review' : `Question ${idx + 1} of ${sec.questions.length}`}</span>
+          </div>
+          <span className="spacer" />
+          <span className={`exam-clock ${low ? 'low' : ''}`}>{hideClock ? '' : formatClock(remaining)}</span>
+          <button className="btn" onClick={() => setHideClock((v) => !v)}>
+            {hideClock ? 'Show time' : 'Hide time'}
           </button>
-        )}
-        <button className={`btn ${review ? 'on' : ''}`} onClick={() => (review ? goTo(idx) : openReview())}>
-          Review
-        </button>
-        {!review && (
-          <>
-            <button className="btn" onClick={() => goTo(idx - 1)} disabled={idx === 0}>
-              Back
+        </div>
+        <div className="exam-actions">
+          <button className={`btn ${calc ? 'on' : ''}`} onClick={() => setCalc((v) => !v)}>
+            Calculator
+          </button>
+          {!review && (
+            <button className={`btn ${sec.marked[idx] ? 'on' : ''}`} onClick={toggleMark}>
+              {sec.marked[idx] ? 'Marked' : 'Mark'}
             </button>
-            <button className="btn" onClick={() => (idx === sec.questions.length - 1 ? openReview() : goTo(idx + 1))}>
-              Next
-            </button>
-          </>
-        )}
+          )}
+          <button className={`btn ${review ? 'on' : ''}`} onClick={() => (review ? goTo(idx) : openReview())}>
+            Review
+          </button>
+          {!review && (
+            <>
+              <button className="btn" onClick={() => goTo(idx - 1)} disabled={idx === 0}>
+                Back
+              </button>
+              <button className="btn" onClick={() => (idx === sec.questions.length - 1 ? openReview() : goTo(idx + 1))}>
+                Next
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="exam-body">
         {review ? (

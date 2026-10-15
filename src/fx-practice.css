@@ -372,3 +372,94 @@
 .practice-fx .recap-detail h4 {
   margin: 14px 0 4px;
 }
+
+/* ---------------------------------------------------------------- small screens */
+/* The title row's two groups flow as one row on a wide screen. */
+.practice-fx .practice-title,
+.practice-fx .practice-tools {
+  display: contents;
+}
+
+/* Same breakpoint as useSmallScreen() in Practice.tsx. */
+@media (max-width: 640px) {
+  .practice-fx .practice-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .practice-fx .practice-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .practice-fx .practice-title h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 20px;
+  }
+  .practice-fx .practice-title .spacer {
+    display: none;
+  }
+  .practice-fx .practice-tools {
+    display: flex;
+    gap: 8px;
+  }
+  .practice-fx .practice-tools .btn {
+    flex: 1;
+    padding: 6px 12px;
+  }
+  .practice-fx .practice-tools .btn-ghost {
+    border-color: var(--border);
+  }
+
+  /* Chips ellipsize inside the card instead of pushing past its edge; the timer takes its own line. */
+  .practice-fx .question-meta {
+    gap: 6px 8px;
+    margin-bottom: 12px;
+  }
+  .practice-fx .question-meta .chip {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .practice-fx .chip-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .practice-fx .question-meta .pace {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* Hint and Check (Next after the result) are a bar pinned to the bottom of the screen, flush with the card's edges. */
+  .practice-fx .action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    gap: 8px 10px;
+    margin: 14px -16px -16px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .practice-fx .action-bar .spacer,
+  .practice-fx .enter-hint {
+    display: none;
+  }
+  .practice-fx .action-bar .btn-big {
+    flex: 1 1 0;
+  }
+  /* The cost of the last hint step reads above the buttons, not squeezed beside them. */
+  .practice-fx .action-bar .hint-cost {
+    flex: 1 1 100%;
+    order: -1;
+  }
+  /* Whatever scrolls into view (a new hint, the result) clears the bar. */
+  .practice-fx .strategy-box,
+  .practice-fx .feedback {
+    scroll-margin-bottom: 100px;
+  }
+}

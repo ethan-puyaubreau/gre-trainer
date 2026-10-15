@@ -687,6 +687,12 @@ h3 {
   background: var(--surface);
   color: var(--accent);
 }
+/* The bar's groups only matter on a phone (small-screens block below); elsewhere they dissolve into the one flat row. */
+.exam-head,
+.exam-info,
+.exam-actions {
+  display: contents;
+}
 .exam-body {
   border: 1px solid var(--border);
   border-top: none;
@@ -954,6 +960,40 @@ details summary {
     flex: none;
     white-space: nowrap;
     padding: 9px 10px;
+  }
+
+  /* Section test: the exam bar stays at the top while a tall item scrolls. Row 1 is where you are and the clock, row 2 the tools and Back / Next. */
+  .exam-bar {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  .exam-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .exam-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .exam-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .exam-bar .btn {
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .exam-actions .btn {
+    flex: 1 1 auto;
   }
 }
 

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Calculator } from '../components/Calculator';
 import { LessonView } from '../components/LessonView';
 import { LevelChange } from '../components/LevelChange';
@@ -55,6 +55,19 @@ function scopeTitle(scope: PracticeScope): string {
 
 const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
+/** Same breakpoint as the small-screen rules in styles.css and fx-practice.css. */
+const SMALL = '(max-width: 640px)';
+function useSmallScreen(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const m = window.matchMedia(SMALL);
+      m.addEventListener('change', onChange);
+      return () => m.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(SMALL).matches,
+  );
+}
+
 const REASON: Record<Pick['reason'], [string, string]> = {
   repair: ['Comeback after a miss', 'chip-warn'],
   review: ['Spaced review', 'chip-accent'],
@@ -107,6 +120,13 @@ export function Practice({ route }: { route: string[] }) {
     !!lessonSkill && lessonDue(lessonSkill, { enabled: store.settings.lessons, level: store.skills[lessonSkill]?.level ?? 0, seen: store.lessonsSeen });
 
   const elapsed = useStopwatch(!!current && !result && !recap && !gated, current?.question.id);
+
+  // On a phone the Hint and Check buttons are a bar pinned to the bottom; a new hint opens above it, so bring it into view.
+  const small = useSmallScreen();
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (small && hintLevel > 0) panel.current?.scrollIntoView({ block: 'nearest' });
+  }, [small, hintLevel]);
 
   const next = useCallback(() => {
     // A replay ends on the recap once its queue is served.
@@ -331,22 +351,62 @@ export function Practice({ route }: { route: string[] }) {
   const last = lastHint(skill.id);
   // One panel: the hint steps before the answer, the free full card after the result.
   const panelText = result ? (cardOpen ? skill.strategy : '') : hintText(skill.strategy, hintLevel, LESSONS[skill.id]?.example);
+  // Hint and Check, then the big Next button once there is a result (it sits in the feedback title on a wide screen).
+  // On a phone this is a bar pinned to the bottom of the screen at the end of the card, after the hint panel, so a new hint opens above it.
+  const actions = result ? (
+    small && (
+      <div key="next" className="row action-bar">
+        <button autoFocus className="btn btn-primary btn-big" onClick={next}>
+          Next question →
+        </button>
+      </div>
+    )
+  ) : (
+    <div key="check" className={small ? 'row action-bar' : 'row'} style={small ? undefined : { marginTop: 18 }}>
+      <button
+        className="btn btn-ghost"
+        onClick={stepHint}
+        disabled={hintLevel === FULL_CARD}
+        aria-describedby={hintLevel === FULL_CARD - 1 ? 'hint-cost' : undefined}
+        title={`Three steps: the first line, the bullets, then ${last === 'Full card' ? 'the full card' : 'a worked example with the full card'}. Only the last step costs the mastery credit.`}
+      >
+        {hintLabel(hintLevel, last)}
+      </button>
+      {hintLevel === FULL_CARD - 1 && (
+        <span id="hint-cost" className="hint-cost small">
+          {lastHintCost(last)}
+        </span>
+      )}
+      <span className="spacer" />
+      <span className="muted small enter-hint">
+        <span className="kbd">Enter</span> to check
+      </span>
+      <button className="btn btn-primary btn-big" onClick={submit} disabled={!isAnswered(response)}>
+        Check
+      </button>
+    </div>
+  );
 
   return (
     <div className="practice-fx">
-      <div className="row" style={{ marginBottom: 12 }}>
-        <h1 style={{ margin: 0 }}>{scopeTitle(scope)}</h1>
-        <span className="spacer" />
-        <span className="chip">
-          Session: {session.correct}/{session.answered}
-        </span>
-        <Streak n={session.streak} />
-        <button className="btn btn-ghost" onClick={() => setRecap(true)} disabled={outcomes.length === 0} title="See how this session went">
-          End session
-        </button>
-        <button className={`btn ${calcOpen ? 'btn-primary' : ''}`} onClick={() => setCalcOpen((v) => !v)}>
-          Calculator
-        </button>
+      {/* The two groups flow as one row on a wide screen and stack on a phone (display: contents, see fx-practice.css). */}
+      <div className="row practice-head" style={{ marginBottom: 12 }}>
+        <div className="practice-title">
+          <h1 style={{ margin: 0 }}>{scopeTitle(scope)}</h1>
+          <span className="spacer" />
+          <span className="chip">
+            Session: {session.correct}/{session.answered}
+          </span>
+          <Streak n={session.streak} />
+        </div>
+        <div className="practice-tools">
+          <button className="btn btn-ghost" onClick={() => setRecap(true)} disabled={outcomes.length === 0} title="See how this session went">
+            End session
+          </button>
+          <button className={`btn ${calcOpen ? 'btn-primary' : ''}`} onClick={() => setCalcOpen((v) => !v)}>
+            Calculator
+          </button>
+        </div>
       </div>
 
       <div className="question-card">
@@ -355,10 +415,13 @@ export function Practice({ route }: { route: string[] }) {
           {showLabels && (
             <>
               <a className={`chip chip-accent${reveal}`} href={href('practice', 'skill', skill.id)} title="Practice only this skill">
-                <i className={`level-dot level-${level}`} /> {skill.name} · {LEVEL_NAMES[level]}
+                <i className={`level-dot level-${level}`} />
+                <span className="chip-text">
+                  {skill.name} · {LEVEL_NAMES[level]}
+                </span>
               </a>
               <span className={`chip${reveal}`} title={`Question type: ${template.style}`}>
-                {template.style}
+                <span className="chip-text">{template.style}</span>
               </span>
             </>
           )}
@@ -380,31 +443,7 @@ export function Practice({ route }: { route: string[] }) {
 
         <QuestionView key={question.id} q={question} response={response} onChange={setResponse} locked={!!result} reveal={!!result} autoFocus />
 
-        {!result && (
-          <div className="row" style={{ marginTop: 18 }}>
-            <button
-              className="btn btn-ghost"
-              onClick={stepHint}
-              disabled={hintLevel === FULL_CARD}
-              aria-describedby={hintLevel === FULL_CARD - 1 ? 'hint-cost' : undefined}
-              title={`Three steps: the first line, the bullets, then ${last === 'Full card' ? 'the full card' : 'a worked example with the full card'}. Only the last step costs the mastery credit.`}
-            >
-              {hintLabel(hintLevel, last)}
-            </button>
-            {hintLevel === FULL_CARD - 1 && (
-              <span id="hint-cost" className="hint-cost small">
-                {lastHintCost(last)}
-              </span>
-            )}
-            <span className="spacer" />
-            <span className="muted small">
-              <span className="kbd">Enter</span> to check
-            </span>
-            <button className="btn btn-primary btn-big" onClick={submit} disabled={!isAnswered(response)}>
-              Check
-            </button>
-          </div>
-        )}
+        {!small && actions}
 
         {result && (
           <Feedback
@@ -413,12 +452,12 @@ export function Practice({ route }: { route: string[] }) {
             paceSec={paceSec}
             skillName={skill.name}
             hintLevel={hintLevel}
-            onNext={next}
+            onNext={small ? undefined : next}
             nextStepText={nextStep(result.outcome.state)}
           />
         )}
         {panelText && (
-          <div className="strategy-box">
+          <div className="strategy-box" ref={panel}>
             {!result && (
               <p className={`small hint-note${hintLevel === FULL_CARD ? ' hint-cost' : ' muted'}`}>
                 {hintLevel === FULL_CARD ? lastHintCost(last) : `Hint ${hintLevel} of ${FULL_CARD}`}
@@ -427,6 +466,7 @@ export function Practice({ route }: { route: string[] }) {
             <Rich text={panelText} />
           </div>
         )}
+        {small && actions}
       </div>
 
       {calcOpen && (
@@ -507,7 +547,8 @@ function Feedback({
   paceSec: number;
   skillName: string;
   hintLevel: HintLevel;
-  onNext: () => void;
+  /** Absent on a phone, where the Next button is the bar pinned to the bottom. */
+  onNext?: () => void;
   nextStepText: string;
 }) {
   const { grade: g, outcome, timeMs } = result;
@@ -516,7 +557,12 @@ function Feedback({
   const traps = g.traps.map((id) => TRAPS[id]).filter(Boolean);
   const dodged = result.dodged.filter((id) => TRAPS[id]);
   const nextBtn = useRef<HTMLButtonElement>(null);
-  useEffect(() => nextBtn.current?.focus(), []);
+  const box = useRef<HTMLDivElement>(null);
+  // Focusing Next also brings the result into view; without that button (the pinned bar has focus) do it directly.
+  useEffect(() => {
+    if (nextBtn.current) nextBtn.current.focus();
+    else box.current?.scrollIntoView({ block: 'nearest' });
+  }, []);
   // Why a correct answer may not move the skill. Credit rule: the model (a style needs difficulty 2 or 3 and no full card; only the pace gates Mastered).
   const creditNote =
     hintLevel === FULL_CARD
@@ -529,7 +575,7 @@ function Feedback({
             : 'Correct, and this question type counts. It was over the pace, though, and Mastered needs an answer on pace.'
           : '';
   return (
-    <div className={`feedback ${g.correct ? 'ok' : 'ko'}`}>
+    <div className={`feedback ${g.correct ? 'ok' : 'ko'}`} ref={box}>
       <div className="feedback-title">
         <span style={{ color: g.correct ? 'var(--good)' : 'var(--bad)' }}>{g.correct ? 'Correct' : g.invalid ? 'Not a valid answer' : 'Not quite'}</span>
         <span className={`chip ${judged ? (onPace ? 'chip-good' : 'chip-warn') : ''}`}>
@@ -538,9 +584,11 @@ function Feedback({
         </span>
         {hintLevel === FULL_CARD && <span className="chip chip-warn">hint used</span>}
         <span className="spacer" />
-        <button ref={nextBtn} className="btn btn-primary" onClick={onNext}>
-          Next question →
-        </button>
+        {onNext && (
+          <button ref={nextBtn} className="btn btn-primary" onClick={onNext}>
+            Next question →
+          </button>
+        )}
       </div>
 
       <p className="small" style={{ margin: '10px 0 0' }}>
