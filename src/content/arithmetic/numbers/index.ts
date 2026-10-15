@@ -5,6 +5,7 @@ import { fractionTemplates } from './fractions';
 import { numberLineTemplates } from './numberLine';
 import { percentTemplates } from './percent';
 import { ratioTemplates } from './ratios';
+import { rateMeetingTemplates, rateMeetingTraps } from './ratesMeeting';
 import { rateAverageSpeedTemplates, rateAverageSpeedTraps } from './ratesAverageSpeed';
 import { ratioShiftTemplates, ratioShiftTraps } from './ratiosShift';
 import { ratioPercentTemplates, ratioPercentTraps } from './ratiosPercent';
@@ -15,5 +16,5 @@ import { realNumberTemplates } from './realNumbers';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...ratioMixtureTemplates, ...ratioPercentTemplates, ...ratioShiftTemplates, ...rateTemplates, ...rateAverageSpeedTemplates];
-export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...ratioMixtureTraps, ...ratioPercentTraps, ...ratioShiftTraps, ...rateAverageSpeedTraps };
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...ratioMixtureTemplates, ...ratioPercentTemplates, ...ratioShiftTemplates, ...rateTemplates, ...rateAverageSpeedTemplates, ...rateMeetingTemplates];
+export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...ratioMixtureTraps, ...ratioPercentTraps, ...ratioShiftTraps, ...rateAverageSpeedTraps, ...rateMeetingTraps };
