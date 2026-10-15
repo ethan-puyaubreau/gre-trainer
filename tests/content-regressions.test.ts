@@ -100,3 +100,26 @@ describe('alg.expressions.power-factor-ne', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('alg.functions.property-ne', () => {
+  it('no wrong-method value (the traps and the mistake named in the explanation) equals the right answer', () => {
+    const bad: string[] = [];
+    let n = 0;
+    for (const { seed, d, q, params } of bodies('alg.functions.property-ne')) {
+      if (q.format !== 'ne') continue;
+      const { kind, k } = params as { kind: string; k: number[] };
+      const answer = q.answer.toNumber();
+      // each wrong value is recomputed here from the parameters, the way the mistaken student would
+      let wrong: number | null;
+      if (kind === 'periodic') wrong = k[3] + (k[2] - k[1]); // counts the distance instead of the steps
+      else if (kind === 'step') wrong = k[0] > 1 ? k[4] + k[1] * (k[3] - k[2]) : null; // counts b - a steps instead of (b - a) / p (a real mistake only when p > 1)
+      else if (kind === 'growth') wrong = k[3] * k[0] * k[2]; // treats the growth as linear: v r n instead of v r^n
+      else wrong = k[4] ? k[3] * k[3] + k[2] : k[5] * k[3] + k[2]; // substitutes t directly into the rule
+      n++;
+      if (wrong === answer) bad.push(`seed ${seed} d${d} (${kind}): the mistaken value ${wrong} equals the answer`);
+      if (q.traps?.some((tr) => tr.value.toNumber() === answer)) bad.push(`seed ${seed} d${d}: a trap value equals the answer`);
+    }
+    expect(n).toBeGreaterThan(1000);
+    expect(bad).toEqual([]);
+  });
+});

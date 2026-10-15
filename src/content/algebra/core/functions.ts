@@ -562,71 +562,75 @@ const propertyNE: Template<PropParams> = {
   format: 'ne',
   style: 'function given by a property or a transformed input',
   generate(rng, d) {
-    const kind: PropParams['kind'] = rng.pick(d === 1 ? ['periodic', 'step'] : d === 2 ? ['step', 'growth', 'transformed', 'periodic'] : ['transformed', 'step', 'transformed', 'growth']);
-    let stem: string;
-    let explanation: string;
-    let answer: number;
-    let k: number[];
-    const traps: { value: Frac; trap: string }[] = [];
-    if (kind === 'periodic') {
-      const p = rng.int(1, 4);
-      const a = rng.int(-5, 6);
-      const n = rng.int(3, 12);
-      const b = a + p * n;
-      const v = intExcept(rng, -9, 15, 0);
-      answer = v;
-      k = [p, a, b, v];
-      stem = `For every number $x$, the function $f$ satisfies $f(x) = f(x + ${p})$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
-      explanation = `The property says the value of $f$ repeats every ${p} unit${p > 1 ? 's' : ''}: $f(${num(a)}) = f(${num(a + p)}) = f(${num(a + 2 * p)}) = \\cdots$. Since $${num(b)} = ${num(a)} + ${p} \\cdot ${n}$, you reach $${num(b)}$ after ${n} steps, so $f(${num(b)}) = ${num(v)}$.`;
-      traps.push({ value: frac(v + (b - a)), trap: 'alg-step-count' });
-    } else if (kind === 'step') {
-      const p = rng.pick(d === 1 ? [1, 2] : [2, 3, 4]);
-      const c = intExcept(rng, -6, 7, 0);
-      const a = rng.int(-4, 6);
-      const n = rng.int(3, 9);
-      const b = a + p * n;
-      const v = rng.int(-10, 15);
-      answer = v + c * n;
-      k = [p, c, a, b, v];
-      stem = `For every number $x$, the function $f$ satisfies $f(x + ${p}) = f(x) ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
-      explanation = `Each increase of ${p} in $x$ ${c > 0 ? 'adds' : 'subtracts'} ${Math.abs(c)}. From $x = ${num(a)}$ to $x = ${num(b)}$ the input increases by $${b - a} = ${p} \\cdot ${n}$, which is ${n} steps.
+    for (;;) {
+      const kind: PropParams['kind'] = rng.pick(d === 1 ? ['periodic', 'step'] : d === 2 ? ['step', 'growth', 'transformed', 'periodic'] : ['transformed', 'step', 'transformed', 'growth']);
+      let stem: string;
+      let explanation: string;
+      let answer: number;
+      let k: number[];
+      const traps: { value: Frac; trap: string }[] = [];
+      if (kind === 'periodic') {
+        const p = rng.int(1, 4);
+        const a = rng.int(-5, 6);
+        const n = rng.int(3, 12);
+        const b = a + p * n;
+        const v = intExcept(rng, -9, 15, 0);
+        answer = v;
+        k = [p, a, b, v];
+        stem = `For every number $x$, the function $f$ satisfies $f(x) = f(x + ${p})$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
+        explanation = `The property says the value of $f$ repeats every ${p} unit${p > 1 ? 's' : ''}: $f(${num(a)}) = f(${num(a + p)}) = f(${num(a + 2 * p)}) = \\cdots$. Since $${num(b)} = ${num(a)} + ${p} \\cdot ${n}$, you reach $${num(b)}$ after ${n} steps, so $f(${num(b)}) = ${num(v)}$.`;
+        traps.push({ value: frac(v + (b - a)), trap: 'alg-step-count' });
+      } else if (kind === 'step') {
+        const p = rng.pick(d === 1 ? [1, 2] : [2, 3, 4]);
+        const c = intExcept(rng, -6, 7, 0);
+        const a = rng.int(-4, 6);
+        const n = rng.int(3, 9);
+        const b = a + p * n;
+        const v = rng.int(-10, 15);
+        answer = v + c * n;
+        k = [p, c, a, b, v];
+        stem = `For every number $x$, the function $f$ satisfies $f(x + ${p}) = f(x) ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
+        explanation = `Each increase of ${p} in $x$ ${c > 0 ? 'adds' : 'subtracts'} ${Math.abs(c)}. From $x = ${num(a)}$ to $x = ${num(b)}$ the input increases by $${b - a} = ${p} \\cdot ${n}$, which is ${n} steps.
 
 So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = ${num(answer)}$.${p > 1 ? ` Counting ${b - a} steps instead of ${n} gives $${num(v + c * (b - a))}$.` : ''}`;
-      if (p > 1) traps.push({ value: frac(v + c * (b - a)), trap: 'alg-step-count' });
-    } else if (kind === 'growth') {
-      const r = rng.pick([2, 3, -2]);
-      const a = rng.int(-3, 4);
-      const n = rng.int(2, r === 3 ? 4 : 5);
-      const v = rng.int(1, 6);
-      answer = v * r ** n;
-      k = [r, a, n, v];
-      stem = `For every number $x$, the function $f$ satisfies $f(x + 1) = ${num(r)}f(x)$. If $f(${num(a)}) = ${v}$, what is $f(${num(a + n)})$?`;
-      explanation = `Each increase of 1 in $x$ multiplies the value by $${num(r)}$. Going from $x = ${num(a)}$ to $x = ${num(a + n)}$ takes ${n} steps, so $f(${num(a + n)}) = ${v} \\cdot ${paren(r)}^{${n}} = ${num(answer)}$.`;
-      traps.push({ value: frac(v * r * n), trap: 'alg-growth-linear' });
-    } else {
-      // f((x + h)/m) = x^2 + e  ->  f(t) with x = m t - h
-      const m = rng.pick([2, 3]);
-      const h = intExcept(rng, -5, 5, 0);
-      const e = rng.int(-9, 9);
-      const t = intExcept(rng, -3, 5, 0);
-      const x0 = m * t - h;
-      const quad = rng.chance(0.6);
-      const lin2 = rng.int(2, 5);
-      answer = quad ? x0 * x0 + e : lin2 * x0 + e;
-      k = [m, h, e, t, quad ? 1 : 0, lin2];
-      const rule = quad ? poly([1, 0, e]) : poly([lin2, e]);
-      const input = `\\dfrac{x ${h < 0 ? '-' : '+'} ${Math.abs(h)}}{${m}}`;
-      stem = `The function $f$ is defined by $f\\left(${input}\\right) = ${rule}$ for all numbers $x$. What is the value of $f(${num(t)})$?`;
-      explanation = `Find the $x$ that makes the input equal to $${num(t)}$: $${input} = ${num(t)}$ gives $x = ${m}(${num(t)}) ${h < 0 ? '+' : '-'} ${Math.abs(h)} = ${num(x0)}$.
+        if (p > 1) traps.push({ value: frac(v + c * (b - a)), trap: 'alg-step-count' });
+      } else if (kind === 'growth') {
+        const r = rng.pick([2, 3, -2]);
+        const a = rng.int(-3, 4);
+        const n = rng.int(2, r === 3 ? 4 : 5);
+        const v = rng.int(1, 6);
+        answer = v * r ** n;
+        k = [r, a, n, v];
+        stem = `For every number $x$, the function $f$ satisfies $f(x + 1) = ${num(r)}f(x)$. If $f(${num(a)}) = ${v}$, what is $f(${num(a + n)})$?`;
+        explanation = `Each increase of 1 in $x$ multiplies the value by $${num(r)}$. Going from $x = ${num(a)}$ to $x = ${num(a + n)}$ takes ${n} steps, so $f(${num(a + n)}) = ${v} \\cdot ${paren(r)}^{${n}} = ${num(answer)}$.`;
+        traps.push({ value: frac(v * r * n), trap: 'alg-growth-linear' });
+      } else {
+        // f((x + h)/m) = x^2 + e  ->  f(t) with x = m t - h
+        const m = rng.pick([2, 3]);
+        const h = intExcept(rng, -5, 5, 0);
+        const e = rng.int(-9, 9);
+        const t = intExcept(rng, -3, 5, 0);
+        const x0 = m * t - h;
+        const quad = rng.chance(0.6);
+        const lin2 = rng.int(2, 5);
+        answer = quad ? x0 * x0 + e : lin2 * x0 + e;
+        k = [m, h, e, t, quad ? 1 : 0, lin2];
+        const rule = quad ? poly([1, 0, e]) : poly([lin2, e]);
+        const input = `\\dfrac{x ${h < 0 ? '-' : '+'} ${Math.abs(h)}}{${m}}`;
+        stem = `The function $f$ is defined by $f\\left(${input}\\right) = ${rule}$ for all numbers $x$. What is the value of $f(${num(t)})$?`;
+        explanation = `Find the $x$ that makes the input equal to $${num(t)}$: $${input} = ${num(t)}$ gives $x = ${m}(${num(t)}) ${h < 0 ? '+' : '-'} ${Math.abs(h)} = ${num(x0)}$.
 
 Then $f(${num(t)}) = ${quad ? `${paren(x0)}^2` : `${lin2}(${num(x0)})`}${e === 0 ? '' : ` ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(answer)}$. Substituting $${num(t)}$ directly into $${rule}$ is the trap: the rule is written for the variable $x$, not for the input of $f$.`;
-      const direct = quad ? t * t + e : lin2 * t + e;
-      traps.push({ value: frac(direct), trap: 'alg-substitute-directly' });
+        const direct = quad ? t * t + e : lin2 * t + e;
+        traps.push({ value: frac(direct), trap: 'alg-substitute-directly' });
+      }
+      // a wrong-method value that equals the right answer would make the question degenerate: draw again
+      if (traps.some((tr) => tr.value.eq(answer!))) continue;
+      return {
+        params: { kind, k: k! },
+        q: { format: 'ne', stem: stem!, answer: frac(answer!), traps, explanation: explanation! },
+      };
     }
-    return {
-      params: { kind, k: k! },
-      q: { format: 'ne', stem: stem!, answer: frac(answer!), traps: traps.filter((tr) => !tr.value.eq(answer!)), explanation: explanation! },
-    };
   },
   check(q, { kind, k }) {
     if (q.format !== 'ne') return 'wrong format';
