@@ -91,6 +91,11 @@
   }
 }
 
+/* Mixed practice: the skill and style chips pop in with the result. */
+.practice-fx .label-reveal {
+  animation: fx-pop var(--dur) var(--ease-spring) backwards;
+}
+
 /* ---------------------------------------------------------------- level change chip */
 .practice-fx .level-change {
   display: inline-flex;

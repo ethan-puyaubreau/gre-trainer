@@ -214,6 +214,10 @@ export function Practice({ route }: { route: string[] }) {
   const level = st?.level ?? 0;
   const paceSec = store.settings.paceSec;
   const [reasonText, reasonCls] = REASON[pick.reason];
+  // Mixed practice hides the skill and the style until the result: naming them would give the topic away.
+  const mixed = scope.kind !== 'skill';
+  const showLabels = !mixed || !!result;
+  const reveal = mixed ? ' label-reveal' : '';
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
   // Before the answer, opening the strategy card is a hint (penalised); after the result it is free.
   const toggleStrategy = () => {
@@ -241,12 +245,16 @@ export function Practice({ route }: { route: string[] }) {
       <div className="question-card">
         <div className="question-meta">
           <span className={`chip ${reasonCls}`}>{reasonText}</span>
-          <a className="chip chip-accent" href={href('practice', 'skill', skill.id)} title="Practice only this skill">
-            <i className={`level-dot level-${level}`} /> {skill.name} · {LEVEL_NAMES[level]}
-          </a>
-          <span className="chip" title={template.style}>
-            {template.style}
-          </span>
+          {showLabels && (
+            <>
+              <a className={`chip chip-accent${reveal}`} href={href('practice', 'skill', skill.id)} title="Practice only this skill">
+                <i className={`level-dot level-${level}`} /> {skill.name} · {LEVEL_NAMES[level]}
+              </a>
+              <span className={`chip${reveal}`} title={template.style}>
+                {template.style}
+              </span>
+            </>
+          )}
           <span className="chip">{'●'.repeat(question.difficulty) + '○'.repeat(3 - question.difficulty)}</span>
           <span className="spacer" />
           {store.settings.showTimer || result ? (
