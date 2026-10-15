@@ -1,5 +1,6 @@
 import type { Template, Trap } from '../../../engine/types';
 import { barEntryTemplates, barEntryTraps } from './barEntry';
+import { chainEvalTemplates, chainEvalTraps } from './chainEval';
 import { consecutiveTemplates } from './consecutive';
 import { divisibilityTemplates } from './divisibility';
 import { evaluateTemplates } from './evaluate';
@@ -28,5 +29,6 @@ export const integersTemplates: Template<any>[] = [
   ...evaluateTemplates,
   ...groupingCompareTemplates,
   ...barEntryTemplates,
+  ...chainEvalTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps };
