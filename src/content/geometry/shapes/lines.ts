@@ -19,10 +19,12 @@ import {
   type Pt,
 } from './fig';
 import { angleLabel, checkMcm, checkMcs, evalTex, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
-import { retryAll } from '../redraw';
+import { Redraw, retryAll } from '../redraw';
 
 const SKILL = 'geo.lines-angles';
 const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
+/** p/q in TeX (display style) without a denominator of 1. */
+const dr = (p: number, q: number) => (q === 1 ? `${p}` : `\\dfrac{${p}}{${q}}`);
 
 /* ================================================================== transversal figure (shared) */
 
@@ -210,28 +212,43 @@ const parallelAlgebra: Template<ParAlgParams> = {
       let correct: number;
       const traps: { value: number; trap: string }[] = [];
       let fillers: number[];
+      // wrong values of x, each from a named slip: the other relation, 360 or 90 degrees, a sign error
+      const wrongX: { x: number; trap: string }[] = [
+        { x: xw, trap: wrongTrap },
+        { x: (360 - k1 - k2) / (c1 + c2), trap: 'geo-ang-line-360' },
+        { x: (90 - k1 - k2) / (c1 + c2), trap: 'geo-par-complementary' },
+        { x: same ? (k1 + k2) / (c2 - c1) : (180 + k1 + k2) / (c1 + c2), trap: 'geo-ang-sign-slip' },
+      ].filter((w) => Number.isInteger(w.x) && w.x > 0 && w.x !== x0);
+      const asAngle = (v: number) => Number.isInteger(v) && v > 0 && v < 180;
       if (ask === 'x') {
         correct = x0;
-        if (xwOk) traps.push({ value: xw, trap: wrongTrap });
-        traps.push({ value: m2, trap: 'geo-ang-wrong-unknown' });
+        for (const w of wrongX) traps.push({ value: w.x, trap: w.trap });
+        traps.push({ value: m2, trap: 'geo-ang-wrong-unknown' }, { value: m1, trap: 'geo-ang-wrong-unknown' });
         fillers = [x0 + 5, x0 - 5, x0 + 10, x0 - 10, 2 * x0];
       } else if (ask === 'angle') {
         const L = labels[askLabel];
         correct = L.c * x0 + L.k;
         traps.push({ value: x0, trap: 'geo-ang-wrong-unknown' });
-        if (xwOk) {
-          const w = L.c * xw + L.k;
-          if (w > 0 && w < 180) traps.push({ value: w, trap: wrongTrap });
-        }
-        fillers = [180 - correct, correct + 10, correct - 10, correct + 20, correct - 20];
+        for (const w of wrongX) if (asAngle(L.c * w.x + L.k)) traps.push({ value: L.c * w.x + L.k, trap: w.trap });
+        if (asAngle(180 - correct)) traps.push({ value: 180 - correct, trap: 'geo-ang-supplement' });
+        fillers = [correct + 10, correct - 10, correct + 20, correct - 20];
       } else {
         const y = measureAt(yAt!.pos, phi);
         correct = y;
-        traps.push({ value: 180 - y, trap: isPhiType(yAt!.pos) === isPhiType(pos2) ? 'geo-par-supp-not-equal' : 'geo-par-equal-not-supp' });
+        const sameY = isPhiType(yAt!.pos) === isPhiType(pos2);
+        traps.push({ value: 180 - y, trap: sameY ? 'geo-par-supp-not-equal' : 'geo-par-equal-not-supp' });
         traps.push({ value: x0, trap: 'geo-ang-wrong-unknown' });
+        for (const v of [m1, m2]) if (v !== y && v !== 180 - y) traps.push({ value: v, trap: 'geo-ang-wrong-unknown' });
+        for (const w of wrongX) {
+          const a2 = c2 * w.x + k2;
+          const yy = sameY ? a2 : 180 - a2;
+          if (asAngle(a2) && asAngle(yy)) traps.push({ value: yy, trap: w.trap });
+        }
         fillers = [y + 10, y - 10, y + 20, y - 20];
       }
       if (traps.some((t) => t.value === correct)) continue;
+      // every wrong choice names a slip: four different positive trap values
+      if (new Set(traps.map((t) => t.value).filter((v) => v > 0)).size < 4) continue;
       const { choices, answer, values } = intChoices(rng, correct, traps, fillers);
 
       const marks = [
@@ -239,7 +256,7 @@ const parallelAlgebra: Template<ParAlgParams> = {
         { at: 'Q' as At, pos: pos2, tex: angleLabel(c2, k2) },
         ...(yAt ? [{ ...yAt, tex: '$y^\\circ$' }] : []),
       ];
-      const figure = transversalFigure(drawPhi(phi), marks);
+      const figure = { ...transversalFigure(drawPhi(phi), marks), ...(drawPhi(phi) !== phi ? { notToScale: true } : {}) };
 
       // Explanation
       const L1 = `$${labTex(labels[0])}$`;
@@ -255,7 +272,7 @@ const parallelAlgebra: Template<ParAlgParams> = {
       let solve: string;
       if (same) {
         const cc = c2 - c1;
-        solve = `$${e2} = ${e1}$, so $${linTex(cc, 0)} = ${num(k1 - k2)}$`;
+        solve = cc === 1 ? `$${e2} = ${e1}$` : `$${e2} = ${e1}$, so $${linTex(cc, 0)} = ${num(k1 - k2)}$`;
       } else {
         solve = `$${sumTerm(labels[0])} + ${sumTerm(labels[1])} = 180$, so $${linTex(c1 + c2, 0)} = ${num(180 - k1 - k2)}$`;
       }
@@ -362,7 +379,7 @@ function fanFigure(values: number[], texs: string[], total: 180 | 360, start: nu
     : rayNames.map((n) => ({ from: 'O', to: n }));
   const k = pxPerUnit(Object.values(points).concat([[-R, -R], [R, R]]));
   const labels = values.map((_, i) => ({ at: wedgeLabel(O, dir(dirs[i]), dir(dirs[i + 1]), texs[i], k, { minPx: 22 }), text: texs[i] }));
-  return { kind: 'geometry', points, hideLabels: Object.keys(points), segments, labels };
+  return { kind: 'geometry', points, hideLabels: Object.keys(points), segments, labels, ...(values.some((v) => v < minDraw) ? { notToScale: true } : {}) };
 }
 
 const aroundPoint: Template<AroundParams> = {
@@ -406,23 +423,26 @@ const aroundPoint: Template<AroundParams> = {
       const misread = form === 'whole' ? new Frac(180 * p, p + q) : new Frac(180 * p, q);
       if (misread.lt(180)) traps.push({ value: ask === 'r' ? misread : new Frac(180).sub(misread), trap: 'geo-ang-ratio-whole' });
       const figure = fanFigure([r.toNumber(), s.toNumber()].reverse(), ['$s^\\circ$', '$r^\\circ$'], 180, 0, true);
-      const cond = form === 'whole' ? `$\\dfrac{r}{r + s} = \\dfrac{${p}}{${q}}$` : `$\\dfrac{r}{s} = \\dfrac{${p}}{${q}}$`;
+      const cond = form === 'whole' ? `$\\dfrac{r}{r + s} = ${dr(p, q)}$` : `$\\dfrac{r}{s} = ${dr(p, q)}$`;
       return {
         params: { kind, exprs: [], ratio: { form, p, q, ask }, ask: 0 },
         q: {
           format: 'ne',
           stem: `In the figure above, a ray meets a straight line. If ${cond}, what is the value of $${ask}$?`,
           answer: ans,
-          traps: traps.filter((t) => !t.value.eq(ans)),
+          traps: ((): typeof traps => {
+            if (traps.some((t) => t.value.eq(ans))) throw new Redraw('a trap equals the answer');
+            return traps;
+          })(),
           figure,
           explanation:
             form === 'whole'
-              ? `The two angles form a straight line, so $r + s = 180$. Then $\\dfrac{r}{180} = \\dfrac{${p}}{${q}}$ and $r = \\dfrac{${p} \\cdot 180}{${q}} = ${dec(r)}$.
+              ? `The two angles form a straight line, so $r + s = 180$. Then $\\dfrac{r}{180} = ${dr(p, q)}$ and $r = ${q === 1 ? `${p} \\cdot 180` : `\\dfrac{${p} \\cdot 180}{${q}}`} = ${dec(r)}$.
 
 The ratio compares $r$ with the WHOLE straight angle, not with $s$: reading it as $r : s = ${p} : ${q}$ would give a different answer. And a straight line is $180^\\circ$, not $360^\\circ$.`
               : `The two angles form a straight line, so $r + s = 180$. With $r : s = ${p} : ${q}$, the straight angle is split into $${p} + ${q} = ${p + q}$ equal parts of $\\dfrac{180}{${p + q}}$ degrees each, so $r = ${dec(r)}$ and $s = ${dec(s)}$.
 
-So $${ask} = ${dec(ans)}$. Careful: $\\frac{r}{s} = \\frac{${p}}{${q}}$ does not mean $r$ is $\\frac{${p}}{${q}}$ of $180$.`,
+So $${ask} = ${dec(ans)}$. Careful: $\\frac{r}{s} = ${q === 1 ? p : `\\frac{${p}}{${q}}`}$ does not mean $r$ is ${q === 1 ? `${p} times` : `$\\frac{${p}}{${q}}$`} of $180$.`,
         },
       };
     }
@@ -479,7 +499,8 @@ So $${ask} = ${dec(ans)}$. Careful: $\\frac{r}{s} = \\frac{${p}}{${q}}$ does not
         const traps = [
           { value: frac(v), trap: 'geo-ang-vertical-adjacent' },
           { value: frac(x0), trap: 'geo-ang-wrong-unknown' },
-        ].filter((t) => !t.value.eq(y));
+        ];
+        if (traps.some((t) => t.value.eq(y))) throw new Redraw('a trap equals the answer');
         return {
           params: { kind, exprs, ask: 'y' },
           q: {
@@ -540,7 +561,10 @@ The $y^\\circ$ angle forms a straight line with it, so $y = 180 - ${v} = ${y}$. 
         format: 'ne',
         stem: `${where} ${askText.charAt(0).toUpperCase() + askText.slice(1)}`,
         answer: frac(answer),
-        traps: traps.filter((t) => !t.value.eq(answer)),
+        traps: ((): typeof traps => {
+          if (traps.some((t) => t.value.eq(answer))) throw new Redraw('a trap equals the answer');
+          return traps;
+        })(),
         figure,
         explanation: `${kind === 'line' ? 'The angles together make a straight angle' : 'The angles together go all the way around the point'}, so they add up to $${total}^\\circ$:
 
@@ -637,9 +661,9 @@ const zigzagQC: Template<ZigParams> = {
   generate(rng, d) {
     const kind: ZigKind = rng.pick(
       d === 1
-        ? (['numbers', 'numbers', 'find-b', 'symbolic'] as const)
+        ? (['numbers', 'numbers', 'find-b', 'symbolic', 'open'] as const)
         : d === 2
-          ? (['numbers', 'numbers', 'find-b', 'find-b', 'symbolic', 'lower-bound'] as const)
+          ? (['numbers', 'numbers', 'find-b', 'symbolic', 'lower-bound', 'open'] as const)
           : (['numbers', 'find-b', 'find-b', 'double', 'lower-bound', 'open'] as const),
     );
     const a = rng.int(5, 13) * 5;
@@ -767,6 +791,8 @@ You do not need the value of $b$: the bend angle is always larger than either ou
         { from: 'P', to: 'B' },
       ],
       labels: lab,
+      // numbers on the figure are drawn as given only when the angles can be drawn that way; letters are never to scale
+      ...((kind === 'numbers' || kind === 'find-b') && drawA === a && drawB === b ? {} : { notToScale: true }),
     };
     return {
       params,
@@ -869,10 +895,13 @@ const eightAngles: Template<EightParams> = {
     const phi = rng.chance(0.5) ? theta : 180 - theta;
     const type = (l: Letter) => isPhiType(LETTER_AT[l].pos);
     const val = (l: Letter) => measureAt(LETTER_AT[l].pos, phi);
-    const figure = transversalFigure(
-      drawPhi(phi),
-      LETTERS.map((l) => ({ ...LETTER_AT[l], tex: `$${l}^\\circ$` })),
-    );
+    const figure = {
+      ...transversalFigure(
+        drawPhi(phi),
+        LETTERS.map((l) => ({ ...LETTER_AT[l], tex: `$${l}^\\circ$` })),
+      ),
+      ...(drawPhi(phi) !== phi ? { notToScale: true } : {}),
+    };
     if (d === 1 || (d === 2 && rng.chance(0.4))) {
       const given = rng.pick(LETTERS);
       const gv = val(given);
@@ -943,7 +972,7 @@ So the angles of measure $${target}^\\circ$ among the choices are ${letters
       stmts.map((s) => ({
         text: stmtTex(s),
         correct: truth(s),
-        ...(!truth(s) && s.kind !== 'sums' ? { trap: s.kind === 'eq' ? 'geo-par-equal-not-supp' : 'geo-par-supp-not-equal' } : {}),
+        ...(!truth(s) ? { trap: s.kind === 'sums' ? 'geo-par-sums-assumed' : s.kind === 'eq' ? 'geo-par-equal-not-supp' : 'geo-par-supp-not-equal' } : {}),
       })),
     );
     const sameT = LETTERS.filter((l) => type(l));

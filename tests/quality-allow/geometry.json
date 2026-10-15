@@ -18,18 +18,6 @@
   "geo.composite.inscribed": {
     "distractors.trapped": "baseline"
   },
-  "geo.lines-angles.around-point": {
-    "artifacts.frac-1": "baseline"
-  },
-  "geo.lines-angles.bent-line-qc": {
-    "qc.d-share": "baseline"
-  },
-  "geo.lines-angles.eight-angles": {
-    "distractors.trapped": "baseline"
-  },
-  "geo.lines-angles.parallel-algebra": {
-    "distractors.trapped": "baseline"
-  },
   "geo.polygons.angle-sum": {
     "distractors.trapped": "baseline"
   },

@@ -10,6 +10,22 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Made two angles add to $180^\\circ$ when they are equal',
     fix: 'Corresponding, alternate interior and alternate exterior angles are equal, not supplementary. Only an angle of each kind (e.g. same-side interior angles) adds up to $180^\\circ$.',
   },
+  'geo-par-complementary': {
+    label: 'Made two angles of parallel lines add up to $90^\\circ$',
+    fix: 'Nothing here makes a right angle. Angles in matching positions are equal; an angle of each kind adds up to $180^\\circ$.',
+  },
+  'geo-par-sums-assumed': {
+    label: 'Assumed two sums of angles are equal',
+    fix: 'Replace every angle by its measure, $\\theta$ or $180^\\circ - \\theta$, and compare the two sums. They are equal only when both sides hold the same kinds of angles.',
+  },
+  'geo-ang-supplement': {
+    label: 'Gave the supplement of the angle instead of the angle itself',
+    fix: 'After solving for $x$, substitute it into the expression for the angle that was asked about. The angle next to it on a line is a different angle.',
+  },
+  'geo-ang-sign-slip': {
+    label: 'Made a sign error when solving the equation',
+    fix: 'Subtract the same number from both sides: $c_1x + k_1 = c_2x + k_2$ gives $(c_1 - c_2)x = k_2 - k_1$. Substitute back to check.',
+  },
   'geo-par-bend': {
     label: 'Took the angle at the bend as $180^\\circ$ minus the other two',
     fix: 'Draw a line through the bend parallel to the two lines: the bend angle splits into two alternate interior angles, so it equals the SUM of the two outer angles.',
