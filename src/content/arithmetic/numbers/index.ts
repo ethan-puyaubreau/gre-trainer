@@ -17,9 +17,12 @@ import { ratioMixtureTemplates, ratioMixtureTraps } from './ratiosMixture';
 import { ratioTotalTemplates, ratioTotalTraps } from './ratioTotals';
 import { rateTemplates } from './rates';
 import { realNumberTemplates } from './realNumbers';
+import { numbersTraps as traps } from './traps';
+import { realAbsQCTemplates, realAbsQCTraps } from './realAbsQC';
+import { realBetweenTemplates, realBetweenTraps } from './realBetween';
+import { realRationalTemplates, realRationalTraps } from './realRational';
 import { stackedDiscountTemplates } from './stackedDiscount';
 import { successiveTemplates } from './successive';
-import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...compoundGrowthTemplates, ...percentChainTemplates, ...missingChangeTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates, ...ratioMixtureTemplates, ...ratioPercentTemplates, ...ratioShiftTemplates, ...rateAverageSpeedTemplates, ...rateMeetingTemplates, ...ratePooledTemplates];
-export const numbersTraps: Record<string, Trap> = {...traps, ...ratioTotalTraps, ...compoundGrowthTraps, ...percentChainTraps, ...ratioMixtureTraps, ...ratioPercentTraps, ...ratioShiftTraps, ...rateAverageSpeedTraps, ...rateMeetingTraps, ...ratePooledTraps};
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...compoundGrowthTemplates, ...percentChainTemplates, ...missingChangeTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates, ...ratioMixtureTemplates, ...ratioPercentTemplates, ...ratioShiftTemplates, ...rateAverageSpeedTemplates, ...rateMeetingTemplates, ...ratePooledTemplates, ...realRationalTemplates, ...realBetweenTemplates, ...realAbsQCTemplates];
+export const numbersTraps: Record<string, Trap> = {...traps, ...ratioTotalTraps, ...compoundGrowthTraps, ...percentChainTraps, ...ratioMixtureTraps, ...ratioPercentTraps, ...ratioShiftTraps, ...rateAverageSpeedTraps, ...rateMeetingTraps, ...ratePooledTraps, ...realRationalTraps, ...realBetweenTraps, ...realAbsQCTraps};
