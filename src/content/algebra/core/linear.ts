@@ -334,11 +334,15 @@ const shortcutNE: Template<ShortParams> = {
       k = [a, b, c, m, e];
       const target = m < 0 ? lin([[e, ''], [m * a, 'x']]) : lin([[m * a, 'x'], [e, '']]);
       stem = `If $${lin([[a, 'x'], [b, '']])} = ${num(c)}$, what is the value of $${target}$?`;
-      explanation = `No need to find $x$${(c - b) % a !== 0 ? ` (it is the fraction $${new Frac(c - b, a).toTex()}$)` : ''}. From the equation, $${a}x = ${num(c)} ${b > 0 ? '-' : '+'} ${Math.abs(b)} = ${num(c - b)}$.
-
-Then $${lin([[m * a, 'x']])} = ${times(m, num(c - b))} = ${num(m * (c - b))}$${e === 0 ? '' : `, so $${target} = ${num(m * (c - b))} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$`}.`;
       const wrong = m * c + e;
-      if (wrong !== answer) traps.push({ value: frac(wrong), trap: 'alg-shortcut-constant' });
+      explanation = `The target contains the same block $${a}x$ as the equation, so isolate that block instead of solving for $x$${(c - b) % a !== 0 ? ` (it is the fraction $${new Frac(c - b, a).toTex()}$)` : ''}. From the equation, $${a}x = ${num(c)} ${b > 0 ? '-' : '+'} ${Math.abs(b)} = ${num(c - b)}$.
+
+Then $${lin([[m * a, 'x']])} = ${times(m, num(c - b))} = ${num(m * (c - b))}$${e === 0 ? '' : `, so $${target} = ${num(m * (c - b))} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$`}.
+
+Check: substituting $x = ${new Frac(c - b, a).toTex()}$ into the target gives the same value, $${num(answer)}$.
+
+Trap: scaling the right side as it stands, $${times(m, num(c))}${e === 0 ? '' : ` ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(wrong)}$, forgets that the constant $${num(b)}$ on the left must be moved first. Rule: isolate the block the target contains, then scale it.`;
+      traps.push({ value: frac(wrong), trap: 'alg-shortcut-constant' });
     } else if (kind === 'two-var') {
       const [v1, v2] = rng.pick([['a', 'b'], ['x', 'y'], ['p', 'q'], ['m', 'n']]);
       const a = rng.int(1, 5);
@@ -351,9 +355,13 @@ Then $${lin([[m * a, 'x']])} = ${times(m, num(c - b))} = ${num(m * (c - b))}$${e
       k = [a, b, c, m, e];
       const target = lin([[m * a, v1], [m * b, v2], [e, '']]);
       stem = `If $${lin([[a, v1], [b, v2]])} = ${num(c)}$, what is the value of $${target}$?`;
-      explanation = `One equation cannot give both $${v1}$ and $${v2}$, so look at the target: $${lin([[m * a, v1], [m * b, v2]])} = ${times(m, lin([[a, v1], [b, v2]]))} = ${times(m, num(c))} = ${num(m * c)}$.
+      explanation = `One equation cannot give both $${v1}$ and $${v2}$, so look at the target instead: its variable part is a multiple of the left side. $${lin([[m * a, v1], [m * b, v2]])} = ${times(m, lin([[a, v1], [b, v2]]))} = ${times(m, num(c))} = ${num(m * c)}$.
 
-${e === 0 ? '' : `So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$.`}`;
+${e === 0 ? `So the value is $${num(answer)}$.` : `So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)} = ${num(answer)}$.`}
+
+Check: every pair $(${v1}, ${v2})$ that satisfies the equation gives this value, because the target depends only on the left side.
+
+Trap: ${e === 0 ? 'trying to solve for both letters is impossible with one equation, and unnecessary' : `$${times(m, `(${num(c)} ${e < 0 ? '-' : '+'} ${Math.abs(e)})`)} = ${num(m * (c + e))}$ scales the constant $${num(e)}$ as well, but only the letters are multiplied`}. Rule: if the target is a multiple of the left side, scale the whole equation.`;
       if (e !== 0) traps.push({ value: frac(m * (c + e)), trap: 'alg-shortcut-constant' });
     } else {
       const a = rng.int(4, 9);
@@ -369,11 +377,15 @@ ${e === 0 ? '' : `So $${target} = ${num(m * c)} ${e < 0 ? '-' : '+'} ${Math.abs(
       k = [a, b, dd, e, m, f];
       const target = lin([[m * (a - dd), 'x'], [f, '']]);
       stem = `If $${lin([[a, 'x'], [b, '']])} = ${lin([[dd, 'x'], [e, '']])}$, what is the value of $${target}$?`;
-      explanation = `Collect the $x$ terms: subtract $${lin([[dd, 'x']])}$ from both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides to get $${a - dd}x = ${num(e - b)}$.
-
-${m === 1 ? '' : `Multiply by ${m}: $${m * (a - dd)}x = ${num(m * (e - b))}$. `}${f === 0 ? `So the value is $${num(answer)}$.` : `Then $${target} = ${num(m * (e - b))} ${f < 0 ? '-' : '+'} ${Math.abs(f)} = ${num(answer)}$.`}`;
       const wrong = m * (e + b) + f;
-      if (wrong !== answer) traps.push({ value: frac(wrong), trap: 'alg-move-term-sign' });
+      explanation = `The target contains the combined $x$ term, so collect the $x$ terms and the constants on opposite sides: subtract $${lin([[dd, 'x']])}$ from both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides to get $${a - dd}x = ${num(e - b)}$.
+
+${m === 1 ? '' : `Multiply by ${m}: $${m * (a - dd)}x = ${num(m * (e - b))}$. `}${f === 0 ? `So the value is $${num(answer)}$.` : `Then $${target} = ${num(m * (e - b))} ${f < 0 ? '-' : '+'} ${Math.abs(f)} = ${num(answer)}$.`}
+
+Check: the target's $x$ coefficient, $${m * (a - dd)}$, is ${m === 1 ? 'exactly' : `$${m}$ times`} the collected coefficient $${a - dd}$.
+
+Trap: carrying $${num(b)}$ across without changing its sign gives $${num(e + b)}$ instead of $${num(e - b)}$ on the right, and the final value $${num(wrong)}$. Rule: moving a term to the other side changes its sign.`;
+      traps.push({ value: frac(wrong), trap: 'alg-move-term-sign' });
     }
     return { params: { kind, k: k! }, q: { format: 'ne', stem, answer: frac(answer), traps, explanation } };
   },
