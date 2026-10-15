@@ -669,7 +669,7 @@ h3 {
 /* ---------------------------------------------------------------- section sim */
 .exam-bar {
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
   padding: 10px 16px;
   display: flex;
@@ -678,18 +678,14 @@ h3 {
   flex-wrap: wrap;
 }
 .exam-bar .btn {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: #fff;
+  background: color-mix(in srgb, var(--surface) 14%, transparent);
+  border-color: color-mix(in srgb, var(--surface) 30%, transparent);
+  color: var(--surface);
   padding: 6px 12px;
 }
 .exam-bar .btn.on {
-  background: #fff;
+  background: var(--surface);
   color: var(--accent);
-}
-:root[data-theme='dark'] .exam-bar,
-:root:not([data-theme='light']) .exam-bar {
-  color: #fff;
 }
 .exam-body {
   border: 1px solid var(--border);
@@ -704,7 +700,10 @@ h3 {
   font-size: 18px;
 }
 .exam-clock.low {
-  color: #ffd2cc;
+  background: var(--surface);
+  color: var(--bad);
+  padding: 0 8px;
+  border-radius: 6px;
 }
 .review-table {
   width: 100%;
