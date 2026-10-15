@@ -1,7 +1,8 @@
-import { qcCompare } from '../../../engine/build';
+import { qcCompare, qcCompareNum } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { lin, num } from '../../../engine/tex';
+import { plural, term } from '../../../engine/text';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { SPECIAL, intExcept, qcEnd, qcSamples, randomReals, times } from './util';
 
@@ -537,7 +538,8 @@ function signReason(pair: SignPair, cond: SignCond, ans: QCChoice): string {
 /* ================================================================== 4. Words to algebra (QC) */
 
 interface WordParams {
-  kind: 'order' | 'older-by' | 'twice' | 'percent' | 'more-than';
+  kind: 'consecutive' | 'chain' | 'older-by' | 'twice' | 'percent';
+  /** consecutive: [m, step, e, delta, lower bound or NaN, mode]; chain: [p, q, e, delta, lower bound or NaN, mode]; others as before */
   k: number[];
 }
 
@@ -548,7 +550,15 @@ const NAMES = [
   ['Grace', 'Hugo'],
   ['Ines', 'Jonah'],
   ['Kemal', 'Lena'],
+  ['Mira', 'Nico'],
+  ['Omar', 'Priya'],
+  ['Quinn', 'Rosa'],
+  ['Sam', 'Tara'],
+  ['Uma', 'Viktor'],
+  ['Wes', 'Xena'],
 ];
+
+const relWord = (r: QCChoice) => (r === 'A' ? 'Quantity A is greater' : r === 'B' ? 'Quantity B is greater' : 'the quantities are equal');
 
 const translateQC: Template<WordParams> = {
   id: 'alg.qc-algebra.translate-qc',
@@ -556,7 +566,7 @@ const translateQC: Template<WordParams> = {
   format: 'qc',
   style: 'translate words into algebra, then compare',
   generate(rng, d) {
-    const kind: WordParams['kind'] = rng.pick(d === 1 ? ['order', 'older-by', 'percent'] : ['order', 'older-by', 'twice', 'percent', 'more-than']);
+    const kind: WordParams['kind'] = rng.pick(d === 1 ? ['consecutive', 'consecutive', 'older-by', 'percent'] : ['consecutive', 'chain', 'older-by', 'twice', 'percent']);
     const [P, Q] = rng.pick(NAMES);
     let info: string;
     let A: string;
@@ -565,34 +575,121 @@ const translateQC: Template<WordParams> = {
     const traps: QCQuestion['traps'] = {};
     let explanation: string;
     let k: number[];
-    if (kind === 'order') {
-      const m = rng.pick([2, 3]);
-      const bounded = rng.chance(0.45);
-      info = bounded ? `${P} is younger than ${Q}, and ${Q} is less than ${m === 2 ? 'twice' : 'three times'} as old as ${P}.` : `${P} is younger than ${Q}.`;
-      A = `${m === 2 ? 'Twice' : 'Three times'} ${P}'s age`;
-      B = `${Q}'s age`;
-      answer = bounded ? 'A' : 'D';
+    if (kind === 'consecutive') {
+      // the sum of m consecutive integers (or even integers) beginning with n, against an expression in n
+      const m = rng.pick(d === 1 ? [3, 4] : [3, 4, 5]);
+      const step = d === 3 && rng.chance(0.5) ? 2 : 1;
+      const S = (step * m * (m - 1)) / 2;
+      const mode = rng.pick(d === 1 ? [0, 0, 1] : [0, 1, 1]);
+      const e = rng.pick([1, 2]);
+      const delta = rng.pick([S, S, S - 2, S + 2, S + 1, S - 1]);
+      // scaled comparisons need a condition on n: positive (step 1), at least a bound, or none
+      let lower: number | null = null;
+      if (mode === 1) {
+        const cond = rng.pick(step === 1 ? ['positive', 'bound', 'none'] : ['bound', 'none']);
+        if (cond === 'positive') lower = 1;
+        else if (cond === 'bound') lower = step === 2 ? 2 * rng.int(-1, 5) : rng.int(-2, 8);
+      }
+      const bExpr = (n: number) => (mode === 0 ? m * n + delta : (m + e) * n);
+      const nSet: number[] = [];
+      const lo = lower ?? -60;
+      for (let n = lo; n <= lo + 200; n++) if (step === 1 || n % 2 === 0) nSet.push(n);
+      const relAt = (n: number): QCChoice => qcCompare(m * n + S, bExpr(n));
+      // closed form: constant difference S - delta, or S - e n which is not positive from some n on
+      answer = mode === 0 ? qcCompare(S, delta) : lower === null || S - e * lower >= 0 ? 'D' : 'B';
+      const kind2 = step === 2 ? 'even integers' : 'integers';
+      const nWord = step === 2 ? 'an even integer' : 'an integer';
+      info = lower === 1 && mode === 1 && step === 1 ? '$n$ is a positive integer.' : lower !== null ? `$n$ is ${nWord} with $n \\ge ${num(lower)}$.` : `$n$ is ${nWord}.`;
+      A = `The sum of the ${m} consecutive ${kind2} beginning with $n$`;
+      B = mode === 0 ? `$${m}n ${delta < 0 ? '-' : '+'} ${Math.abs(delta)}$` : `$${m + e}n$`;
+      const terms = Array.from({ length: m }, (_, i) => (i === 0 ? 'n' : `n + ${i * step}`));
+      const listTex = m <= 3 ? terms.join(', ') : `${terms[0]}, ${terms[1]}, \\ldots, ${terms[m - 1]}`;
+      const sumTex = `${m}n + ${S}`;
+      const offsets = Array.from({ length: m - 1 }, (_, i) => (i + 1) * step).join(' + ');
+      const wrongRel = new Set(nSet.map((n) => qcCompare(m * n, bExpr(n))));
       if (answer === 'D') {
-        traps.A = 'tested-one-value';
-        traps.B = 'tested-one-value';
-      } else traps.D = 'alg-qc-variable-d';
-      explanation = `Let $p$ be ${P}'s age and $q$ be ${Q}'s age. The information says $p < q$${bounded ? ` and $q < ${m}p$` : ''}. Compare $${m}p$ with $q$.
+        // two simple allowed values that compare differently
+        const nice = (step === 2 ? [0, 2, 4, 6, 8, 10, 20, -2, -4] : [1, 2, 3, 0, 4, 5, 6, 8, 10, 20, -1, -2, 50]).filter((n) => nSet.includes(n));
+        const pool = nice.length > 1 ? nice : nSet;
+        const n1 = pool[0];
+        const n2 = pool.find((n) => relAt(n) !== relAt(n1)) ?? nSet.find((n) => relAt(n) !== relAt(n1)) ?? nSet[nSet.length - 1];
+        traps[relAt(n1)] = 'tested-one-value';
+        const line = (n: number) => `for $n = ${num(n)}$, Quantity A is $${num(m * n + S)}$ and Quantity B is $${num(bExpr(n))}$, so ${relWord(relAt(n))}`;
+        explanation = `Write the ${m} ${kind2}: $${listTex}$. Their sum is $${sumTex}$ (the offsets ${offsets} add up to ${S}).
 
-${
-        bounded
-          ? `The second statement is exactly $q < ${m}p$, so Quantity A is greater.`
-          : `With $p = 6$ and $q = 10$: $${m}p = ${6 * m} > 10$. With $p = 4$ and $q = ${4 * m + 5}$: $${m}p = ${4 * m} < ${4 * m + 5}$. Both pairs satisfy $p < q$.`
-      } ${qcEnd(answer)}`;
-      k = [m, bounded ? 1 : 0];
+Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: ${S} versus $${term(e, 'n')}$. The comparison depends on $n$: ${line(n1)}; ${line(n2)}. Two allowed values disagree. ${qcEnd('D')}`;
+      } else {
+        traps.D = 'alg-qc-variable-d';
+        if (wrongRel.size === 1) {
+          const w = [...wrongRel][0];
+          if (w !== answer) traps[w] = 'alg-consecutive-offset';
+        }
+        explanation =
+          mode === 0
+            ? `Write the ${m} ${kind2}: $${listTex}$. Their sum is $${sumTex}$ (the offsets ${offsets} add up to ${S}).
+
+Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: $${S}$ versus $${num(delta)}$. ${qcEnd(answer)}
+
+Leaving out the offsets gives $${m}n$ and a different comparison.`
+            : `Write the ${m} ${kind2}: $${listTex}$. Their sum is $${sumTex}$.
+
+Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: $${S}$ versus $${term(e, 'n')}$. Every allowed $n$ is at least $${num(lower!)}$, so $${term(e, 'n')} \\ge ${num(e * lower!)} > ${S}$ and Quantity B is greater. ${qcEnd(answer)}
+
+Leaving out the offsets gives $${m}n$ against ${B}, which is not the sum.`;
+      }
+      k = [m, step, e, delta, lower ?? NaN, mode];
+    } else if (kind === 'chain') {
+      // x = y + p, z = y - q: compare x with z + delta, or with 2z
+      const p = rng.int(2, 9);
+      const q = rng.int(2, 9);
+      const mode = rng.pick(d === 2 ? [0, 1] : [0, 1, 1]);
+      const t = mode === 1 ? rng.pick([NaN, NaN, p + 2 * q - rng.int(1, 3), p + 2 * q + rng.int(0, 3)]) : NaN;
+      const delta = rng.pick([p + q, p + q, p + q - 2, p + q + 3, p + q + 1]);
+      info = `$x$ is ${p} more than $y$, and $z$ is ${q} less than $y$.${Number.isNaN(t) ? '' : ` Also, $y > ${num(t)}$.`}`;
+      A = '$x$';
+      B = mode === 0 ? `$z + ${delta}$` : '$2z$';
+      // x - B = p + q - delta  (mode 0)  or  p + 2q - y  (mode 1)
+      const threshold = p + 2 * q;
+      if (mode === 0) answer = qcCompare(p + q, delta);
+      else answer = Number.isNaN(t) || t < threshold ? 'D' : 'B';
+      const ys = Number.isNaN(t) ? [-5, 0, 1, threshold, threshold + 10] : [t + 0.5, threshold - 0.5, threshold + 10];
+      const relY = (y: number): QCChoice => (mode === 0 ? qcCompare(p + q, delta) : qcCompareNum(y + p, 2 * (y - q)));
+      // wrong translation: z = y + q
+      const wrongRel = (y: number): QCChoice => (mode === 0 ? qcCompare(p - q, delta) : qcCompareNum(y + p, 2 * (y + q)));
+      if (answer === 'D') {
+        const allowed = ys.filter((y) => Number.isNaN(t) || y > t);
+        const y1 = allowed.find((y) => relY(y) === 'A') ?? allowed[0];
+        const y2 = allowed.find((y) => relY(y) === 'B') ?? allowed.find((y) => relY(y) !== relY(y1)) ?? allowed[allowed.length - 1];
+        const line = (y: number) => `for $y = ${num(y)}$, $x = ${num(y + p)}$ and $2z = ${num(2 * (y - q))}$, so ${relWord(relY(y))}`;
+        traps[relY(y1)] = 'tested-one-value';
+        explanation = `Write everything with $y$: $x = y + ${p}$ and $z = y - ${q}$.
+
+Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$, which depends on $y$: ${line(y1)}; ${line(y2)}. Two allowed values disagree. ${qcEnd('D')}`;
+      } else {
+        traps.D = 'alg-qc-variable-d';
+        const w = wrongRel(ys[0]);
+        if (w !== answer) traps[w] = 'alg-translation-direction';
+        explanation =
+          mode === 0
+            ? `Write everything with $y$: $x = y + ${p}$ and $z = y - ${q}$. Then $x - z = ${p + q}$, whatever $y$ is.
+
+So Quantity A is $z + ${p + q}$ and Quantity B is $z + ${delta}$: compare ${p + q} with ${delta}. ${qcEnd(answer)}
+
+Writing $z = y + ${q}$ (the "less than" reversed) gives $x - z = ${p - q}$, a different comparison.`
+            : `Write everything with $y$: $x = y + ${p}$ and $z = y - ${q}$. Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$.
+
+Since $y > ${num(t)} \\ge ${threshold}$, this is negative. ${qcEnd(answer)}`;
+      }
+      k = [p, q, delta, t, mode];
     } else if (kind === 'older-by') {
-      const dd = rng.int(3, 12);
-      const shift = rng.pick([dd, dd, dd + 2, dd - 1]);
-      info = `${Q} is ${dd} years older than ${P}.`;
-      A = `${P}'s age ${shift} years from now`;
+      const dd = rng.int(3, 15);
+      const shift = rng.pick([dd, dd, dd + 2, dd - 1, dd + 3, dd - 2]);
+      info = `${Q} is ${plural(dd, 'year')} older than ${P}.`;
+      A = `${P}'s age ${plural(shift, 'year')} from now`;
       B = `${Q}'s age now`;
       answer = qcCompare(shift, dd);
       if (answer !== 'D') traps.D = 'alg-qc-variable-d';
-      explanation = `Let $p$ be ${P}'s age now. Then ${Q}'s age now is $p + ${dd}$, and ${P}'s age ${shift} years from now is $p + ${shift}$.
+      explanation = `Let $p$ be ${P}'s age now. Then ${Q}'s age now is $p + ${dd}$, and ${P}'s age ${plural(shift, 'year')} from now is $p + ${shift}$.
 
 Subtract $p$ from both: compare ${shift} with ${dd}. ${qcEnd(answer)}`;
       k = [dd, shift];
@@ -619,8 +716,8 @@ The difference is ${t} years, always. ${qcEnd(answer)}`;
 ${P}'s age could be less than ${t}, equal to it, or greater. ${qcEnd(answer)}`;
       }
       k = [t, variant === 'future' ? 1 : 0];
-    } else if (kind === 'percent') {
-      const n = rng.pick([100, 200, 50, 300, 100]);
+    } else {
+      const n = rng.pick([100, 200, 50, 300, 100, 150, 250, 400, 500]);
       const r = new Frac(n, 100);
       const bOpt = rng.pick(['same', 'same', 'x2', 'big']);
       const Bcoef = bOpt === 'same' ? r : bOpt === 'x2' ? frac(1) : r.mul(2);
@@ -638,28 +735,6 @@ Compare $${coefTex(r)}x^2$ with $${coefTex(Bcoef)}x^2$: since $x^2 > 0$, only th
 
 Reading "$x$ percent" as $x$ (instead of $\\frac{x}{100}$) gives $${n}x^2$.`;
       k = [n, Bcoef.n, Bcoef.d];
-    } else {
-      // more-than: k more teachers than students, t teachers; total vs 2t - k
-      const kk = rng.int(4, 20);
-      const ctx = rng.pick([
-        ['teachers', 'students', 'meeting'],
-        ['members', 'guests', 'club dinner'],
-        ['adults', 'children', 'concert'],
-      ]);
-      const bOpt = rng.pick(['right', 'right', 'wrong-sign', 'double']);
-      info = `At a ${ctx[2]}, there are ${kk} more ${ctx[0]} than ${ctx[1]}. The number of ${ctx[0]} is $t$.`;
-      A = `The total number of ${ctx[0]} and ${ctx[1]} at the ${ctx[2]}`;
-      B = bOpt === 'right' ? `$2t - ${kk}$` : bOpt === 'wrong-sign' ? `$2t + ${kk}$` : `$2t$`;
-      answer = bOpt === 'right' ? 'C' : 'B';
-      if (answer === 'C') traps.A = 'alg-translation-direction';
-      else traps.C = 'alg-translation-direction';
-      traps.D = 'alg-qc-variable-d';
-      explanation = `There are ${kk} FEWER ${ctx[1]} than ${ctx[0]}, so the number of ${ctx[1]} is $t - ${kk}$. The total is $t + (t - ${kk}) = 2t - ${kk}$.
-
-Compare $2t - ${kk}$ with ${B}. ${qcEnd(answer)}
-
-Writing the ${ctx[1]} as $t + ${kk}$ reverses the relationship.`;
-      k = [kk, bOpt === 'right' ? 0 : bOpt === 'wrong-sign' ? 1 : 2];
     }
     return {
       params: { kind, k: k! },
@@ -669,28 +744,39 @@ Writing the ${ctx[1]} as $t + ${kk}$ reverses the relationship.`;
   check(q, { kind, k }, rng) {
     if (q.format !== 'qc') return 'wrong format';
     const samples: [number, number][] = [];
-    for (let i = 0; i < 400; i++) {
-      const p = 0.5 + rng.next() * rng.pick([5, 30, 80]);
-      if (kind === 'order') {
-        const [m, bounded] = k;
-        // q in (p, m p) if bounded, else any q > p
-        const qv = bounded ? p + (m * p - p) * (0.001 + 0.998 * rng.next()) : p + rng.next() * rng.pick([0.5, 5, 50, 200]);
-        samples.push([m * p, qv]);
-      } else if (kind === 'older-by') {
-        const [dd, shift] = k;
-        samples.push([p + shift, p + dd]);
-      } else if (kind === 'twice') {
-        const [t, future] = k;
-        samples.push(future ? [2 * (p + t), 2 * p + t] : [p + t, 2 * p]);
-      } else if (kind === 'percent') {
-        const [n, bn, bd] = k;
-        const x = p;
-        samples.push([(x / 100) * (n * x), (bn / bd) * x * x]);
-      } else {
-        const [kk, bOpt] = k;
-        const t = kk + 1 + Math.floor(rng.next() * 100);
-        const others = t - kk;
-        samples.push([t + others, bOpt === 0 ? 2 * t - kk : bOpt === 1 ? 2 * t + kk : 2 * t]);
+    if (kind === 'consecutive') {
+      const [m, step, e, delta, lower, mode] = k;
+      const lo = Number.isNaN(lower) ? -150 : lower;
+      for (let n = lo; n <= lo + 400; n++) {
+        if (step === 2 && n % 2 !== 0) continue;
+        // build the integers explicitly and add them
+        let sum = 0;
+        for (let i = 0; i < m; i++) sum += n + i * step;
+        samples.push([sum, mode === 0 ? m * n + delta : (m + e) * n]);
+      }
+    } else if (kind === 'chain') {
+      const [p, qq, delta, t, mode] = k;
+      for (let i = 0; i < 400; i++) {
+        const base = Number.isNaN(t) ? (rng.next() * 2 - 1) * rng.pick([5, 30, 100]) : t + 0.001 + rng.next() * rng.pick([2, 30, 100]);
+        const y = base;
+        const x = y + p;
+        const z = y - qq;
+        samples.push([x, mode === 0 ? z + delta : 2 * z]);
+      }
+    } else {
+      for (let i = 0; i < 400; i++) {
+        const p = 0.5 + rng.next() * rng.pick([5, 30, 80]);
+        if (kind === 'older-by') {
+          const [dd, shift] = k;
+          samples.push([p + shift, p + dd]);
+        } else if (kind === 'twice') {
+          const [t, future] = k;
+          samples.push(future ? [2 * (p + t), 2 * p + t] : [p + t, 2 * p]);
+        } else {
+          const [n, bn, bd] = k;
+          const x = p;
+          samples.push([(x / 100) * (n * x), (bn / bd) * x * x]);
+        }
       }
     }
     const expected = qcSamples(samples, 1e-9);

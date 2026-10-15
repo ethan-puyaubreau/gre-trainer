@@ -436,6 +436,10 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Assumed equal because both use the same numbers',
     fix: 'Expand and cancel what is common: $(x + 4)(y + 3) - (x + 3)(y + 4) = y - x$, which depends on $x$ and $y$.',
   },
+  'alg-consecutive-offset': {
+    label: 'Forgot the offsets of consecutive integers',
+    fix: 'The integers beginning with $n$ are $n$, $n + 1$, $n + 2$, ...: their sum is $3n + 3$ for three of them, not $3n$.',
+  },
   'alg-translation-slip': {
     label: 'Applied "twice" to only part of the quantity',
     fix: 'Translate exactly: "twice the age in 5 years" is $2(p + 5) = 2p + 10$, not $2p + 5$.',
