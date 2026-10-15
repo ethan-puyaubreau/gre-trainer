@@ -149,6 +149,17 @@ describe('lessons seen', () => {
     expect(isProgressData({ ...old, lessonsSeen: [1] })).toBe(false);
   });
 
+  it('accepts a daily goal from 1 to 200 and rejects anything else', () => {
+    const withGoal = (dailyGoal: unknown) => ({ ...initialData(), settings: { ...initialData().settings, dailyGoal } });
+    for (const ok of [undefined, 1, 20, 200]) expect(isProgressData(withGoal(ok))).toBe(true);
+    for (const bad of [0, 201, -5, 2.5, NaN, '20', null]) expect(isProgressData(withGoal(bad))).toBe(false);
+  });
+
+  it('keeps the daily goal through an import', () => {
+    useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, dailyGoal: 35 } });
+    expect(useProgress.getState().settings.dailyGoal).toBe(35);
+  });
+
   it('keeps the lessons setting through an import', () => {
     useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, lessons: false } });
     expect(useProgress.getState().settings.lessons).toBe(false);

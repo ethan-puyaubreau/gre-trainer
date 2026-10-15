@@ -23,6 +23,49 @@
   border-radius: 2px;
 }
 
+/* Daily goal: a ring filled with today's answers, drawn in on arrival with the motion tokens. */
+.goal-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 2px;
+}
+.goal-ring svg {
+  position: absolute;
+  inset: 0;
+  fill: none;
+  stroke-width: 3.5;
+  transform: rotate(-90deg);
+}
+.goal-track {
+  stroke: var(--border);
+}
+.goal-arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  animation: fx-goal-fill var(--dur-slow) var(--ease-out) both;
+}
+.goal-ring.done .goal-arc {
+  stroke: var(--good);
+}
+.stat .goal-ring b {
+  font-size: 16px;
+}
+@keyframes fx-goal-fill {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+.habit-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 12px 0 0;
+}
+
 /* Progress since the last visit: a one-time glow and a level badge on the tiles whose level rose. */
 .skill-tile.fx-raised {
   position: relative;

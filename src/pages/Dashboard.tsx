@@ -6,6 +6,7 @@ import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '.
 import { LESSONS } from '../content/lessons';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
+import { dayStreak, DEFAULT_DAILY_GOAL, tomorrowDue } from '../mastery/habit';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextCriteria, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
 import { reducedMotion } from '../motion';
 import { href } from '../router';
@@ -93,6 +94,7 @@ export function Dashboard() {
     const counts = [0, 0, 0, 0, 0];
     for (const sk of playable) counts[states[sk.id]?.level ?? 0]++;
     const due = playable.filter((sk) => states[sk.id] && isDue(states[sk.id], now)).length;
+    const tried = Object.fromEntries(playable.filter((sk) => states[sk.id]).map((sk) => [sk.id, states[sk.id]]));
     const trapCounts = new Map<string, number>();
     for (const h of history.slice(-400)) for (const t of h.traps) trapCounts.set(t, (trapCounts.get(t) ?? 0) + 1);
     const traps = [...trapCounts].sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -105,6 +107,8 @@ export function Dashboard() {
       mastery: playable.length ? Math.round((100 * pts) / (100 * playable.length)) : 0,
       counts,
       due,
+      tomorrow: tomorrowDue(tried, now),
+      streak: dayStreak(history, now),
       traps,
     };
   }, [history, states, now, playable]);
@@ -138,6 +142,11 @@ export function Dashboard() {
               ))}
             </div>
           </div>
+          <GoalRing done={stats.today} goal={settings.dailyGoal ?? DEFAULT_DAILY_GOAL} />
+          <div className="stat" style={{ minWidth: 80 }}>
+            <b>{stats.streak}</b>
+            <span>day streak</span>
+          </div>
           <div className="stat" style={{ minWidth: 110 }}>
             <b>
               {stats.todayCorrect}/{stats.today}
@@ -155,6 +164,9 @@ export function Dashboard() {
             <span>avg time / {formatClock(settings.paceSec * 1000)} pace</span>
           </div>
         </div>
+        <p className="habit-line muted small">
+          <span>Tomorrow: {stats.tomorrow === 0 ? 'nothing to review' : `${stats.tomorrow} skill${stats.tomorrow === 1 ? '' : 's'} to review`}</span>
+        </p>
       </div>
 
       <div className="grid grid-3">
@@ -322,6 +334,32 @@ export function Dashboard() {
       )}
 
       {open && <SkillDrawer skill={open} opener={opener} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+/** Today's answers against the daily goal: a ring that is drawn in on arrival (the global reduced-motion rules cut it). */
+function GoalRing({ done, goal }: { done: number; goal: number }) {
+  const p = Math.min(1, done / goal);
+  const met = done >= goal;
+  return (
+    <div className="stat">
+      <div
+        className={met ? 'goal-ring done' : 'goal-ring'}
+        role="progressbar"
+        aria-label="Daily goal"
+        aria-valuemin={0}
+        aria-valuemax={goal}
+        aria-valuenow={Math.min(done, goal)}
+        aria-valuetext={`${done} of ${goal} answers today`}
+      >
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle className="goal-track" cx="18" cy="18" r="15" />
+          {p > 0 && <circle className="goal-arc" cx="18" cy="18" r="15" pathLength={1} style={{ strokeDashoffset: 1 - p }} />}
+        </svg>
+        <b>{done}</b>
+      </div>
+      <span>{met ? 'goal reached' : `of ${goal} today`}</span>
     </div>
   );
 }

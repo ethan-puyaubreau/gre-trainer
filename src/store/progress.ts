@@ -4,6 +4,7 @@ import type { Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Difficulty, Question } from '../engine/types';
 import { templatesBySkill } from '../content';
+import { MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, requirementsFor, type AttemptInput, type AttemptOutcome, type SkillState } from '../mastery/model';
 import { scheduleRepair, type Remediation } from '../mastery/scheduler';
 import { dropWeakFlags, migrateProgress, migrateStyleCredits } from './migrate';
@@ -49,6 +50,8 @@ export interface Settings {
   lastExportAt?: number;
   /** Show a skill's lesson before its first question (undefined = on). */
   lessons?: boolean;
+  /** Answers a day to aim for (undefined = 20). */
+  dailyGoal?: number;
 }
 
 export interface ProgressData {
@@ -116,12 +119,18 @@ export const NOT_AN_EXPORT = 'This file is not a GRE Trainer progress export.';
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const isNum = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
 
+/** The optional settings, checked when present: a bad value would reach the pages unguarded. */
+function validSettings(s: Record<string, unknown>): boolean {
+  const g = s.dailyGoal;
+  return g === undefined || (typeof g === 'number' && Number.isInteger(g) && g >= MIN_DAILY_GOAL && g <= MAX_DAILY_GOAL);
+}
+
 /** Shape check for an imported file: every field the pages read without a guard must be there. */
 export function isProgressData(x: unknown): x is ProgressData {
   if (!isObj(x) || x.version !== 1) return false;
   if (!isObj(x.skills) || !Object.values(x.skills).every(isObj)) return false;
   if (!Array.isArray(x.remediation) || (x.sections !== undefined && !Array.isArray(x.sections))) return false;
-  if (x.settings !== undefined && !isObj(x.settings)) return false;
+  if (x.settings !== undefined && !(isObj(x.settings) && validSettings(x.settings))) return false;
   if (x.seq !== undefined && !isNum(x.seq)) return false;
   if (x.lessonsSeen !== undefined && !(Array.isArray(x.lessonsSeen) && x.lessonsSeen.every((id) => typeof id === 'string'))) return false;
   return (

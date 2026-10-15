@@ -1,14 +1,20 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatClock } from '../components/Timer';
+import { DEFAULT_DAILY_GOAL, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
 import { exportProgress, isProgressData, NOT_AN_EXPORT, useProgress } from '../store/progress';
 
+const fieldStyle = { padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' } as const;
 const answers = (k: number) => `${k} answer${k === 1 ? '' : 's'}`;
 
 export function Settings() {
   const { settings, updateSettings, importData, reset, history } = useProgress();
   const [msg, setMsg] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  // The field is typed in, so it keeps its own text: an empty or half-typed number is not a goal yet.
+  const goal = settings.dailyGoal ?? DEFAULT_DAILY_GOAL;
+  const [goalText, setGoalText] = useState(String(goal));
+  useEffect(() => setGoalText(String(goal)), [goal]);
 
   const download = () => {
     updateSettings({ lastExportAt: Date.now() });
@@ -61,6 +67,29 @@ export function Settings() {
           <input type="checkbox" checked={settings.showTimer} onChange={(e) => updateSettings({ showTimer: e.target.checked })} />
           Show the timer while answering
         </label>
+
+        <h3>Daily goal</h3>
+        <div className="row">
+          <input
+            type="number"
+            min={MIN_DAILY_GOAL}
+            max={MAX_DAILY_GOAL}
+            step={1}
+            value={goalText}
+            onChange={(e) => {
+              setGoalText(e.target.value);
+              const n = Number(e.target.value);
+              if (e.target.value !== '' && Number.isInteger(n) && n >= MIN_DAILY_GOAL && n <= MAX_DAILY_GOAL) updateSettings({ dailyGoal: n });
+            }}
+            onBlur={() => setGoalText(String(goal))}
+            style={{ ...fieldStyle, width: 84 }}
+            aria-label="Daily goal in answers"
+          />
+          <span>answers a day</span>
+        </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          The ring on the dashboard fills as you answer. Choose between {MIN_DAILY_GOAL} and {MAX_DAILY_GOAL}.
+        </p>
 
         <h3>Lessons before new skills</h3>
         <div className="tabs">
