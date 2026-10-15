@@ -134,6 +134,18 @@ describe('mastery model', () => {
     expect(s.firstCreditAt).toBe(T0 + 1);
   });
 
+  it('promotes to Mastered only on an answer that credits, even when every criterion has been met for 18 h', () => {
+    const ready = proficient({ t1: 3, t2: 2, t3: 2 });
+    const at18 = T0 + 18 * H;
+    expect(applyAttempt(ready, ans('t3', at18), REQ).state.level).toBe(4); // credits: control
+    const easy = applyAttempt(ready, ans('t3', at18, { difficulty: 1 }), REQ);
+    expect(easy.state.level).toBe(3); // difficulty 1 never credits
+    const aided = applyAttempt(ready, ans('t3', at18, { hintLevel: 3 }), REQ);
+    expect(aided.state.level).toBe(3); // the full strategy card cancels the credit
+    // The checklist is complete, so the very next credited answer promotes.
+    expect(applyAttempt(aided.state, ans('t3', at18 + 1), REQ).state.level).toBe(4);
+  });
+
   it('cancels the credit only for the full strategy card', () => {
     expect(applyAttempt(newSkillState(), ans('t1', T0, { hintLevel: 3 }), REQ).state.styles).toEqual({});
     expect(applyAttempt(newSkillState(), ans('t1', T0, { hintLevel: 2 }), REQ).state.styles).toEqual({ t1: 2 });
