@@ -20,7 +20,7 @@ export const mxSplitTraps: Record<string, Trap> = {
   },
   'algw-split-difference-sign': {
     label: 'Added the smaller interest instead of subtracting it',
-    fix: 'If one account earns $D more than the other, then (higher interest) $-$ (lower interest) $= D$.',
+    fix: 'If one account earns $D$ dollars more than the other, then (higher interest) minus (lower interest) equals $D$.',
   },
 };
 

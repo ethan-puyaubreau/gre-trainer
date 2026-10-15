@@ -12,7 +12,7 @@ export const mxSimpleYearsTraps: Record<string, Trap> = {
   },
   'algw-one-principal-only': {
     label: 'Found the years to earn the principal once instead of the multiple asked',
-    fix: 'To reach $k$ times the deposit, the interest must be $k - 1$ times the deposit, so the years are $\frac{(k - 1) \cdot 100}{r}$.',
+    fix: 'To reach $k$ times the deposit, the interest must be $k - 1$ times the deposit, so the years are $\\frac{(k - 1) \\cdot 100}{r}$.',
   },
   'algw-principal-ignored': {
     label: 'Divided by the rate alone and ignored the principal',
@@ -20,7 +20,7 @@ export const mxSimpleYearsTraps: Record<string, Trap> = {
   },
   'algw-percent-instead-of-years': {
     label: 'Gave the total percent growth instead of the number of years',
-    fix: 'Total growth in percent is rate $\times$ years. Divide it by the yearly rate to get the years.',
+    fix: 'Total growth in percent is rate times years. Divide it by the yearly rate to get the years.',
   },
   'algw-gave-rate': {
     label: 'Gave the rate, a number already in the problem',

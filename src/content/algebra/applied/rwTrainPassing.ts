@@ -133,11 +133,9 @@ Check: in ${dx(ans)} seconds the ${noun} moves ${dx(ans.mul(v))} meters and the 
     const a = q.answer;
     const step = frac(1, 10);
     if (kind === 'length') {
-      // Use the answer as the length: speed from the pole, then find when the rear clears the platform.
+      // Use the answer as the length: the speed comes from the pole, and the rear must clear the platform exactly at t2.
       const speed = a.div(t1);
-      let t = frac(0);
-      for (let i = 0; i < 700 && speed.mul(t).sub(a).lt(P); i++) t = t.add(step);
-      return t.eq(t2) ? null : `crossing would take ${t} seconds, not ${t2}`;
+      return speed.mul(t2).sub(a).eq(P) ? null : `the rear is ${speed.mul(t2).sub(a)} m past the platform start at ${t2} s, not ${P}`;
     }
     // Step time forward until the rear has cleared; the answer must be the first such moment.
     const rearClear = (t: Frac) => (kind === 'cross' ? frac(v).mul(t).sub(L).gte(P) : frac(v).mul(t).sub(L).gte(frac(vB).mul(t).add(LB)));
