@@ -352,6 +352,10 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Used the square of the scale factor for a volume',
     fix: 'A volume scales with the CUBE of the scale factor. The square is for areas.',
   },
+  'geo-sim-wrong-length': {
+    label: 'Gave a length from the figure instead of the one asked',
+    fix: 'The proportion gives the unknown length. Do not stop at a number that is already in the figure; solve the proportion and answer what is asked.',
+  },
   'geo-sim-no-divide': {
     label: 'Multiplied the lengths without dividing by the matching length',
     fix: 'Similar triangles give a proportion: $\\frac{h}{s_2} = \\frac{h_1}{s_1}$. Multiply across the proportion and then divide by the remaining length.',

@@ -606,6 +606,10 @@ const SCALE_NOTES: Record<string, (vs: string) => string> = {
   'geo-sim-double-percent': (vs) => `doubling the percent, ${vs}, forgets the product of the two increases`,
   'geo-sim-ratio-not-change': (vs) => `the new area as a percent of the old one, ${vs}, is not the change`,
   'geo-sim-square-percent': (vs) => `squaring the percent itself, ${vs}, is not the area factor`,
+  'geo-sim-wrong-length': (vs) => `${vs} is a length already in the figure, not the one asked for`,
+  'geo-sim-triple-percent': (vs) => `tripling the percent, ${vs}, treats three dimensions as one increase of $3p$ percent`,
+  'geo-sim-squared-for-volume': (vs) => `squaring the scale factor, ${vs}, is for areas, not volumes`,
+  'geo-sim-averaged-percent': (vs) => `averaging the change of a side with the change of the area, ${vs}, has no basis`,
   'geo-sim-additive': (vs) => `adding the difference of the shadows to the height, ${vs}, treats the scale as a shift`,
   'geo-sim-no-divide': (vs) => `multiplying the post's height by the tree's shadow, ${vs}, never divides by the post's shadow`,
   'geo-sim-part-whole': (vs) => `comparing the shadow with the distance to the lamppost instead of the whole base, ${vs}, mixes a part with the whole`,
@@ -682,7 +686,6 @@ function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionB
               { value: new Frac(f * f, 100), trap: 'geo-sim-ratio-not-change' },
               { value: new Frac(pct * pct, 100), trap: 'geo-sim-square-percent' },
               { value: fq.pow(3).sub(1).abs().mul(100), trap: 'geo-sim-cubed' },
-              { value: 3 * pct, trap: 'geo-sim-double-percent' },
               { value: f, trap: 'geo-sim-ratio-not-change' },
               { value: keyPct.add(pct).div(2), trap: 'geo-sim-averaged-percent' },
             ]
@@ -737,8 +740,8 @@ That is ${up ? `an increase of $${decimal(scaled)} - 1 = ${decimal(scaled.sub(1)
           { value: h1 + s2 - s1, trap: 'geo-sim-additive' },
           { value: new Frac(h1 * s1, s2), trap: 'geo-sim-inverted' },
           { value: h1 * s2, trap: 'geo-sim-no-divide' },
-          { value: s2, trap: 'geo-ang-wrong-unknown' },
-          { value: h1, trap: 'geo-ang-wrong-unknown' },
+          { value: s2, trap: 'geo-sim-wrong-length' },
+          { value: h1, trap: 'geo-sim-wrong-length' },
           { value: s2 - s1, trap: 'geo-sim-additive' },
           { value: new Frac(h1 * s2 * s2, s1 * s1), trap: 'geo-sim-perimeter-squared' },
         ].filter((t) => (t.value instanceof Frac ? t.value.isTerminating() : true));
@@ -787,11 +790,11 @@ Check: the tree's shadow is $${ft(new Frac(s2, s1))}$ times the post's shadow, a
         { value: new Frac(dd * (H - h), h), trap: 'geo-sim-inverted' },
         { value: s.add(dd), trap: 'geo-sim-whole-not-part' },
         { value: new Frac(dd * H, h), trap: 'geo-sim-inverted' },
-        { value: Frac.of(dd), trap: 'geo-ang-wrong-unknown' },
-        { value: Frac.of(h), trap: 'geo-ang-wrong-unknown' },
+        { value: Frac.of(dd), trap: 'geo-sim-wrong-length' },
+        { value: Frac.of(h), trap: 'geo-sim-wrong-length' },
         { value: new Frac(h * dd, H + h), trap: 'geo-sim-additive' },
         { value: s.mul(new Frac(h, H)), trap: 'geo-sim-part-whole' },
-        { value: Frac.of(H - h), trap: 'geo-ang-wrong-unknown' },
+        { value: Frac.of(H - h), trap: 'geo-sim-wrong-length' },
       ].filter((t) => t.value.isTerminating());
       const { choices, answer, values } = intChoices(rng, s.toNumber(), traps, [s.add(2), s.sub(2), Frac.of(dd), s.add(1), s.sub(1)], (v) => `$${dec(v)}$`);
       const sc = 4 / (dd + s.toNumber());
