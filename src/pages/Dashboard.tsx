@@ -192,7 +192,7 @@ export function Dashboard() {
           <div className="chip chip-accent">Recommended</div>
           <h3>Smart practice</h3>
           <p className="muted small">
-            Repairs missed skills in a new style, reviews what is due, then moves you forward.
+            Missed skills come back with new numbers, then in another question type the next day. Also reviews what is due and moves you forward.
             {remediation.length > 0 && ` ${remediation.length} skill${remediation.length > 1 ? 's' : ''} waiting to come back.`}
           </p>
           <a className="btn btn-primary" href={href('practice')}>
