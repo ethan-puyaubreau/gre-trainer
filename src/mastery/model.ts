@@ -227,7 +227,7 @@ function stepText(s: SkillState): string {
   if (s.level === 1) return 'Answer one question correctly.';
   const need = STYLES_FOR_PROFICIENT - Object.keys(s.styles).length;
   return need > 0
-    ? `Answer ${need} more style${need > 1 ? 's' : ''} correctly at medium or hard difficulty, without the full strategy card.`
+    ? `Answer ${need} more question type${need > 1 ? 's' : ''} correctly at medium or hard difficulty, without the full strategy card.`
     : 'One more correct answer.';
 }
 
@@ -241,7 +241,7 @@ export function nextCriteria(s: SkillState, req: SkillRequirements, now: number)
   const production = PRODUCTION.filter((f) => req.formats.includes(f));
   const back = s.firstCreditAt === undefined ? undefined : s.firstCreditAt + RETENTION_MS;
   const out: Criterion[] = [
-    { key: 'styles', label: `Styles ${credits}/${need}`, done: credits >= need, detail: 'correct, medium or hard, without the full strategy card' },
+    { key: 'styles', label: `Question types ${credits}/${need}`, done: credits >= need, detail: 'correct, medium or hard, without the full strategy card' },
     { key: 'formats', label: `${needFormats} format${needFormats === 1 ? '' : 's'}`, done: s.formats.length >= needFormats },
   ];
   if (production.length) {

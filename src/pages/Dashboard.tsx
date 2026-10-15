@@ -481,7 +481,7 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
       <a className="btn btn-primary" href={href('practice', 'skill', skill.id)}>
         Practice this skill
       </a>
-      <h3>Question styles</h3>
+      <h3>Question types</h3>
       <ul className="list-plain">
         {templates.map((t) => (
           <li key={t.id} className="row">

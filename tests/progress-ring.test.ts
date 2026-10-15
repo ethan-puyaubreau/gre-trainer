@@ -19,13 +19,13 @@ describe('nextCriteria', () => {
     expect(nextCriteria(at(1), REQ, T0).map((c) => c.label)).toEqual(['Answer one question correctly.']);
     const familiar = nextCriteria(at(2, { styles: { t0: 2 } }), REQ, T0);
     expect(familiar).toHaveLength(1);
-    expect(familiar[0].label).toMatch(/^Answer 1 more style correctly/);
+    expect(familiar[0].label).toMatch(/^Answer 1 more question type correctly/);
     expect(nextCriteria(at(4), REQ, T0)).toEqual([]);
   });
 
   it('lists the five Mastered criteria at Proficient', () => {
     expect(nextCriteria(proficient, REQ, T0 + H).map((c) => [c.key, c.label, c.done])).toEqual([
-      ['styles', 'Styles 2/3', false],
+      ['styles', 'Question types 2/3', false],
       ['formats', '2 formats', true],
       ['production', 'Numeric entry', false],
       ['hard', 'One hard question', true],

@@ -357,7 +357,7 @@ export function Practice({ route }: { route: string[] }) {
               <a className={`chip chip-accent${reveal}`} href={href('practice', 'skill', skill.id)} title="Practice only this skill">
                 <i className={`level-dot level-${level}`} /> {skill.name} · {LEVEL_NAMES[level]}
               </a>
-              <span className={`chip${reveal}`} title={template.style}>
+              <span className={`chip${reveal}`} title={`Question type: ${template.style}`}>
                 {template.style}
               </span>
             </>
@@ -526,7 +526,7 @@ function Feedback({
         : judged && !onPace
           ? outcome.from === 4
             ? 'Correct, but over the pace: a Mastered skill is confirmed only by answers on pace.'
-            : 'Correct, and this style counts. It was over the pace, though, and Mastered needs an answer on pace.'
+            : 'Correct, and this question type counts. It was over the pace, though, and Mastered needs an answer on pace.'
           : '';
   return (
     <div className={`feedback ${g.correct ? 'ok' : 'ko'}`}>
@@ -546,7 +546,7 @@ function Feedback({
       <p className="small" style={{ margin: '10px 0 0' }}>
         <strong>{skillName}</strong>:{' '}
         {outcome.from !== outcome.to ? <LevelChange from={outcome.from} to={outcome.to} /> : <span className="chip">{LEVEL_NAMES[outcome.to]}</span>}{' '}
-        {g.correct ? `${creditNote} ${nextStepText}`.trim() : 'This skill comes back within a few questions with new numbers, then again tomorrow in a different style.'}
+        {g.correct ? `${creditNote} ${nextStepText}`.trim() : 'This skill comes back within a few questions with new numbers, then again tomorrow in a different question type.'}
       </p>
 
       {dodged.length > 0 && (
