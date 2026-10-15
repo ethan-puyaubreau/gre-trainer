@@ -14,7 +14,8 @@ import { chainTemplates, chainTraps } from './chains';
 import { sameTemplates, sameTraps } from './same';
 import { mustTemplates, mustTraps } from './mustbe';
 import { scaleTemplates, scaleTraps } from './ineqScale';
+import { boundsTemplates, boundsTraps } from './ineqBounds';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates, ...boundsTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps, ...boundsTraps };
