@@ -209,7 +209,7 @@ const arrangementsMCM: Template<ArrangementParams> = {
       const denom = g.map((x) => `${x}!`).join(' \\cdot ');
       const explanation = `Identical letters make some orders look the same, so divide out the orders of each repeated letter. The ${word(n)} letters give $\\dfrac{${n}!}{${denom}} = \\dfrac{${num(fact(n))}}{${num(g.reduce((a, x) => a * fact(x).n, 1))}} = ${num(total)}$ arrangements.
 
-Another correct way is to choose the positions of each repeated letter in turn with binomials, using only the positions still free, then arrange the single letters. Every correct choice is one of these counts in disguise. Evaluate each choice:
+Another correct way is to choose the positions of each repeated letter in turn with binomials, using only the positions still free, then arrange the single letters. Every correct choice is one of these counts rewritten in another form. Evaluate each choice:
 ${lines.join('\n')}
 
 Trap: ${trapLine[items[wi].trap!]}
