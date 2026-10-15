@@ -341,7 +341,7 @@ const orderQC: Template<OrderParams> = {
     const pool = QCONDS.map((c, i) => ({ c, i })).filter(({ c }) => (d === 1 ? c.d === 1 : d === 2 ? c.d <= 2 : c.d >= 2));
     for (;;) {
       const { c: cond, i: ci } = rng.pick(pool);
-      const exprs = [...EXPRS, ...CONSTS].filter((e) => usable(e, cond.set));
+      const exprs = [...EXPRS, ...CONSTS].filter((e) => e.tex !== 'x^6' && usable(e, cond.set));
       const pts = repPoints(cond.set);
       const options: { a: Ex; b: Ex; rel: QCChoice }[] = [];
       for (const a of exprs)
@@ -389,7 +389,7 @@ const orderQC: Template<OrderParams> = {
       if (traps && Object.keys(traps).includes(answer)) traps = undefined;
       const sym = (r: QCChoice) => (r === 'A' ? '>' : r === 'B' ? '<' : '=');
       const lines = rows
-        .map((r) => `- $x = ${r.x.toTex()}$${r.endpoint ? ' (endpoint)' : ''}: $A = ${r.va.toTex()}$, $B = ${r.vb.toTex()}$, so A $${sym(r.rel)}$ B`)
+        .map((r) => `- $x = ${r.x.toTex()}$${r.endpoint ? ' (endpoint)' : ''}: Quantity A is $${r.va.toTex()}$ and Quantity B is $${r.vb.toTex()}$, so A $${sym(r.rel)}$ B`)
         .join('\n');
       // The conclusion must follow from what is shown. D: two cited cases that disagree. C: the identity |x| = +-x on the range.
       // A or B: the quantities can only be equal at the points of {-1, 0, 1} listed (and where |x| = +-x), none of them allowed,
@@ -408,14 +408,14 @@ const orderQC: Template<OrderParams> = {
       const reason =
         answer === 'D'
           ? other
-            ? `${at(rows[0])}, but ${at(other)}: the comparison flips inside the range.`
+            ? `${at(rows[0])}, but ${at(other)}: the comparison flips.`
             : 'The comparison changes with $x$.'
           : answer === 'C' && absPair && (nonneg || nonpos)
             ? `For a number that is ${nonneg ? 'not negative' : 'not positive'}, $|x| = ${nonneg ? 'x' : '-x'}$: the two quantities are the same number.`
             : answer === 'A' || answer === 'B'
               ? `${
                   absPair
-                    ? `$|x| = ${absPair.tex}$ only when $x ${absPair.tex === 'x' ? '\\ge' : '\\le'} 0$, which no allowed $x$ satisfies`
+                    ? `$|x| = ${absPair.tex}$ exactly when $x ${absPair.tex === 'x' ? '\\ge' : '\\le'} 0$, and no allowed $x$ does that`
                     : eqPts.length === 0
                       ? 'A and B are never equal'
                       : `A and B can be equal only at ${ptTex.length > 1 ? `${ptTex.slice(0, -1).join(', ')} or ${ptTex[ptTex.length - 1]}` : ptTex[0]}, and ${ptTex.length > 1 ? 'none of these is' : 'it is not'} allowed`
@@ -423,7 +423,7 @@ const orderQC: Template<OrderParams> = {
               : 'The two quantities are equal for every allowed $x$.';
       const trapLine =
         answer === 'D'
-          ? 'Trap: one test value, or the endpoints alone, can hide the flip; test every part of the range.'
+          ? 'Trap: a single test value, or the endpoints alone, can hide the flip.'
           : traps
             ? `Trap: ${Object.entries(traps)
                 .map(([k]) => `reasoning with a value outside this range (such as $x = 2$) points to ${QC_REL[k as QCChoice]}`)
@@ -441,7 +441,7 @@ const orderQC: Template<OrderParams> = {
           explanation: `Compare the quantities on every part of the allowed range${rows.some((r) => r.endpoint) ? ', endpoints included' : ''}:
 ${lines}
 
-${reason} ${qcEnd(answer)}${trapLine ? `\n\n${trapLine}` : ''}`,
+${reason} ${qcEnd(answer)}${trapLine ? ` ${trapLine}` : ''}`,
         },
       };
     }
