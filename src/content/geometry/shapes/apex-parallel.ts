@@ -56,7 +56,7 @@ interface P {
 }
 
 /** Same choices in a random order (the answer position follows). */
-function mixed<T extends { choices: unknown[]; answer: number; values: number[] }>(rng: { shuffle<U>(a: readonly U[]): U[] }, r: T): T {
+export function mixed<T extends { choices: unknown[]; answer: number; values: number[] }>(rng: { shuffle<U>(a: readonly U[]): U[] }, r: T): T {
   const order = rng.shuffle(r.choices.map((_, i) => i));
   return { ...r, choices: order.map((i) => r.choices[i]), values: order.map((i) => r.values[i]), answer: order.indexOf(r.answer) };
 }
