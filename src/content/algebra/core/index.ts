@@ -17,7 +17,8 @@ import { linearRelationTemplates, linearRelationTraps } from './linearRelationQc
 import { linearParameterTemplates, linearParameterTraps } from './linearParameterNe';
 import { linearWordTemplates, linearWordTraps } from './linearWordMcs';
 import { systemSymmetricTemplates, systemSymmetricTraps } from './systemSymmetricQc';
+import { systemTicketsTemplates, systemTicketsTraps } from './systemTicketsMcs';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates, ...linearWordTemplates, ...systemSymmetricTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps, ...linearWordTraps, ...systemSymmetricTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates, ...linearWordTemplates, ...systemSymmetricTemplates, ...systemTicketsTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps, ...linearWordTraps, ...systemSymmetricTraps, ...systemTicketsTraps };
