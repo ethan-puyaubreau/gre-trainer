@@ -112,6 +112,20 @@ const absQC: Template<Params> = {
       diff: `$|${a} - ${b}|$ equals $|${a}| + |${b}|$ when $${a}$ and $${b}$ have opposite signs (or one is 0), and is smaller when the signs agree.`,
       cross: `$|${a} + ${b}|$ is larger than $|${a} - ${b}|$ when $${a}$ and $${b}$ have the same sign, smaller when they differ, and equal when one is 0.`,
     };
+    const SIGN_PATTERN: Record<Cls, string> = {
+      same: 'have the same sign',
+      opp: 'have opposite signs',
+      samez: 'have the same sign (or one is 0)',
+      oppz: 'have opposite signs (or one is 0)',
+      abseq: '',
+      any: '',
+    };
+    const signStep =
+      d !== 3
+        ? ''
+        : cond.cls === 'abseq'
+          ? `Since $${a}^2 = ${b}^2$, either $${b} = ${a}$ or $${b} = -${a}$, with $${a} \\ne 0$, so both sign patterns occur. `
+          : `An odd power keeps the sign, so $${a}^3$ has the sign of $${a}$ and $${b}^3$ the sign of $${b}$. The condition therefore says that $${a}$ and $${b}$ ${SIGN_PATTERN[cond.cls]}. `;
     let verdict: string;
     if (opt.ans === 'D') {
       const x1 = pairs.find((p) => relAt(p) === 'C') ?? pairs[0];
@@ -129,7 +143,7 @@ const absQC: Template<Params> = {
         quantityB: `$${swap ? qa : qb}$`,
         answer,
         ...(trapLetter !== answer ? { traps: { [trapLetter]: 'num-abs-distribute' } } : {}),
-        explanation: `Compare with the triangle inequality, not with a plug-in guess. ${reasonByForm[opt.form]}
+        explanation: `Compare with the triangle inequality, not with a plug-in guess. ${signStep}${reasonByForm[opt.form]}
 
 ${verdict}
 
