@@ -250,8 +250,8 @@ const farthestClosest: Template<FarParams> = {
 The ${mode === 'far' ? 'greatest' : 'least'} distance belongs to $${fmt(vals[target])}$.${
             trapIdx >= 0 && trapIdx !== target
               ? mode === 'far'
-                ? ` Note that $${fmt(vals[trapIdx])}$ has the greatest absolute value, but it is on the same side of 0 as $${ct}$, so it is closer.`
-                : ` Note that $${fmt(vals[trapIdx])}$ looks close in size, but it is on the other side of 0.`
+                ? ` Note that $${fmt(vals[trapIdx])}$ is the greatest in size (absolute value) among the numbers on the same side of 0 as $${ct}$, but it is on that side, so it is only $${coordTex(vals[trapIdx].sub(c).abs(), style)}$ away, less than $${coordTex(vals[target].sub(c).abs(), style)}$.`
+                : ` Note that $${fmt(vals[trapIdx])}$ has the size closest to that of $${ct}$ among the numbers on the other side of 0, but it is on the other side of 0, so it is $${coordTex(vals[trapIdx].sub(c).abs(), style)}$ away, more than $${coordTex(vals[target].sub(c).abs(), style)}$.`
               : ''
           }`,
         },

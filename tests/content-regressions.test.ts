@@ -36,3 +36,45 @@ describe('geo.solids.measures', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('arith.number-line.farthest', () => {
+  type Far = { mode: 'far' | 'close'; c: { toNumber(): number }; values: { toNumber(): number }[] };
+  const rows = () =>
+    bodies('arith.number-line.farthest').flatMap(({ seed, d, q, params }) => {
+      if (q.format !== 'mcs') return [];
+      const { mode, c, values } = params as Far;
+      return [{ seed, d, mode, c: c.toNumber(), vals: values.map((v) => v.toNumber()), tagged: q.choices.findIndex((ch) => ch.trap), ex: q.explanation ?? '' }];
+    });
+
+  it('never claims the greatest absolute value for a number that does not have it', () => {
+    const bad = rows()
+      .filter((r) => r.tagged >= 0 && /has the greatest absolute value/.test(r.ex) && Math.abs(r.vals[r.tagged]) < Math.max(...r.vals.map(Math.abs)))
+      .map((r) => `seed ${r.seed} d${r.d}: ${r.vals[r.tagged]} is not the largest in |x| of ${r.vals}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('describes the real trap criterion: same side of 0 as c (far), other side of 0 (close)', () => {
+    const bad: string[] = [];
+    let far = 0;
+    let close = 0;
+    for (const r of rows()) {
+      if (r.tagged < 0) continue;
+      const v = r.vals[r.tagged];
+      const same = r.vals.filter((x) => Math.sign(x) === Math.sign(r.c));
+      const other = r.vals.filter((x) => Math.sign(x) === -Math.sign(r.c));
+      if (r.mode === 'far') {
+        far++;
+        if (Math.abs(v) !== Math.max(...same.map(Math.abs))) bad.push(`seed ${r.seed} d${r.d}: far trap ${v} is not the largest in size on c's side`);
+        if (!r.ex.includes('among the numbers on the same side of 0 as')) bad.push(`seed ${r.seed} d${r.d}: far explanation does not state the criterion`);
+      } else {
+        close++;
+        const gap = (x: number) => Math.abs(Math.abs(x) - Math.abs(r.c));
+        if (gap(v) !== Math.min(...other.map(gap))) bad.push(`seed ${r.seed} d${r.d}: close trap ${v} is not the closest in size to c on the other side`);
+        if (!r.ex.includes('among the numbers on the other side of 0')) bad.push(`seed ${r.seed} d${r.d}: close explanation does not state the criterion`);
+      }
+    }
+    expect(far).toBeGreaterThan(50);
+    expect(close).toBeGreaterThan(50);
+    expect(bad).toEqual([]);
+  });
+});
