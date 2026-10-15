@@ -234,6 +234,22 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Turned a conversion factor upside down',
     fix: 'Write the factor as a fraction that cancels the old unit: $\\frac{60\\text{ min}}{1\\text{ h}}$ to go from per minute to per hour gives a BIGGER number per hour.',
   },
+  'num-unit-forgotten': {
+    label: 'Stopped before the units were right',
+    fix: 'Follow the units to the end: miles ÷ (miles per gallon) = gallons, and gallons × (dollars per gallon) = dollars. A number of gallons is not a cost.',
+  },
+  'num-factor-forgotten': {
+    label: 'Left one of the factors out',
+    fix: 'List every factor the units call for (kilowatts, hours per day, days, dollars per kilowatt-hour) and use each once.',
+  },
+  'num-subtract-for-divide': {
+    label: 'Subtracted the rate instead of dividing by it',
+    fix: 'How many times the rate fits into the total is a division: $\\frac{\\$5.40}{\\$0.15} = 36$, not $5.40 - 0.15$.',
+  },
+  'num-fixed-fee-ignored': {
+    label: 'Divided the whole total by the rate, fee included',
+    fix: 'The fixed fee is not paid per unit. Take it out of the total first, then divide what is left by the rate.',
+  },
   'num-one-way': {
     label: 'Counted only one way of a round trip',
     fix: 'A round trip covers the distance twice.',

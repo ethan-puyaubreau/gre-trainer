@@ -5,22 +5,6 @@
   "arith.exponents.common-base-qc": {
     "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
   },
-  "arith.rates.approx-cost-mcs": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.rates.compound-ne": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.rates.equivalent-rates-mcm": {
-    "artifacts.plural-1": "baseline"
-  },
-  "arith.rates.unit-convert-qc": {
-    "qc.never-d": "baseline"
-  },
-  "arith.rates.unit-rate-mcs": {
-    "distractors.trapped": "baseline"
-  },
   "arith.ratios.change-ne": {
     "artifacts.frac-1": "baseline",
     "artifacts.plural-1": "baseline"
