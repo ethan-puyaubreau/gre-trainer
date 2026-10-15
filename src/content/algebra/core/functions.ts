@@ -240,13 +240,25 @@ const operationQC: Template<OpParams> = {
       const slip = qcCompare(new Frac(evalOpSlip(op.terms, p, q)), new Frac(evalOpSlip(op.terms, r, sv)));
       if (slip !== answer) traps[slip] = 'alg-substitute-negative';
       if (r === q && sv === p && answer !== 'C' && !traps.C) traps.C = 'alg-assumed-commutative';
-      explanation = `Substitute carefully, keeping negative numbers in parentheses.
+      const slipA = evalOpSlip(op.terms, p, q);
+      const slipB = evalOpSlip(op.terms, r, sv);
+      const swapped = r === q && sv === p;
+      const trapLine = swapped
+        ? answer === 'C'
+          ? `Trap: do not assume the operation is symmetric; here the two orders agree only because of the numbers chosen, both giving $${num(vA)}$.`
+          : `Trap: the order of the inputs matters: swapping them moved the value from $${num(vA)}$ to $${num(vB)}$, so the operation is not commutative.`
+        : slipA !== vA.toNumber() || slipB !== vB.toNumber()
+          ? `Trap: dropping the parentheses around a negative input gives $${num(slipA)}$ for Quantity A instead of $${num(vA)}$.`
+          : `Trap: compare the computed values, $${num(vA)}$ against $${num(vB)}$, not the look of the two expressions.`;
+      explanation = `The symbol $${s}$ is only a rule: put the first number where $a$ is and the second where $b$, keeping each negative number in parentheses so that powers and products act on the whole number.
 
 Quantity A: $${paren(p)} ${s} ${paren(q)} = ${biSub(op.terms, p, q)} = ${num(vA)}$.
 
 Quantity B: $${paren(r)} ${s} ${paren(sv)} = ${biSub(op.terms, r, sv)} = ${num(vB)}$.
 
-${qcEnd(answer)}`;
+Check: compare the two results. ${qcEnd(answer)}
+
+${trapLine} Rule: evaluate each side completely before comparing.`;
     } else {
       const c = intExcept(rng, -4, 5, 0);
       const xFirst = rng.chance(0.5);
@@ -307,9 +319,17 @@ ${qcEnd(answer)}`;
         : isZero
           ? 'The difference is 0 for every $x$.'
           : `${crit.length ? `The difference is 0 only at $x = ${crit.map(fmtRoot).join('$ and $x = ')}$, outside the allowed values` : 'The difference is never 0'}, so its sign is the same for every allowed $x$: it is ${answer === 'A' ? 'positive' : 'negative'}.`;
-      explanation = `Apply the definition with $a$ and $b$ replaced by what is on each side of $${s}$. Quantity A: $${xExpr} = ${pa}$. Quantity B: ${bKind === 'swap' ? `$${swapExpr} = ${pb}$` : `$${pb}$`}.
+      const trapLine =
+        answer === 'D'
+          ? 'Trap: one allowed value would seem to settle it, but the difference changes sign inside the allowed values. Rule: a sign change means D.'
+          : answer === 'C'
+            ? 'Trap: the two sides look different, yet their difference is 0 for every $x$. Rule: compare the expanded forms, not their appearance.'
+            : 'Trap: the answer is not D, because the difference never changes sign on the allowed values. Rule: factor the difference and check its sign on the whole allowed range.';
+      explanation = `Since $x$ is free, study the sign of the difference of the two quantities. Apply the definition with $a$ and $b$ replaced by what is on each side of $${s}$. Quantity A: $${xExpr} = ${pa}$. Quantity B: ${bKind === 'swap' ? `$${swapExpr} = ${pb}$` : `$${pb}$`}.
 
-Quantity A minus Quantity B is $${pd}$. ${critText} ${qcEnd(answer)}`;
+Quantity A minus Quantity B is $${pd}$. ${critText} ${qcEnd(answer)}
+
+${trapLine}`;
     }
     return {
       params: { op: op.terms, kind, k: k!, lo, hi, bKind, bNum },
@@ -613,7 +633,11 @@ const propertyNE: Template<PropParams> = {
         answer = v;
         k = [p, a, b, v];
         stem = `For every number $x$, the function $f$ satisfies $f(x) = f(x + ${p})$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
-        explanation = `The property says the value of $f$ repeats every ${p} unit${p > 1 ? 's' : ''}: $f(${num(a)}) = f(${num(a + p)}) = f(${num(a + 2 * p)}) = \\cdots$. Since $${num(b)} = ${num(a)} + ${p} \\cdot ${n}$, you reach $${num(b)}$ after ${n} steps, so $f(${num(b)}) = ${num(v)}$.`;
+        explanation = `The property says the value of $f$ repeats every ${p} unit${p > 1 ? 's' : ''}: $f(${num(a)}) = f(${num(a + p)}) = f(${num(a + 2 * p)}) = \\cdots$. Since $${num(b)} = ${num(a)} + ${p} \\cdot ${n}$, you reach $${num(b)}$ after ${n} steps, so $f(${num(b)}) = ${num(v)}$.
+
+Check: the equality $f(x) = f(x + ${p})$ never changes the value, so every term of the chain equals $${num(v)}$.
+
+Trap: treating the property as "adds ${p} each step" would give $${num(v + (b - a))}$, but the property compares values and adds nothing. Rule: a repeating value is the same after any whole number of periods.`;
         traps.push({ value: frac(v + (b - a)), trap: 'alg-step-count' });
       } else if (kind === 'step') {
         const p = rng.pick(d === 1 ? [1, 2] : [2, 3, 4]);
@@ -627,7 +651,11 @@ const propertyNE: Template<PropParams> = {
         stem = `For every number $x$, the function $f$ satisfies $f(x + ${p}) = f(x) ${c < 0 ? '-' : '+'} ${Math.abs(c)}$. If $f(${num(a)}) = ${num(v)}$, what is $f(${num(b)})$?`;
         explanation = `Each increase of ${p} in $x$ ${c > 0 ? 'adds' : 'subtracts'} ${Math.abs(c)}. From $x = ${num(a)}$ to $x = ${num(b)}$ the input increases by $${b - a} = ${p} \\cdot ${n}$, which is ${n} steps.
 
-So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = ${num(answer)}$.${p > 1 ? ` Counting ${b - a} steps instead of ${n} gives $${num(v + c * (b - a))}$.` : ''}`;
+So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = ${num(answer)}$.
+
+Check: after ${n} steps of ${p}, the input has moved $${p} \\cdot ${n} = ${b - a}$ and lands exactly on $${num(b)}$.
+
+${p > 1 ? `Trap: counting ${b - a} steps instead of ${n} would give $${num(v + c * (b - a))}$, because one step is ${p} units, not 1.` : `Trap: miscounting by a single step moves the result by $${Math.abs(c)}$.`} Rule: steps = distance in $x$ divided by the step size.`;
         if (p > 1) traps.push({ value: frac(v + c * (b - a)), trap: 'alg-step-count' });
       } else if (kind === 'growth') {
         const r = rng.pick([2, 3, -2]);
@@ -637,7 +665,11 @@ So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = $
         answer = v * r ** n;
         k = [r, a, n, v];
         stem = `For every number $x$, the function $f$ satisfies $f(x + 1) = ${num(r)}f(x)$. If $f(${num(a)}) = ${v}$, what is $f(${num(a + n)})$?`;
-        explanation = `Each increase of 1 in $x$ multiplies the value by $${num(r)}$. Going from $x = ${num(a)}$ to $x = ${num(a + n)}$ takes ${n} steps, so $f(${num(a + n)}) = ${v} \\cdot ${paren(r)}^{${n}} = ${num(answer)}$.`;
+        explanation = `Each increase of 1 in $x$ multiplies the value by $${num(r)}$. Going from $x = ${num(a)}$ to $x = ${num(a + n)}$ takes ${n} steps, so $f(${num(a + n)}) = ${v} \\cdot ${paren(r)}^{${n}} = ${num(answer)}$.
+
+Check: the values run $${Array.from({ length: n + 1 }, (_, i) => num(v * r ** i)).join(' \\to ')}$, and the last one is $${num(answer)}$.
+
+Trap: $${v} \\cdot ${paren(r)} \\cdot ${n} = ${num(v * r * n)}$ multiplies by $${num(r)}$ only once and then by the number of steps, but each step multiplies again. Rule: a constant ratio per step gives $v r^{n}$.`;
         traps.push({ value: frac(v * r * n), trap: 'alg-growth-linear' });
       } else {
         // f((x + h)/m) = x^2 + e  ->  f(t) with x = m t - h
@@ -653,10 +685,14 @@ So $f(${num(b)}) = ${num(v)} ${c < 0 ? '-' : '+'} ${n} \\cdot ${Math.abs(c)} = $
         const rule = quad ? poly([1, 0, e]) : poly([lin2, e]);
         const input = `\\dfrac{x ${h < 0 ? '-' : '+'} ${Math.abs(h)}}{${m}}`;
         stem = `The function $f$ is defined by $f\\left(${input}\\right) = ${rule}$ for all numbers $x$. What is the value of $f(${num(t)})$?`;
-        explanation = `Find the $x$ that makes the input equal to $${num(t)}$: $${input} = ${num(t)}$ gives $x = ${m}(${num(t)}) ${h < 0 ? '+' : '-'} ${Math.abs(h)} = ${num(x0)}$.
-
-Then $f(${num(t)}) = ${quad ? `${paren(x0)}^2` : `${lin2}(${num(x0)})`}${e === 0 ? '' : ` ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(answer)}$. Substituting $${num(t)}$ directly into $${rule}$ is the trap: the rule is written for the variable $x$, not for the input of $f$.`;
         const direct = quad ? t * t + e : lin2 * t + e;
+        explanation = `The rule is written in terms of $x$, but $f$ is asked at the input $${num(t)}$. Find the $x$ that makes the input equal to $${num(t)}$: $${input} = ${num(t)}$ gives $x = ${m}(${num(t)}) ${h < 0 ? '+' : '-'} ${Math.abs(h)} = ${num(x0)}$.
+
+Then $f(${num(t)}) = ${quad ? `${paren(x0)}^2` : `${lin2}(${num(x0)})`}${e === 0 ? '' : ` ${e < 0 ? '-' : '+'} ${Math.abs(e)}`} = ${num(answer)}$.
+
+Check: for $x = ${num(x0)}$ the input is $\\dfrac{${num(x0)} ${h < 0 ? '-' : '+'} ${Math.abs(h)}}{${m}} = ${num(t)}$, as required.
+
+Trap: substituting $${num(t)}$ directly into $${rule}$ gives $${num(direct)}$, but the rule is written for $x$, not for the input of $f$. Rule: set the input equal to the asked value and solve for $x$ first.`;
         traps.push({ value: frac(direct), trap: 'alg-substitute-directly' });
       }
       // a wrong-method value that equals the right answer would make the question degenerate: draw again
