@@ -38,7 +38,7 @@ export function Settings() {
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Pace</h3>
         <p className="muted small">
-          A correct answer counts toward mastery only if it is within this time. The GRE gives about 1:45 per question (21 min for 12, 26 min for 15).
+          From Proficient on, a correct answer counts toward mastery only if it is within this time. Below Proficient only accuracy counts. The GRE gives about 1:45 per question (21 min for 12, 26 min for 15).
         </p>
         <div className="row">
           <input
