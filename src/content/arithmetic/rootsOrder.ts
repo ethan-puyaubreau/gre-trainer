@@ -32,7 +32,7 @@ const orderRoots: Template<Params> = {
   style: 'greatest or least of several radicals with coefficients',
   generate(rng, d) {
     const kind = rng.pick(['greatest', 'least'] as const);
-    const gap = d === 1 ? 0.4 : d === 2 ? 0.25 : 0.12;
+    const gap = d === 1 ? 0.4 : d === 2 ? 0.4 : 0.25;
     const extreme = kind === 'greatest' ? 'largest' : 'smallest';
     for (;;) {
       const items: Item[] = [];
@@ -74,7 +74,7 @@ const orderRoots: Template<Params> = {
           answer: order.indexOf(best),
           explanation: `Both the coefficient and the radicand change the size of a root, so put every number on the same footing.
 
-${d === 1 ? 'Move each coefficient under the radical, $c\\sqrt{r} = \\sqrt{c^2 r}$, and compare radicands, or estimate:' : 'Cube roots and square roots cannot share one radical, so estimate each value:'} ${shown}.
+${d === 1 ? 'Move each coefficient under the radical, $c\\sqrt{r} = \\sqrt{c^2 r}$, and compare radicands, or estimate:' : 'Square roots and cube roots are hard to compare by hand under one radical, so estimate each value:'} ${shown}.
 
 The ${kind} is $${tex(items[best])}$.
 
