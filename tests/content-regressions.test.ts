@@ -123,3 +123,34 @@ describe('alg.functions.property-ne', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('arith.exponents.negative-exponent-qc', () => {
+  type Neg = { kind: string; fa: { neg: boolean }; fb: { neg: boolean } | null };
+  const rows = () =>
+    bodies('arith.exponents.negative-exponent-qc').flatMap(({ seed, d, q, params }) => {
+      if (q.format !== 'qc') return [];
+      const { kind, fa, fb } = params as Neg;
+      return [{ seed, d, kind, negBase: fa.neg || !!fb?.neg, info: q.info ?? '', ex: q.explanation ?? '' }];
+    });
+
+  it('talks about the parity of n only when a base is negative', () => {
+    const bad = rows()
+      .filter((r) => !r.negBase && /\b(even|odd)\b/.test(`${r.info} ${r.ex}`))
+      .map((r) => `seed ${r.seed} d${r.d} (${r.kind}): parity mentioned for positive bases`);
+    expect(bad).toEqual([]);
+  });
+
+  it('never shows two parity cases that say the same thing', () => {
+    const bad: string[] = [];
+    let split = 0;
+    for (const r of rows()) {
+      const ev = /- If \$n\$ is even: (.*)\n/.exec(r.ex);
+      const od = /- If \$n\$ is odd: (.*)\n/.exec(r.ex);
+      if (!ev || !od) continue;
+      split++;
+      if (ev[1] === od[1]) bad.push(`seed ${r.seed} d${r.d}: identical cases "${ev[1]}"`);
+    }
+    expect(split).toBeGreaterThan(20);
+    expect(bad).toEqual([]);
+  });
+});

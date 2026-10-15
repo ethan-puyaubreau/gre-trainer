@@ -235,6 +235,9 @@ With a negative exponent the comparison flips: the smaller fraction raised to a 
         quantityA = `$${formTex(fa, a)}$`;
         quantityB = `$${c}$`;
       }
+      // the parity of n changes the value only through a negative base: with positive bases do not mention it
+      const signed = fa.neg || !!fb?.neg;
+      if (!signed) parity = 'any';
       info = nWord(sgn, parity);
 
       // explanation
@@ -249,7 +252,7 @@ With a negative exponent the comparison flips: the smaller fraction raised to a 
       const exN = (odd: boolean) => (sgn < 0 ? (odd ? -1 : -2) : odd ? 1 : 2);
       const exVal = (form: PowForm, odd: boolean) => valueOf(form, a, exN(odd)).toTex();
       const exampleFor = (odd: boolean) => `$n = ${exN(odd)}$ gives $${exVal(fa, odd)}$ and $${fb ? exVal(fb, odd) : c}$`;
-      if (parity === 'any') {
+      if (parity === 'any' && signed) {
         const [ev, od] = caseLines;
         explanation = `${intro ? `${intro} ` : ''}The parity of $n$ is not given, so check both cases.
 
