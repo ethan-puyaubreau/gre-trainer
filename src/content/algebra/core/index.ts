@@ -17,3 +17,6 @@ import { mustTemplates, mustTraps } from './mustbe';
 export const coreSkills: Skill[] = coreAlgebraSkills;
 export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates];
 export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps };
+import { crossTermTemplate, crossTermTraps } from './crossTerm';
+coreTemplates.push(crossTermTemplate);
+Object.assign(coreTraps, crossTermTraps);
