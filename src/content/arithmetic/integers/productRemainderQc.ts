@@ -71,6 +71,7 @@ const productRemainderQc: Template<Params> = {
       const shown = [...new Set([first, ns[1], lo, hi])].slice(0, 3);
       const condText = cond === 'any' ? 'a positive integer' : cond === 'even' ? 'an even positive integer' : 'an odd positive integer';
       const e = exprTex(v, k, c);
+      const fact = k === 2 ? 2 : k === 3 ? 6 : 24;
       const A = `The remainder when $${e}$ is divided by ${m}`;
       const B = `$${r}$`;
       const outcome =
@@ -90,11 +91,11 @@ const productRemainderQc: Template<Params> = {
           ...(trapLetter !== answer ? { traps: { [trapLetter]: 'cons-one-n-remainder' } } : {}),
           explanation: `The remainder of an expression in $${v}$ depends only on the remainder of $${v}$, so it repeats: test the values of one full cycle.
 
-${shown.map(sample).join('; ')}. Over a full cycle the possible remainders are ${sorted.join(', ')}. ${outcome}
+${shown.map(sample).join('; ')}. Checking every allowed value from ${first} to ${2 * m} (a full cycle) gives the remainders ${ns.map((n) => prodVal(n, k, c) % m).join(', ')}, so the possible remainders are ${sorted.join(', ')}.${c === 0 && fact % m === 0 ? ` This also follows from the fact that a product of ${k} consecutive integers is a multiple of ${k}! = ${fact}, hence of ${m}.` : ''} ${outcome}
 
-Trap: ${trapLetter !== answer ? `stopping at $${v} = ${first}$, whose remainder is ${firstRel === 'A' ? 'greater than' : firstRel === 'B' ? 'less than' : 'equal to'} ${r}, suggests that ${QC_WORDS[trapLetter]} (${trapLetter}).` : `a single test value would not prove the comparison; the whole cycle does.`}
+To compare a remainder with a number, list the remainders over one full cycle of $${v}$. So ${QC_WORDS[answer]} (${answer}).
 
-To compare a remainder with a number, list the remainders over one full cycle of $${v}$. So ${QC_WORDS[answer]} (${answer}).`,
+Trap: ${trapLetter !== answer ? `stopping at $${v} = ${first}$, whose remainder is ${firstRel === 'A' ? 'greater than' : firstRel === 'B' ? 'less than' : 'equal to'} ${r}, suggests that ${QC_WORDS[trapLetter]} (${trapLetter}).` : `a single test value would not prove the comparison; the whole cycle does.`}`,
         },
       };
     }
