@@ -133,7 +133,7 @@ Trap: the choice $${num(value)}$ ${why}. Rule: more workers means fewer days. Th
         ].map((x) => ({ ...x, value: ok(x.value) ? x.value : 0 }));
         p = { ...base, kind, m, n, h, U, V };
         stem = `${m} identical machines, each working at the same constant rate, produce ${num(U)} ${item} in ${h} hours. At that rate, how many hours would ${n} of these machines need to produce ${num(V)} ${item}?`;
-        explanation = (why, value) => `Time grows with the amount to produce and shrinks with the number of machines. The amount goes from ${num(U)} to ${num(V)}, so multiply the time by $\\frac{${num(V)}}{${num(U)}} = ${num(frac(V, U))}$. The machines go from ${m} to ${n}, so multiply by $\\frac{${m}}{${n}} = ${num(frac(m, n))}$. The time is $${h} \\times ${num(frac(V, U))} \\times ${num(frac(m, n))} = ${correct}$ hours.
+        explanation = (why, value) => `Time grows with the amount to produce and shrinks with the number of machines. The amount goes from ${num(U)} to ${num(V)}, so multiply the time by $\\frac{${num(V)}}{${num(U)}}${num(frac(V, U)) === `\\frac{${num(V)}}{${num(U)}}` ? '' : ` = ${num(frac(V, U))}`}$. The machines go from ${m} to ${n}, so multiply by $\\frac{${m}}{${n}}${num(frac(m, n)) === `\\frac{${m}}{${n}}` ? '' : ` = ${num(frac(m, n))}`}$. The time is $${h} \\times ${num(frac(V, U))} \\times ${num(frac(m, n))} = ${correct}$ hours.
 
 Check: one machine makes $\\frac{${num(U)}}{${m} \\times ${h}} = ${num(frac(U, m * h))}$ ${item} an hour, and $${n} \\times ${correct} \\times ${num(frac(U, m * h))} = ${num(V)}$.
 
