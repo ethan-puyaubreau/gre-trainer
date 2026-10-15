@@ -108,7 +108,7 @@ const chainedNE: Template<ChainParams> = {
       if (d === 1) {
         solve = `Add the first two equations: $${lin([[2, 'x']])} = ${num(c + f)}$, so $x = ${num(x0)}$. Subtract the second from the first: $${lin([[2, 'y']])} = ${num(c - f)}$, so $y = ${num(y0)}$.`;
       } else {
-        solve = `To eliminate $y$, multiply the first equation by $${num(e)}$ and the second by $${num(b)}$, then subtract: $${lin([[det, 'x']])} = ${num(xnum)}$, so $x = ${num(x0)}$. From the first equation, $${lin([[b, 'y']])} = ${num(c)} - ${paren(a * x0)} = ${num(c - a * x0)}$, so $y = ${num(y0)}$.`;
+        solve = `${e === -b ? `To eliminate $y$, add the equations: $${lin([[a + dd, 'x']])} = ${num(c + f)}$` : e === b ? `To eliminate $y$, subtract the second equation from the first: $${lin([[a - dd, 'x']])} = ${num(c - f)}$` : `To eliminate $y$, multiply the first equation by $${num(e)}$ and the second by $${num(b)}$, then subtract: $${lin([[det, 'x']])} = ${num(xnum)}$`}, so $x = ${num(x0)}$. From the first equation, $${lin([[b, 'y']])} = ${num(c)} - ${paren(a * x0)} = ${num(c - a * x0)}$, so $y = ${num(y0)}$.`;
       }
       const prod = (p: number, v: number) => (p === 1 ? paren(v) : `${num(p)} \\cdot ${paren(v)}`);
       const known = [g, h].map((p, k) => [p, k === 0 ? x0 : y0] as const).filter(([p]) => p !== 0).map(([p, v], k) => (k === 0 ? prod(p, v) : p < 0 ? ' - ' + prod(-p, v) : ' + ' + prod(p, v))).join('');

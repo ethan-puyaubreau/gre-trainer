@@ -51,8 +51,8 @@ function infoOf(p: ShiftParams): string | undefined {
     case 'right': return `$${x} > ${y} > ${num(-p.b)}$`;
     case 'left': return `$${y} < ${x} < ${num(-p.b)}$`;
     case 'across': return `$${y} < ${num(-p.b)} < ${x}$`;
-    case 'free': return `$${x} > ${y}$`;
-    default: return undefined;
+    case 'free': return `$${x} > ${y}$, with $${x}$ and $${y}$ both different from $${num(-p.b)}$`;
+    default: return `Quantity B adds $${p.s}$ to both the numerator and the denominator of quantity A`;
   }
 }
 
@@ -95,7 +95,7 @@ function build(p: ShiftParams): QCQuestion {
     if (p.cond === 'any') body = `${head} Here $${x}$ can be positive or negative, so test both: ${eg(1)}; ${eg(-1)}.`;
     else {
       const sg = p.kind === 'num' || p.cond === 'pos' ? 1 : -1;
-      body = `${head} The shift is ${word(sg)} and $${num(d)}$ is ${word(d)}, so $B - A$ is ${word(sg * d)}. Check: ${p.kind === 'num' ? `with a shift of $${p.s}$, A is $${frac(new Frac(a, b))}$ and B is $${frac(g(a, b, new Frac(p.s)))}$` : eg(sg)}.`;
+      body = `${head} ${p.kind === 'num' ? `Here $${S}$` : 'The shift'} is ${word(sg)} and $${num(d)}$ is ${word(d)}, so $B - A$ is ${word(sg * d)}. Check: ${p.kind === 'num' ? `after adding $${p.s}$ to both parts, A is $${frac(new Frac(a, b))}$ and B is $${frac(g(a, b, new Frac(p.s)))}$` : eg(sg)}.`;
     }
   } else {
     const head = `Subtracting, $A - B = \\frac{(${x} - ${y})\\cdot ${paren(d)}}{(${b} + ${x})(${b} + ${y})}$.`;
@@ -118,7 +118,7 @@ function build(p: ShiftParams): QCQuestion {
 
 ${body} ${qcEnd(answer)}
 
-Trap: adding the same number to both parts of a fraction does not leave it unchanged. Rule: compare $\\frac{a+s}{b+s}$ with $\\frac{a}{b}$ through the sign of $s(b-a)$ over positive denominators.`;
+Trap: adding the same number to both parts of a fraction does not leave it unchanged. Rule: compare $\\frac{a+s}{b+s}$ with $\\frac{a}{b}$ through the sign of $s(b-a)$ divided by the signs of the denominators.`;
   return { format: 'qc', info: infoOf(p), quantityA: `$${A}$`, quantityB: `$${B}$`, answer, traps, explanation };
 }
 

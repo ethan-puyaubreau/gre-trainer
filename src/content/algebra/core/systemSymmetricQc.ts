@@ -58,7 +58,7 @@ const qcSymmetric: Template<Params> = {
       const mt = (c: number, body: string) => (c === 1 ? body : c === -1 ? `-(${body})` : `${num(c)}(${body})`);
       const sumTex = `${mt(p + q, 'x + y')} = ${num(A + B)}`;
       const subTex = `${mt(p - q, 'x - y')} = ${num(A - B)}`;
-      const how = `The coefficients are swapped, so combine the equations. Adding them gives $${sumTex}$, so $x + y = ${num(s)}$. Subtracting the second from the first gives $${subTex}$, so $x - y = ${num(df)}$.`;
+      const how = `The coefficients are swapped, so combine the equations. Adding them gives $${sumTex}$${p + q === 1 ? '' : `, so $x + y = ${num(s)}$`}. Subtracting the second from the first gives $${subTex}$${p - q === 1 ? '' : `, so $x - y = ${num(df)}$`}.`;
       if (form === 0) {
         qa = '$x$';
         qb = '$y$';
@@ -67,7 +67,7 @@ const qcSymmetric: Template<Params> = {
         if (answer !== 'C') traps.C = 'alg-sys-symmetric-equal';
         explanation = `${how}
 
-The sign of $x - y = ${num(df)}$ decides: ${df === 0 ? '$x = y$ here only because the right sides are equal' : df > 0 ? '$x$ is greater than $y$' : '$y$ is greater than $x$'}. ${qcEnd(answer)}${
+${df === 0 ? 'So $x = y$, and the quantities are equal' : df > 0 ? 'Since $x - y$ is positive, $x$ is greater than $y$' : 'Since $x - y$ is negative, $y$ is greater than $x$'}. ${qcEnd(answer)}${
           answer !== 'C' ? `\n\nTrap: because the equations look symmetric, it is tempting to say $x = y$. That would need the right sides to be equal, but $${num(A)} - ${paren(B)} = ${num(A - B)}$, not 0.` : ''
         }
 

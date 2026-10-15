@@ -106,7 +106,7 @@ Check: at $x = ${r}$ the left side is $${r * r} ${key[1] * r < 0 ? '-' : '+'} ${
           key = [p, -(q + p * s2), q * s2];
           sols = [[q, p], [s2, 1]];
           stem = `Which of the following is an equation whose solutions are $x = ${new Frac(q, p).toTex()}$ and $x = ${s2}$?`;
-          steps = `The solution $${new Frac(q, p).toTex()}$ comes from the factor $(${p}x ${q < 0 ? '+' : '-'} ${Math.abs(q)})$, since it is 0 at that $x$, and $s = ${s2}$ comes from $(x ${s2 < 0 ? '+' : '-'} ${Math.abs(s2)})$. Multiply: $(${p}x ${q < 0 ? '+' : '-'} ${Math.abs(q)})(x ${s2 < 0 ? '+' : '-'} ${Math.abs(s2)}) = ${poly(key)}$.
+          steps = `The solution $${new Frac(q, p).toTex()}$ comes from the factor $(${p}x ${q < 0 ? '+' : '-'} ${Math.abs(q)})$, since it is 0 at that $x$, and $x = ${s2}$ comes from $(x ${s2 < 0 ? '+' : '-'} ${Math.abs(s2)})$. Multiply: $(${p}x ${q < 0 ? '+' : '-'} ${Math.abs(q)})(x ${s2 < 0 ? '+' : '-'} ${Math.abs(s2)}) = ${poly(key)}$.
 
 Check: at $x = ${s2}$ the second factor is 0, and at $x = ${new Frac(q, p).toTex()}$ the first factor is 0.`;
           rule = 'A fractional solution $\\frac{q}{p}$ comes from the factor $(px - q)$, not $(qx - p)$.';

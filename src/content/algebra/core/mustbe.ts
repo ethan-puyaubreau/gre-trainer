@@ -84,8 +84,7 @@ function family(id: 'opposite' | 'negatives' | 'bounds' | 'squares' | 'fraction'
         ys: [b - 0.25, b - 0.5, b - 1, b - 2, b - 5, b - 10, b - 50],
         stmts: [
           { t: `${X} - ${Y} > ${num(a - b)}`, f: (x, y) => x - y > a - b },
-          { t: `${Y} - ${X} < ${num(b - a)}`, f: (x, y) => y - x < b - a },
-          { t: `2${X} - 2${Y} > ${num(2 * (a - b))}`, f: (x, y) => 2 * x - 2 * y > 2 * (a - b) },
+          { t: `${X} - ${Y} > ${num(a - b - 2)}`, f: (x, y) => x - y > a - b - 2 },
           { t: `${X} - ${Y} > ${num(a - b - 1)}`, f: (x, y) => x - y > a - b - 1 },
           { t: `${X} > ${Y}`, f: (x, y) => x > y },
           { t: `${X} + ${Y} > ${num(a + b)}`, f: (x, y) => x + y > a + b },
@@ -188,7 +187,9 @@ const mustBeTrueMCM: Template<MustParams> = {
       const { choices, answer } = flaggedChoices(
         items.map((it) => ({ text: `$${it.s.t}$`, correct: it.ok, ...(it.ok ? {} : { trap: it.s.sq ? 'alg-must-square-order' : 'alg-must-one-example' }) })),
       );
-      const simple = [...pts].sort((p, q) => Math.abs(p[0]) + Math.abs(p[1]) - Math.abs(q[0]) - Math.abs(q[1]));
+      // prefer small integer pairs that are not ties (|x| = |y|)
+      const cost = (p: [number, number]) => Math.abs(p[0]) + Math.abs(p[1]) + (Number.isInteger(p[0]) && Number.isInteger(p[1]) ? 0 : 100) + (Math.abs(p[0]) === Math.abs(p[1]) ? 50 : 0);
+      const simple = [...pts].sort((p, q) => cost(p) - cost(q));
       const lines = items.map((it, k) => {
         if (it.ok) return `- ${letter(k)}: true for every allowed pair, as the condition shows.`;
         const [x, y] = simple.find(([px, py]) => !it.s.f(px, py))!;

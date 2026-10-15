@@ -111,7 +111,7 @@ Compare $${num(total)}$ with $${num(N)}$. ${qcEnd(answer)}`;
         const sHi = paired(hi, c, M);
         body = `The signs alternate, so pair the terms: $${pair}$ for every $j$. The first ${2 * k2} terms make $${k2}$ pairs with sum $-${k2}t$${odd ? `, and the unpaired last term is $a_{${M}} = ${M}t + ${c}$, so the total is $${k2 + 1}t + ${c}$` : ''}.
 
-With $t = ${lo}$ the sum is $${num(sLo)}$ and with $t = ${hi}$ it is $${num(sHi)}$; in between it takes the values of the integers $t$ in the range. So the sum lies between $${num(sMin)}$ and $${num(sMax)}$, ends included, while the other quantity is $${num(N)}$. ${qcEnd(answer)}`;
+With $t = ${lo}$ the sum is $${num(sLo)}$ and with $t = ${hi}$ it is $${num(sHi)}$; since $t$ is an integer from $${lo}$ to $${hi}$, the sum takes only the values in between. So the sum lies between $${num(sMin)}$ and $${num(sMax)}$, ends included, while the other quantity is $${num(N)}$. ${qcEnd(answer)}`;
       }
       const why = Object.entries(traps).length
         ? (() => {

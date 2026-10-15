@@ -31,6 +31,7 @@ interface Fam {
   points: Record<string, number>[];
 }
 
+const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
 const term = (c: number, v: Ex): Ex => (c === 1 ? v : mul(N(c), v));
 /** v + c (c signed) */
 const vPlus = (v: string, c: number): Ex => add(V(v), N(c));
@@ -127,7 +128,7 @@ function build(f: Family, d: 1 | 2 | 3, rng: Parameters<Template<P>['generate']>
     { e: div(add(term(a, V(x)), mul(N(-1), term(b, V(y)))), add(term(a, V(x)), term(b, V(y)))), trap: 'alg-multiply-wrong-factor', why: `multiplying $\\frac{${a}}{${x}}$ by $${x}$ instead of by $${y}$` },
     { e: div(dn, add(ay, mul(N(-1), bx))), trap: 'alg-fraction-inverted', why: `turning the fraction upside down` },
   ];
-  if (a !== b) wrongs.push({ e: div(N(a - b), N(a + b)), trap: 'alg-fraction-ignore-variables', why: `forgetting that the denominators ${x} and ${y} are different` });
+  if (a !== b) wrongs.push({ e: (() => { const g = gcd(Math.abs(a - b), a + b); const nn = (a - b) / g; const dd = (a + b) / g; return dd === 1 ? N(nn) : div(N(nn), N(dd)); })(), trap: 'alg-fraction-ignore-variables', why: `forgetting that the denominators ${x} and ${y} are different` });
   else wrongs.push({ e: div(add(bx, ay), add(ay, mul(N(-1), bx))), trap: 'alg-fraction-inverted', why: `swapping numerator and denominator` });
   return {
     target,
@@ -204,7 +205,7 @@ const simplifyFractionMCS: Template<P> = {
           stem: `Which of the following is equal to $${texEx(fam.target)}$ for ${fam.domain}?`,
           choices,
           answer,
-          explanation: `A fraction simplifies only by cancelling common factors, so factor first.
+          explanation: `${fam.vars.length === 2 ? 'A stacked fraction simplifies by clearing the small fractions with their common denominator.' : 'A fraction simplifies only by cancelling common factors, so factor first.'}
 
 ${fam.method}
 

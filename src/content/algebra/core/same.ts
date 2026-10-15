@@ -236,7 +236,7 @@ const consequenceMCM: Template<ConsequenceParams> = {
         'alg-sys-rhs-sign': `choice ${letter(wi)} subtracts the left sides but adds the right sides.`,
         'alg-sys-lhs-sign': `choice ${letter(wi)} flips the sign of the $y$ term of a correct combination.`,
       };
-      const explanation = `If $x$ and $y$ satisfy both equations, solve for them and test each choice. To eliminate $y$, multiply the first equation by $${num(e)}$ and the second by $${num(b)}$, then subtract: $${lin([[det, 'x']])} = ${num(c * e - b * f)}$, so $x = ${num(x0)}$. Then $y = ${num(y0)}$ from the first equation.
+      const explanation = `If $x$ and $y$ satisfy both equations, solve for them and test each choice. ${e === -b ? `To eliminate $y$, add the equations: $${lin([[a + dd, 'x']])} = ${num(c + f)}$` : e === b ? `To eliminate $y$, subtract the second equation from the first: $${lin([[a - dd, 'x']])} = ${num(c - f)}$` : `To eliminate $y$, multiply the first equation by $${num(e)}$ and the second by $${num(b)}$, then subtract: $${lin([[det, 'x']])} = ${num(c * e - b * f)}$`}, so $x = ${num(x0)}$. Then $y = ${num(y0)}$ from the first equation.
 
 Substitute $x = ${num(x0)}$ and $y = ${num(y0)}$ into each choice:
 ${lines.join('\n')}

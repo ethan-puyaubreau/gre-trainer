@@ -139,12 +139,12 @@ Rule: when two unknowns share a coefficient, compare them through their differen
       const fac = ystar === 0 ? lin([[m, 'y']]) : `${m < 0 ? '-' : ''}${Math.abs(m) === 1 ? '' : Math.abs(m)}(y ${ystar < 0 ? '+' : '-'} ${Math.abs(ystar)})`;
       explanation = `Look at the difference $x - y$. From $${lin([[a, 'x'], [b, '']])} = ${lin([[c, 'y'], [e, '']])}$, $${lin([[a, 'x']])} = ${lin([[c, 'y'], [e - b, '']])}$, so $${a}(x - y) = ${lin([[c - a, 'y'], [e - b, '']])}$.
 
-The right side is $${fac}$, which is 0 at $y = ${yAt(ystar)}$: $x - y$ changes sign there, and for $y > ${yAt(ystar)}$ it has the sign of $${m}$. ${
+The right side is $${fac}$, which is 0 at $y = ${yAt(ystar)}$: $x - y$ changes sign there. For $y > ${yAt(ystar)}$ it is ${m > 0 ? 'positive' : 'negative'}, because the coefficient $${c} - ${a} = ${m}$ is ${m > 0 ? 'positive' : 'negative'}. ${
         answer === 'D'
           ? `Here $y > ${yAt(L)}$ allows values on both sides of $${yAt(ystar)}$: at $y = ${yAt(ystar + 1)}$ Quantity ${m > 0 ? 'A' : 'B'} is greater, and at $y = ${new Frac(2 * ystar - 1, 2).toTex()}$ Quantity ${m > 0 ? 'B' : 'A'} is greater. (D)`
-          : `Every allowed $y$ is greater than $${yAt(ystar)}$ (it exceeds $${yAt(L)}$, which is at least $${yAt(ystar)}$), so $x - y$ is ${m > 0 ? 'positive' : 'negative'} throughout. ${qcEnd(answer)}
+          : `Every allowed $y$ is greater than $${yAt(ystar)}$ (since $y > ${yAt(L)}$ and $${yAt(L)} \\ge ${yAt(ystar)}$), so $x - y$ is ${m > 0 ? 'positive' : 'negative'} throughout. ${qcEnd(answer)}
 
-Trap: reading the sign from $c = ${c}$ or from $a = ${a}$ alone. What matters is $c - a = ${m}$.`
+Trap: reading the sign from the coefficient $${c}$ or $${a}$ alone. What matters is their difference, $${c} - ${a} = ${m}$.`
       }
 
 Rule: a difference of two unknowns can change sign; find where, then see which side the condition allows.`;

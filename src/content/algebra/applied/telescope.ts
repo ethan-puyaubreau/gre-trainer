@@ -25,6 +25,10 @@ export const telescopeTraps: Record<string, Trap> = {
     label: 'Added the denominators when subtracting the fractions',
     fix: '$\\frac{1}{p} - \\frac{1}{q} = \\frac{q - p}{pq}$. The denominators multiply; they are never added.',
   },
+  'alg-telescope-off-by-one': {
+    label: 'Off by one: counted the terms from the wrong starting index',
+    fix: 'Do not shift the index by one at the end. Solve $m + c = N$ exactly and check the term $a_m$ against the difference.',
+  },
   'alg-telescope-off-pair': {
     label: 'Built the denominators from the neighbouring terms instead of the two terms in the question',
     fix: '$a_k - a_{k+1}$ uses the denominators $k + c$ and $k + c + 1$, exactly the indices written in the question. Substitute them before multiplying.',
@@ -79,6 +83,7 @@ const telescopeMCS: Template<TelescopeParams> = {
         { value: N + c, trap: 'alg-telescope-shift-sign' },
         { value: D + E - c, trap: 'alg-telescope-add-denominators' },
         { value: g, trap: 'alg-telescope-index-difference' },
+        { value: m + 1, trap: 'alg-telescope-off-by-one' },
       ];
       if ((E * (E + g)) % g === 0) traps.push({ value: (E * (E + g)) / g - c, trap: 'alg-telescope-off-pair' });
       if (D - g >= 1 && ((D - g) * D) % g === 0) traps.push({ value: ((D - g) * D) / g - c, trap: 'alg-telescope-off-pair' });
@@ -90,6 +95,7 @@ const telescopeMCS: Template<TelescopeParams> = {
         'alg-telescope-shift-sign': `adding the shift to the matched denominator instead of subtracting it gives $${num(N + c)}$, which does not satisfy $${sh('m')} = ${num(N)}$`,
         'alg-telescope-add-denominators': `adding the denominators $${D}$ and $${E}$ gives $${num(D + E - c)}$ after the shift, but denominators multiply`,
         'alg-telescope-index-difference': `subtracting the indices, which are $${g}$ apart, gives $${num(g)}$, but the terms are fractions, not indices`,
+        'alg-telescope-off-by-one': `one more or one fewer than $${num(m)}$ comes from miscounting the index; the equation $${sh('m')} = ${num(N)}$ gives exactly $${num(m)}$`,
         'alg-telescope-off-pair': `using the neighbours of $${L}_{${k}}$ and $${L}_{${k + g}}$ builds the wrong denominators and lands on another index`,
       };
       const present = new Set(built.choices.map((ch) => ch.trap));
@@ -111,7 +117,7 @@ Rule: a term of $\\dfrac{a}{n + c}$ is fixed by its denominator, so compare deno
         params: { a, c, k, g, L },
         q: {
           format: 'mcs',
-          stem: `A sequence is defined by $${L}_n = \\dfrac{${a}}{${lin([[1, 'n'], [c, '']])}}$ for every positive integer $n$. If $${L}_{${k}} - ${L}_{${k + g}} = ${L}_m$ for some positive integer $m$, what is $m$?`,
+          stem: `A sequence is defined by $${L}_n = \\dfrac{${a}}{${lin([[1, 'n'], [c, '']])}}$ for every integer $n \\ge ${c < 0 ? 1 - c : 1}$. If $${L}_{${k}} - ${L}_{${k + g}} = ${L}_m$ for some integer $m \\ge ${c < 0 ? 1 - c : 1}$, what is $m$?`,
           choices: built.choices,
           answer: built.answer,
           explanation,

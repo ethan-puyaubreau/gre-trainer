@@ -51,7 +51,7 @@ function build(b: BoundsParams) {
   let method: string;
   if (b.product) {
     const list = [b.r[0][0], b.r[0][1]].flatMap((xv) => [b.r[1][0], b.r[1][1]].map((yv) => `$${num(xv)} \\cdot ${yv < 0 ? `(${yv})` : yv} = ${num(xv * yv)}$`)).join(', ');
-    method = `A product of two ranges is extreme at a corner, and a corner of two negative ends can beat the positive ones. The four products are ${list}. The ${b.greatest ? 'greatest' : 'least'} is $${num(best.v)}$.`;
+    method = `A product of two ranges is extreme at a corner, so test all four corners, signs included. The four products are ${list}. The ${b.greatest ? 'greatest' : 'least'} is $${num(best.v)}$, from $${x} = ${num(best.x)}$ and $${y} = ${num(best.y)}$.`;
   } else {
     const end = (c: number, n: string, v: number) => `$${n}$ has a ${c > 0 ? 'positive' : 'negative'} multiplier, so use its ${(c > 0) === b.greatest ? 'largest' : 'smallest'} value, $${num(v)}$`;
     method = `To ${b.greatest ? 'maximize' : 'minimize'} $${exprTex(b)}$, pick each end by the sign in front of the variable: ${end(b.p, x, best.x)}, and ${end(b.q, y, best.y)}. The result is $${num(best.v)}$.`;

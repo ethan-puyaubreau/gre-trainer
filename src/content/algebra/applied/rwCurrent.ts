@@ -105,7 +105,7 @@ Check: ${D} ÷ ${v1} = ${fx(frac(D, v1))} and ${D} ÷ ${v2} = ${fx(frac(D, v2))}
         ...(kind === 'still' ? [{ value: frac(2 * D, t1 + t2), trap: 'algw-current-ignored', why: 'is the average speed of the round trip, which is not the speed in still water' }] : []),
       ].filter((x) => x.value.isTerminating() && !x.value.eq(answer));
       const first = traps[0];
-      const stem = `${W.mover} travels ${D} ${W.dist} ${W.fwd} in ${t1} hours and returns over the same route ${W.back} in ${t2} hours. ${W.cur}, and it keeps a constant speed relative to the ${W.med === 'wind' ? 'air' : 'water'}. ${
+      const stem = `${W.mover} travels ${D} ${W.dist} ${W.fwd} in ${t1} hours and returns over the same route ${W.back} in ${t2} hours. ${W.cur}. ${W.mover} keeps a constant speed relative to the ${W.med === 'wind' ? 'air' : 'water'}. ${
         kind === 'current' ? `What is the speed of the ${W.med}, in ${unit}?` : `What is the speed of the ${W.mover.slice(2)} in ${W.still}, in ${unit}?`
       }`;
       return {
