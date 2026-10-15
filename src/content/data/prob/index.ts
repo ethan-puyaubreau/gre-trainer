@@ -11,7 +11,9 @@ import { singleDITemplates } from './di-single';
 import { decadeTemplates } from './di-decades';
 import { mixedTemplates } from './di-mixed';
 import { probSkills } from './skills';
-import { probTraps } from './traps';
+import { probTraps as baseProbTraps } from './traps';
+import { pigeonTemplates, pigeonTraps } from './pigeon';
 
-export { probSkills, probTraps };
-export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates];
+export { probSkills };
+export const probTraps = { ...baseProbTraps, ...pigeonTraps };
+export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates, ...pigeonTemplates];
