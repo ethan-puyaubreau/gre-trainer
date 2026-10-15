@@ -40,7 +40,7 @@ function scopeTitle(scope: PracticeScope): string {
 }
 
 const REASON: Record<Pick['reason'], [string, string]> = {
-  repair: ['Comeback: same skill, new style', 'chip-warn'],
+  repair: ['Comeback after a miss', 'chip-warn'],
   review: ['Spaced review', 'chip-accent'],
   practice: ['Practice', 'chip'],
   new: ['New skill', 'chip-good'],
@@ -453,7 +453,7 @@ function Feedback({
       <p className="small" style={{ margin: '10px 0 0' }}>
         <strong>{skillName}</strong>:{' '}
         {outcome.from !== outcome.to ? <LevelChange from={outcome.from} to={outcome.to} /> : <span className="chip">{LEVEL_NAMES[outcome.to]}</span>}{' '}
-        {g.correct ? `${creditNote} ${nextStepText}`.trim() : 'This skill comes back in a different style within a few questions, and again tomorrow.'}
+        {g.correct ? `${creditNote} ${nextStepText}`.trim() : 'This skill comes back within a few questions with new numbers, then again tomorrow in a different style.'}
       </p>
 
       {dodged.length > 0 && (
