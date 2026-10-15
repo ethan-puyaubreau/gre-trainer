@@ -1,9 +1,9 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac, Frac } from '../../../engine/frac';
 import { sum } from '../../../engine/math';
 import { num } from '../../../engine/tex';
 import type { GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { mcmCheck, mcsCheck, neCheck } from './util';
+import { mcmCheck, mcsCheck, neCheck, trapOnlyChoices } from './util';
 
 const SKILL = 'data.sets';
 const rel = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -212,6 +212,8 @@ $${N - r[3]}$ is the number in at least one group, which still includes the ${r[
         }
       }
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((t) => t.value.eq(answer))) return twoSetCount.generate(rng, d);
     return {
       params: p,
       q: {
@@ -219,7 +221,7 @@ $${N - r[3]}$ is the number in at least one group, which still includes the ${r[
         stem,
         answer: frac(answer),
         ...(suffix ? { suffix } : {}),
-        traps: traps.filter((t) => t.value.sign() > 0 && !t.value.eq(answer)).filter((t, i, arr) => arr.findIndex((x) => x.value.eq(t.value)) === i),
+        traps: traps.filter((t) => t.value.sign() > 0).filter((t, i, arr) => arr.findIndex((x) => x.value.eq(t.value)) === i),
         explanation,
       },
     };
@@ -551,7 +553,8 @@ const vennDiagram: Template<VennParams> = {
     let figure: GeometryFigure;
     let stem = '';
     let correct = 0;
-    const traps: { value: number; trap: string }[] = [];
+    let included: number[] = [];
+    let regionNames: string[] = [];
     let explanation = '';
     let total = 0;
     if (sets === 2) {
@@ -562,6 +565,7 @@ const vennDiagram: Template<VennParams> = {
       ask = d === 1 ? rng.pick(['in-b', 'exactly-one', 'not-a'] as const) : rng.pick(['x-two', 'circle-totals'] as const);
       let texts = regions.map((r) => `$${r}$`);
       const names = ctx.names;
+      regionNames = [`the ${names[0]}-only region`, `the ${names[1]}-only region`, 'the overlap', 'the region outside both circles'];
       if (ask === 'circle-totals') {
         // Book convention: a number next to a circle's name is that circle's total.
         texts = ['', '', '$x$', `$${neither}$`];
@@ -569,7 +573,7 @@ const vennDiagram: Template<VennParams> = {
         figure = vennFigure(2, [`${names[0]} (${oa + both})`, `${names[1]} (${ob + both})`], texts);
         stem = `In the Venn diagram above, the number next to each circle's label is the total number of ${ctx.unit} in that circle, $x$ is the number of ${ctx.unit} in both circles, and ${neither} ${ctx.unit} are in neither circle. If there are ${total} ${ctx.unit} in all, how many of them are in exactly one of the two circles?`;
         correct = oa + ob;
-        traps.push({ value: both, trap: 'prob-wrong-event' }, { value: oa + ob + 2 * both, trap: 'prob-venn-no-overlap' }, { value: total - neither, trap: 'prob-venn-only' });
+        included = [0, 1];
         explanation = `Total: $${total} = ${oa + both} + ${ob + both} - x + ${neither}$, so $x = ${both}$. Exactly one: $(${oa + both} - ${both}) + (${ob + both} - ${both}) = ${oa} + ${ob} = ${correct}$.
 
 $${total - neither}$ counts everyone in at least one circle, including the ${both} in both.`;
@@ -584,7 +588,7 @@ $${total - neither}$ counts everyone in at least one circle, including the ${bot
         figure = vennFigure(2, names, texts);
         stem = `The Venn diagram above shows the numbers of ${ctx.unit} in each region. If there are ${total} ${ctx.unit} in all, how many of them ${ctx.A}?`;
         correct = (mult + 1) * xv;
-        traps.push({ value: xv, trap: 'prob-wrong-event' }, { value: mult * xv, trap: 'prob-venn-only' }, { value: regions[1] + xv, trap: 'prob-wrong-event' });
+        included = [0, 2];
         explanation = `Add the regions: $${mult}x + x + ${regions[1]} + ${regions[3]} = ${total}$, so $${mult + 1}x = ${total - regions[1] - regions[3]}$ and $x = ${xv}$. The ${names[0]} circle holds $${mult}x + x = ${mult + 1}x = ${correct}$ ${ctx.unit}.
 
 $${mult * xv}$ leaves out the ${xv} in the overlap, which are also inside the ${names[0]} circle.`;
@@ -593,21 +597,21 @@ $${mult * xv}$ leaves out the ${xv} in the overlap, which are also inside the ${
         if (ask === 'in-b') {
           stem = `The Venn diagram above shows the numbers of ${ctx.pop} who ${ctx.A}, who ${ctx.B}, who do both, and who do neither. How many of the ${ctx.unit} ${ctx.B}?`;
           correct = ob + both;
-          traps.push({ value: ob, trap: 'prob-venn-only' }, { value: ob + both + neither, trap: 'prob-wrong-event' }, { value: total - oa, trap: 'prob-wrong-event' });
+          included = [1, 2];
           explanation = `Everything inside the ${names[1]} circle: $${ob} + ${both} = ${correct}$.
 
 ${ob} is only the part of the circle outside the overlap.`;
         } else if (ask === 'exactly-one') {
           stem = `The Venn diagram above shows the numbers of ${ctx.pop} who ${ctx.A}, who ${ctx.B}, who do both, and who do neither. How many of the ${ctx.unit} are in exactly one of the two groups?`;
           correct = oa + ob;
-          traps.push({ value: oa + ob + both, trap: 'prob-venn-only' }, { value: oa + ob + 2 * both, trap: 'prob-venn-no-overlap' });
+          included = [0, 1];
           explanation = `Exactly one means inside one circle but outside the overlap: $${oa} + ${ob} = ${correct}$.
 
 $${oa + ob + both}$ also counts the ${both} in both groups.`;
         } else {
           stem = `The Venn diagram above shows the numbers of ${ctx.pop} who ${ctx.A}, who ${ctx.B}, who do both, and who do neither. How many of the ${ctx.unit} do NOT ${ctx.A}?`;
           correct = ob + neither;
-          traps.push({ value: neither, trap: 'prob-venn-only' }, { value: ob, trap: 'prob-venn-forgot-neither' }, { value: oa, trap: 'prob-wrong-event' });
+          included = [1, 3];
           explanation = `Everyone outside the ${names[0]} circle: the ${ob} in the ${names[1]} circle only and the ${neither} outside both circles, $${ob} + ${neither} = ${correct}$.
 
 ${neither} forgets the ${ob} who are only in the ${names[1]} circle.`;
@@ -626,37 +630,80 @@ ${neither} forgets the ${ob} who are only in the ${names[1]} circle.`;
       const others = total - regions[xAt];
       const xv = regions[xAt];
       const nameList = `${ctx.names[0]}, ${ctx.names[1]}, and ${ctx.names[2]}`;
+      const [n0, n1, n2] = ctx.names;
+      regionNames = [`the ${n0}-only region`, `the ${n1}-only region`, `the ${n2}-only region`, `the ${n0}-and-${n1} region`, `the ${n0}-and-${n2} region`, `the ${n1}-and-${n2} region`, 'the center (all three groups)', 'the region outside all circles'];
       const solve = `The regions add up to ${total}: $x + ${others} = ${total}$, so $x = ${xv}$.`;
       if (ask === 'exactly-two') {
         stem = `The Venn diagram above shows the numbers of ${ctx.pop} in groups ${nameList} (the number in each region counts the ${ctx.unit} in that region only). If there are ${total} ${ctx.unit} in all, how many are in exactly two of the three groups?`;
         correct = pairs;
-        traps.push({ value: pairs + T, trap: 'prob-venn-triple' }, { value: pairs - xv, trap: 'prob-wrong-event' });
+        included = [3, 4, 5];
         explanation = `${solve} Exactly two means the three regions where just two circles overlap: $${regions[3]} + ${regions[4]} + ${regions[5]} = ${correct}$.
 
 The center region (${T}) is in all three groups, not exactly two.`;
       } else if (ask === 'at-least-two') {
         stem = `The Venn diagram above shows the numbers of ${ctx.pop} in groups ${nameList} (the number in each region counts the ${ctx.unit} in that region only). If there are ${total} ${ctx.unit} in all, how many are in at least two of the three groups?`;
         correct = pairs + T;
-        traps.push({ value: pairs, trap: 'prob-venn-triple' }, { value: total - regions[7], trap: 'prob-wrong-event' });
+        included = [3, 4, 5, 6];
         explanation = `${solve} At least two: the three two-group regions plus the center, $${regions[3]} + ${regions[4]} + ${regions[5]} + ${T} = ${correct}$.
 
 $${pairs}$ leaves out the ${T} who are in all three groups.`;
       } else {
         stem = `The Venn diagram above shows the numbers of ${ctx.pop} in groups ${nameList} (the number in each region counts the ${ctx.unit} in that region only). If there are ${total} ${ctx.unit} in all, how many are in group ${ctx.names[0]}?`;
         correct = regions[0] + regions[3] + regions[4] + T;
-        traps.push({ value: regions[0], trap: 'prob-venn-only' }, { value: regions[0] + regions[3] + regions[4], trap: 'prob-venn-triple' });
+        included = [0, 3, 4, 6];
         explanation = `${solve} Group ${ctx.names[0]} is its whole circle: $${regions[0]} + ${regions[3]} + ${regions[4]} + ${T} = ${correct}$.
 
 ${regions[0]} is only the part of the circle outside the other two.`;
       }
     }
-    const { choices, answer } = numericChoices(rng, {
-      correct,
-      traps: traps.filter((t) => t.value > 0 && t.value !== correct),
-      fillers: [correct + 5, correct - 4, correct + 10, correct - 8].filter((v) => v > 0),
-      format: (v) => `$${num(v)}$`,
+    // Each wrong choice is the right regions with one or two regions left out, added or swapped.
+    const regs = regions!;
+    const inc = new Set(included);
+    const overlapAt = sets === 2 ? 2 : 6;
+    const outsideAt = sets === 2 ? 3 : 7;
+    const deltas: { removed: number[]; added: number[] }[] = [];
+    const ids = regs.map((_, i) => i);
+    for (const i of ids) deltas.push({ removed: inc.has(i) ? [i] : [], added: inc.has(i) ? [] : [i] });
+    const doubles: typeof deltas = [];
+    for (const i of ids) for (const j of ids) if (i < j) doubles.push({ removed: [i, j].filter((x) => inc.has(x)), added: [i, j].filter((x) => !inc.has(x)) });
+    const phrase = (xs: number[]) => xs.map((i) => regionNames[i]).join(' and ');
+    const cands = [...rng.shuffle(deltas), ...rng.shuffle(doubles)].flatMap((dl) => {
+      const set = new Set(inc);
+      dl.removed.forEach((i) => set.delete(i));
+      dl.added.forEach((i) => set.add(i));
+      const value = [...set].reduce((t, i) => t + regs[i], 0);
+      if (value <= 0 || value === correct) return [];
+      const trap =
+        dl.added.length === 0
+          ? dl.removed.length === 1 && dl.removed[0] === overlapAt
+            ? sets === 2
+              ? 'prob-venn-only'
+              : 'prob-venn-triple'
+            : dl.removed.length === 1 && dl.removed[0] === outsideAt
+              ? 'prob-venn-forgot-neither'
+              : 'prob-venn-missed-region'
+          : dl.removed.length === 0
+            ? 'prob-venn-extra-region'
+            : 'prob-venn-wrong-region';
+      const why = (x: string) =>
+        dl.added.length === 0
+          ? `leaving out ${phrase(dl.removed)} gives $${x}$, but it belongs to what is asked`
+          : dl.removed.length === 0
+            ? `also counting ${phrase(dl.added)} gives $${x}$, but it is not part of what is asked`
+            : `counting ${phrase(dl.added)} in place of ${phrase(dl.removed)} gives $${x}$`;
+      return [{ value, trap, why }];
     });
-    return { params: { sets, regions: regions!, xAt, ask: ask!, total }, q: { format: 'mcs', figure: figure!, stem, choices, answer, explanation } };
+    // the old last paragraph named one trap; replace it with a mistake that is really a choice
+    explanation = explanation.replace(/\n\n[^\n]*$/, '');
+    const built = trapOnlyChoices(rng, correct, cands, (x) => `$${num(x.n)}$`);
+    if (!built) return vennDiagram.generate(rng, d);
+    const cite = rng.pick(built.used);
+    explanation = `${explanation}
+
+Trap: ${cite.why(num(cite.value))}.
+
+Read every region from the diagram, then add exactly the regions the question names.`;
+    return { params: { sets, regions: regions!, xAt, ask: ask!, total }, q: { format: 'mcs', figure: figure!, stem, choices: built.choices, answer: built.answer, explanation } };
   },
   check(q, { sets, regions, xAt, ask, total }) {
     // Solve for x by trying every value, then count members region by region.
@@ -752,13 +799,25 @@ const percentOfGroup: Template<PctGroupParams> = {
     const stem0 = `Of ${ctx.pop}, ${pa} percent ${ctx.A}, ${pb} percent ${ctx.B}, and ${ob} percent ${ctx.bNotA}.`;
     let stem = '';
     let correct: Frac;
-    const traps: { value: Frac; trap: string }[] = [];
+    const traps: { value: Frac; trap: string; why: (v: string) => string }[] = [];
+    const T = (value: Frac, trap: string, why: (v: string) => string) => traps.push({ value, trap, why });
+    const sq = (x: string) => `$${x}$`;
     let explanation = '';
     let fmt: (v: Frac) => string;
     if (ask === 'a-not-b') {
       correct = frac(100 * oa, pa);
       stem = `${stem0} What percent of the ${ctx.aOwners} do not ${ctx.B}?`;
-      traps.push({ value: frac(oa), trap: 'prob-percent-of-whole' }, { value: frac(100 * both, pa), trap: 'prob-wrong-event' }, { value: frac(both), trap: 'prob-percent-of-whole' });
+      T(frac(oa), 'prob-percent-of-whole', (x) => `${sq(x + '\\%')} is a percent of everyone, but the base here is the ${ctx.aOwners}`);
+      T(frac(100 * both, pa), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of the ${ctx.aOwners} who do ${ctx.B}`);
+      T(frac(both), 'prob-percent-of-whole', (x) => `${sq(x + '\\%')} is the percent of everyone who do both`);
+      T(frac(100 * oa, pb), 'prob-percent-wrong-base', (x) => `dividing by the ${pb} percent who ${ctx.B} gives ${sq(x + '\\%')}, but the base is the ${pa} percent who ${ctx.A}`);
+      T(frac(100 - pa), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone who do not ${ctx.A}`);
+      T(frac(100 * oa, 100 - pb), 'prob-percent-wrong-base', (x) => `dividing by the ${100 - pb} percent who do not ${ctx.B} gives ${sq(x + '\\%')}, but the base is the ${ctx.aOwners}`);
+      T(frac(100 * oa, oa + ob), 'prob-percent-wrong-base', (x) => `dividing by everyone in exactly one group gives ${sq(x + '\\%')}, but the base is the ${ctx.aOwners}`);
+      T(frac(100 * oa, pa + pb), 'prob-percent-wrong-base', (x) => `dividing by the two percents added up gives ${sq(x + '\\%')}, but the base is the ${ctx.aOwners}`);
+      T(frac(100 - oa), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone outside the group of ${ctx.person}s who ${ctx.aNotB}`);
+      T(frac(100 - both), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone who do not do both`);
+      T(frac(100 * ob, pb), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of the ${ctx.bOwners} who do not ${ctx.A}`);
       fmt = (v) => `$${v.isInt() ? num(v) : v.toNumber().toFixed(1)}\\%$`;
       explanation = `Both: $${pb} - ${ob} = ${both}$ percent of everyone. So $${pa} - ${both} = ${oa}$ percent of everyone ${ctx.aNotB}. As a percent of the ${ctx.aOwners}: $\\frac{${oa}}{${pa}} = ${num(correct)}\\%$.
 
@@ -766,7 +825,17 @@ ${oa} percent is a percent of the whole population; the question uses the ${ctx.
     } else if (ask === 'b-also-a') {
       correct = frac(100 * both, pb);
       stem = `${stem0} What percent of the ${ctx.bOwners} also ${ctx.A}?`;
-      traps.push({ value: frac(both), trap: 'prob-percent-of-whole' }, { value: frac(100 * both, pa), trap: 'prob-reversed-condition' }, { value: frac(100 * ob, pb), trap: 'prob-wrong-event' });
+      T(frac(both), 'prob-percent-of-whole', (x) => `${sq(x + '\\%')} uses the whole population as the base`);
+      T(frac(100 * both, pa), 'prob-reversed-condition', (x) => `dividing by the ${pa} percent who ${ctx.A} gives ${sq(x + '\\%')}, the wrong group`);
+      T(frac(100 * ob, pb), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of the ${ctx.bOwners} who do not ${ctx.A}`);
+      T(frac(100 * both, pa + pb - both), 'prob-percent-wrong-base', (x) => `dividing by everyone in at least one group gives ${sq(x + '\\%')}, but the base is the ${ctx.bOwners}`);
+      T(frac(100 - pb), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone who do not ${ctx.B}`);
+      T(frac(100 * both, 100 - pa), 'prob-percent-wrong-base', (x) => `dividing by the ${100 - pa} percent who do not ${ctx.A} gives ${sq(x + '\\%')}, but the base is the ${ctx.bOwners}`);
+      T(frac(100 * both, ob + both + oa), 'prob-percent-wrong-base', (x) => `dividing by everyone in at least one group gives ${sq(x + '\\%')}, but the base is the ${ctx.bOwners}`);
+      T(frac(100 * both, pa + pb), 'prob-percent-wrong-base', (x) => `dividing by the two percents added up gives ${sq(x + '\\%')}, but the base is the ${ctx.bOwners}`);
+      T(frac(100 - both), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone who do not do both`);
+      T(frac(100 - ob), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of everyone outside the group of ${ctx.person}s who ${ctx.bNotA}`);
+      T(frac(100 * oa, pa), 'prob-wrong-event', (x) => `${sq(x + '\\%')} is the percent of the ${ctx.aOwners} who do not ${ctx.B}`);
       fmt = (v) => `$${v.isInt() ? num(v) : v.toNumber().toFixed(1)}\\%$`;
       explanation = `Both: $${pb} - ${ob} = ${both}$ percent of everyone. As a percent of the ${ctx.bOwners}: $\\frac{${both}}{${pb}} = ${num(correct)}\\%$.
 
@@ -774,16 +843,29 @@ ${both} percent uses the whole population as the base, and $\\frac{${both}}{${pa
     } else {
       correct = frac(both, pa);
       stem = `${stem0} If one of the ${ctx.person}s who ${ctx.A} is to be selected at random, what is the probability that the ${ctx.person} selected ${ctx.bEvent}?`;
-      traps.push({ value: frac(both, 100), trap: 'prob-percent-of-whole' }, { value: frac(both, pb), trap: 'prob-reversed-condition' }, { value: frac(oa, pa), trap: 'prob-wrong-event' });
+      T(frac(both, 100), 'prob-percent-of-whole', (x) => `${sq(x)} divides by everyone instead of the given group`);
+      T(frac(both, pb), 'prob-reversed-condition', (x) => `dividing by the ${pb} percent who ${ctx.B} gives ${sq(x)}, the wrong group`);
+      T(frac(oa, pa), 'prob-wrong-event', (x) => `${sq(x)} is the probability of the other event`);
+      T(frac(both, pa + pb - both), 'prob-percent-wrong-base', (x) => `dividing by everyone in at least one group gives ${sq(x)}, but the group is those who ${ctx.A}`);
+      T(frac(pa, 100), 'prob-percent-of-whole', (x) => `${sq(x)} is the probability for the whole population`);
+      T(frac(pb, 100), 'prob-percent-of-whole', (x) => `${sq(x)} is the probability that the other trait appears in the whole population`);
       fmt = (v) => `$${v.toTex()}$`;
       explanation = `Both: $${pb} - ${ob} = ${both}$ percent of everyone. Among the ${pa} percent who ${ctx.A}, the share in both is $\\frac{${both}}{${pa}} = ${correct.toTex()}$.
 
 $\\frac{${both}}{100}$ divides by everyone instead of the given group.`;
     }
-    const fillers = [correct.add(10), correct.sub(10), correct.mul(frac(1, 2)), correct.add(5)].filter((v) => v.sign() > 0 && (ask !== 'prob-b-given-a' || v.lt(1)));
-    const fillersP = ask === 'prob-b-given-a' ? [frac(1, 2), frac(1, 3), frac(2, 3), frac(1, 4), frac(3, 4)] : fillers;
-    const { choices, answer } = numericChoices(rng, { correct: correct!, traps: traps.filter((t) => !t.value.eq(correct!) && t.value.sign() > 0), fillers: fillersP, format: fmt! });
-    return { params: { regions: regions!, ask }, q: { format: 'mcs', stem, choices, answer, explanation } };
+    // percents are shown with at most one decimal, so keep only mistakes that are exact there
+    const usable = traps.filter((t) => t.value.sign() > 0 && (ask === 'prob-b-given-a' ? t.value.lt(1) : t.value.mul(10).isInt() && !t.value.gt(100)));
+    explanation = explanation.replace(/\n\n[^\n]*$/, '');
+    const built = trapOnlyChoices(rng, correct!, rng.shuffle(usable), fmt!);
+    if (!built) return percentOfGroup.generate(rng, d);
+    const cite = rng.pick(built.used);
+    explanation = `${explanation}
+
+Trap: ${cite.why(ask === 'prob-b-given-a' ? cite.value.toTex() : cite.value.isInt() ? num(cite.value) : cite.value.toNumber().toFixed(1))}.
+
+The base of a percent is the group named after "of the": divide by that group, not by everyone.`;
+    return { params: { regions: regions!, ask }, q: { format: 'mcs', stem, choices: built.choices, answer: built.answer, explanation } };
   },
   check(q, { regions, ask }) {
     // Build a population of 100 people (percents) and count.

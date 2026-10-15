@@ -224,6 +224,18 @@ export const probTraps: Record<string, Trap> = {
     label: 'Went past the greatest possible value',
     fix: 'The overlap cannot exceed the smaller group, and the neither group cannot exceed the total minus the larger group.',
   },
+  'prob-venn-missed-region': {
+    label: 'Left out a region that belongs to what is asked',
+    fix: 'List the regions of the diagram that satisfy the question, then add all of them and only them.',
+  },
+  'prob-venn-extra-region': {
+    label: 'Added a region that does not belong to what is asked',
+    fix: 'List the regions of the diagram that satisfy the question, then add all of them and only them.',
+  },
+  'prob-venn-wrong-region': {
+    label: 'Counted the wrong region in place of the right one',
+    fix: 'Match each phrase of the question ("only", "both", "neither", "at least") to its regions before adding.',
+  },
   'prob-venn-triple': {
     label: 'Mishandled the members in all three groups',
     fix: 'With "exactly two" data: at least one = A + B + C $-$ (exactly two) $-$ 2(all three). With pairwise overlaps: A + B + C $-$ (pairs) + (all three).',

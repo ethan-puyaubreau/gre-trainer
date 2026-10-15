@@ -71,11 +71,5 @@
   },
   "data.interpretation.worktime-price": {
     "distractors.trapped": "baseline"
-  },
-  "data.sets.percent-of-group": {
-    "distractors.trapped": "baseline"
-  },
-  "data.sets.venn-diagram": {
-    "distractors.trapped": "baseline"
   }
 }
