@@ -3,7 +3,7 @@ import type { Lesson } from '../lessons';
 export const dataLessons: Record<string, Lesson> = {
   'data.center': {
     idea: `Work with totals: sum = average $\\times$ count. To add, remove or correct a value, update the total first, then divide by the new count.`,
-    recognize: `Think totals when a question gives an average and a count, adds or removes a value, or asks for a greatest or least possible value. For medians, order the list first, and push the other values to their limits.`,
+    recognize: `If you see an average with a count, or a value added, removed or corrected, think: totals. Never average two averages of groups of different sizes; turn each into a total first. If you see a median, order the list first. If you see a greatest or least possible value, push every other value to its limit: values after the median are at least the median, and values before it at most the median.`,
     example: {
       problem: `The average of $5$ numbers is $12$. A sixth number is added and the average of the six becomes $14$. What is the sixth number?`,
       steps: [
@@ -45,7 +45,7 @@ export const dataLessons: Record<string, Lesson> = {
   },
   'data.distributions': {
     idea: `A frequency table says how many times each value occurs. For the median, use cumulative counts to reach position $\\frac{n + 1}{2}$; for the mean, multiply each value by its count. In standard units, value = mean + $z \\times$ SD.`,
-    recognize: `Think of this with a table of values and counts, grouped data, values given in standard deviations from the mean, or a normal curve with percents.`,
+    recognize: `If you see a table of values and counts, think: the counts are frequencies, not data values. If you see standard deviations from the mean, think: $z = \\frac{\\text{value} - \\text{mean}}{\\text{SD}}$. To compare positions in two distributions, use standard units, never raw distances.`,
     example: {
       problem: `Eleven households report how many cars they own: $3$ own none, $4$ own one, $2$ own two and $2$ own three. What is the median number of cars?`,
       steps: [
@@ -59,7 +59,7 @@ export const dataLessons: Record<string, Lesson> = {
   },
   'data.counting': {
     idea: `First decide whether order matters. If it does, or the choices fill distinct positions, multiply the choices slot by slot; if not, divide by the orderings, which gives $\\binom{n}{k}$. Fill any restricted slot first.`,
-    recognize: `Think counting for "how many ways" and "how many numbers" questions, with words like arrangements, seats, committees or handshakes. Read the conditions (no repeats, even, must be together) before multiplying.`,
+    recognize: `Think counting for "how many ways" and "how many numbers" questions, with words like arrangements, seats, committees or handshakes. Read the conditions (no repeats, even, must be together) before multiplying. Handshakes among $n$ people are unordered pairs: $\\frac{n(n-1)}{2}$, not $n(n-1)$.`,
     example: {
       problem: `How many three-digit even numbers can be made from the digits $1, 2, 3, 4, 5$ if no digit is repeated?`,
       steps: [
@@ -101,7 +101,7 @@ export const dataLessons: Record<string, Lesson> = {
   },
   'data.interpretation': {
     idea: `Read the title, units and scale before the question. Percent change is (new $-$ old) $\\div$ old, with the earlier value as the base, and successive percent changes multiply rather than add.`,
-    recognize: `Think of these steps for any table, bar graph or circle graph, especially when the title gives units such as "in thousands" or the question asks for a percent change or a share of a total.`,
+    recognize: `For any table, bar graph or circle graph, read the title, units and scale first. If the title says "in thousands", think: multiply every value by $1000$. If you see a percent change, think: divide by the earlier value. If you see a share of a total, think: part $\\div$ total.`,
     example: {
       problem: `A bar graph titled "Visitors (in thousands)" shows $50$ for 2022 and $60$ for 2023. How many more visitors came in 2023, and by what percent did the number grow?`,
       steps: [
