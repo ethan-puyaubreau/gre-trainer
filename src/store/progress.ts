@@ -167,12 +167,19 @@ export const useProgress = create<ProgressData & Actions>()(
         );
         const seq = s.seq + 1;
         // The repair this question came from is done (any other entry of the skill stays queued). A miss replaces the skill's
-        // queue with a fresh first comeback; a first comeback answered right leaves the next-day comeback in another style.
-        let remediation = repair ? withoutOne(s.remediation, repair) : s.remediation;
+        // queue with a fresh first comeback. A first comeback answered right leaves the next-day comeback in another style,
+        // but only if this attempt really removed the entry (a stale pick or a second tab must not add a duplicate) and the
+        // skill still has a come-back date (a stage 2 entry is served only when the skill is due, so it would be stranded).
+        let remediation = s.remediation;
+        let served: Remediation | undefined;
+        if (repair) {
+          remediation = withoutOne(s.remediation, repair);
+          if (remediation.length < s.remediation.length) served = repair;
+        }
         if (!correct) {
           remediation = [...remediation.filter((r) => r.skillId !== question.skillId), scheduleRepair(createRng(randomSeed()), question.skillId, question.templateId, seq)];
-        } else if (repair && (repair.stage ?? 1) === 1) {
-          remediation = [...remediation, scheduleRepair(createRng(randomSeed()), question.skillId, repair.missedTemplate, seq, 2)];
+        } else if (served && (served.stage ?? 1) === 1 && outcome.state.dueAt !== undefined) {
+          remediation = [...remediation, scheduleRepair(createRng(randomSeed()), question.skillId, served.missedTemplate, seq, 2)];
         }
         const record: AttemptRecord = {
           qid: question.id,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodeSegment } from '../src/router';
 import { dropWeakFlags } from '../src/store/migrate';
+import { DAY, newSkillState, type SkillState } from '../src/mastery/model';
 import type { Remediation } from '../src/mastery/scheduler';
 import { exportProgress, initialData, isProgressData, MAX_ATTEMPT_MS, useProgress } from '../src/store/progress';
 
@@ -54,6 +55,8 @@ describe('repair queue', () => {
   const queue = () => useProgress.getState().remediation;
   const stage1: Remediation = { skillId: 'arith.s', missedTemplate: 'arith.x', dueSeq: 2, stage: 1 };
   const stage2: Remediation = { skillId: 'arith.s', missedTemplate: 'arith.x', dueSeq: 0, stage: 2 };
+  // A skill that was missed: it has a come-back date (a day after the miss) unless it was reviewed since.
+  const missed = (dueAt: number | undefined): Record<string, SkillState> => ({ 'arith.s': { ...newSkillState(), level: 1, attempts: 1, dueAt } });
 
   it('keeps a first comeback that is not due yet when the skill is answered again', () => {
     useProgress.setState({ ...initialData(), remediation: [stage1] });
@@ -63,9 +66,28 @@ describe('repair queue', () => {
   });
 
   it('serving a first comeback right schedules the next-day comeback on the same missed template', () => {
-    useProgress.setState({ ...initialData(), seq: 4, remediation: [{ ...stage1, dueSeq: 4 }] });
+    useProgress.setState({ ...initialData(), seq: 4, skills: missed(Date.now() + DAY), remediation: [{ ...stage1, dueSeq: 4 }] });
     answer(true, { ...stage1, dueSeq: 4 });
     expect(queue()).toEqual([{ skillId: 'arith.s', missedTemplate: 'arith.x', dueSeq: 5, stage: 2 }]);
+  });
+
+  it('schedules no next-day comeback when the answer cleared the come-back date', () => {
+    // Reviewed after the date: the skill is no longer due, so a stage 2 entry would never be served.
+    useProgress.setState({ ...initialData(), seq: 4, skills: missed(Date.now() - 1000), remediation: [{ ...stage1, dueSeq: 4 }] });
+    answer(true, { ...stage1, dueSeq: 4 });
+    expect(useProgress.getState().skills['arith.s'].dueAt).toBeUndefined();
+    expect(queue()).toEqual([]);
+  });
+
+  it('adds nothing when the served entry is no longer in the queue', () => {
+    // A stale pick or a second tab already served it.
+    useProgress.setState({ ...initialData(), seq: 4, skills: missed(Date.now() + DAY), remediation: [] });
+    answer(true, { ...stage1, dueSeq: 4 });
+    expect(queue()).toEqual([]);
+    const other = { ...stage1, dueSeq: 9 };
+    useProgress.setState({ remediation: [other] });
+    answer(true, { ...stage1, dueSeq: 4 });
+    expect(queue()).toEqual([other]);
   });
 
   it('missing a comeback restarts the chain with one fresh first comeback', () => {
@@ -87,7 +109,7 @@ describe('repair queue', () => {
 
   it('serves one entry at a time and leaves other skills alone', () => {
     const t: Remediation = { skillId: 'arith.t', missedTemplate: 'arith.y', dueSeq: 1, stage: 1 };
-    useProgress.setState({ ...initialData(), seq: 3, remediation: [stage1, t] });
+    useProgress.setState({ ...initialData(), seq: 3, skills: missed(Date.now() + DAY), remediation: [stage1, t] });
     answer(true, stage1);
     expect(queue().map((r) => [r.skillId, r.stage])).toEqual([
       ['arith.t', 1],
@@ -97,7 +119,7 @@ describe('repair queue', () => {
 
   it('counts an entry saved before stages existed as a first comeback', () => {
     const old = { skillId: 'arith.s', missedTemplate: 'arith.x', dueSeq: 1 } as Remediation;
-    useProgress.setState({ ...initialData(), seq: 1, remediation: [old] });
+    useProgress.setState({ ...initialData(), seq: 1, skills: missed(Date.now() + DAY), remediation: [old] });
     answer(true, old);
     expect(queue()).toMatchObject([{ skillId: 'arith.s', stage: 2 }]);
   });
