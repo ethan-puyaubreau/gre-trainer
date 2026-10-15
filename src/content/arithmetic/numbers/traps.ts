@@ -80,7 +80,7 @@ export const numbersTraps: Record<string, Trap> = {
   },
   'num-abs-vs-one': {
     label: 'Compared |x| with 1 without locating x between the ticks',
-    fix: '|x| < 1 exactly when x lies between the ticks -1 and 1, whatever its sign. A negative number between -1 and 0 has |x| < 1.',
+    fix: '$|x| < 1$ exactly when $x$ lies between the ticks $-1$ and $1$, whatever its sign. A negative number between $-1$ and $0$ has $|x| < 1$.',
   },
   'num-wrong-point': {
     label: 'Found the coordinate of the wrong point',
