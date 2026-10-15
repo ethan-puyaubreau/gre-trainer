@@ -59,7 +59,7 @@ const hypBound: Template<P> = {
     let wrong: { letter: QCChoice; trap: string } | null = null;
     let body: string;
     if (kind === 'integer') {
-      const multi = d === 3 || rng.chance(0.3);
+      const multi = d === 3 || rng.chance(d === 2 ? 0.5 : 0.3);
       h = rng.pick(multi ? H_TWO : H_ONE);
       const pairs = intPairs(h);
       const sums = pairs.map(([a, b]) => a + b);
@@ -71,11 +71,11 @@ const hypBound: Template<P> = {
       const list = pairs.map(([a, b]) => `$${a}$ and $${b}$ (sum $${a + b}$)`).join(', ');
       body = `Recognize: the legs are whole numbers with $x^2 + y^2 = ${h * h}$, so list every pair that works.
 
-The pairs are ${list}. ${answer === 'D' ? `The sums ${sums.join(', ')} are not all on the same side of $${N}$, so $x + y$ is not fixed.` : `Every sum ${answer === 'A' ? 'exceeds' : answer === 'B' ? 'is below' : 'equals'} $${N}$.`}
+${pairs.length === 1 ? 'The only pair is' : 'The pairs are'} ${list}. ${answer === 'D' ? `The sums ${sums.join(', ')} are not all on the same side of $${N}$, so $x + y$ is not fixed.` : `Every sum ${answer === 'A' ? 'exceeds' : answer === 'B' ? 'is below' : 'equals'} $${N}$.`}
 
 Check: ${pairs.map(([a, b]) => `$${a}^2 + ${b}^2 = ${a * a + b * b}$`).join(', ')}.
 
-${wrong && wrong.letter !== answer ? `Trap: using only the pair $${pairs[0][0]}$ and $${pairs[0][1]}$ would suggest that ${QC_SAY[wrong.letter]}.\n\n` : ''}Rule: with whole-number legs, enumerate every pair; do not assume there is only one.`;
+${wrong && wrong.letter !== answer ? `Trap: using only the pair $${pairs[0][0]}$ and $${pairs[0][1]}$ would suggest that ${QC_SAY[wrong.letter]}.\n\n` : ''}Rule: with whole-number legs, ${pairs.length === 1 ? 'list the pairs that satisfy the equation' : 'enumerate every pair; do not assume there is only one'}.`;
     } else if (kind === 'sum') {
       h = d === 2 ? rng.int(6, 30) : rng.int(31, 60);
       const rt = h * Math.SQRT2;
