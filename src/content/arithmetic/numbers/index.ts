@@ -5,6 +5,7 @@ import { decimalExprTemplates, decimalExprTraps } from './decimalExpr';
 import { decimalExtraTemplates } from './decimalsMore';
 import { fractionTemplates } from './fractions';
 import { fractionsQcTemplates } from './fractionsQc';
+import { absIntervalTemplates, absIntervalTraps } from './absInterval';
 import { numberLineTemplates } from './numberLine';
 import { partToWholeTemplates, partToWholeTraps } from './partToWhole';
 import { percentTemplates } from './percent';
@@ -17,5 +18,5 @@ import { realNumberTemplates } from './realNumbers';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...complexFractionTemplates, ...wholeCountTemplates, ...unorderedTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
-export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps, ...complexFractionTraps, ...wholeCountTraps, ...unorderedTraps };
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...complexFractionTemplates, ...wholeCountTemplates, ...unorderedTemplates, ...absIntervalTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
+export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps, ...complexFractionTraps, ...wholeCountTraps, ...unorderedTraps, ...absIntervalTraps };
