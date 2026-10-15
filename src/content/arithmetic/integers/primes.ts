@@ -844,9 +844,9 @@ const parityPowerQC: Template<PPowParams> = {
           quantityB: `$${bv}$`,
           answer,
           traps,
-          explanation: `A power of $-1$ is 1 when the exponent is even and $-1$ when it is odd, so only the parity of ${shift ? '$p + 1$' : '$p$'} matters.
+          explanation: `A power of $-1$ is 1 for an even exponent and $-1$ for an odd one, so only the parity of ${shift ? '$p + 1$' : '$p$'} matters.
 
-Test every case the statement allows: ${caseText}. Rules: odd + odd and even + even are even, odd + even is odd, a product is even if a factor is even${expr.tex.includes('^') ? ', a power keeps the parity of its base' : ''}.
+Test every allowed case: ${caseText}. Rules: odd + odd and even + even are even; a product with an even factor is even${expr.tex.includes('^') ? '; a power keeps the parity of its base' : ''}.
 
 ${valueLine} Compare with $${bv}$: ${QC_WORDS[answer]}. (${answer})
 

@@ -246,8 +246,8 @@ With a negative exponent the comparison flips: the smaller fraction raised to a 
       const intro = sgn < 0 ? `Write $n = -m$, where $m$ is a positive${parity === 'any' ? '' : ` ${parity}`} integer.` : '';
       const describe = (form: PowForm, odd: boolean) => `$${formTex(form, a)} = ${positiveForm(form, a, sgn, odd, letter)}$`;
       const caseLines = parities.map((odd) => {
-        const partA = `${describe(fa, odd)}, which is ${regionText(region(fa, sgn, odd))}`;
-        const partB = fb ? `${describe(fb, odd)}, which is ${regionText(region(fb, sgn, odd))}` : `Quantity B is $${c}$`;
+        const partA = `${describe(fa, odd)} (${regionText(region(fa, sgn, odd))})`;
+        const partB = fb ? `${describe(fb, odd)} (${regionText(region(fb, sgn, odd))})` : `Quantity B is $${c}$`;
         return { odd, text: `${partA}; ${partB}` };
       });
       const exN = (odd: boolean) => (sgn < 0 ? (odd ? -1 : -2) : odd ? 1 : 2);
@@ -255,7 +255,7 @@ With a negative exponent the comparison flips: the smaller fraction raised to a 
       const exampleFor = (odd: boolean) => `$n = ${exN(odd)}$ gives $${exVal(fa, odd)}$ and $${fb ? exVal(fb, odd) : c}$`;
       if (parity === 'any' && signed) {
         const [ev, od] = caseLines;
-        explanation = `${intro ? `${intro} ` : ''}The parity of $n$ is not given, so check both cases.
+        explanation = `${intro ? `${intro} ` : ''}The parity of $n$ is not given: check both cases.
 
 - If $n$ is even: ${ev.text}. ${cap(QC_WORDS[results0(fa, fb, sgn, false, c)])}.
 - If $n$ is odd: ${od.text}. ${cap(QC_WORDS[results0(fa, fb, sgn, true, c)])}.
@@ -267,8 +267,8 @@ ${answer === 'D' ? `The two cases disagree (for example, ${exampleFor(false)}, w
 So ${QC_WORDS[answer]}. For example, ${exampleFor(parity === 'odd')}. (${answer})`;
       }
       const tips: string[] = [];
-      if (fa.neg || fb?.neg) tips.push(parity === 'any' ? 'a negative base gives a positive result for even exponents and a negative result for odd ones' : `a negative base raised to an ${parity} power is ${parity === 'even' ? 'positive' : 'negative'}`);
-      if (sgn < 0) tips.push('a negative exponent takes the reciprocal; it does not make the value negative');
+      if (fa.neg || fb?.neg) tips.push(parity === 'any' ? 'a negative base gives a positive value for even exponents and a negative one for odd exponents' : `a negative base raised to an ${parity} power is ${parity === 'even' ? 'positive' : 'negative'}`);
+      if (sgn < 0) tips.push('a negative exponent means the reciprocal, not a negative value');
       if (tips.length) explanation += `\n\nRemember: ${listAnd(tips)}.`;
       return {
         params: { kind, a, b, nSign: sgn, parity, fa, fb, c, terms },

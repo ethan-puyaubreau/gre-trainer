@@ -487,7 +487,7 @@ const couldBeN: Template<CouldBeParams> = {
       const pattern =
         conds.length === 1
           ? `Numbers with remainder ${conds[0][1]} on division by ${conds[0][0]} are $n = ${conds[0][0]}k + ${conds[0][1]}$: ${first.join(', ')}, and so on, going up by ${conds[0][0]}.`
-          : `Numbers with remainder ${conds[0][1]} on division by ${conds[0][0]} are ${range(0, 4)
+          : `Remainder ${conds[0][1]} on division by ${conds[0][0]} gives ${range(0, 4)
               .map((k) => conds[0][0] * k + conds[0][1])
               .join(', ')}, ...; the first that also leaves remainder ${conds[1][1]} on division by ${conds[1][0]} is ${first[0]}, and the pattern repeats every $\\operatorname{lcm}(${conds[0][0]}, ${conds[1][0]}) = ${L}$: ${first.slice(0, 3).join(', ')}, ...${
               diff === 3 ? ` (not every ${conds[0][0] * conds[1][0]}, since ${conds[0][0]} and ${conds[1][0]} share a factor)` : ''

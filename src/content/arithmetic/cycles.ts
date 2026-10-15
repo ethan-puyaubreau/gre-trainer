@@ -343,20 +343,20 @@ const unitsDigitPower: Template<UnitsParams> = {
         .map((t, i) => {
           const c = cycles[i];
           const r = t.exp % c.length;
-          return `Powers of ${t.base % 10} end in ${c.join(', ')}, a cycle of ${c.length}. As $${t.exp} = ${c.length} \\cdot ${Math.floor(t.exp / c.length)} + ${r}$, $${t.base}^{${t.exp}}$ ends in ${
-            r === 0 ? 'the last element' : `element number ${r}`
+          return `Powers of ${t.base % 10} cycle through ${c.join(', ')}. With $${t.exp} = ${c.length} \\cdot ${Math.floor(t.exp / c.length)} + ${r}$, $${t.base}^{${t.exp}}$ ends in ${
+            r === 0 ? 'the last one' : `number ${r}`
           }: ${digits[i]}.`;
         })
         .join('\n\n');
-      const tail = op === 'single' ? '' : ` So the units digit of the ${op === '+' ? 'sum' : 'product'} is that of $${digits[0]} ${op === '+' ? '+' : '\\times'} ${digits[1]}$, which is ${answer}.`;
+      const tail = op === 'single' ? '' : ` So the units digit of the ${op === '+' ? 'sum' : 'product'} is that of $${digits[0]} ${op === '+' ? '+' : '\\times'} ${digits[1]}$: ${answer}.`;
       const t0 = terms[0];
       const L0 = cycles[0].length;
       const e0 = t0.exp % L0 === 0 ? L0 : (t0.exp % L0) + L0;
-      const check = `Check: $${t0.base % 10}^{${e0}} = ${num((t0.base % 10) ** e0)}$ ends in ${unitsDigitByCycle(t0.base, e0)}, and ${e0} has the same remainder on division by ${L0} as ${t0.exp}.`;
+      const check = `Check: $${t0.base % 10}^{${e0}} = ${num((t0.base % 10) ** e0)}$ ends in ${unitsDigitByCycle(t0.base, e0)}; ${e0} and ${t0.exp} both leave remainder ${t0.exp % L0} by ${L0}.`;
       const say: string[] = [];
       const digit = (id: string) => shown.get(id);
       if (digit('power-as-product'))
-        say.push(`${digit('power-as-product')} comes from ${op === 'single' ? 'base times exponent' : 'base times exponent in each term'}, but $3^4 = 81$, not $3 \\times 4 = 12$`);
+        say.push(`${digit('power-as-product')} multiplies base by exponent, but $3^4 = 81$, not $12$`);
       if (digit('cycle-off-by-one')) say.push(`${digit('cycle-off-by-one')} is one place off in the cycle`);
       else if (digit('units-base-digit')) say.push(`${digit('units-base-digit')} keeps the units digit of the base, as if the exponent did nothing`);
       else if (digit('units-exponent-last-digit')) say.push(`${digit('units-exponent-last-digit')} uses only the last digit of the exponent`);
@@ -373,7 +373,7 @@ const unitsDigitPower: Template<UnitsParams> = {
           ][rng.int(0, 2)],
           choices,
           answer: idx,
-          explanation: `Units digits of big powers repeat in a cycle, so only the position in the cycle matters.\n\n${lines}${tail}\n\n${check}${trap}\n\nRule: divide the exponent by the cycle length and use the remainder as the position (0 means the last element).`,
+          explanation: `Units digits of powers repeat in a cycle.\n\n${lines}${tail}\n\n${check}${trap}\n\nRule: the exponent's remainder by the cycle length is the position (0 means the last).`,
         },
       };
     }
