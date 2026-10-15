@@ -108,9 +108,9 @@ export const geometryLessons: Record<string, Lesson> = {
       steps: [
         `The square has area $8^2 = 64$, because it is the whole figure.`,
         `The circle's diameter is $8$, so $r = 4$ and its area is $16\\pi$, because an inscribed circle's diameter equals the side of the square.`,
-        `Shaded $= 64 - 16\\pi \\approx 13.76$, because shaded = whole $-$ unshaded; using $\\pi \\approx 3.14$ (not $3$) keeps close comparisons right.`,
+        `Shaded $= 64 - 16\\pi \\approx 13.73$, because shaded = whole $-$ unshaded; rounding $\\pi$ to $3$ would give $16$, too far off in a close comparison.`,
       ],
-      answer: `$64 - 16\\pi$, about $13.76$`,
+      answer: `$64 - 16\\pi$, about $13.73$`,
     },
     traps: ['geom-shaded-wrong-region', 'geom-circle-radius-diameter', 'geom-shaded-pi-as-3'],
   },
