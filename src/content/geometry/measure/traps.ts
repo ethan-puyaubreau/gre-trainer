@@ -70,6 +70,38 @@ export const measureTraps: Record<string, Trap> = {
     label: 'Counted the wrong number of triangles',
     fix: 'From one vertex, the diagonals split an $n$-gon into $n - 2$ triangles, each with an angle sum of $180^\\circ$.',
   },
+  'geom-poly-dropped-constants': {
+    label: 'Left out the constant terms',
+    fix: 'Add the constants too: collect the $x$ terms on one side and the numbers on the other before dividing.',
+  },
+  'geom-poly-sign-error': {
+    label: 'Moved a constant across with the wrong sign',
+    fix: 'Subtract the constants from the angle sum: $px + q = S$ gives $px = S - q$.',
+  },
+  'geom-poly-divided-by-n': {
+    label: 'Divided by the number of angles',
+    fix: 'Divide by the total coefficient of $x$ (the $x$ terms add up, so $2x$ counts as two), not by the number of angles.',
+  },
+  'geom-poly-all-right': {
+    label: 'Assumed every angle is $90^\\circ$',
+    fix: 'Nothing says the angles are right angles. Use the angle sum $(n - 2) \\cdot 180^\\circ$ instead.',
+  },
+  'geom-poly-sum-180': {
+    label: 'Used $180^\\circ$ for every polygon',
+    fix: '$180^\\circ$ is the angle sum of a TRIANGLE. A polygon with $n$ sides has $(n - 2) \\cdot 180^\\circ$.',
+  },
+  'geom-poly-90-per-triangle': {
+    label: 'Used $90^\\circ$ for each triangle',
+    fix: 'Every triangle has an angle sum of $180^\\circ$, so a polygon split into $n - 2$ triangles has $(n - 2) \\cdot 180^\\circ$.',
+  },
+  'geom-poly-360-per-triangle': {
+    label: 'Used $360^\\circ$ for each triangle',
+    fix: 'The angles of a TRIANGLE add up to $180^\\circ$; $360^\\circ$ is for a quadrilateral, or for the exterior angles of any polygon.',
+  },
+  'geom-poly-reflex': {
+    label: 'Gave the reflex angle',
+    fix: 'The interior angle of a convex polygon is less than $180^\\circ$. $360^\\circ$ minus it is the angle on the outside.',
+  },
   'geom-poly-side-count': {
     label: 'Miscounted the sides of the polygon',
     fix: 'Count the vertices of the figure one by one. A polygon with $n$ sides has $n$ vertices, and the angle formulas depend on that exact $n$.',
@@ -77,6 +109,38 @@ export const measureTraps: Record<string, Trap> = {
   'geom-rect-subtracted-sides': {
     label: 'Subtracted the width from the length instead of adding it',
     fix: 'Half the perimeter is length PLUS width: $\\ell + w = \\frac{P}{2}$.',
+  },
+  'geom-rect-squared-sum': {
+    label: 'Squared the sum of the sides instead of multiplying them',
+    fix: 'The area is the product $\\ell w$, not $(\\ell + w)^2$.',
+  },
+  'geom-rect-fencepost': {
+    label: 'Counted grid points instead of unit steps',
+    fix: 'A side from $x = -3$ to $x = 5$ has length $5 - (-3) = 8$, the number of unit steps, not the $9$ points on it.',
+  },
+  'geom-rect-quarter-perimeter': {
+    label: 'Set length + width equal to a quarter of the perimeter',
+    fix: 'The perimeter is $2(\\ell + w)$, so $\\ell + w$ is HALF the perimeter, not a quarter.',
+  },
+  'geom-rect-percent-more': {
+    label: 'Read "p percent of" as "p percent more than"',
+    fix: '"The width is $p$ percent of the length" means $w = \\frac{p}{100}\\ell$, with no extra length added.',
+  },
+  'geom-rect-answered-side': {
+    label: 'Gave a side of the rectangle instead of the quantity asked',
+    fix: 'After finding the sides, reread the question and compute what it asks (area, perimeter or diagonal).',
+  },
+  'geom-rect-triangle-half': {
+    label: 'Halved the product of the sides',
+    fix: 'The area of a rectangle is $\\ell w$; the factor $\\frac{1}{2}$ belongs to a triangle.',
+  },
+  'geom-rect-forgot-two': {
+    label: 'Subtracted $\\ell w$ instead of $2\\ell w$',
+    fix: '$(\\ell + w)^2 = \\ell^2 + 2\\ell w + w^2$, so $\\ell^2 + w^2 = (\\ell + w)^2 - 2\\ell w$.',
+  },
+  'geom-rect-no-sqrt': {
+    label: 'Gave the square of the diagonal',
+    fix: '$\\ell^2 + w^2$ is the square of the diagonal; take its square root.',
   },
   'geom-rect-three-sides': {
     label: 'Perimeter of a rectangle $= 2\\ell + w$',
@@ -118,6 +182,14 @@ export const measureTraps: Record<string, Trap> = {
   'geom-circle-ratio-linear': {
     label: 'Used the ratio of the radii for the areas',
     fix: 'Areas grow with the SQUARE of the radius: radii in the ratio $p : q$ give areas in the ratio $p^2 : q^2$.',
+  },
+  'geom-circle-ratio-fourth': {
+    label: 'Squared the ratio twice',
+    fix: 'Area scales with the SQUARE of the ratio of the radii, once: $\\left(\\frac{r_1}{r_2}\\right)^2$.',
+  },
+  'geom-circle-ratio-one-side': {
+    label: 'Applied the square to one side of the ratio only',
+    fix: 'The ratio $r_1 : r_2$ becomes $r_1^2 : r_2^2$ for areas: square both terms.',
   },
   'geom-circle-ratio-cubed': {
     label: 'Cubed the ratio for an area',
@@ -195,6 +267,18 @@ export const measureTraps: Record<string, Trap> = {
   'geom-shaded-one-piece': {
     label: 'Counted the wrong number of pieces',
     fix: 'Check how many of the equal pieces are shaded: compute (whole − unshaded) and divide by the number of pieces only if just one of them is shaded.',
+  },
+  'geom-shaded-circle-fraction': {
+    label: 'Took the wrong fraction of the circle',
+    fix: 'A quarter circle is $\\frac{1}{4}\\pi r^2$; two of them make a semicircle, four make the whole circle.',
+  },
+  'geom-shaded-radius-not-squared': {
+    label: 'Forgot to square the radius',
+    fix: 'The area of a circle is $\\pi r^2$: the radius is squared, not just multiplied by $\\pi$.',
+  },
+  'geom-shaded-diameter-radius': {
+    label: 'Mixed up radius and diameter',
+    fix: 'The radius is half the diameter. Taking every length for twice (or half) what it is changes every area by a factor of 4.',
   },
   'geom-shaded-radius-wrong': {
     label: 'Took the wrong radius for the circle',

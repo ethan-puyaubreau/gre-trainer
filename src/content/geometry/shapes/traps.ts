@@ -26,6 +26,14 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Made a sign error when solving the equation',
     fix: 'Subtract the same number from both sides: $c_1x + k_1 = c_2x + k_2$ gives $(c_1 - c_2)x = k_2 - k_1$. Substitute back to check.',
   },
+  'geo-ang-wrong-coefficient': {
+    label: 'Divided by the wrong coefficient of $x$',
+    fix: 'Collect the $x$ terms first: $c_1x + c_2x = (c_1 + c_2)x$, or $c_2x - c_1x = (c_2 - c_1)x$. Then divide by that total, not by one coefficient.',
+  },
+  'geo-ang-dropped-constant': {
+    label: 'Left one of the constants out of the equation',
+    fix: 'Both labels have their constants: move every number to the right side, subtract each one, then divide.',
+  },
   'geo-par-bend': {
     label: 'Took the angle at the bend as $180^\\circ$ minus the other two',
     fix: 'Draw a line through the bend parallel to the two lines: the bend angle splits into two alternate interior angles, so it equals the SUM of the two outer angles.',
@@ -64,6 +72,14 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Added a constant to the $180^\\circ$ instead of subtracting it',
     fix: 'From $Cx + K = 180$, subtract $K$ from both sides: $Cx = 180 - K$.',
   },
+  'geo-tri-sum-90': {
+    label: 'Used $90^\\circ$ for the angles of a triangle',
+    fix: 'The three angles of a triangle add up to $180^\\circ$; $90^\\circ$ is the sum of the two acute angles of a RIGHT triangle.',
+  },
+  'geo-tri-mis-added': {
+    label: 'Added the $x$ terms wrongly (one too many or too few)',
+    fix: 'Count the coefficients of $x$ in all three expressions and add them: the equation is $Cx + K = 180$ with $C$ the sum of the three coefficients.',
+  },
   'geo-tri-wrong-angle': {
     label: 'Gave a different angle of the triangle than the one asked',
     fix: 'Find all three angles first, then read off the one the question asks for (largest, smallest, at a given vertex).',
@@ -72,6 +88,10 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Subtracted the wrong pair of angles',
     fix: 'The difference asked for is between the LARGEST and the SMALLEST angle. List the three angles, then pick those two.',
   },
+  'geo-tri-iso-three': {
+    label: 'Shared the rest between three angles instead of two',
+    fix: 'An isosceles triangle has TWO equal angles. After subtracting the given angle from $180^\\circ$, split what is left in two.',
+  },
   'geo-tri-iso-half': {
     label: 'Halved the given angle instead of sharing what is left',
     fix: 'The equal angles share $180^\\circ$ minus the other angle. Half of the given angle has no role in an isosceles triangle.',
@@ -79,6 +99,18 @@ export const shapesTraps: Record<string, Trap> = {
   'geo-tri-ext-add': {
     label: 'Added the known remote angle to the exterior angle',
     fix: 'The exterior angle EQUALS the sum of the two remote interior angles, so the unknown one is the exterior angle MINUS the known one.',
+  },
+  'geo-tri-ext-forgot': {
+    label: 'Used only one of the two remote angles',
+    fix: 'The exterior angle equals the SUM of both remote interior angles: exterior $=$ known angle $+$ unknown angle.',
+  },
+  'geo-tri-ext-twice': {
+    label: 'Subtracted the known angle twice',
+    fix: 'Subtract the known remote angle once from the exterior angle to get the other remote angle.',
+  },
+  'geo-tri-ext-half': {
+    label: 'Halved the exterior angle as if the remote angles were equal',
+    fix: 'Nothing says the two remote angles are equal. Subtract the known one from the exterior angle.',
   },
   'geo-tri-ext-supp': {
     label: 'Used the interior angle next to the exterior angle',
@@ -242,6 +274,26 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Used the area instead of the perimeter',
     fix: 'Material along the sides is a length: use the perimeter.',
   },
+  'geo-rt-left-out-leg': {
+    label: 'Left a leg out of the perimeter of the triangle',
+    fix: 'The strip goes along ALL three sides: both legs and the hypotenuse.',
+  },
+  'geo-rt-sides-twice': {
+    label: 'Counted the sides twice',
+    fix: 'Each side of the triangle is outlined once: the perimeter is leg + leg + hypotenuse.',
+  },
+  'geo-rt-no-sqrt': {
+    label: 'Gave the square of the hypotenuse',
+    fix: 'The Pythagorean sum gives the SQUARE of the hypotenuse. Take the square root to get its length.',
+  },
+  'geo-rt-half-twice': {
+    label: 'Took a quarter of the product of the legs as the area',
+    fix: 'The area of a right triangle is ONE half of the product of the legs: $\\frac{1}{2}(ak)(bk) = K$.',
+  },
+  'geo-rt-counted-twice': {
+    label: 'Counted one of the lengths twice',
+    fix: 'Each Pythagorean step uses each square once. List the squares you add and check that each length appears only once.',
+  },
   'geo-rt-hyp-only': {
     label: 'Used only the hypotenuse as the length of strip per triangle',
     fix: 'The strip goes along ALL three sides, so each triangle uses its perimeter: leg + leg + hypotenuse.',
@@ -279,6 +331,26 @@ export const shapesTraps: Record<string, Trap> = {
   'geo-sim-additive': {
     label: 'Added a constant instead of multiplying by the scale factor',
     fix: 'Similar figures scale by a common FACTOR: every length is multiplied by the same number, not increased by the same amount.',
+  },
+  'geo-sim-squared-twice': {
+    label: 'Squared the ratio twice',
+    fix: 'Areas go with the square of the ratio of lengths once: $\\left(\\frac{a}{b}\\right)^2$, not the fourth power.',
+  },
+  'geo-sim-one-side-squared': {
+    label: 'Squared only one term of the ratio',
+    fix: 'To square a ratio, square BOTH terms: $\\left(\\frac{a}{b}\\right)^2 = \\frac{a^2}{b^2}$.',
+  },
+  'geo-sim-averaged-percent': {
+    label: 'Averaged the change of the sides and the change of the area',
+    fix: 'The changes are not averaged: the new area (or volume) is the old one times the scale factor squared (or cubed).',
+  },
+  'geo-sim-triple-percent': {
+    label: 'Tripled the percent for a volume',
+    fix: 'Three dimensions multiply: the factor is $(1 + \\frac{p}{100})^3$, not $1 + \\frac{3p}{100}$.',
+  },
+  'geo-sim-squared-for-volume': {
+    label: 'Used the square of the scale factor for a volume',
+    fix: 'A volume scales with the CUBE of the scale factor. The square is for areas.',
   },
   'geo-sim-no-divide': {
     label: 'Multiplied the lengths without dividing by the matching length',

@@ -561,6 +561,7 @@ interface ScaleParams {
   p?: number;
   q?: number;
   pct?: number;
+  dim?: 2 | 3;
   up?: boolean;
   h1?: number;
   s1?: number;
@@ -570,6 +571,9 @@ interface ScaleParams {
   dd?: number;
   values: number[];
 }
+
+/** (a : b) to the power e (negative: inverted), as a pair of whole numbers. */
+const pw = (a: number, b: number, e: number): [number, number] => (e >= 0 ? [a ** e, b ** e] : [b ** -e, a ** -e]);
 
 function ratioChoice(rng: Rng, correct: [number, number], wrong: { r: [number, number]; trap?: string }[]) {
   const val = (r: [number, number]) => r[0] / r[1];
@@ -609,7 +613,7 @@ const SCALE_NOTES: Record<string, (vs: string) => string> = {
 };
 
 function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionBody } {
-    const kind: ScaleKind = rng.pick(d === 1 ? (['shadow', 'ratio'] as const) : d === 2 ? (['ratio', 'percent', 'shadow'] as const) : (['ratio', 'percent', 'lamp', 'lamp'] as const));
+    const kind: ScaleKind = rng.pick(d === 1 ? (['shadow', 'ratio'] as const) : d === 2 ? (['ratio', 'percent', 'shadow', 'lamp'] as const) : (['ratio', 'percent', 'lamp', 'shadow', 'lamp'] as const));
     if (kind === 'ratio') {
       // GE-14 style, for similar triangles
       const pairs: [number, number][] = [
@@ -630,19 +634,27 @@ function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionB
       let explanation: string;
       if (dirn === 'side-to-area') {
         res = ratioChoice(rng, [a * a, b * b], [
-          { r: [a, b], trap: 'geo-sim-linear-area' },
-          { r: [b * b, a * a], trap: 'geo-sim-inverted' },
-          { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
-          { r: [b, a], trap: 'geo-sim-inverted' },
+          { r: pw(a, b, 1), trap: 'geo-sim-linear-area' },
+          { r: pw(a, b, -2), trap: 'geo-sim-inverted' },
+          { r: pw(a, b, 3), trap: 'geo-sim-cubed' },
+          { r: pw(a, b, -1), trap: 'geo-sim-inverted' },
+          { r: pw(a, b, 4), trap: 'geo-sim-squared-twice' },
+          { r: pw(a, b, -3), trap: 'geo-sim-inverted' },
+          { r: [a * a, b], trap: 'geo-sim-one-side-squared' },
+          { r: [a, b * b], trap: 'geo-sim-one-side-squared' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the length of each side of $T$ to the length of the corresponding side of $U$ is $${a}$ to $${b}$. What is the ratio of the area of $T$ to the area of $U$?`;
         explanation = `For similar figures, every length scales by $${rt(a, b)}$ and every area by $\\left(${rt(a, b)}\\right)^2 = ${rt(a * a, b * b)}$. So the ratio of the areas is $${a * a}$ to $${b * b}$.`;
       } else {
         res = ratioChoice(rng, [a, b], [
-          { r: [a * a, b * b], trap: 'geo-sim-perimeter-squared' },
-          { r: [b, a], trap: 'geo-sim-inverted' },
-          { r: [b * b, a * a], trap: 'geo-sim-inverted' },
-          { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
+          { r: pw(a, b, 2), trap: 'geo-sim-perimeter-squared' },
+          { r: pw(a, b, -1), trap: 'geo-sim-inverted' },
+          { r: pw(a, b, -2), trap: 'geo-sim-inverted' },
+          { r: pw(a, b, 3), trap: 'geo-sim-cubed' },
+          { r: pw(a, b, 4), trap: 'geo-sim-squared-twice' },
+          { r: pw(a, b, -3), trap: 'geo-sim-inverted' },
+          { r: [a * a, b], trap: 'geo-sim-one-side-squared' },
+          { r: [a, b * b], trap: 'geo-sim-one-side-squared' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the area of $T$ to the area of $U$ is $${a * a}$ to $${b * b}$. What is the ratio of the perimeter of $T$ to the perimeter of $U$?`;
         explanation = `Areas scale by the square of the scale factor, so the scale factor for lengths is $\\sqrt{${rt(a * a, b * b)}} = ${rt(a, b)}$. Perimeters are lengths, so their ratio is $${a}$ to $${b}$.`;
@@ -653,33 +665,59 @@ function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionB
       };
     }
     if (kind === 'percent') {
-      const pct = rng.pick([10, 20, 25, 30, 40, 50]);
+      // every side of a triangle (area) or every edge of a box (volume) is changed by pct percent
+      const dim: 2 | 3 = d >= 2 && rng.chance(0.4) ? 3 : 2;
+      const pct = rng.pick(dim === 3 ? [10, 20, 30, 40, 50] : [10, 20, 25, 30, 40, 50]);
       const up = rng.chance(0.65);
       const f = up ? 100 + pct : 100 - pct;
-      const areaPct = new Frac(f * f, 100).sub(100).abs(); // percent change of the area
+      const fq = new Frac(f, 100);
+      const scaled = fq.pow(dim); // factor on the area or the volume
+      const keyPct = scaled.sub(1).abs().mul(100); // percent change of the area or the volume
+      const lower = dim === 3 ? new Frac(f * f, 100) : null;
+      const wrong: { value: number | Frac; trap: string }[] =
+        dim === 2
+          ? [
+              { value: pct, trap: 'geo-sim-linear-area' },
+              { value: 2 * pct, trap: 'geo-sim-double-percent' },
+              { value: new Frac(f * f, 100), trap: 'geo-sim-ratio-not-change' },
+              { value: new Frac(pct * pct, 100), trap: 'geo-sim-square-percent' },
+              { value: fq.pow(3).sub(1).abs().mul(100), trap: 'geo-sim-cubed' },
+              { value: 3 * pct, trap: 'geo-sim-double-percent' },
+              { value: f, trap: 'geo-sim-ratio-not-change' },
+              { value: keyPct.add(pct).div(2), trap: 'geo-sim-averaged-percent' },
+            ]
+          : [
+              { value: pct, trap: 'geo-sim-linear-area' },
+              { value: 3 * pct, trap: 'geo-sim-triple-percent' },
+              { value: fq.pow(2).sub(1).abs().mul(100), trap: 'geo-sim-squared-for-volume' },
+              { value: lower!, trap: 'geo-sim-squared-for-volume' },
+              { value: scaled.mul(100), trap: 'geo-sim-ratio-not-change' },
+              { value: f, trap: 'geo-sim-ratio-not-change' },
+              { value: new Frac(pct ** 3, 10000), trap: 'geo-sim-square-percent' },
+              { value: 2 * pct, trap: 'geo-sim-double-percent' },
+              { value: keyPct.add(pct).div(2), trap: 'geo-sim-averaged-percent' },
+            ];
       const { choices, answer, values } = intChoices(
         rng,
-        areaPct.toNumber(),
-        [
-          { value: pct, trap: 'geo-sim-linear-area' },
-          { value: 2 * pct, trap: 'geo-sim-double-percent' },
-          { value: new Frac(f * f, 100), trap: 'geo-sim-ratio-not-change' },
-          { value: new Frac(pct * pct, 100), trap: 'geo-sim-square-percent' },
-        ],
-        [areaPct.toNumber() + 10, areaPct.toNumber() - 10, 3 * pct],
+        keyPct.toNumber(),
+        wrong.filter((w) => (w.value instanceof Frac ? w.value.isTerminating() : true)),
+        [],
         (v) => `$${dec(v)}\\%$`,
       );
-      const fr = new Frac(f, 100);
+      const thing = dim === 2 ? 'triangle' : 'box';
       return {
-        params: { kind, pct, up, values },
+        params: { kind, pct, up, dim, values },
         q: {
           format: 'mcs',
-          stem: `Each side of triangle $T$ is ${up ? 'increased' : 'decreased'} by $${pct}$ percent to form triangle $U$. The area of $U$ is how many percent ${up ? 'greater' : 'less'} than the area of $T$?`,
+          stem:
+            dim === 2
+              ? `Each side of triangle $T$ is ${up ? 'increased' : 'decreased'} by $${pct}$ percent to form triangle $U$. The area of $U$ is how many percent ${up ? 'greater' : 'less'} than the area of $T$?`
+              : `Each edge of rectangular box $T$ is ${up ? 'increased' : 'decreased'} by $${pct}$ percent to form box $U$. The volume of $U$ is how many percent ${up ? 'greater' : 'less'} than the volume of $T$?`,
           choices,
           answer,
-          explanation: `$U$ is similar to $T$ with scale factor $${decimal(fr)}$, so its area is $${decimal(fr)}^2 = ${decimal(fr.mul(fr))}$ times the area of $T$.
+          explanation: `$U$ is similar to $T$ with scale factor $${decimal(fq)}$, so its ${dim === 2 ? 'area' : 'volume'} is $${decimal(fq)}^${dim} = ${decimal(scaled)}$ times the ${dim === 2 ? 'area' : 'volume'} of ${thing === 'triangle' ? '$T$' : '$T$'}.
 
-That is ${up ? `an increase of $${decimal(fr.mul(fr))} - 1 = ${decimal(fr.mul(fr).sub(1))}$, or $${dec(areaPct)}\\%$` : `a decrease of $1 - ${decimal(fr.mul(fr))} = ${decimal(new Frac(1).sub(fr.mul(fr)))}$, or $${dec(areaPct)}\\%$`}.`,
+That is ${up ? `an increase of $${decimal(scaled)} - 1 = ${decimal(scaled.sub(1))}$, or $${dec(keyPct)}\\%$` : `a decrease of $1 - ${decimal(scaled)} = ${decimal(new Frac(1).sub(scaled))}$, or $${dec(keyPct)}\\%$`}.`,
         },
       };
     }
@@ -699,6 +737,10 @@ That is ${up ? `an increase of $${decimal(fr.mul(fr))} - 1 = ${decimal(fr.mul(fr
           { value: h1 + s2 - s1, trap: 'geo-sim-additive' },
           { value: new Frac(h1 * s1, s2), trap: 'geo-sim-inverted' },
           { value: h1 * s2, trap: 'geo-sim-no-divide' },
+          { value: s2, trap: 'geo-ang-wrong-unknown' },
+          { value: h1, trap: 'geo-ang-wrong-unknown' },
+          { value: s2 - s1, trap: 'geo-sim-additive' },
+          { value: new Frac(h1 * s2 * s2, s1 * s1), trap: 'geo-sim-perimeter-squared' },
         ].filter((t) => (t.value instanceof Frac ? t.value.isTerminating() : true));
         const { choices, answer, values } = intChoices(rng, h2, traps, [h2 + 2, h2 - 3, h2 + 5, h2 - 5, h2 + 8], (v) => `$${dec(v)}$`);
         // figure: post and tree with their shadows, sun rays dashed
@@ -745,6 +787,11 @@ Check: the tree's shadow is $${ft(new Frac(s2, s1))}$ times the post's shadow, a
         { value: new Frac(dd * (H - h), h), trap: 'geo-sim-inverted' },
         { value: s.add(dd), trap: 'geo-sim-whole-not-part' },
         { value: new Frac(dd * H, h), trap: 'geo-sim-inverted' },
+        { value: Frac.of(dd), trap: 'geo-ang-wrong-unknown' },
+        { value: Frac.of(h), trap: 'geo-ang-wrong-unknown' },
+        { value: new Frac(h * dd, H + h), trap: 'geo-sim-additive' },
+        { value: s.mul(new Frac(h, H)), trap: 'geo-sim-part-whole' },
+        { value: Frac.of(H - h), trap: 'geo-ang-wrong-unknown' },
       ].filter((t) => t.value.isTerminating());
       const { choices, answer, values } = intChoices(rng, s.toNumber(), traps, [s.add(2), s.sub(2), Frac.of(dd), s.add(1), s.sub(1)], (v) => `$${dec(v)}$`);
       const sc = 4 / (dd + s.toNumber());
@@ -810,7 +857,11 @@ const scaleMCS: Template<ScaleParams> = {
         [1, 3],
       ];
       const f = p.up ? 1 + p.pct! / 100 : 1 - p.pct! / 100;
-      target = (Math.abs(shoelace(T.map((P) => mul(P, f))) - shoelace(T)) / shoelace(T)) * 100;
+      if (p.dim === 3) {
+        // a box 3 x 4 x 5 with every edge scaled by f
+        const vol = (k: number) => 3 * k * (4 * k) * (5 * k);
+        target = (Math.abs(vol(f) - vol(1)) / vol(1)) * 100;
+      } else target = (Math.abs(shoelace(T.map((P) => mul(P, f))) - shoelace(T)) / shoelace(T)) * 100;
     } else if (p.kind === 'shadow') {
       // the tree's top lies on the line through the tip of its shadow parallel to the post's sun ray
       const ray = sub([0, p.h1!], [p.s1!, 0]);

@@ -114,8 +114,8 @@ function solveTriX(exprs: [E, E, E]): { x: number; ang: Record<V3, number> } | n
 /* ================================================================== 1. Angle sum and exterior angles (MCS) */
 
 type SumParams =
-  | { v: 'expr'; exprs: [E, E, E]; ask: 'x' | 'largest' | 'diff'; values: number[] }
-  | { v: 'exterior'; ext: E; top: E; left: E; ask: 'x' | 'top'; values: number[] }
+  | { v: 'expr'; exprs: [E, E, E]; ask: 'x' | 'largest' | 'diff' | 'angle'; idx: number; values: number[] }
+  | { v: 'exterior'; ext: E; top: E; left: E; ask: 'x' | 'top' | 'ext'; values: number[] }
   | { v: 'iso'; apex: 'T' | 'L'; given: V3; value: number; ask: V3 | 'ext'; values: number[] };
 
 const angleSum: Template<SumParams> = {
@@ -132,31 +132,45 @@ const angleSum: Template<SumParams> = {
       const vals = exprs.map((e) => ev(e, x0));
       const mx = Math.max(...vals);
       const mn = Math.min(...vals);
-      let ask: 'x' | 'largest' | 'diff' = d === 1 ? 'x' : d === 2 ? 'largest' : rng.pick(['largest', 'diff'] as const);
-      if (ask !== 'x' && vals.filter((t) => t === mx).length > 1) ask = 'x';
-      const correct = ask === 'x' ? x0 : ask === 'largest' ? mx : mx - mn;
+      let ask: 'x' | 'largest' | 'diff' | 'angle' = d === 1 ? rng.pick(['x', 'angle'] as const) : d === 2 ? rng.pick(['largest', 'angle', 'x'] as const) : rng.pick(['largest', 'diff', 'angle'] as const);
+      const idx = rng.int(0, 2);
+      if ((ask === 'largest' || ask === 'diff') && vals.filter((t) => t === mx).length > 1) ask = 'x';
+      if (ask === 'angle' && (vals.filter((t) => t === vals[idx]).length > 1 || vals[idx] === x0)) ask = 'x';
+      const correct = ask === 'x' ? x0 : ask === 'largest' ? mx : ask === 'angle' ? vals[idx] : mx - mn;
       const C = exprs.reduce((s, e) => s + e.c, 0);
       const K = exprs.reduce((s, e) => s + e.k, 0);
-      const xw = (360 - K) / C;
-      const xSign = (180 + K) / C; // constants moved across with the wrong sign
-      const xDrop = 180 / C; // constants ignored
-      const traps: { value: number; trap: string }[] = [];
+      // wrong values of x, each from a named slip (on both sides of x0, so the key can sit anywhere)
       const eMax = exprs[vals.indexOf(mx)];
+      const eMin = exprs[vals.indexOf(mn)];
+      const wrongX: { x: number; trap: string }[] = [
+        { x: (360 - K) / C, trap: 'geo-tri-sum-360' },
+        { x: (90 - K) / C, trap: 'geo-tri-sum-90' },
+        { x: (180 + K) / C, trap: 'geo-tri-const-sign' }, // constants moved across with the wrong sign
+        { x: 180 / C, trap: 'geo-tri-drop-constant' }, // constants ignored
+        { x: (180 - K) / (C + 1), trap: 'geo-tri-mis-added' }, // one coefficient of x too many or too few
+        { x: C > 1 ? (180 - K) / (C - 1) : NaN, trap: 'geo-tri-mis-added' },
+        ...exprs.filter((e) => e.k !== 0).map((e) => ({ x: (180 - K + 2 * e.k) / C, trap: 'geo-tri-const-sign' })), // one constant with the wrong sign
+      ].filter((w) => Number.isInteger(2 * w.x) && w.x > 0 && w.x !== x0);
+      const at = (x: number) => (ask === 'largest' ? ev(eMax, x) : ask === 'diff' ? ev(eMax, x) - ev(eMin, x) : ask === 'angle' ? ev(exprs[idx], x) : x);
+      const traps: { value: number; trap: string }[] = [];
       const sorted = [...vals].sort((a, b) => a - b);
       const mid = sorted[1];
-      if (ask === 'x')
-        traps.push(
-          { value: xw, trap: 'geo-tri-sum-360' },
-          { value: xSign, trap: 'geo-tri-const-sign' },
-          { value: xDrop, trap: 'geo-tri-drop-constant' },
-          ...vals.map((t) => ({ value: t, trap: 'geo-ang-wrong-unknown' })),
-        );
+      for (const w of wrongX) {
+        const v = at(w.x);
+        if (Number.isInteger(2 * v) && v > 0 && v < (ask === 'x' ? 400 : 180)) traps.push({ value: v, trap: w.trap });
+      }
+      if (ask === 'x') traps.push(...vals.map((t) => ({ value: t, trap: 'geo-ang-wrong-unknown' })));
       if (ask === 'largest')
         traps.push(
-          { value: ev(eMax, xw), trap: 'geo-tri-sum-360' },
-          { value: ev(eMax, xSign), trap: 'geo-tri-const-sign' },
           { value: x0, trap: 'geo-ang-wrong-unknown' },
           ...vals.filter((t) => t !== mx).map((t) => ({ value: t, trap: 'geo-tri-wrong-angle' })),
+          { value: 180 - mx, trap: 'geo-ang-supplement' },
+        );
+      if (ask === 'angle')
+        traps.push(
+          { value: x0, trap: 'geo-ang-wrong-unknown' },
+          ...vals.filter((t) => t !== vals[idx]).map((t) => ({ value: t, trap: 'geo-tri-wrong-angle' })),
+          { value: 180 - vals[idx], trap: 'geo-ang-supplement' },
         );
       if (ask === 'diff')
         traps.push(
@@ -165,6 +179,7 @@ const angleSum: Template<SumParams> = {
           { value: mx - mid, trap: 'geo-tri-diff-pair' },
           { value: mid - mn, trap: 'geo-tri-diff-pair' },
           { value: mx + mn, trap: 'geo-tri-diff-pair' },
+          { value: mn, trap: 'geo-tri-diff-pair' },
         );
       const fillers = ask === 'x' ? [x0 + 5, x0 - 5, x0 + 10, 2 * x0] : [correct + 10, correct - 10, correct + 20, correct - 5, 180 - correct];
       const { choices, answer, values } = intChoices(rng, correct, traps, fillers);
@@ -172,13 +187,13 @@ const angleSum: Template<SumParams> = {
       const fb = new FigBuilder().pt(nT, pts.T).pt(nL, pts.L).pt(nR, pts.R).poly(nT, nL, nR);
       fb.angle(nT, nL, nR, lab(exprs[0])).angle(nL, nT, nR, lab(exprs[1])).angle(nR, nT, nL, lab(exprs[2]));
       const askText =
-        ask === 'x' ? 'what is the value of $x$?' : ask === 'largest' ? `what is the measure, in degrees, of the largest angle of triangle $${nT}${nL}${nR}$?` : `what is the positive difference, in degrees, between the measures of the largest and smallest angles of triangle $${nT}${nL}${nR}$?`;
+        ask === 'x' ? 'what is the value of $x$?' : ask === 'angle' ? `what is the measure, in degrees, of the angle labeled ${lab(exprs[idx])}?` : ask === 'largest' ? `what is the measure, in degrees, of the largest angle of triangle $${nT}${nL}${nR}$?` : `what is the positive difference, in degrees, between the measures of the largest and smallest angles of triangle $${nT}${nL}${nR}$?`;
       const after =
         ask === 'x'
           ? ''
-          : `\n\nThe angles are ${vals.map((t) => `$${t}^\\circ$`).join(', ')}, so ${ask === 'largest' ? `the largest is $${mx}^\\circ$` : `the difference is $${mx} - ${mn} = ${correct}$`}. (Stopping at $x$ answers the wrong question.)`;
+          : `\n\nThe angles are ${vals.map((t) => `$${t}^\\circ$`).join(', ')}, so ${ask === 'largest' ? `the largest is $${mx}^\\circ$` : ask === 'angle' ? `the angle labeled ${lab(exprs[idx])} is $${correct}^\\circ$` : `the difference is $${mx} - ${mn} = ${correct}$`}. (Stopping at $x$ answers the wrong question.)`;
       return {
-        params: { v, exprs, ask, values },
+        params: { v, exprs, ask, idx, values },
         q: {
           format: 'mcs',
           stem: `In triangle $${nT}${nL}${nR}$ above, ${askText}`,
@@ -226,16 +241,29 @@ Using $360^\\circ$ (the angle sum of a quadrilateral) instead of $180^\\circ$ is
       const p = ev(top, x0);
       const q = left.k;
       const e = ev(ext, x0);
-      const ask: 'x' | 'top' = d === 2 ? 'x' : rng.pick(['x', 'top'] as const);
-      const correct = ask === 'x' ? x0 : p;
-      // trap: treating the exterior angle as one of the triangle's angles
-      const xw = d === 2 ? 180 - e - q : (180 - ext.k - top.k - q) / (ext.c + top.c);
-      // trap: adding the known remote angle to the exterior angle instead of subtracting it
-      const xAdd = d === 2 ? e + q : (ext.k + q - top.k) / (top.c - ext.c);
+      const ask: 'x' | 'top' | 'ext' = d === 2 ? 'x' : rng.pick(['x', 'top', 'ext'] as const);
+      const correct = ask === 'x' ? x0 : ask === 'top' ? p : e;
+      // wrong values of x from wrong relations between the exterior angle and the interior ones
+      const wrongX: { x: number; trap: string }[] = [
+        // the exterior angle treated as one of the three angles of the triangle
+        { x: d === 2 ? 180 - e - q : (180 - ext.k - top.k - q) / (ext.c + top.c), trap: 'geo-tri-ext-adjacent' },
+        // the known remote angle added to the exterior angle instead of subtracted
+        { x: d === 2 ? e + q : (ext.k + q - top.k) / (top.c - ext.c), trap: 'geo-tri-ext-add' },
+        // only one remote angle: ext = top
+        { x: d === 2 ? e : (top.k - ext.k) / (ext.c - top.c), trap: 'geo-tri-ext-forgot' },
+        // the known angle subtracted twice
+        { x: d === 2 ? e - 2 * q : (top.k + 2 * q - ext.k) / (ext.c - top.c), trap: 'geo-tri-ext-twice' },
+        // the exterior angle halved, as if the two remote angles were equal
+        { x: d === 2 ? e / 2 - q : (top.k + q - ext.k / 2) / (ext.c / 2 - top.c), trap: 'geo-tri-ext-half' },
+      ].filter((w) => Number.isFinite(w.x) && Number.isInteger(2 * w.x) && w.x > 0 && w.x !== x0);
       const traps: { value: number; trap: string }[] = [];
-      if (ask === 'x') traps.push({ value: xw, trap: 'geo-tri-ext-adjacent' }, { value: xAdd, trap: 'geo-tri-ext-add' });
-      else traps.push({ value: ev(top, xw), trap: 'geo-tri-ext-adjacent' }, { value: x0, trap: 'geo-ang-wrong-unknown' }, { value: ev(top, xAdd), trap: 'geo-tri-ext-add' });
-      traps.push({ value: 180 - e, trap: 'geo-tri-ext-supp' }, { value: q, trap: 'geo-ang-wrong-unknown' }, { value: e, trap: 'geo-ang-wrong-unknown' });
+      for (const w of wrongX) {
+        const v = ask === 'x' ? w.x : ask === 'top' ? ev(top, w.x) : ev(ext, w.x);
+        if (Number.isInteger(2 * v) && v > 0 && v < (ask === 'x' ? 400 : 180)) traps.push({ value: v, trap: w.trap });
+      }
+      if (ask !== 'x') traps.push({ value: x0, trap: 'geo-ang-wrong-unknown' });
+      if (ask === 'ext') traps.push({ value: 180 - e, trap: 'geo-tri-ext-interior' }, { value: p, trap: 'geo-ang-wrong-unknown' }, { value: q, trap: 'geo-ang-wrong-unknown' });
+      else traps.push({ value: 180 - e, trap: 'geo-tri-ext-supp' }, { value: q, trap: 'geo-ang-wrong-unknown' }, { value: e, trap: 'geo-ang-wrong-unknown' });
       if (ask === 'x' && d !== 2) traps.push({ value: p, trap: 'geo-ang-wrong-unknown' });
       const { choices, answer, values } = intChoices(rng, correct, traps, [correct + 10, correct - 10, correct + 5, e]);
       const pts = triPts(p, q, 180 - p - q);
@@ -248,7 +276,7 @@ Using $360^\\circ$ (the angle sum of a quadrilateral) instead of $180^\\circ$ is
         params: { v, ext, top, left, ask, values },
         q: {
           format: 'mcs',
-          stem: `In the figure above, side $${nL}${nR}$ of triangle $${nT}${nL}${nR}$ is extended. ${ask === 'x' ? 'What is the value of $x$?' : `What is the measure, in degrees, of angle $${nT}$?`}`,
+          stem: `In the figure above, side $${nL}${nR}$ of triangle $${nT}${nL}${nR}$ is extended. ${ask === 'x' ? 'What is the value of $x$?' : ask === 'ext' ? `What is the measure, in degrees, of the exterior angle at $${nR}$?` : `What is the measure, in degrees, of angle $${nT}$?`}`,
           figure: fb.build(soft(p, q, 180 - p - q)),
           choices,
           answer,
@@ -256,7 +284,7 @@ Using $360^\\circ$ (the angle sum of a quadrilateral) instead of $180^\\circ$ is
 
 $$${eq}$$
 
-${d === 2 ? `so $x = ${e} - ${q} = ${x0}$.` : `so ${ext.c - top.c === 1 ? '' : `$${linTex(ext.c - top.c, 0)} = ${num(top.k + q - ext.k)}$ and `}$x = ${x0}$.${ask === 'top' ? ` Angle $${nT}$ measures $${evalTex(top.c, top.k, x0)} = ${p}$ degrees.` : ''}`}
+${d === 2 ? `so $x = ${e} - ${q} = ${x0}$.` : `so ${ext.c - top.c === 1 ? '' : `$${linTex(ext.c - top.c, 0)} = ${num(top.k + q - ext.k)}$ and `}$x = ${x0}$.${ask === 'top' ? ` Angle $${nT}$ measures $${evalTex(top.c, top.k, x0)} = ${p}$ degrees.` : ask === 'ext' ? ` The exterior angle measures $${evalTex(ext.c, ext.k, x0)} = ${e}$ degrees.` : ''}`}
 
 The exterior angle is not an angle of the triangle: adding it to the other two angles to make $180^\\circ$ is the trap.`,
         },
@@ -272,7 +300,7 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
     let ang: Record<V3, number>;
     if (apex === 'T') {
       if (rng.chance(0.5)) {
-        value = rng.int(2, 14) * 10;
+        value = rng.int(2, 10) * 10;
         given = 'T';
         ask = rng.pick(['L', 'R'] as const);
         correct = (180 - value) / 2;
@@ -282,6 +310,9 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
           { value: value / 2, trap: 'geo-tri-iso-half' },
           { value: (360 - value) / 2, trap: 'geo-tri-sum-360' },
           { value: 90 - value, trap: 'geo-tri-iso-half' },
+          { value: (180 - value) / 3, trap: 'geo-tri-iso-three' },
+          { value: 60, trap: 'geo-tri-equilateral-assumed' },
+          { value: 180 - value / 2, trap: 'geo-tri-iso-split' },
         );
         ang = { T: value, L: correct, R: correct };
       } else {
@@ -295,11 +326,14 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
           { value: (180 - value) / 2, trap: 'geo-tri-iso-pair' },
           { value: 360 - 2 * value, trap: 'geo-tri-sum-360' },
           { value: 90 - value, trap: 'geo-tri-iso-half' },
+          { value: 180 - 3 * value, trap: 'geo-tri-iso-three' },
+          { value: 60, trap: 'geo-tri-equilateral-assumed' },
+          { value: 180 - value / 2, trap: 'geo-tri-iso-split' },
         );
         ang = { T: correct, L: value, R: value };
       }
     } else {
-      value = rng.int(2, 14) * 10;
+      value = rng.int(2, 10) * 10;
       given = 'L';
       ask = d === 3 && rng.chance(0.6) ? 'ext' : 'R';
       const base = (180 - value) / 2;
@@ -312,6 +346,9 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
           { value: 180 - 2 * value, trap: 'geo-tri-iso-pair' },
           { value: 180 - value / 2, trap: 'geo-tri-iso-half' },
           { value: value, trap: 'geo-tri-iso-pair' },
+          { value: 120, trap: 'geo-tri-equilateral-assumed' },
+          { value: 60, trap: 'geo-tri-equilateral-assumed' },
+          { value: 90 + value, trap: 'geo-tri-iso-split' },
         );
       else
         traps.push(
@@ -320,6 +357,9 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
           { value: 180 - value, trap: 'geo-tri-iso-split' },
           { value: value / 2, trap: 'geo-tri-iso-half' },
           { value: (360 - value) / 2, trap: 'geo-tri-sum-360' },
+          { value: (180 - value) / 3, trap: 'geo-tri-iso-three' },
+          { value: 60, trap: 'geo-tri-equilateral-assumed' },
+          { value: 180 - value / 2, trap: 'geo-tri-iso-split' },
         );
     }
     // keep the example non-equilateral
@@ -368,7 +408,7 @@ Trap: the equal angles face the equal sides. Making the wrong pair of angles equ
       const s = solveTriX(p.exprs);
       if (!s) return 'no unique x';
       const angs = Object.values(s.ang);
-      target = p.ask === 'x' ? s.x : p.ask === 'largest' ? Math.max(...angs) : Math.max(...angs) - Math.min(...angs);
+      target = p.ask === 'x' ? s.x : p.ask === 'largest' ? Math.max(...angs) : p.ask === 'angle' ? s.ang[(['T', 'L', 'R'] as V3[])[p.idx]] : Math.max(...angs) - Math.min(...angs);
     } else if (p.v === 'exterior') {
       const hits: number[] = [];
       for (let x = -60; x <= 200; x++) {
@@ -378,7 +418,7 @@ Trap: the equal angles face the equal sides. Making the wrong pair of angles equ
         const tri = triFromTwo({ T: t, L: l });
         if (!tri) continue;
         const extM = angleAt(tri.R, add(tri.R, [1, 0]), tri.T);
-        if (near(extM, ev(p.ext, x), 1e-9)) hits.push(p.ask === 'x' ? x : t);
+        if (near(extM, ev(p.ext, x), 1e-9)) hits.push(p.ask === 'x' ? x : p.ask === 'ext' ? extM : t);
       }
       if (hits.length !== 1) return `${hits.length} solutions`;
       target = hits[0];

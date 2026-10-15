@@ -57,6 +57,8 @@ const RATIO_NOTES: Record<string, (vs: string) => string> = {
   'geom-circle-ratio-linear': (vs) => `the ratio of the lengths, ${vs}, forgets that areas use the square`,
   'geom-circle-ratio-squared': (vs) => `squaring the ratio for a length, ${vs}, gives the ratio of the areas`,
   'geom-circle-ratio-cubed': (vs) => `cubing the ratio, ${vs}, is for volumes`,
+  'geom-circle-ratio-fourth': (vs) => `raising the ratio to the fourth power, ${vs}, applies the square twice`,
+  'geom-circle-ratio-one-side': (vs) => `${vs} applies the square (or forgets it) on one side of the ratio only`,
   'geom-circle-radius-diameter': (vs) => `mixing up radius and diameter, ${vs}, doubles one side of the ratio`,
 };
 
@@ -89,11 +91,16 @@ const ratio: Template<RatioParams> = {
     let explanation: string;
     let a = 0;
     let b = 0;
+    // ratio of the radii, u to v, and the power e that turns it into the ratio asked for
+    let u = 0;
+    let v = 0;
+    let e = 1;
     if (mode === 'radius-area' || mode === 'radius-circ') {
       // r_A = r, r_B = (p/q) r
       const areas = mode === 'radius-area';
       a = q;
       b = p;
+      [u, v, e] = [q, p, areas ? 2 : 1];
       correct = areas ? [q * q, p * p] : [q, p];
       if (areas) {
         wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-inverted' }, { r: [q, p], trap: 'geom-circle-ratio-linear' }, { r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q ** 3, p ** 3], trap: 'geom-circle-ratio-cubed' });
@@ -111,6 +118,7 @@ The radii are in the ratio ${q} to ${p}, and areas use the SQUARE of that ratio.
       // areas (p^2) pi and (q^2) pi -> circumferences p : q
       a = p * p;
       b = q * q;
+      [u, v, e] = [p, q, 1];
       correct = [p, q];
       wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-squared' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [2 * p, q], trap: 'geom-circle-radius-diameter' });
       stem = `Circle $W$ has area $${piTex(new Frac(p * p))}$, and circle $Z$ has area $${piTex(new Frac(q * q))}$. What is the ratio of the circumference of $W$ to that of $Z$?`;
@@ -120,6 +128,7 @@ Circumferences are $2\\pi \\cdot ${p}$ and $2\\pi \\cdot ${q}$, in the ratio ${p
     } else if (mode === 'circ-area') {
       a = 2 * p;
       b = 2 * q;
+      [u, v, e] = [p, q, 2];
       correct = [p * p, q * q];
       wrong.push({ r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [2 * p * p, q * q], trap: 'geom-circle-radius-diameter' });
       stem = `The circumference of circle $W$ is $${piTex(new Frac(2 * p))}$, and the circumference of circle $Z$ is $${piTex(new Frac(2 * q))}$. What is the ratio of the area of $W$ to that of $Z$?`;
@@ -130,6 +139,7 @@ The areas are $${piTex(new Frac(p * p))}$ and $${piTex(new Frac(q * q))}$, in th
       // diameter of A = p * radius of B  ->  r_A = (p/2) r_B, areas p^2 : 4
       p = rng.pick([1, 3, 5, 3, 5, 7]);
       a = p;
+      [u, v, e] = [p, 2, 2];
       correct = red([p * p, 4]);
       wrong.push({ r: [p * p, 1], trap: 'geom-circle-radius-diameter' }, { r: red([p, 2]), trap: 'geom-circle-ratio-linear' }, { r: red([4, p * p]), trap: 'geom-circle-ratio-inverted' }, { r: [p, 1], trap: 'geom-circle-ratio-linear' }, { r: [1, p * p], trap: 'geom-circle-ratio-inverted' });
       stem = `The diameter of circle $A$ is ${p === 1 ? 'equal to' : `${p} times`} the radius of circle $B$. What is the ratio of the area of $A$ to that of $B$?`;
@@ -142,6 +152,21 @@ The diameter is twice the radius, so $${p === 1 ? '' : p}r$ is the diameter of $
     correct = red(correct);
     const txt = (r: [number, number]) => `${plain(r[0])} to ${plain(r[1])}`;
     const [x0, y0] = correct;
+    // the other powers of the ratio of the radii, one side only, and a radius taken for a diameter
+    const power = (m: number): [number, number] => [u ** m, v ** m];
+    const POWER_TRAPS = ['geom-circle-ratio-linear', 'geom-circle-ratio-squared', 'geom-circle-ratio-cubed', 'geom-circle-ratio-fourth'];
+    const family: { r: [number, number]; trap: string }[] = [
+      ...[1, 2, 3, 4].filter((m) => m !== e).map((m) => ({ r: power(m), trap: POWER_TRAPS[m - 1] })),
+      ...[1, 2, 3].map((m) => ({ r: [v ** m, u ** m] as [number, number], trap: 'geom-circle-ratio-inverted' })),
+      ...([[u ** 2, v], [u, v ** 2]] as [number, number][]).map((r) => ({ r, trap: 'geom-circle-ratio-one-side' })),
+      ...[2, 2 ** e, 1 / 2 ** e, 1 / 2]
+        .filter((f, i, all) => all.indexOf(f) === i)
+        .map((f) => ({ r: (f >= 1 ? [f * u ** e, v ** e] : [u ** e, v ** e / f]) as [number, number], trap: 'geom-circle-radius-diameter' })),
+    ].filter((w) => {
+      const [x, y] = red(w.r);
+      return !(x === x0 && y === y0) && x <= 400 && y <= 400;
+    });
+    wrong.push(...family);
     const generic: [number, number][] = [
       [2 * x0, y0],
       [x0, 2 * y0],

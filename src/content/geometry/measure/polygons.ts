@@ -56,6 +56,14 @@ const polyNotes = (n: number): Record<string, (vs: string) => string> => ({
   'geom-poly-side-count': (vs) => `miscounting the sides by one gives ${vs}`,
   'geom-poly-exterior-angle': (vs) => `${vs} is the exterior angle, not the interior one`,
   'geom-poly-diagonal-bisects': (vs) => `half the interior angle, ${vs}, assumes the diagonal bisects the angle, but it cuts off an isosceles triangle`,
+  'geom-poly-sum-180': (vs) => `${vs} is the angle sum of a triangle, not of this polygon`,
+  'geom-poly-360-per-triangle': (vs) => `using $360^\\circ$ for each of the ${n - 2} triangles gives ${vs}`,
+  'geom-poly-90-per-triangle': (vs) => `using $90^\\circ$ for each of the ${n - 2} triangles gives ${vs}`,
+  'geom-poly-all-right': (vs) => `assuming every angle is a right angle gives ${vs}`,
+  'geom-poly-reflex': (vs) => `${vs} is the angle on the outside, $360^\\circ$ minus the interior angle`,
+  'geom-poly-dropped-constants': (vs) => `leaving out the constant terms in the equation gives ${vs}`,
+  'geom-poly-sign-error': (vs) => `subtracting a constant that should be added, or the reverse, gives ${vs}`,
+  'geom-poly-divided-by-n': (vs) => `dividing by the number of angles instead of the total of the $x$ coefficients gives ${vs}`,
   'geom-poly-answered-other': (vs) => `${vs} answers a different question than the one asked`,
 });
 
@@ -84,8 +92,8 @@ const angleSum: Template<AngleSumParams> = {
           ? (['irregular', 'irregular', 'regular-sum', 'regular-angle'] as const)
           : (['irregular', 'regular-diagonal', 'regular-sum'] as const),
     );
-    if (mode === 'irregular') return irregularAngles(rng, d === 1 ? 4 : d === 2 ? rng.pick([4, 5, 5]) : rng.pick([5, 6]), d);
-    const n = rng.pick(mode === 'regular-sum' ? [5, 6, 8, 9, 10, 12, 15, 18, 20] : mode === 'regular-diagonal' ? [5, 6, 8] : [5, 6, 8, 10]);
+    if (mode === 'irregular') return irregularAngles(rng, d === 1 ? rng.pick([4, 5, 5, 5]) : d === 2 ? rng.pick([5, 5, 6, 6]) : rng.pick([5, 6]), d);
+    const n = rng.pick(mode === 'regular-sum' ? [6, 8, 9, 10, 12, 15, 18, 20] : mode === 'regular-diagonal' ? [6, 8, 9, 10] : [5, 6, 8, 9, 10]);
     const I = 180 - 360 / n;
     const S = (n - 2) * 180;
     const name = POLY_NAME[n] ?? `${n}-sided polygon`;
@@ -99,6 +107,10 @@ const angleSum: Template<AngleSumParams> = {
           { value: (n - 3) * 180, trap: 'geom-poly-triangle-count' },
           { value: 360, trap: 'geom-poly-sum-360' },
           { value: (n + 1) * 180, trap: 'geom-poly-side-count' },
+          { value: (n + 2) * 180, trap: 'geom-poly-side-count' },
+          { value: (n - 2) * 360, trap: 'geom-poly-360-per-triangle' },
+          { value: (n - 2) * 90, trap: 'geom-poly-90-per-triangle' },
+          { value: (n - 4) * 180, trap: 'geom-poly-triangle-count' },
         ],
         fillers: [],
         format: (v) => `$${num(v)}^\\circ$`,
@@ -135,9 +147,16 @@ ${trapNotes(choices, polyNotes(n))}`,
           { value: S, trap: 'geom-poly-answered-other' },
           { value: 180 - 360 / (n + 1), trap: 'geom-poly-side-count' },
           { value: 180 - 360 / (n - 1), trap: 'geom-poly-side-count' },
+          { value: 360 - I, trap: 'geom-poly-reflex' },
+          { value: S / (n - 1), trap: 'geom-poly-side-count' },
+          { value: S / (n + 1), trap: 'geom-poly-side-count' },
+          { value: 180 - 360 / (n + 2), trap: 'geom-poly-side-count' },
+          { value: 360 / (n + 1), trap: 'geom-poly-exterior-angle' },
+          { value: 360 / (n - 1), trap: 'geom-poly-exterior-angle' },
+          { value: 180 - 720 / n, trap: 'geom-poly-exterior-angle' },
         ],
         fillers: [],
-        format: (v) => `$${num(v)}$`,
+        format: (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`,
       });
       return {
         params: { mode, n, exprs: [], pts, ask: 'each', regularAngle: I, values: choicesValues(choices) },
@@ -168,6 +187,11 @@ ${trapNotes(choices, polyNotes(n))}`,
         { value: I, trap: 'geom-poly-answered-other' },
         { value: new Frac(180, n - 1), trap: 'geom-poly-side-count' },
         { value: new Frac(180, n + 1), trap: 'geom-poly-side-count' },
+        { value: new Frac(180, n + 2), trap: 'geom-poly-side-count' },
+        { value: new Frac(180, n - 2), trap: 'geom-poly-side-count' },
+        { value: new Frac(360, n + 1), trap: 'geom-poly-exterior-angle' },
+        { value: new Frac(90, n), trap: 'geom-poly-diagonal-bisects' },
+        { value: new Frac(I - 90), trap: 'geom-poly-answered-other' },
       ],
       fillers: [],
       format: (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`,
@@ -300,7 +324,7 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
     const ask: 'x' | 'largest' = d === 1 || !largestOk ? 'x' : d === 3 || rng.chance(0.5) ? 'largest' : 'x';
 
     const xWith = (total: number) => (total - sumQ) / sumP;
-    const good = (v: number) => Number.isInteger(v) && v > 0 && v < 400;
+    const good = (v: number) => Number.isInteger(2 * v) && v > 0 && v < 400;
     let correct: number;
     const traps: { value: number; trap: string }[] = [];
     let fillers: number[];
@@ -309,19 +333,31 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
       { T: n * 180, trap: 'geom-poly-sum-n180' },
       { T: (n - 1) * 180, trap: 'geom-poly-triangle-count' },
       { T: (n - 3) * 180, trap: 'geom-poly-triangle-count' },
+      { T: (n + 1) * 180, trap: 'geom-poly-side-count' },
+      { T: (n - 2) * 360, trap: 'geom-poly-360-per-triangle' },
+      { T: (n - 2) * 90, trap: 'geom-poly-90-per-triangle' },
+      { T: 180, trap: 'geom-poly-sum-180' },
+      ...(n * 90 !== S ? [{ T: n * 90, trap: 'geom-poly-all-right' }] : []),
+      ...(n >= 6 ? [{ T: (n - 4) * 180, trap: 'geom-poly-triangle-count' }] : []),
       ...(n >= 5 ? [{ T: 360, trap: 'geom-poly-sum-360' }] : []),
+    ];
+    // slips in the equation itself, whatever the sum
+    const wrongXs = [
+      ...wrongSums.map((w) => ({ x: xWith(w.T), trap: w.trap })),
+      { x: S / sumP, trap: 'geom-poly-dropped-constants' },
+      { x: (S + sumQ) / sumP, trap: 'geom-poly-sign-error' },
+      { x: (S - sumQ) / n, trap: 'geom-poly-divided-by-n' },
     ];
     if (ask === 'x') {
       correct = x;
-      for (const w of wrongSums) if (good(xWith(w.T))) traps.push({ value: xWith(w.T), trap: w.trap });
+      for (const w of wrongXs) if (good(w.x)) traps.push({ value: w.x, trap: w.trap });
       for (const v of new Set(values)) if (v !== x) traps.push({ value: v, trap: 'geom-poly-answered-other' });
     } else {
       const big = exprs[maxIdx];
       correct = maxV;
       traps.push({ value: x, trap: 'geom-poly-answered-other' });
-      for (const w of wrongSums) {
-        const xv = xWith(w.T);
-        if (good(xv) && angleVal(big, xv) > 0 && angleVal(big, xv) < 400) traps.push({ value: angleVal(big, xv), trap: w.trap });
+      for (const w of wrongXs) {
+        if (good(w.x) && angleVal(big, w.x) > 0 && angleVal(big, w.x) < 400) traps.push({ value: angleVal(big, w.x), trap: w.trap });
       }
       for (const v of new Set(values)) if (v !== maxV) traps.push({ value: v, trap: 'geom-poly-answered-other' });
     }
@@ -333,7 +369,10 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
       correct,
       traps,
       fillers,
-      format: (v) => (ask === 'x' ? `$${num(v)}$` : `$${num(v)}^\\circ$`),
+      format: (v) => {
+        const t = v.isInt() ? num(v.n) : v.toDecimalString();
+        return ask === 'x' ? `$${t}$` : `$${t}^\\circ$`;
+      },
     });
 
     const fig = new Fig();
@@ -405,6 +444,28 @@ const DIAG_RECTS: [number, number][] = [
   [12, 5],
 ];
 
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const rectNotes = (pct: number): Record<string, (vs: string) => string> => ({
+  'geom-rect-percent-of-perimeter': (vs) => `the width is ${pct} percent of the LENGTH, not of the perimeter; taking it of the perimeter gives ${vs}`,
+  'geom-rect-semiperimeter': (vs) => `$\\ell + w$ is half the perimeter; setting it equal to the whole perimeter gives ${vs}`,
+  'geom-rect-assumed-square': (vs) => `${vs} treats the rectangle as a square, which nothing says`,
+  'geom-rect-subtracted-sides': (vs) => `${vs} comes from subtracting the sides where they should be added`,
+  'geom-rect-three-sides': (vs) => `${vs} counts only three sides in the perimeter`,
+  'geom-rect-quarter-perimeter': (vs) => `${vs} sets $\\ell + w$ equal to a quarter of the perimeter instead of a half`,
+  'geom-rect-percent-more': (vs) => `${vs} reads "${pct} percent of" as "${pct} percent more than"`,
+  'geom-rect-area-for-perimeter': (vs) => `${vs} is the perimeter, or the area, whichever the question does not ask for`,
+  'geom-rect-half-perimeter': (vs) => `${vs} is only half the perimeter ($\\ell + w$)`,
+  'geom-rect-answered-side': (vs) => `${vs} is a side of the rectangle, not what was asked`,
+  'geom-rect-squared-sum': (vs) => `${vs} squares the sum of the sides instead of multiplying them`,
+  'geom-rect-fencepost': (vs) => `${vs} counts the grid points on each side instead of the unit steps between them`,
+  'geom-rect-triangle-half': (vs) => `${vs} halves the product, which is the area of a triangle, not of a rectangle`,
+  'geom-rect-coordinate-sign': (vs) => `${vs} comes from subtracting coordinates of opposite signs as if they had the same sign`,
+  'geom-rect-added-sides': (vs) => `adding the sides gives ${vs}, which is longer than the diagonal`,
+  'geom-rect-square-of-sum': (vs) => `${vs} adds $2\\ell w$ to $(\\ell + w)^2$ instead of subtracting it`,
+  'geom-rect-forgot-two': (vs) => `${vs} subtracts $\\ell w$ once instead of $2\\ell w$`,
+  'geom-rect-no-sqrt': (vs) => `${vs} is the square of the diagonal`,
+});
+
 const rectangles: Template<RectParams> = {
   id: 'geo.polygons.rectangles',
   skill: 'geo.polygons',
@@ -424,15 +485,31 @@ const rectangles: Template<RectParams> = {
       // traps
       const wP = (pct * P) / 100; // width taken as p% of the perimeter
       const lP = P / 2 - wP;
-      const traps: { v: Ex; trap: string }[] = [];
-      if (Number.isInteger(wP * lP) && lP > 0) traps.push({ v: Ex.of(wP * lP), trap: 'geom-rect-percent-of-perimeter' });
-      traps.push({ v: Ex.of(4 * A), trap: 'geom-rect-semiperimeter' });
-      if (Number.isInteger(P / 4)) traps.push({ v: Ex.of((P / 4) ** 2), trap: 'geom-rect-assumed-square' });
-      // l - w = P/2 instead of l + w = P/2
-      const lSub = P / 2 / (1 - pct / 100);
-      traps.push({ v: Ex.of((pct / 100) * lSub * lSub), trap: 'geom-rect-subtracted-sides' });
-      traps.push({ v: Ex.of(P), trap: 'geom-rect-area-for-perimeter' });
-      traps.push({ v: Ex.of(P / 2), trap: 'geom-rect-half-perimeter' });
+      const r = new Frac(a, b); // width over length
+      // area of the rectangle whose width is r times its length and whose length is `len`
+      const areaOf = (len: Frac) => r.mul(len).mul(len);
+      const cands: { v: Frac; trap: string }[] = [
+        { v: new Frac(Number.isInteger(wP * lP) && lP > 0 ? wP * lP : 0), trap: 'geom-rect-percent-of-perimeter' },
+        { v: new Frac(4 * A), trap: 'geom-rect-semiperimeter' },
+        { v: new Frac(P * P, 16), trap: 'geom-rect-assumed-square' },
+        // l - w = P/2 instead of l + w = P/2
+        { v: areaOf(new Frac(P / 2).div(new Frac(1).sub(r))), trap: 'geom-rect-subtracted-sides' },
+        // 2l + w = P
+        { v: areaOf(new Frac(P).div(r.add(2))), trap: 'geom-rect-three-sides' },
+        // l + w = P/4
+        { v: new Frac(A, 4), trap: 'geom-rect-quarter-perimeter' },
+        // w is p percent MORE than l
+        { v: new Frac(1).add(r).mul(new Frac(P / 2).div(r.add(2)).mul(new Frac(P / 2).div(r.add(2)))), trap: 'geom-rect-percent-more' },
+        { v: new Frac(P), trap: 'geom-rect-area-for-perimeter' },
+        { v: new Frac(P / 2), trap: 'geom-rect-half-perimeter' },
+        { v: new Frac(l), trap: 'geom-rect-answered-side' },
+        { v: new Frac(w), trap: 'geom-rect-answered-side' },
+        { v: new Frac(A, 2), trap: 'geom-rect-triangle-half' },
+        { v: new Frac((l + w) ** 2), trap: 'geom-rect-squared-sum' },
+        { v: new Frac(l * l), trap: 'geom-rect-assumed-square' },
+        { v: new Frac(w * w), trap: 'geom-rect-assumed-square' },
+      ];
+      const traps = cands.filter((c) => c.v.isInt() && c.v.n > 0 && c.v.n !== A).map((c) => ({ v: Ex.of(c.v), trap: c.trap }));
       const { choices, answer, values } = exChoices(rng, Ex.of(A), traps, []);
       return {
         params: { mode, P, A, pct, verts: [], ask: 'area', values },
@@ -447,7 +524,7 @@ $$\\ell + ${frac(pct, 100).toTex()}\\ell = \\frac{${P}}{2} = ${P / 2} \\quad\\Ri
 
 So the width is $${w}$ and the area is $${l} \\cdot ${w} = ${num(A)}$.
 
-Traps: the width is ${pct} percent of the LENGTH, not of the perimeter; and $\\ell + w$ is half the perimeter, not the whole perimeter.`,
+${trapNotes(choices, rectNotes(pct), 2, 'geom-rect-percent-of-perimeter')}`,
         },
       };
     }
@@ -478,17 +555,29 @@ Traps: the width is ${pct} percent of the LENGTH, not of the perimeter; and $\\e
               { v: Ex.of(W + H), trap: 'geom-rect-half-perimeter' },
               { v: Ex.of(2 * (Ws + H)), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(2 * (W + Hs)), trap: 'geom-rect-coordinate-sign' },
+              { v: Ex.of(2 * (Ws + Hs)), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(W * H), trap: 'geom-rect-area-for-perimeter' },
               { v: Ex.of(2 * W + H), trap: 'geom-rect-three-sides' },
               { v: Ex.of(W + 2 * H), trap: 'geom-rect-three-sides' },
+              { v: Ex.of(4 * W), trap: 'geom-rect-assumed-square' },
+              { v: Ex.of(4 * H), trap: 'geom-rect-assumed-square' },
+              { v: Ex.of(2 * (W + H) + 2), trap: 'geom-rect-fencepost' },
+              { v: Ex.of(2 * (W + H) + 4), trap: 'geom-rect-fencepost' },
+              { v: Ex.of(2 * W * H), trap: 'geom-rect-area-for-perimeter' },
             ]
           : [
               { v: Ex.of(Ws * H), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(W * Hs), trap: 'geom-rect-coordinate-sign' },
+              { v: Ex.of(Ws * Hs), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(2 * (W + H)), trap: 'geom-rect-area-for-perimeter' },
               { v: Ex.of(W * W), trap: 'geom-rect-assumed-square' },
               { v: Ex.of(H * H), trap: 'geom-rect-assumed-square' },
               { v: Ex.of(W + H), trap: 'geom-rect-half-perimeter' },
+              { v: Ex.of((W + 1) * (H + 1)), trap: 'geom-rect-fencepost' },
+              { v: Ex.of((W + 1) * H), trap: 'geom-rect-fencepost' },
+              { v: Ex.of(W * (H + 1)), trap: 'geom-rect-fencepost' },
+              { v: Ex.of((W + H) ** 2), trap: 'geom-rect-squared-sum' },
+              ...((W * H) % 2 === 0 ? [{ v: Ex.of((W * H) / 2), trap: 'geom-rect-triangle-half' }] : []),
             ];
       const { choices, answer, values } = exChoices(rng, Ex.of(correct), traps, []);
       const pt = ([x, y]: P2) => `(${num(x)}, ${num(y)})`;
@@ -503,7 +592,9 @@ Traps: the width is ${pct} percent of the LENGTH, not of the perimeter; and $\\e
 
 ${ask === 'perimeter' ? `Perimeter $= 2(${W} + ${H}) = ${2 * (W + H)}$.` : `Area $= ${W} \\cdot ${H} = ${W * H}$.`}
 
-Subtracting a negative coordinate adds its size: the distance from $${x1}$ to $${x2}$ is ${W}, not ${Ws}.${ask === 'perimeter' ? ` And ${W + H} is only half the perimeter.` : ''}`,
+Subtracting a negative coordinate adds its size: the distance from $${x1}$ to $${x2}$ is ${W}, not ${Ws}.
+
+${trapNotes(choices, rectNotes(0), 2, 'geom-rect-coordinate-sign')}`,
         },
       };
     }
@@ -519,9 +610,15 @@ Subtracting a negative coordinate adds its size: the distance from $${x1}$ to $$
         { v: Ex.of(a + b), trap: 'geom-rect-added-sides' },
         { v: Ex.sqrt(2, (a + b) / 2), trap: 'geom-rect-assumed-square' },
         { v: Ex.sqrt((a + b) ** 2 + 2 * A), trap: 'geom-rect-square-of-sum' },
+        { v: Ex.sqrt((a + b) ** 2 - A), trap: 'geom-rect-forgot-two' },
+        { v: Ex.of(dg * dg), trap: 'geom-rect-no-sqrt' },
         { v: Ex.sqrt(2 * A), trap: 'geom-rect-assumed-square' },
         { v: Ex.sqrt(A), trap: 'geom-rect-assumed-square' },
-        { v: Ex.of(Math.abs(a - b)), trap: 'geom-rect-added-sides' },
+        { v: Ex.of(Math.abs(a - b)), trap: 'geom-rect-subtracted-sides' },
+        { v: Ex.of(Math.max(a, b)), trap: 'geom-rect-answered-side' },
+        { v: Ex.of(Math.min(a, b)), trap: 'geom-rect-answered-side' },
+        { v: Ex.of(P), trap: 'geom-rect-area-for-perimeter' },
+        { v: Ex.of(A), trap: 'geom-rect-area-for-perimeter' },
       ],
       [],
     );
@@ -538,7 +635,7 @@ $$\\ell^2 + w^2 = (\\ell + w)^2 - 2\\ell w = ${(a + b) ** 2} - ${2 * A} = ${dg *
 
 so the diagonal is $${dg}$. (The sides are ${Math.min(a, b)} and ${Math.max(a, b)}: their sum is ${a + b} and their product ${A}.)
 
-Adding the sides (${a + b}) is not the diagonal, and the rectangle is not a square.`,
+${trapNotes(choices, rectNotes(0), 2, 'geom-rect-added-sides')}`,
       },
     };
   },

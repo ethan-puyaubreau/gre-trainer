@@ -64,16 +64,20 @@ export function surdTex(s: Surd): string {
 }
 
 /**
- * Position of the correct answer among the feasible ones. At least half of the wrong choices should name a
- * mistake, and the more traps a position keeps the likelier it is, so the key still lands anywhere from A to E.
+ * Position of the correct answer among the feasible ones: among the positions where every wrong choice names a
+ * mistake; when no position can name them all, among those that name the most. A high position needs more
+ * mistakes below the key, so it is feasible less often: the weight 1 + 0.1 K evens that out.
  */
-export function pickPosition<T>(rng: Rng, plan: T[], kept: (p: T) => number, wrong: number): T {
+export function pickPosition<T extends { K: number }>(rng: Rng, plan: T[], kept: (p: T) => number, wrong: number): T {
+  const full = plan.filter((p) => kept(p) >= wrong);
   const best = Math.max(...plan.map(kept));
-  const floor = Math.min(best, Math.ceil(wrong / 2));
-  const pool = plan.filter((p) => kept(p) >= floor);
-  const weights = pool.map((p) => 2 ** kept(p));
-  let r = rng.next() * weights.reduce((a, b) => a + b, 0);
-  for (let i = 0; i < pool.length; i++) if ((r -= weights[i]) < 0) return pool[i];
+  const pool = full.length ? full : plan.filter((p) => kept(p) === best);
+  const weights = pool.map((p) => 1 + 0.1 * p.K);
+  let r = rng.next() * weights.reduce((x, y) => x + y, 0);
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i];
+    if (r < 0) return pool[i];
+  }
   return pool[pool.length - 1];
 }
 
@@ -126,6 +130,30 @@ export function positioned<T>(
   for (const c of below.slice(0, pick.K - pick.nb)) items.push({ v: c });
   for (const c of above.slice(0, count - 1 - pick.K - pick.na)) items.push({ v: c });
   return items.sort((a, b) => val(a.v) - val(b.v));
+}
+
+/** Factors that special-triangle ratios turn into one another (a side over another side, a square of a ratio...). */
+export const SURD_FACTORS = {
+  two: surd(2, 1),
+  half: surd(new Frac(1, 2), 1),
+  r2: surd(1, 2),
+  ir2: surd(new Frac(1, 2), 2),
+  r3: surd(1, 3),
+  ir3: surd(new Frac(1, 3), 3),
+  tor3: surd(new Frac(2, 3), 3),
+  r3h: surd(new Frac(1, 2), 3),
+  four: surd(4, 1),
+  quarter: surd(new Frac(1, 4), 1),
+};
+
+/** The key times each factor named in `ids`, tagged with the slip that factor stands for (the key itself is skipped). */
+export function factorTraps(key: Surd, ids: Partial<Record<keyof typeof SURD_FACTORS, string>>): { v: Surd; trap: string }[] {
+  const out: { v: Surd; trap: string }[] = [];
+  for (const [name, trap] of Object.entries(ids) as [keyof typeof SURD_FACTORS, string][]) {
+    const v = surdMul(key, SURD_FACTORS[name]);
+    if (Math.abs(surdVal(v) - surdVal(key)) > 1e-9) out.push({ v, trap });
+  }
+  return out;
 }
 
 /** Five (or `count`) surd choices: correct + traps + fillers, unique by value, ascending, correct at a random position. */

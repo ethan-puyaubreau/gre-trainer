@@ -184,7 +184,7 @@ const parallelAlgebra: Template<ParAlgParams> = {
       const pos2 = rng.pick(POSITIONS);
       const m1 = measureAt(pos1, phi);
       const m2 = measureAt(pos2, phi);
-      const x0 = d === 1 ? rng.int(2, 7) * 5 : rng.int(10, 40);
+      const x0 = d === 1 ? rng.int(2, 11) * 5 : rng.int(10, 60);
       const c1 = d === 1 ? 0 : rng.int(1, 4);
       const k1 = d === 1 ? m1 : m1 - c1 * x0;
       const c2 = rng.int(2, d === 1 ? 4 : 6);
@@ -201,7 +201,7 @@ const parallelAlgebra: Template<ParAlgParams> = {
       const wrongTrap = same ? 'geo-par-supp-not-equal' : 'geo-par-equal-not-supp';
       const xwOk = Number.isInteger(xw) && xw > 0 && xw !== x0;
 
-      const ask: ParAlgParams['ask'] = d === 1 ? 'x' : d === 2 ? (rng.chance(0.5) ? 'x' : 'angle') : rng.chance(0.75) ? 'y' : 'angle';
+      const ask: ParAlgParams['ask'] = d === 1 ? (rng.chance(0.6) ? 'x' : 'angle') : d === 2 ? (rng.chance(0.3) ? 'x' : 'angle') : rng.chance(0.75) ? 'y' : 'angle';
       const askLabel: 0 | 1 = ask === 'angle' && c1 > 0 && rng.chance(0.5) ? 0 : 1;
       let yAt: { at: At; pos: Pos } | undefined;
       if (ask === 'y') {
@@ -218,6 +218,22 @@ const parallelAlgebra: Template<ParAlgParams> = {
         { x: (360 - k1 - k2) / (c1 + c2), trap: 'geo-ang-line-360' },
         { x: (90 - k1 - k2) / (c1 + c2), trap: 'geo-par-complementary' },
         { x: same ? (k1 + k2) / (c2 - c1) : (180 + k1 + k2) / (c1 + c2), trap: 'geo-ang-sign-slip' },
+        // the right relation with a slip in the algebra: one coefficient, or one constant, forgotten
+        ...(same
+          ? [
+              { x: (k1 - k2) / c1, trap: 'geo-ang-wrong-coefficient' },
+              { x: (k1 - k2) / c2, trap: 'geo-ang-wrong-coefficient' },
+              { x: (k1 - k2) / (c1 + c2), trap: 'geo-ang-wrong-coefficient' },
+              { x: k1 / (c2 - c1), trap: 'geo-ang-dropped-constant' },
+              { x: -k2 / (c2 - c1), trap: 'geo-ang-dropped-constant' },
+            ]
+          : [
+              { x: (180 - k1 - k2) / c1, trap: 'geo-ang-wrong-coefficient' },
+              { x: (180 - k1 - k2) / c2, trap: 'geo-ang-wrong-coefficient' },
+              { x: (180 - k1 - k2) / Math.abs(c1 - c2), trap: 'geo-ang-wrong-coefficient' },
+              { x: (180 - k1) / (c1 + c2), trap: 'geo-ang-dropped-constant' },
+              { x: (180 - k2) / (c1 + c2), trap: 'geo-ang-dropped-constant' },
+            ]),
       ].filter((w) => Number.isInteger(w.x) && w.x > 0 && w.x !== x0);
       const asAngle = (v: number) => Number.isInteger(v) && v > 0 && v < 180;
       if (ask === 'x') {
