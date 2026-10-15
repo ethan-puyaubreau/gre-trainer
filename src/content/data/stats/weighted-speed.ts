@@ -113,7 +113,7 @@ The distances are $${u} \\times ${hours} = ${u * hours}$ and $${v} \\times ${hou
 
 Check: with any other equal time the hours cancel.
 
-Trap: the distance of the whole trip is not needed, so the relationship can be determined, and answer D is not right.
+Trap: not being given the distance does not make the relationship undeterminable, because equal times fix the weights.
 
 Rule: equal times give the plain average of the speeds; equal distances do not.`,
           },
