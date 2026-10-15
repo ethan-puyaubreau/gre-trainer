@@ -1,5 +1,6 @@
 // Pure helpers for the practice page: what a session did, kept apart from React.
 
+import { parseQuestionId, SEED_POOL, poolSeed } from '../engine/generate';
 import { grade, type Response } from '../engine/grade';
 import { parseInline } from '../engine/rich';
 import type { Difficulty, QuestionBody } from '../engine/types';
@@ -150,4 +151,21 @@ export function stemPreview(q: QuestionBody, max = 90): string {
     len += text.length;
   }
   return out.trim();
+}
+
+/** What "Replay my traps" serves: the first missed question of each template (its id carries template and difficulty), in order. */
+export function replayIds(missed: SessionOutcome[]): string[] {
+  const seen = new Set<string>();
+  return missed.flatMap((m) => {
+    const p = parseQuestionId(m.questionId);
+    if (!p || seen.has(p.templateId)) return [];
+    seen.add(p.templateId);
+    return [m.questionId];
+  });
+}
+
+/** A seed for the replayed question: new numbers, never the missed question again. `draw` is injectable for tests. */
+export function replaySeed(missedSeed: number, draw: () => number = poolSeed): number {
+  const seed = draw();
+  return seed === missedSeed ? (seed % SEED_POOL) + 1 : seed;
 }

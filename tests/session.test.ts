@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { TEMPLATES } from '../src/content';
 import { LESSONS } from '../src/content/lessons';
 import { Frac } from '../src/engine/frac';
 import { parseRich } from '../src/engine/rich';
 import type { QuestionBody } from '../src/engine/types';
 import type { Level } from '../src/mastery/model';
-import { dodgedTraps, earnsReward, hintText, paceJudged, stemPreview, summarize, type RewardInput, type SessionOutcome } from '../src/mastery/session';
+import { generateQuestion, SEED_POOL } from '../src/engine/generate';
+import {
+  dodgedTraps,
+  earnsReward,
+  hintText,
+  paceJudged,
+  replayIds,
+  replaySeed,
+  stemPreview,
+  summarize,
+  type RewardInput,
+  type SessionOutcome,
+} from '../src/mastery/session';
 
 const explanation = '';
 const mcs: QuestionBody = {
@@ -114,6 +127,39 @@ describe('summarize: missed questions', () => {
   });
 });
 
+describe('replayIds', () => {
+  const miss = (questionId: string): SessionOutcome => ({
+    skillId: 'a',
+    from: 2,
+    to: 2,
+    correct: false,
+    dodged: 0,
+    questionId,
+    response: { format: 'mcs', choice: 1 },
+    traps: [],
+  });
+
+  it('keeps the first missed question of each template, in order', () => {
+    expect(replayIds([miss('a.x#7#2'), miss('a.y#9#3'), miss('a.x#12#1'), miss('a.z#3#1')])).toEqual(['a.x#7#2', 'a.y#9#3', 'a.z#3#1']);
+  });
+
+  it('is empty with nothing missed and skips ids that cannot be read', () => {
+    expect(replayIds([])).toEqual([]);
+    expect(replayIds([miss('broken')])).toEqual([]);
+  });
+});
+
+describe('replaySeed', () => {
+  it('serves the drawn seed', () => {
+    expect(replaySeed(5, () => 9)).toBe(9);
+  });
+
+  it('never serves the missed seed again, and stays in the verified pool', () => {
+    expect(replaySeed(5, () => 5)).toBe(6);
+    expect(replaySeed(SEED_POOL, () => SEED_POOL)).toBe(1);
+  });
+});
+
 describe('stemPreview', () => {
   const mcsStem = (stem: string): QuestionBody => ({ ...mcs, stem });
 
@@ -137,6 +183,15 @@ describe('stemPreview', () => {
   it('puts the two quantities of a comparison side by side', () => {
     expect(stemPreview({ ...qc, quantityA: '$x$', quantityB: '$y$' })).toBe('A: $x$ B: $y$');
     expect(stemPreview({ ...qc, info: 'Let $x > 0$.', quantityA: '$x$', quantityB: '$y$' })).toBe('Let $x > 0$. A: $x$ B: $y$');
+  });
+
+  it('previews a question of every template, short and parseable', () => {
+    for (const t of TEMPLATES)
+      for (const difficulty of [1, 2, 3] as const) {
+        const preview = stemPreview(generateQuestion(t, 1, difficulty), 90);
+        expect(() => parseRich(preview), `${t.id} ${difficulty}`).not.toThrow();
+        expect(preview.length, `${t.id} ${difficulty}`).toBeLessThan(240);
+      }
   });
 
   it('keeps every preview parseable', () => {

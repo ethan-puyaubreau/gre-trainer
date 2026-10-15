@@ -8,13 +8,24 @@ import { SessionRecap } from '../components/SessionRecap';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
 import { AREA_NAMES, SKILLS, skillById, templateById, templatesBySkill, TRAPS } from '../content';
 import { LESSONS, lessonDue } from '../content/lessons';
-import { generateQuestion, poolSeed } from '../engine/generate';
+import { generateQuestion, parseQuestionId, poolSeed } from '../engine/generate';
 import { grade, isAnswered, type GradeResult, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area, Question } from '../engine/types';
 import { isOnPace, LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
-import { dodgedTraps, earnsReward, FULL_CARD, hintText, paceJudged, summarize, type HintLevel, type SessionOutcome } from '../mastery/session';
+import {
+  dodgedTraps,
+  earnsReward,
+  FULL_CARD,
+  hintText,
+  paceJudged,
+  replayIds,
+  replaySeed,
+  summarize,
+  type HintLevel,
+  type SessionOutcome,
+} from '../mastery/session';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
@@ -83,6 +94,8 @@ export function Practice({ route }: { route: string[] }) {
   const [empty, setEmpty] = useState(false);
   const recent = useRef<string[]>([]);
   const lastSkill = useRef<string | undefined>(undefined);
+  // "Replay my traps": ids of the missed questions still to replay, served before the scheduler. null when no replay is running.
+  const replay = useRef<string[] | null>(null);
 
   // A skill met for the first time shows its lesson before the question (the question is already easy: difficulty 1).
   const lessonSkill = current?.question.skillId;
@@ -92,30 +105,40 @@ export function Practice({ route }: { route: string[] }) {
   const elapsed = useStopwatch(!!current && !result && !recap && !gated, current?.question.id);
 
   const next = useCallback(() => {
+    // A replay ends on the recap once its queue is served.
+    if (replay.current && replay.current.length === 0) {
+      replay.current = null;
+      setRecap(true);
+      return;
+    }
+    // The same template and difficulty as the miss, with new numbers.
+    const old = replay.current ? parseQuestionId(replay.current.shift()!) : null;
     const s = useProgress.getState();
     const rng = createRng(randomSeed());
     const recentTemplates = [...s.history.slice(-12).map((h) => h.templateId), ...recent.current].slice(-12);
-    const pick = nextPick(
-      rng,
-      {
-        skills: SKILLS,
-        templatesBySkill,
-        states: s.skills,
-        remediation: s.remediation,
-        seq: s.seq,
-        now: Date.now(),
-        recentTemplates,
-        lastSkill: lastSkill.current,
-      },
-      scope,
-    );
+    const pick: Pick | null = old
+      ? { skillId: templateById.get(old.templateId)!.skill, templateId: old.templateId, difficulty: old.difficulty, reason: 'repair' }
+      : nextPick(
+          rng,
+          {
+            skills: SKILLS,
+            templatesBySkill,
+            states: s.skills,
+            remediation: s.remediation,
+            seq: s.seq,
+            now: Date.now(),
+            recentTemplates,
+            lastSkill: lastSkill.current,
+          },
+          scope,
+        );
     if (!pick) {
       setEmpty(true);
       setCurrent(null);
       return;
     }
     const t = templateById.get(pick.templateId)!;
-    const question = generateQuestion(t, poolSeed(), pick.difficulty);
+    const question = generateQuestion(t, old ? replaySeed(old.seed) : poolSeed(), pick.difficulty);
     recent.current = [...recent.current, pick.templateId].slice(-12);
     lastSkill.current = pick.skillId;
     setEmpty(false);
@@ -127,6 +150,7 @@ export function Practice({ route }: { route: string[] }) {
   }, [scope]);
 
   useEffect(() => {
+    replay.current = null;
     next();
     setSession({ answered: 0, correct: 0, streak: 0 });
     setOutcomes([]);
@@ -207,11 +231,19 @@ export function Practice({ route }: { route: string[] }) {
   }, [current, recap, gated, result, response, next, submit]);
 
   const summary = useMemo(() => summarize(outcomes), [outcomes]);
-  const keepPracticing = () => {
+  const restart = () => {
     setSession({ answered: 0, correct: 0, streak: 0 });
     setOutcomes([]);
     setRecap(false);
+  };
+  const keepPracticing = () => {
+    restart();
     if (result) next();
+  };
+  const replayTraps = () => {
+    replay.current = replayIds(summary.missed);
+    restart();
+    next();
   };
 
   if (empty) {
@@ -219,7 +251,7 @@ export function Practice({ route }: { route: string[] }) {
       return (
         <div className="practice-fx">
           <h1>{scopeTitle(scope)}</h1>
-          <SessionRecap summary={summary} onKeep={keepPracticing} exhausted />
+          <SessionRecap summary={summary} onKeep={keepPracticing} onReplay={replayTraps} exhausted />
         </div>
       );
     }
@@ -238,7 +270,7 @@ export function Practice({ route }: { route: string[] }) {
     return (
       <div className="practice-fx">
         <h1>{scopeTitle(scope)}</h1>
-        <SessionRecap summary={summary} onKeep={keepPracticing} />
+        <SessionRecap summary={summary} onKeep={keepPracticing} onReplay={replayTraps} />
       </div>
     );
   }

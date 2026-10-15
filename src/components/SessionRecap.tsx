@@ -104,8 +104,21 @@ function MissRow({ miss, index }: { miss: SessionOutcome; index: number }) {
   );
 }
 
-/** End-of-session card. `exhausted`: nothing is left to practice in this selection, so there is nothing to keep going with. */
-export function SessionRecap({ summary, onKeep, exhausted }: { summary: SessionSummary; onKeep: () => void; exhausted?: boolean }) {
+/**
+ * End-of-session card. `exhausted`: nothing is left to practice in this selection, so there is nothing to keep going with.
+ * `onReplay` starts a run on the missed questions' templates with new numbers (the button shows only when something was missed).
+ */
+export function SessionRecap({
+  summary,
+  onKeep,
+  onReplay,
+  exhausted,
+}: {
+  summary: SessionSummary;
+  onKeep: () => void;
+  onReplay?: () => void;
+  exhausted?: boolean;
+}) {
   const keep = useRef<HTMLButtonElement>(null);
   const smart = useRef<HTMLAnchorElement>(null);
   useEffect(() => (keep.current ?? smart.current)?.focus(), []);
@@ -175,6 +188,11 @@ export function SessionRecap({ summary, onKeep, exhausted }: { summary: SessionS
         ) : (
           <button ref={keep} className="btn btn-primary" onClick={onKeep}>
             Keep practicing
+          </button>
+        )}
+        {onReplay && missed.length > 0 && (
+          <button className="btn" onClick={onReplay} title="The same kinds of question as the ones you missed, with new numbers">
+            Replay my traps
           </button>
         )}
         <a className="btn" href={href('')}>
