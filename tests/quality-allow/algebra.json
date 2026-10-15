@@ -30,9 +30,6 @@
     "artifacts.exp-1": "baseline",
     "bank.difficulty": "baseline"
   },
-  "alg.qc-algebra.sign-cases-qc": {
-    "bank.difficulty": "baseline"
-  },
   "alg.rate-work.alone-time": {
     "artifacts.frac-1": "baseline",
     "distractors.trapped": "baseline"

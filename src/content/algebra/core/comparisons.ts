@@ -439,12 +439,18 @@ The sign depends only on the denominator. ${
         k = [1, 0];
       }
     } else {
-      const a = rng.int(1, 9);
-      const b = intExcept(rng, 1, 9, a);
+      // d3 uses constants of mixed sign, so its questions differ from those of d2
+      let a: number;
+      let b: number;
+      do {
+        a = d === 3 ? intExcept(rng, -9, 9, 0) : rng.int(1, 9);
+        b = d === 3 ? intExcept(rng, -9, 9, 0, a) : intExcept(rng, 1, 9, a);
+      } while (d === 3 && a > 0 && b > 0);
+      const pt = (v: string, c: number) => `(${v} ${c < 0 ? '-' : '+'} ${Math.abs(c)})`;
       const rel = rng.pick(d === 1 ? ['y>x', 'x>y', 'none', 'eq'] : ['y>x', 'x>y', 'none', 'none', 'eq', 'eq']);
       info = rel === 'y>x' ? '$y > x$' : rel === 'x>y' ? '$x > y$' : rel === 'eq' ? '$x = y$' : undefined;
-      A = `$(x + ${a})(y + ${b})$`;
-      B = `$(x + ${b})(y + ${a})$`;
+      A = `$${pt('x', a)}${pt('y', b)}$`;
+      B = `$${pt('x', b)}${pt('y', a)}$`;
       // A - B = (a - b)(y - x)
       const sgnYX = rel === 'y>x' ? 1 : rel === 'x>y' ? -1 : rel === 'eq' ? 0 : null;
       answer = sgnYX === null ? 'D' : qcCompare((a - b) * sgnYX, 0);
