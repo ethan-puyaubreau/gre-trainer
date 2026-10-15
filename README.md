@@ -14,8 +14,8 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
   formats (quantitative comparison, select one, select one or more, numeric entry).
 - **Mastery levels.** Not started → Attempted → Familiar → Proficient → Mastered.
   - A correct answer within the GRE pace (1:45 per question) and without hints moves the skill up.
-  - A correct but slow or hinted answer only counts up to Familiar.
-  - Mastered requires clean answers on 3 different styles, on 2 different days.
+  - Pace (1.5x at the hardest level) only gates Mastered and reviews; hinted answers earn no credit.
+  - Mastered requires clean answers (no hint, difficulty 2 or higher) on 3 to 6 different styles depending on the skill, in at least 2 formats including a production one (numeric entry or select all), one at the hardest level, and 18 hours between the first credit and the last.
 - **Repair queue.** A miss drops the skill one level. The skill comes back 2–4 questions later in
   another style, and again the next day.
 - **Spaced review.** Mastered skills come back after 3, 7, 21 and 60 days. A miss on review drops the
@@ -38,11 +38,11 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
 
 | Area | Skills | Question styles | Named traps |
 |---|---|---|---|
-| Arithmetic | 17 | 89 | 111 |
-| Algebra | 14 | 63 | 166 |
-| Geometry | 9 | 39 | 141 |
-| Data Analysis | 8 | 66 (7 data interpretation families) | 132 |
-| **Total** | **48** | **257** | **550** |
+| Arithmetic | 17 | 95 | 111+ |
+| Algebra | 14 | 69 | 166+ |
+| Geometry | 9 | 46 | 141+ |
+| Data Analysis | 8 | 70 (7 data interpretation families) | 132+ |
+| **Total** | **48** | **280** | **550+** |
 
 Each style generates 1,500 verified variants (500 seeds × 3 difficulty levels). Coverage follows
 the question patterns of ETS's *Official GRE Quantitative Reasoning Practice Questions* (Vol. 1,
