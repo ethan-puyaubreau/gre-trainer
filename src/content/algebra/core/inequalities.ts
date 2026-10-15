@@ -372,8 +372,14 @@ const absQC: Template<AbsParams> = {
         else traps.D = 'alg-qc-variable-d';
         explanation =
           cond === 'none'
-            ? `$|m + ${K}| = m + ${K}$ when $m + ${K} \\ge 0$, but when $m + ${K} < 0$ (for example $m = ${-K - 1}$), Quantity A is positive and Quantity B is negative. ${qcEnd('D')}`
-            : `Since $m > ${num(-K)}$, $m + ${K}$ is positive, and the absolute value of a positive number is the number itself. ${qcEnd('C')}`;
+            ? `The absolute value equals its argument only when the argument is not negative, and nothing here fixes the sign of $m + ${K}$, so test two values. For $m = 0$: Quantity A is ${K} and Quantity B is ${K}. For $m = ${num(-K - 1)}$: Quantity A is 1 and Quantity B is $-1$.
+
+The cases disagree, equal in one and Quantity A greater in the other. ${qcEnd('D')}
+
+Trap: testing only $m = 0$ suggests the quantities are equal. Rule: $|u| = u$ only when $u \\ge 0$; otherwise $|u| = -u$.`
+            : `Since $m > ${num(-K)}$, $m + ${K}$ is positive, and the absolute value of a positive number is the number itself. Check with an allowed value. For $m = 0$: Quantity A is ${K} and Quantity B is ${K}. ${qcEnd('C')}
+
+Trap: a value such as $m = ${num(-K - 1)}$ would make Quantity A equal to 1 and Quantity B equal to $-1$, but it is not allowed because $m > ${num(-K)}$. Rule: $|u| = u$ whenever $u \\ge 0$.`;
         k = [K, 1, 2];
       } else {
         // plus: |m + K| vs K - m  (A >= B iff m >= 0);  minus: |m - K| vs m + K (A >= B iff m <= 0)
@@ -404,9 +410,18 @@ const absQC: Template<AbsParams> = {
           form === 'plus'
             ? `If $m < 0$, then $${K} - m = ${K} + |m|$, and adding a negative number to ${K} gives something smaller in size: $|m + ${K}| < ${K} + |m|$.`
             : `If $m < 0$, then $|m - ${K}| = ${K} - m$, which is greater than $${K} + m$.`;
-        explanation = `Try values. ${tried}
+        const otherM = cond === 'pos' ? -1 : 1;
+        const otherA = Math.abs(form === 'plus' ? otherM + K : otherM - K);
+        const otherB = form === 'plus' ? K - otherM : otherM + K;
+        const trapLine =
+          cond === 'none'
+            ? `Trap: either value alone points to a winner, but the winner changes with the sign of $m$. Rule: when the sign is free, test one value of each sign.`
+            : `Trap: testing $m = ${num(otherM)}$ instead, a value the condition forbids, would give ${otherA} against ${otherB}. Rule: test only values the condition allows.`;
+        explanation = `The sign inside the bars matters, so try values that satisfy the condition. ${tried}
 
-In general, ${cond === 'neg' ? ifNeg.replace(/^If/, 'if') : ifPos}${cond === 'none' ? ` ${ifNeg}` : ''} ${here} ${qcEnd(answer)}`;
+In general, ${cond === 'neg' ? ifNeg.replace(/^If/, 'if') : ifPos}${cond === 'none' ? ` ${ifNeg}` : ` ${here}`} ${qcEnd(answer)}
+
+${trapLine}`;
         k = [K, form === 'plus' ? 1 : -1, form === 'plus' ? 0 : 1];
       }
     } else {
@@ -437,17 +452,39 @@ In general, ${cond === 'neg' ? ifNeg.replace(/^If/, 'if') : ifPos}${cond === 'no
         if (t === lo || t === hi) traps[t === lo ? 'A' : 'B'] = 'alg-strict-endpoint';
         else traps.A = 'tested-one-value';
       } else traps.D = 'alg-qc-variable-d';
-      explanation = `$${info.slice(1, -1)}$ means $-${c} ${opT} ${a === 1 ? 'x' : `${a}x`} ${b > 0 ? '-' : '+'} ${Math.abs(b)} ${opT} ${c}$, so $${num(b - c)} ${opT} ${a === 1 ? 'x' : `${a}x`} ${opT} ${num(b + c)}$${
+      const half = (v: number) => (Number.isInteger(v) ? num(v) : v.toFixed(1));
+      const caseText = (x: number) => `For $x = ${half(x)}$: Quantity A is $${half(x)}$ and Quantity B is $${num(t)}$.`;
+      const atEdge = t === lo || t === hi;
+      // the allowed values shown: both sides of t for D, the closest allowed value to t otherwise
+      const shown =
+        answer === 'D'
+          ? atEdge
+            ? [t, t === lo ? t + 0.5 : t - 0.5]
+            : [t - 0.5, t + 0.5]
+          : answer === 'A'
+            ? [closed ? lo : lo + 0.5]
+            : [closed ? hi : hi - 0.5];
+      const trapLine =
+        answer === 'D'
+          ? atEdge
+            ? `Trap: $${num(t)}$ is an endpoint that belongs to the set, so $x$ can equal it as well as exceed it.`
+            : `Trap: one allowed value alone would settle the comparison wrongly.`
+          : atEdge
+            ? `Trap: $x$ never equals $${num(t)}$ because the inequality is strict.`
+            : `Trap: because $x$ is unknown, answering D is tempting, but every allowed $x$ lies on the same side of $${num(t)}$.`;
+      explanation = `Turn the absolute value into a range for $x$. $${info.slice(1, -1)}$ means $-${c} ${opT} ${a === 1 ? 'x' : `${a}x`} ${b > 0 ? '-' : '+'} ${Math.abs(b)} ${opT} ${c}$, so $${num(b - c)} ${opT} ${a === 1 ? 'x' : `${a}x`} ${opT} ${num(b + c)}$${
         a === 1 ? '' : ` and $${num(lo)} ${opT} x ${opT} ${num(hi)}$`
       }.
 
 ${
         answer === 'A'
-          ? `Every allowed $x$ is ${closed ? 'at least' : 'greater than'} $${num(lo)}$${closed && lo === t ? '' : ''}, which is ${lo === t ? 'equal to' : 'greater than'} $${num(t)}$, so $x > ${num(t)}$.`
+          ? `Every allowed $x$ is ${closed ? 'at least' : 'greater than'} $${num(lo)}$, which is ${lo === t ? 'equal to' : 'greater than'} $${num(t)}$, so $x > ${num(t)}$.`
           : answer === 'B'
             ? `Every allowed $x$ is ${closed ? 'at most' : 'less than'} $${num(hi)}$, which is ${hi === t ? 'equal to' : 'less than'} $${num(t)}$, so $x < ${num(t)}$.`
-            : `The interval contains values of $x$ on both sides of $${num(t)}$${t === lo || t === hi ? ` (including $x = ${num(t)}$ itself)` : ''}.`
-      } ${qcEnd(answer)}`;
+            : `The range contains values of $x$ on both sides of $${num(t)}$${atEdge ? ' (including the endpoint itself)' : ''}.`
+      } ${shown.map(caseText).join(' ')} ${qcEnd(answer)}
+
+${trapLine} Rule: find every allowed $x$ first, then compare the ends of that range with the number.`;
       k = [a, b, c, t, closed ? 1 : 0];
     }
     return {

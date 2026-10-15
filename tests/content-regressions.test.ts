@@ -180,23 +180,36 @@ describe('alg.inequalities.abs-qc', () => {
     let dAnswers = 0;
     for (const { seed, d, q, params } of bodies('alg.inequalities.abs-qc')) {
       const { kind, k, cond } = params as { kind: string; k: number[]; cond: string };
-      if (q.format !== 'qc' || kind !== 'abs-vs-linear' || k[2] === 2) continue; // 'same' form: no values tried
-      linear++;
-      if (cond !== 'none') restricted++;
-      const K = k[0];
-      const plus = k[1] === 1;
-      const allowed = (m: number) => (cond === 'none' ? true : cond === 'pos' ? m > 0 : m < 0);
-      const shown = [...(q.explanation ?? '').matchAll(/For \$m = (-?\d+)\$: Quantity A is (-?\d+) and Quantity B is (-?\d+)\./g)].map((x) => ({ m: Number(x[1]), a: Number(x[2]), b: Number(x[3]) }));
-      const where = `seed ${seed} d${d} (${cond})`;
+      if (q.format !== 'qc') continue;
+      const where = `seed ${seed} d${d} (${kind} ${cond})`;
+      // The values of the unknown tried in the explanation: "For $m = 1$: Quantity A is 3 and Quantity B is 5."
+      const shown = [...(q.explanation ?? '').matchAll(/For \$[mx] = (-?[\d.]+)\$: Quantity A is \$?(-?[\d.]+)\$? and Quantity B is \$?(-?[\d.]+)\$?\./g)].map((x) => ({ v: Number(x[1]), a: Number(x[2]), b: Number(x[3]) }));
+      let allowed: (v: number) => boolean;
+      let expected: (v: number) => [number, number];
+      if (kind === 'abs-vs-linear') {
+        const K = k[0];
+        const plus = k[1] === 1;
+        const same = k[2] === 2;
+        allowed = (m) => (cond === 'none' ? true : cond === 'pos' ? m > 0 : cond === 'neg' ? m < 0 : m > -K);
+        expected = (m) => (same ? [Math.abs(m + K), m + K] : [Math.abs(plus ? m + K : m - K), plus ? K - m : m + K]);
+        if (!same) {
+          linear++;
+          if (cond !== 'none') restricted++;
+        }
+      } else {
+        const [a, b, c, t, closed] = k;
+        allowed = (x) => (closed ? Math.abs(a * x - b) <= c : Math.abs(a * x - b) < c);
+        expected = (x) => [x, t];
+      }
       if (shown.length === 0) bad.push(`${where}: no value tried`);
       for (const s of shown) {
-        if (!allowed(s.m)) bad.push(`${where}: tries m = ${s.m}`);
-        const a = Math.abs(plus ? s.m + K : s.m - K);
-        const b = plus ? K - s.m : s.m + K;
-        if (a !== s.a || b !== s.b) bad.push(`${where}: m = ${s.m} gives ${a} and ${b}, not ${s.a} and ${s.b}`);
+        if (!allowed(s.v)) bad.push(`${where}: tries ${s.v}, which the condition forbids`);
+        const [a, b] = expected(s.v);
+        if (Math.abs(a - s.a) > 1e-9 || Math.abs(b - s.b) > 1e-9) bad.push(`${where}: ${s.v} gives ${a} and ${b}, not ${s.a} and ${s.b}`);
       }
       const rel = new Set(shown.map((s) => (s.a > s.b ? 'A' : s.a < s.b ? 'B' : 'C')));
       if (rel.size > 1 && q.answer !== 'D') bad.push(`${where}: the cases disagree but the answer is ${q.answer}`);
+      // a D answer must show two allowed cases that really disagree
       if (q.answer === 'D' && rel.size < 2) bad.push(`${where}: the answer is D but the cases shown do not disagree (${[...rel]})`);
       if (q.answer === 'D') dAnswers++;
       if (rel.size === 1 && q.answer !== 'D' && !rel.has(q.answer)) bad.push(`${where}: the case shown gives ${[...rel]} but the answer is ${q.answer}`);
