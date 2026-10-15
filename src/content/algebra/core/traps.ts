@@ -314,6 +314,14 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Ordered by size and ignored the signs',
     fix: 'A negative number is less than any positive one, and among negatives the one with the larger size is smaller: $-\\frac{1}{2} < -\\frac{1}{8}$.',
   },
+  'alg-assumed-outside-interval': {
+    label: 'Ordered the expressions at a value the condition does not allow',
+    fix: 'The order of $x$, $x^2$, $\\frac{1}{x}$ changes from one region to another. Pick test values that satisfy the stated condition.',
+  },
+  'alg-condition-reversed': {
+    label: 'Read the condition the wrong way round',
+    fix: 'In $x < y$ the variable $x$ is the smaller one. Choose your test numbers so that $x$ is less than $y$.',
+  },
   'alg-order-reversed': {
     label: 'Listed the order backwards',
     fix: 'The question asks from least to greatest: start with the most negative value.',

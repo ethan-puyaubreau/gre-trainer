@@ -526,7 +526,12 @@ const rangeNE: Template<RangeParams> = {
 
 The ${wantWord} value is $${coef[0] === 1 ? paren(bx) : coef[0] === -1 ? `-${paren(bx)}` : `${coef[0]}(${num(bx)})`} ${coef[1] < 0 ? '-' : '+'} ${Math.abs(coef[1]) === 1 ? paren(by) : `${Math.abs(coef[1])}(${num(by)})`} = ${num(answer)}$.`;
       const naive = coef[0] * (want === 'max' ? x2 : x1) + coef[1] * (want === 'max' ? y2 : y1);
-      if (naive !== answer) traps.push({ value: frac(naive), trap: 'alg-range-subtract' });
+      if (naive !== answer) {
+        traps.push({ value: frac(naive), trap: 'alg-range-subtract' });
+        explanation += `
+
+Trap: taking the ${want === 'max' ? 'largest' : 'smallest'} value of both variables gives $${num(naive)}$, but a negative coefficient turns a larger variable into a smaller result.`;
+      }
     } else if (kind === 'product') {
       const corners = [x1 * y1, x1 * y2, x2 * y1, x2 * y2];
       answer = want === 'max' ? Math.max(...corners) : Math.min(...corners);
@@ -535,22 +540,74 @@ The ${wantWord} value is $${coef[0] === 1 ? paren(bx) : coef[0] === -1 ? `-${par
 
 The ${wantWord} is $${num(answer)}$.`;
       const naive = want === 'max' ? x2 * y2 : x1 * y1;
-      if (naive !== answer) traps.push({ value: frac(naive), trap: 'alg-range-product' });
+      if (naive !== answer) {
+        traps.push({ value: frac(naive), trap: 'alg-range-product' });
+        explanation += `
+
+Trap: multiplying the ${want === 'max' ? 'largest' : 'smallest'} endpoints gives $${num(naive)}$, but a product of two negative endpoints can be larger and a mixed-sign product smaller.`;
+      }
     } else if (kind === 'square') {
-      const lo = rng.int(-9, -1);
-      const hi = rng.int(1, 9);
-      const finalLo = lo === -hi ? lo - 1 : lo;
-      answer = want === 'max' ? Math.max(finalLo * finalLo, hi * hi) : 0;
-      stem = `If $${num(finalLo)} \\le x \\le ${hi}$, what is the ${wantWord} possible value of $x^2$?`;
-      explanation =
-        want === 'max'
-          ? `$x^2$ is largest where $x$ is farthest from 0. The endpoints give $(${num(finalLo)})^2 = ${finalLo * finalLo}$ and $${hi}^2 = ${hi * hi}$, so the greatest value is ${answer}.`
-          : `The interval contains 0, and $x^2 \\ge 0$ for every $x$, so the least value is $0^2 = 0$, not the square of an endpoint.`;
-      const naive = want === 'max' ? hi * hi : Math.min(finalLo * finalLo, hi * hi);
-      if (naive !== answer) traps.push({ value: frac(naive), trap: 'alg-range-square' });
+      // x^2 on an interval that stays on one side of 0 ('away'), contains 0 ('zero-in'), or (x - h)^2 + c ('shift')
+      const variant = rng.pick(d === 1 ? (['away', 'zero-in'] as const) : (['away', 'zero-in', 'shift', 'shift'] as const));
+      let lo: number;
+      let hi: number;
+      let h = 0;
+      let c = 0;
+      if (variant === 'away') {
+        lo = rng.int(2, 6);
+        hi = lo + rng.int(2, 6);
+        if (rng.chance(0.5)) [lo, hi] = [-hi, -lo];
+      } else {
+        lo = rng.int(-9, -2);
+        hi = rng.int(2, 9);
+        if (lo === -hi) lo -= 1;
+      }
+      if (variant === 'shift') {
+        h = rng.int(Math.min(lo + 1, hi - 1), Math.max(lo + 1, hi - 1));
+        c = rng.int(2, 9);
+      }
+      const sq = (v: number) => (v - h) * (v - h) + c;
+      const nearEnd = Math.abs(lo - h) <= Math.abs(hi - h) ? lo : hi;
+      const farEnd = nearEnd === lo ? hi : lo;
+      const inside = lo <= h && h <= hi;
+      const best = want === 'max' ? sq(farEnd) : inside ? c : sq(nearEnd);
+      answer = best;
+      const e = h === 0 ? 'x^2' : `(x ${h > 0 ? '-' : '+'} ${Math.abs(h)})^2 + ${c}`;
+      const base = h === 0 ? 'x' : `x ${h > 0 ? '-' : '+'} ${Math.abs(h)}`;
+      stem = `If $${num(lo)} \\le x \\le ${num(hi)}$, what is the ${wantWord} possible value of $${e}$?`;
+      const val = (v: number) => (h === 0 ? `(${num(v)})^2` : `(${num(v)} ${h > 0 ? '-' : '+'} ${Math.abs(h)})^2 + ${c}`);
+      let naive: number;
+      let naiveWhy: string;
+      if (want === 'max') {
+        explanation = `A square is largest where its base is farthest from 0, so check the two ends: $${val(lo)} = ${sq(lo)}$ and $${val(hi)} = ${sq(hi)}$. The greatest value is $${num(answer)}$.
+
+Check: a value inside the interval, such as $x = ${num(Math.round((lo + hi) / 2))}$, gives $${num(sq(Math.round((lo + hi) / 2)))}$, which is not larger.`;
+        naive = sq(nearEnd);
+        naiveWhy = `squaring the end nearer ${h === 0 ? '0' : `$x = ${h}$`}, which gives the smaller end value`;
+        if (naive === answer) naive = NaN;
+      } else if (inside) {
+        explanation = `A square is never negative, and $${base}$ can be 0 inside the interval (at $x = ${num(h)}$), so the least value is $${h === 0 ? '0^2 = 0' : `0 + ${c} = ${c}`}$, not the value at an endpoint.
+
+Check: the end values are $${sq(lo)}$ and $${sq(hi)}$, both larger.`;
+        naive = Math.min(sq(lo), sq(hi));
+        naiveWhy = 'taking the smaller end value';
+        if (naive === answer) naive = NaN;
+      } else {
+        explanation = `Here $${base}$ stays ${lo - h > 0 ? 'positive' : 'negative'} on the whole interval, so the square grows with the distance from 0 and the least value is at the end nearer 0: $${val(nearEnd)} = ${num(answer)}$.
+
+Check: the other end gives $${num(sq(farEnd))}$, which is larger.`;
+        naive = h === 0 ? 0 : c;
+        naiveWhy = 'assuming the least square is 0 even though 0 is not in the interval';
+        if (naive === answer) naive = NaN;
+      }
+      if (!Number.isNaN(naive)) {
+        explanation += `\n\nTrap: ${naiveWhy} gives $${num(naive)}$, which is not the ${wantWord} value on this interval.`;
+        traps.push({ value: frac(naive), trap: 'alg-range-square' });
+      }
+      explanation += `\n\nRule: the extreme values of a square are at an endpoint or where its base is 0; check both.`;
       strict = [false, false, false, false];
       return {
-        params: { kind, x: [finalLo, hi], y: [0, 0], coef, want, strict },
+        params: { kind, x: [lo, hi], y: [h, c], coef, want, strict },
         q: { format: 'ne', stem, answer: frac(answer), traps, explanation },
       };
     } else {
@@ -590,9 +647,10 @@ To make $${expr}$ as ${want === 'max' ? 'large' : 'small'} as possible take $x =
     const step = kind === 'integer' ? 1 : 0.25;
     const xs = grid(x[0], x[1], strict[0], strict[1], step);
     const ys = kind === 'square' ? [0] : grid(y[0], y[1], strict[2], strict[3], step);
+    const [sh, sc] = kind === 'square' ? y : [0, 0];
     for (const a of xs)
       for (const b of ys) {
-        const v = kind === 'product' ? a * b : kind === 'square' ? a * a : coef[0] * a + coef[1] * b;
+        const v = kind === 'product' ? a * b : kind === 'square' ? (a - sh) * (a - sh) + sc : coef[0] * a + coef[1] * b;
         best = want === 'max' ? Math.max(best, v) : Math.min(best, v);
       }
     return Math.abs(q.answer.toNumber() - best) < 1e-9 ? null : `expected ${best}`;
@@ -601,44 +659,165 @@ To make $${expr}$ as ${want === 'max' ? 'large' : 'small'} as possible take $x =
 
 /* ================================================================== 5. Order expressions under a condition (MCS) */
 
-interface OrderCase {
-  cond: string;
-  exprs: Ex[];
-  /** a representative point */
-  rep: [number, number];
-  /** sampler for the region */
-  region: [number, number, number, number];
-  twoVar: boolean;
-}
-
 const x = V('x');
 const y = V('y');
-const ORDER_CASES: OrderCase[] = [
-  { cond: '-1 < x < y < 0', exprs: [mul(x, y), mul(pow(x, 2), y), mul(x, pow(y, 2))], rep: [-0.5, -0.25], region: [-1, 0, -1, 0], twoVar: true },
-  { cond: '0 < x < y < 1', exprs: [mul(x, y), div(x, y), div(y, x)], rep: [0.25, 0.5], region: [0, 1, 0, 1], twoVar: true },
-  { cond: '-1 < x < y < 0', exprs: [mul(x, y), div(x, y), div(y, x)], rep: [-0.5, -0.25], region: [-1, 0, -1, 0], twoVar: true },
-  { cond: 'x < y < 0', exprs: [add(x, y), add(x, mul(N(-1), y)), add(y, mul(N(-1), x))], rep: [-3, -1], region: [-20, 0, -20, 0], twoVar: true },
-  { cond: 'x < 0 < y < 1', exprs: [mul(x, y), mul(x, pow(y, 2)), mul(pow(x, 2), y)], rep: [-2, 0.5], region: [-20, 0, 0, 1], twoVar: true },
-  { cond: '-1 < x < 0', exprs: [x, pow(x, 2), pow(x, 3)], rep: [-0.5, 0], region: [-1, 0, 0, 0], twoVar: false },
-  { cond: 'x < -1', exprs: [x, pow(x, 3), div(N(1), x)], rep: [-2, 0], region: [-30, -1, 0, 0], twoVar: false },
-  { cond: '0 < x < 1', exprs: [x, pow(x, 2), div(N(1), x)], rep: [0.5, 0], region: [0, 1, 0, 0], twoVar: false },
+
+interface OrderCond {
+  /** Level of difficulty that uses this condition. */
+  level: 1 | 2 | 3;
+  /** The condition as TeX. */
+  text: string;
+  twoVar: boolean;
+  /** Test points shown in the explanation: the first lists the values, the second is the check. */
+  reps: [number, number][];
+  /** Points that break the condition, each one a wrong assumption a student may make. */
+  outside: [number, number][];
+  /** Expressions that can be ordered under this condition. */
+  menu: Ex[];
+  /** Why the order is the same for every allowed value. */
+  why: string;
+  inRegion: (x: number, y: number) => boolean;
+  /** Random allowed point (independent of the grid used to build the question). */
+  sample: (u: number, v: number) => [number, number];
+}
+
+const SINGLE_MENU = [x, pow(x, 2), pow(x, 3), pow(x, 4), div(N(1), x), div(N(1), pow(x, 2)), mul(N(-1), x)];
+const PAIR_MENU = [mul(x, y), div(x, y), div(y, x), add(x, y), add(y, mul(N(-1), x)), add(x, mul(N(-1), y)), pow(x, 2), pow(y, 2), mul(pow(x, 2), y), mul(x, pow(y, 2))];
+const lowHigh = (a: number, b: number): [number, number] => (a <= b ? [a, b] : [b, a]);
+
+const ORDER_CONDS: OrderCond[] = [
+  {
+    level: 1,
+    text: '0 < x < 1',
+    twoVar: false,
+    reps: [[0.5, 0], [0.25, 0]],
+    outside: [[2, 0], [-0.5, 0], [-2, 0]],
+    menu: SINGLE_MENU,
+    why: 'For a number between 0 and 1, each extra factor of $x$ makes the power smaller, and the reciprocal is larger than 1.',
+    inRegion: (a) => a > 0 && a < 1,
+    sample: (u) => [0.001 + 0.998 * u, 0],
+  },
+  {
+    level: 1,
+    text: '-1 < x < 0',
+    twoVar: false,
+    reps: [[-0.5, 0], [-0.25, 0]],
+    outside: [[0.5, 0], [-2, 0], [2, 0]],
+    menu: SINGLE_MENU,
+    why: 'Signs decide first: every negative number is less than every positive one, and among negative numbers the one farther from 0 is smaller.',
+    inRegion: (a) => a > -1 && a < 0,
+    sample: (u) => [-0.001 - 0.998 * u, 0],
+  },
+  {
+    level: 1,
+    text: 'x > 1',
+    twoVar: false,
+    reps: [[2, 0], [3, 0]],
+    outside: [[0.5, 0], [-2, 0], [-0.5, 0]],
+    menu: SINGLE_MENU,
+    why: 'For $x > 1$, a higher power is larger, and the reciprocal is between 0 and 1.',
+    inRegion: (a) => a > 1,
+    sample: (u) => [1.001 + 40 * u * u, 0],
+  },
+  {
+    level: 1,
+    text: 'x < -1',
+    twoVar: false,
+    reps: [[-2, 0], [-3, 0]],
+    outside: [[-0.5, 0], [2, 0], [0.5, 0]],
+    menu: SINGLE_MENU,
+    why: 'For $x < -1$, odd powers are negative and get more negative as the exponent grows, even powers are positive, and the reciprocal is between $-1$ and 0.',
+    inRegion: (a) => a < -1,
+    sample: (u) => [-1.001 - 40 * u * u, 0],
+  },
+  {
+    level: 2,
+    text: '0 < x < y < 1',
+    twoVar: true,
+    reps: [[0.25, 0.5], [0.5, 0.75]],
+    outside: [[2, 3], [-0.5, -0.25]],
+    menu: PAIR_MENU,
+    why: 'Both numbers are between 0 and 1 and $x < y$: a product of two such numbers is smaller than each, and dividing a smaller one by a larger one gives less than 1.',
+    inRegion: (a, b) => a > 0 && a < b && b < 1,
+    sample: (u, v) => lowHigh(0.001 + 0.998 * u, 0.001 + 0.998 * v),
+  },
+  {
+    level: 2,
+    text: 'x < y < 0',
+    twoVar: true,
+    reps: [[-3, -1], [-4, -2]],
+    outside: [[1, 3], [-0.5, -0.25]],
+    menu: PAIR_MENU,
+    why: 'Both numbers are negative and $x$ is farther from 0 than $y$, so $x - y$ is negative, $y - x$ is positive, and sums and products follow the signs.',
+    inRegion: (a, b) => a < b && b < 0,
+    sample: (u, v) => lowHigh(-0.01 - 30 * u * u, -0.01 - 30 * v * v),
+  },
+  {
+    level: 2,
+    text: '0 < x < y',
+    twoVar: true,
+    reps: [[1, 2], [2, 5]],
+    outside: [[-2, -1], [0.25, 0.5]],
+    menu: PAIR_MENU,
+    why: 'Both numbers are positive and $x < y$: the quotient $\\frac{x}{y}$ is below 1, $\\frac{y}{x}$ is above 1, and $y - x$ is positive.',
+    inRegion: (a, b) => a > 0 && a < b,
+    sample: (u, v) => lowHigh(0.01 + 20 * u * u, 0.01 + 20 * v * v),
+  },
+  {
+    level: 3,
+    text: '-1 < x < y < 0',
+    twoVar: true,
+    reps: [[-0.5, -0.25], [-0.75, -0.5]],
+    outside: [[-3, -2], [0.25, 0.5]],
+    menu: PAIR_MENU,
+    why: 'Both numbers are negative fractions with $x$ farther from 0: a product of two of them is positive and smaller than either size, and a quotient of the larger size over the smaller is more than 1.',
+    inRegion: (a, b) => a > -1 && a < b && b < 0,
+    sample: (u, v) => lowHigh(-0.001 - 0.998 * u, -0.001 - 0.998 * v),
+  },
+  {
+    level: 3,
+    text: 'x < 0 < y < 1',
+    twoVar: true,
+    reps: [[-2, 0.5], [-3, 0.25]],
+    outside: [[2, 0.5], [-2, 2]],
+    menu: PAIR_MENU,
+    why: 'Here $x$ is negative and $y$ is a positive fraction: multiplying $x$ by $y$ shrinks its size, so $xy$ lies between $x$ and 0.',
+    inRegion: (a, b) => a < 0 && b > 0 && b < 1,
+    sample: (u, v) => [-0.01 - 30 * u * u, 0.001 + 0.998 * v],
+  },
 ];
 
 interface OrderParams {
   c: number;
+  exprs: Ex[];
   perms: number[][];
 }
 
-const PERMS = [
-  [0, 1, 2],
-  [0, 2, 1],
-  [1, 0, 2],
-  [1, 2, 0],
-  [2, 0, 1],
-  [2, 1, 0],
-];
+const PERM_KEY = (p: number[]) => p.join('');
+const argsort = (vals: number[]) => [0, 1, 2].sort((i, j) => vals[i] - vals[j]);
 
-const orderText = (cs: OrderCase, p: number[]) => `$${p.map((i) => texEx(cs.exprs[i])).join(' < ')}$`;
+/** Values grid for deciding that the order of three expressions does not change over a region. */
+const GRID = [-30, -10, -4, -2, -1.5, -1.01, -0.99, -0.75, -0.5, -0.25, -0.1, -0.01, 0.01, 0.1, 0.25, 0.5, 0.75, 0.99, 1.01, 1.5, 2, 4, 10, 30];
+
+/** The common order of the three expressions over the region, or null when it changes or two values tie. */
+function constantOrder(cond: OrderCond, exprs: Ex[]): number[] | null {
+  let seen: string | null = null;
+  let any = false;
+  for (const a of GRID)
+    for (const b of cond.twoVar ? GRID : [0]) {
+      if (!cond.inRegion(a, b)) continue;
+      const vals = exprs.map((e) => evalEx(e, { x: a, y: b }));
+      const order = argsort(vals);
+      if (vals[order[0]] === vals[order[1]] || vals[order[1]] === vals[order[2]]) return null;
+      const key = PERM_KEY(order);
+      if (seen !== null && seen !== key) return null;
+      seen = key;
+      any = true;
+    }
+  return any && seen ? seen.split('').map(Number) : null;
+}
+
+const orderText = (exprs: Ex[], p: number[]) => `$${p.map((i) => texEx(exprs[i])).join(' < ')}$`;
 
 const orderMCS: Template<OrderParams> = {
   id: 'alg.inequalities.order-mcs',
@@ -646,74 +825,87 @@ const orderMCS: Template<OrderParams> = {
   format: 'mcs',
   style: 'order expressions when the variables lie in an interval',
   generate(rng, d) {
-    const pool = d === 1 ? [3, 5, 7, 6] : d === 2 ? [1, 3, 4, 5, 6, 7] : [0, 1, 2, 4];
-    const c = rng.pick(pool);
-    const cs = ORDER_CASES[c];
-    const env = { x: cs.rep[0], y: cs.rep[1] };
-    const vals = cs.exprs.map((e) => evalEx(e, env));
-    const correct = [0, 1, 2].sort((i, j) => vals[i] - vals[j]);
-    const byAbs = [0, 1, 2].sort((i, j) => Math.abs(vals[i]) - Math.abs(vals[j]));
-    const key = (p: number[]) => p.join('');
-    const others = rng.shuffle(PERMS.filter((p) => key(p) !== key(correct)));
-    // keep the magnitude ordering and the reversed ordering among the wrong choices
-    const rev = [...correct].reverse();
-    const preferred = [byAbs, rev].filter((p) => key(p) !== key(correct));
-    const wrong: number[][] = [];
-    for (const p of [...preferred, ...others]) if (wrong.length < 4 && !wrong.some((w) => key(w) === key(p))) wrong.push(p);
-    const all = rng.shuffle([correct, ...wrong]);
-    const choices: Choice[] = all.map((p) => ({
-      text: orderText(cs, p),
-      ...(key(p) === key(byAbs) && key(p) !== key(correct) ? { trap: 'alg-magnitude-vs-value' } : key(p) === key(rev) ? { trap: 'alg-order-reversed' } : {}),
-    }));
-    const names = cs.exprs.map((e) => `$${texEx(e)}$`);
-    const listNames = `${names[0]}, ${names[1]}, and ${names[2]}`;
-    const repText = cs.twoVar ? `$x = ${fracTex(cs.rep[0])}$ and $y = ${fracTex(cs.rep[1])}$` : `$x = ${fracTex(cs.rep[0])}$`;
-    const valueList = cs.exprs.map((e, i) => `$${texEx(e)} = ${fracTex(vals[i])}$`).join(', ');
-    return {
-      params: { c, perms: all },
-      q: {
-        format: 'mcs',
-        stem: `If $${cs.cond}$, which of the following lists ${listNames} in order from least to greatest?`,
-        choices,
-        answer: all.findIndex((p) => key(p) === key(correct)),
-        explanation: `Test values allowed by the condition, for example ${repText}: ${valueList}. So ${orderText(cs, correct)}.
+    for (;;) {
+      const pool = ORDER_CONDS.map((cs, i) => ({ cs, i })).filter(({ cs }) => cs.level === d);
+      const { cs, i: c } = rng.pick(pool);
+      const exprs = rng.sample(cs.menu, 3);
+      const order = constantOrder(cs, exprs);
+      if (!order) continue;
+      const [rx, ry] = cs.reps[0];
+      const vals = exprs.map((e) => evalEx(e, { x: rx, y: ry }));
+      if (PERM_KEY(argsort(vals)) !== PERM_KEY(order)) continue; // the shown test point must follow the common order
+      const key = PERM_KEY(order);
+      // Wrong lists, each one a slip.
+      const cands: { perm: number[]; trap: string; why: string }[] = [];
+      const add2 = (perm: number[], trap: string, why: string) => {
+        if (PERM_KEY(perm) === key || cands.some((k) => PERM_KEY(k.perm) === PERM_KEY(perm))) return;
+        cands.push({ perm, trap, why });
+      };
+      add2(argsort(vals.map((v) => Math.abs(v))), 'alg-magnitude-vs-value', 'ordering by size and ignoring the signs');
+      add2([...order].reverse(), 'alg-order-reversed', 'listing from greatest to least');
+      add2(argsort(vals.map((v) => -Math.abs(v))), 'alg-magnitude-vs-value', 'ordering by size, largest first');
+      for (const [ox, oy] of cs.outside)
+        add2(argsort(exprs.map((e) => evalEx(e, { x: ox, y: oy }))), 'alg-assumed-outside-interval', cs.twoVar ? `testing $x = ${fracTex(ox)}$ and $y = ${fracTex(oy)}$, which break the condition` : `testing $x = ${fracTex(ox)}$, which breaks the condition`);
+      if (cs.twoVar) add2(argsort(exprs.map((e) => evalEx(e, { x: ry, y: rx }))), 'alg-condition-reversed', 'reading the condition as $y < x$');
+      if (cands.length < 4) continue;
+      const wrong = rng.shuffle(cands).slice(0, 4);
+      const all = rng.shuffle([{ perm: order, trap: '', why: '' }, ...wrong]);
+      const choices: Choice[] = all.map((a) => ({ text: orderText(exprs, a.perm), ...(a.trap ? { trap: a.trap } : {}) }));
+      const names = exprs.map((e) => `$${texEx(e)}$`);
+      const listNames = `${names[0]}, ${names[1]}, and ${names[2]}`;
+      const where = (px0: number, py0: number) => (cs.twoVar ? `$x = ${fracTex(px0)}$ and $y = ${fracTex(py0)}$` : `$x = ${fracTex(px0)}$`);
+      const valueList = exprs.map((e, k) => `$${texEx(e)} = ${fracTex(vals[k])}$`).join(', ');
+      const [cx, cy] = cs.reps[1];
+      const vals2 = exprs.map((e) => evalEx(e, { x: cx, y: cy }));
+      // The first wrong list: a pair it puts in the wrong order.
+      const w0 = wrong[0];
+      let refute = '';
+      for (let a = 0; a + 1 < 3 && !refute; a++) {
+        const u = w0.perm[a];
+        const v = w0.perm[a + 1];
+        if (vals[u] > vals[v]) refute = `It puts $${texEx(exprs[u])}$ before $${texEx(exprs[v])}$, but at the test values $${texEx(exprs[u])} = ${fracTex(vals[u])}$ is greater than $${texEx(exprs[v])} = ${fracTex(vals[v])}$.`;
+      }
+      const explanation = `Test a value the condition allows, ${where(rx, ry)}: ${valueList}. So ${orderText(exprs, order)}.
 
-${
-          vals.some((v) => v < 0)
-            ? 'The order holds for every allowed value: signs decide first (every negative number is less than every positive one), and among negative numbers the one farther from 0 is smaller. Ordering by size alone, ignoring the signs, is the trap.'
-            : 'The order holds for every allowed value: for numbers between 0 and 1, multiplying by another such number makes a product smaller, and dividing by one makes a quotient larger.'
-        }`,
-      },
-    };
+${cs.why} Check with ${where(cx, cy)}: ${exprs.map((e, k) => `$${texEx(e)} = ${fracTex(vals2[k])}$`).join(', ')}, in the same order.
+
+Trap: ${w0.why} gives ${orderText(exprs, w0.perm)}. ${refute}
+
+Rule: test values the condition allows; compare signs before sizes.`;
+      return {
+        params: { c, exprs, perms: all.map((a) => a.perm) },
+        q: {
+          format: 'mcs',
+          stem: `If $${cs.text}$, which of the following lists ${listNames} in order from least to greatest?`,
+          choices,
+          answer: all.findIndex((a) => PERM_KEY(a.perm) === key),
+          explanation,
+        },
+      };
+    }
   },
-  check(q, { c, perms }, rng) {
+  check(q, { c, exprs, perms }, rng) {
     if (q.format !== 'mcs') return 'wrong format';
-    const cs = ORDER_CASES[c];
-    const [x1, x2, y1, y2] = cs.region;
+    const cs = ORDER_CONDS[c];
     const seen = new Set<string>();
     for (let i = 0; i < 400; i++) {
-      let xv: number;
-      let yv: number;
-      do {
-        xv = x1 + (x2 - x1) * rng.next();
-        yv = cs.twoVar ? y1 + (y2 - y1) * rng.next() : 0;
-      } while (xv === x1 || xv === x2 || (cs.twoVar && (yv === y1 || yv === y2 || (cs.cond.includes('x < y') && !(xv < yv)))));
-      const vals = cs.exprs.map((e) => evalEx(e, { x: xv, y: yv }));
-      const order = [0, 1, 2].sort((a, b) => vals[a] - vals[b]);
-      seen.add(order.join(''));
+      const [xv, yv] = cs.sample(rng.next(), rng.next());
+      if (!cs.inRegion(xv, yv)) continue;
+      const vals = exprs.map((e) => evalEx(e, { x: xv, y: yv }));
+      seen.add(argsort(vals).join(''));
     }
     if (seen.size !== 1) return `order not constant: ${[...seen]}`;
     const truth = [...seen][0];
     const idx = perms.findIndex((p) => p.join('') === truth);
-    if (perms.some((p, i) => q.choices[i].text !== orderText(cs, p))) return 'choice text mismatch';
+    if (perms.some((p, i) => q.choices[i].text !== orderText(exprs, p))) return 'choice text mismatch';
     return idx === q.answer ? null : `expected ${idx}`;
   },
 };
 
 function fracTex(v: number): string {
-  for (const dd of [1, 2, 3, 4, 8, 16, 32, 64]) {
+  for (let dd = 1; dd <= 4096; dd++) {
     const n = Math.round(v * dd);
-    if (Math.abs(n / dd - v) < 1e-12) return new Frac(n, dd).toTex();
+    if (Math.abs(n / dd - v) < 1e-12 * Math.max(1, Math.abs(v))) return new Frac(n, dd).toTex();
   }
   return num(v);
 }
