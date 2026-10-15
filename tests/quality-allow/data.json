@@ -72,15 +72,6 @@
   "data.interpretation.worktime-price": {
     "distractors.trapped": "baseline"
   },
-  "data.probability.choose-k": {
-    "distractors.trapped": "baseline"
-  },
-  "data.probability.single-draw": {
-    "distractors.trapped": "baseline"
-  },
-  "data.probability.without-replacement": {
-    "distractors.trapped": "baseline"
-  },
   "data.sets.percent-of-group": {
     "distractors.trapped": "baseline"
   },

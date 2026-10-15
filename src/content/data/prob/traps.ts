@@ -102,6 +102,18 @@ export const probTraps: Record<string, Trap> = {
     label: 'Mixed up "exactly one" and "at least one"',
     fix: '"At least one" also includes the cases where two or more happen. Exactly one of two events: $p(1 - q) + (1 - p)q$; at least one: $1 - (1 - p)(1 - q)$.',
   },
+  'prob-off-by-one': {
+    label: 'Miscounted the favorable items by one',
+    fix: 'Add the counts of exactly the colors asked for, and check the total with a quick sum before dividing.',
+  },
+  'prob-equally-likely': {
+    label: 'Treated the possibilities as equally likely',
+    fix: 'Two possible results are equally likely only when the counts say so. Use favorable $\\div$ total.',
+  },
+  'prob-excluded-one-color': {
+    label: 'Left out only one of the two colors',
+    fix: '"Neither A nor B" removes the items of both colors: subtract both counts from the total before dividing.',
+  },
   'prob-wrong-size': {
     label: 'Used a committee of the wrong size',
     fix: 'Use the number of members the committee has, in every factor: the sizes of the parts must add up to it.',

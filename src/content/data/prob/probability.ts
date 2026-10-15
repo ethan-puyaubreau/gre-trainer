@@ -1,10 +1,10 @@
-import { flaggedChoices, numericChoices, qcCompare, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { frac, Frac } from '../../../engine/frac';
-import { nCr, sum } from '../../../engine/math';
+import { factorial, nCr, nPr, sum } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import { decimal } from '../../../engine/tex';
 import type { Choice, NumberLineFigure, QCChoice, QCQuestion, TableFigure, Template } from '../../../engine/types';
-import { countCombinations, forEachCombination, mcmCheck, mcsCheck, neCheck, word } from './util';
+import { countCombinations, forEachCombination, mcmCheck, mcsCheck, neCheck, trapOnlyChoices, word } from './util';
 
 const SKILL = 'data.probability';
 const dtex = (f: Frac) => decimal(f);
@@ -60,7 +60,7 @@ const singleDraw: Template<DrawParams> = {
     let total: number;
     let fav: number;
     for (;;) {
-      const N0 = rng.pick(d === 1 ? [20, 25, 40, 50] : [20, 25, 40, 50, 60]);
+      const N0 = rng.pick([20, 25, 50]); // totals that divide 100, so every count over the total is an exact two-place decimal
       if (d === 3) {
         removed = rng.int(2, 8);
         counts = partition(rng, N0 + removed, m, 3);
@@ -77,45 +77,69 @@ const singleDraw: Template<DrawParams> = {
     }
     const correct = frac(fav, total);
     const exCount = sum(ex.map((i) => counts[i]));
-    const traps: { value: Frac; trap: string }[] = [];
-    const add = (v: Frac, trap: string) => {
-      if (v.sign() > 0 && v.lt(1) && twoPlaces(v)) traps.push({ value: v, trap });
+    const exNames = ex.map((i) => colors[i]);
+    const [c0, c1] = ex.map((i) => counts[i]);
+    const traps: { value: Frac; trap: string; why: (v: string) => string }[] = [];
+    // each wrong choice is the result of one mistake (only exact two-place decimals can be choices)
+    const add = (v: Frac, trap: string, why: (v: string) => string) => {
+      if (v.sign() > 0 && v.lt(1) && twoPlaces(v)) traps.push({ value: v, trap, why });
     };
+    const pct = (c: number) => `treating the count ${c} as ${c} percent`;
     if (d === 3) {
-      add(frac(sum(counts) - exCount, sum(counts)), 'prob-stale-total');
-      add(frac(fav, sum(counts)), 'prob-stale-total');
+      add(frac(sum(counts) - exCount, sum(counts)), 'prob-stale-total', (v) => `dividing by the original ${sum(counts)} gives $${v}$ and ignores the ${removed} ${ctx.items} removed`);
+      add(frac(fav, sum(counts)), 'prob-stale-total', (v) => `dividing by the original ${sum(counts)} gives $${v}$ and ignores the ${removed} ${ctx.items} removed`);
     }
     if (kind === 'either') {
-      add(frac(total - exCount, total), 'prob-wrong-event');
-      add(frac(exCount, 100), 'prob-count-as-percent');
+      add(frac(total - exCount, total), 'prob-wrong-event', (v) => `$${v}$ is the probability of the other colors`);
+      add(frac(exCount, 100), 'prob-count-as-percent', (v) => `${pct(exCount)} gives $${v}$`);
+      add(frac(c0, total), 'prob-missed-case', (v) => `counting only the ${exNames[0]} ${ctx.items} gives $${v}$ and leaves out the ${exNames[1]} ones`);
+      add(frac(c1, total), 'prob-missed-case', (v) => `counting only the ${exNames[1]} ${ctx.items} gives $${v}$ and leaves out the ${exNames[0]} ones`);
+      add(frac(c0 * c1, total * total), 'prob-and-vs-or', (v) => `multiplying the two probabilities gives $${v}$, which would be "both"; one ${ctx.item} cannot be two colors`);
+      add(frac(exCount, total - exCount), 'prob-wrong-denominator', (v) => `comparing the ${exCount} wanted ${ctx.items} with the ${total - exCount} others gives $${v}$ instead of dividing by all ${total}`);
+      add(frac(exCount + 1, total), 'prob-off-by-one', (v) => `$${v}$ counts ${exCount + 1} favorable ${ctx.items}, one too many`);
     } else {
-      add(frac(exCount, total), 'prob-wrong-event');
-      add(frac(exCount, 100), 'prob-count-as-percent');
-      add(frac(100 - exCount, 100), 'prob-count-as-percent');
+      add(frac(exCount, total), 'prob-wrong-event', (v) => `$${v}$ is the probability of the excluded color${kind === 'not' ? '' : 's'}`);
+      add(frac(exCount, 100), 'prob-count-as-percent', (v) => `${pct(exCount)} gives $${v}$`);
+      add(frac(100 - exCount, 100), 'prob-count-as-percent', (v) => `${pct(exCount)} and subtracting from 100 gives $${v}$`);
+      add(frac(exCount, fav), 'prob-wrong-denominator', (v) => `comparing the ${exCount} excluded ${ctx.items} with the ${fav} wanted ones gives $${v}$ instead of dividing by all ${total}`);
+      add(frac(fav + 1, total), 'prob-off-by-one', (v) => `$${v}$ counts ${fav + 1} favorable ${ctx.items}, one too many`);
+      if (kind === 'neither') {
+        add(frac(total - c0, total), 'prob-excluded-one-color', (v) => `leaving out only the ${exNames[0]} ${ctx.items} gives $${v}$ and still counts the ${exNames[1]} ones`);
+        add(frac(total - c1, total), 'prob-excluded-one-color', (v) => `leaving out only the ${exNames[1]} ${ctx.items} gives $${v}$ and still counts the ${exNames[0]} ones`);
+        add(frac(c0, total), 'prob-wrong-event', (v) => `$${v}$ is the probability of drawing a ${exNames[0]} ${ctx.item} only`);
+        add(frac(c1, total), 'prob-wrong-event', (v) => `$${v}$ is the probability of drawing a ${exNames[1]} ${ctx.item} only`);
+        add(frac(total - c0, total).mul(frac(total - c1, total)), 'prob-assume-independent', (v) => `multiplying the two "not" probabilities gives $${v}$, but one draw is not two independent draws`);
+      }
     }
-    const fillers = [...[1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8].map((k) => correct.add(frac(k, 20))), ...[1, -1, 2, -2, 3, -3, 4, -4].map((k) => correct.add(frac(k, 100)))].filter(
-      (v) => v.sign() > 0 && v.lt(1),
-    );
-    const { choices, answer } = numericChoices(rng, { correct, traps, fillers, format: (v) => `$${v.toNumber().toFixed(2)}$` });
+    add(frac(1, 2), 'prob-equally-likely', (v) => `treating "it happens or it does not" as equally likely gives $${v}$`);
+    const built = trapOnlyChoices(rng, correct, rng.shuffle(traps), (v) => `$${v.toNumber().toFixed(2)}$`);
+    if (!built) return singleDraw.generate(rng, d);
+    const cite = rng.pick(built.used);
 
     const list = colors.map((c, i) => `${counts[i]} are ${c}`);
     const listText = `${list.slice(0, -1).join(', ')}, and ${list[m - 1]}`;
-    const exNames = ex.map((i) => colors[i]);
     const event = kind === 'not' ? `not ${exNames[0]}` : kind === 'neither' ? `neither ${exNames[0]} nor ${exNames[1]}` : `either ${exNames[0]} or ${exNames[1]}`;
     const removal = d === 3 ? ` First, ${removed} of the ${colors[removeFrom]} ${ctx.items} are removed from the ${ctx.container}. Then one of the remaining ${ctx.items} is to be chosen at random.` : ` One ${ctx.item} is to be chosen at random from the ${ctx.container}.`;
     const stem = `A ${ctx.container} contains ${sum(counts)} ${ctx.items}, of which ${listText}.${removal} What is the probability that the ${ctx.item} chosen will be ${event}?`;
     const exPart = ex.map((i) => counts[i]).join(' + ');
+    const exLine = ex.length === 1 ? `There are ${exCount} ${exNames[0]} ${ctx.items}` : `${cap(exNames.join(' or '))}: $${exPart} = ${exCount}$`;
     const explanation =
       kind === 'either'
-        ? `${cap(exNames.join(' or '))}: $${exPart} = ${exCount}$ of the ${total} ${ctx.items}, so the probability is $\\frac{${exCount}}{${total}} = ${correct.toNumber().toFixed(2)}$.
+        ? `One draw, so the probability is the wanted items over all items. ${exLine} of the ${total} ${ctx.items}, so the probability is $\\frac{${exCount}}{${total}} = ${correct.toNumber().toFixed(2)}$.
 
-$${frac(total - exCount, total).toNumber().toFixed(2)}$ is the probability of the other colors.`
-        : `${d === 3 ? `After the removal, ${sum(counts)} $-$ ${removed} = ${total} ${ctx.items} remain. ` : ''}${cap(exNames.join(' or '))}: $${exPart} = ${exCount}$, so ${kind === 'not' ? `not ${exNames[0]}` : `neither of them`}: $${total} - ${exCount} = ${fav}$. The probability is $\\frac{${fav}}{${total}} = ${correct.toNumber().toFixed(2)}$.
+Check: the other colors are $${total - exCount}$ of the ${total}, and $${exCount} + ${total - exCount} = ${total}$.
 
-$\\frac{${exCount}}{${total}}$ is the probability of the excluded ${kind === 'not' ? 'color' : 'colors'}, and $${frac(exCount, 100).toNumber().toFixed(2)}$ treats a count of ${exCount} as ${exCount} percent.${
-            d === 3 ? ` Dividing by ${sum(counts)} ignores the ${removed} ${ctx.items} that were removed.` : ''
-          }`;
-    return { params: { colors, counts, kind, ex, removeFrom, removed }, q: { format: 'mcs', stem, choices, answer, explanation } };
+Trap: ${cite.why(cite.value.toNumber().toFixed(2))}.
+
+The denominator is the number of ${ctx.items} that can be drawn.`
+        : `One draw, so the probability is the wanted items over all items. ${d === 3 ? `After the removal, ${sum(counts)} $-$ ${removed} = ${total} ${ctx.items} remain. ` : ''}${exLine}, so ${kind === 'not' ? `not ${exNames[0]}` : `neither of them`}: $${total} - ${exCount} = ${fav}$. The probability is $\\frac{${fav}}{${total}} = ${correct.toNumber().toFixed(2)}$.
+
+Check: $${fav} + ${exCount} = ${total}$, all the ${ctx.items} left.
+
+Trap: ${cite.why(cite.value.toNumber().toFixed(2))}.
+
+The denominator is the number of ${ctx.items} that can be drawn.`;
+    return { params: { colors, counts, kind, ex, removeFrom, removed }, q: { format: 'mcs', stem, choices: built.choices, answer: built.answer, explanation } };
   },
   check(q, { colors, counts, kind, ex, removeFrom, removed }) {
     // Build the actual items, remove, then count.
@@ -270,6 +294,8 @@ $\\frac{11}{36}$ also counts the outcome where both dice show ${face}.`;
       if (ask === 'exactly-one') traps.push({ value: frac(11, 36), trap: 'prob-exactly-vs-at-least' });
       else traps.push({ value: frac(1, 36), trap: 'prob-and-vs-or' });
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((t) => t.value.eq(answer!))) return independent.generate(rng, d);
     return {
       params: { mode, ps, ask, n },
       q: {
@@ -277,7 +303,7 @@ $\\frac{11}{36}$ also counts the outcome where both dice show ${face}.`;
         stem: stem + (fractionBoxes ? '\n\nGive your answer as a fraction.' : ''),
         answer: answer!,
         ...(fractionBoxes ? { fractionBoxes: true } : {}),
-        traps: traps.filter((t) => !t.value.eq(answer!) && t.value.sign() > 0),
+        traps: traps.filter((t) => t.value.sign() > 0),
         explanation,
       },
     };
@@ -349,54 +375,84 @@ const withoutReplacement: Template<WRParams> = {
     const n = a + b;
     const ask: WRAsk = d === 1 ? 'both-a' : d === 2 ? rng.pick(['one-each', 'both-a', 'one-each'] as const) : rng.pick(['at-least-one-b', 'same'] as const);
     const pairs = n * (n - 1);
-    const traps: { value: Frac; trap: string }[] = [];
+    const traps: { value: Frac; trap: string; why: (v: string) => string }[] = [];
+    const T = (value: Frac, trap: string, why: (v: string) => string) => traps.push({ value, trap, why });
+    const sq = (v: string) => `$${v}$`;
     let correct: Frac;
     let stem = '';
     let explanation = '';
+    let check = '';
     const useB = ask === 'both-a' && rng.chance(0.4);
     if (ask === 'both-a') {
       const k = useB ? b : a;
+      const m = n - k;
       const label = useB ? ctx.B : ctx.A;
       correct = frac(k * (k - 1), pairs);
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.both(label)}?`;
-      traps.push({ value: frac(k * k, n * n), trap: 'prob-with-replacement' }, { value: frac(k, n), trap: 'prob-one-draw' });
-      explanation = `First draw: $\\frac{${k}}{${n}}$. Once ${useB ? ctx.B1 : ctx.A1} is gone, ${k - 1} of the remaining ${n - 1} are of that kind, so the second draw: $\\frac{${k - 1}}{${n - 1}}$. Multiply: $\\frac{${k}}{${n}} \\times \\frac{${k - 1}}{${n - 1}} = ${correct.toTex()}$.
-
-$\\left(\\frac{${k}}{${n}}\\right)^2$ assumes the first one is put back.`;
+      T(frac(k * k, n * n), 'prob-with-replacement', (v) => `putting the first one back gives ${sq(v)}, but the first one is not replaced`);
+      T(frac(k, n), 'prob-one-draw', (v) => `${sq(v)} is the probability of the first draw only`);
+      T(frac(k - 1, n - 1), 'prob-one-draw', (v) => `${sq(v)} is the probability of the second draw only`);
+      T(frac(k * (k - 1), n * n), 'prob-stale-total', (v) => `keeping ${n} in the second denominator gives ${sq(v)}, but one ${ctx.items === 'members' ? 'member' : ctx.items.slice(0, -1)} is gone`);
+      T(frac(k * k, pairs), 'prob-stale-total', (v) => `keeping ${k} in the second numerator gives ${sq(v)}, but one of the ${label} is gone`);
+      T(frac(m * (m - 1), pairs), 'prob-wrong-event', (v) => `${sq(v)} is the probability that both are of the other kind`);
+      explanation = `First draw: $\\frac{${k}}{${n}}$. Once ${useB ? ctx.B1 : ctx.A1} is gone, ${k - 1} of the remaining ${n - 1} are of that kind, so the second draw: $\\frac{${k - 1}}{${n - 1}}$. Multiply: $\\frac{${k}}{${n}} \\times \\frac{${k - 1}}{${n - 1}} = ${correct.toTex()}$.`;
+      check = `${k} of ${n} can start, then ${k - 1} of ${n - 1}: $${k} \\times ${k - 1} = ${k * (k - 1)}$ favorable ordered pairs out of $${n} \\times ${n - 1} = ${pairs}$.`;
     } else if (ask === 'one-each') {
       correct = frac(2 * a * b, pairs);
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.oneEach}?`;
-      traps.push({ value: frac(a * b, pairs), trap: 'prob-one-order' }, { value: frac(2 * a * b, n * n), trap: 'prob-with-replacement' });
-      explanation = `Two orders work: ${ctx.A1} then ${ctx.B1}, $\\frac{${a}}{${n}} \\times \\frac{${b}}{${n - 1}}$, or ${ctx.B1} then ${ctx.A1}, $\\frac{${b}}{${n}} \\times \\frac{${a}}{${n - 1}}$. Total: $2 \\times \\frac{${a * b}}{${pairs}} = ${correct.toTex()}$.
-
-$${frac(a * b, pairs).toTex()}$ counts only one of the two orders.`;
+      T(frac(a * b, pairs), 'prob-one-order', (v) => `${sq(v)} counts only one of the two orders`);
+      T(frac(2 * a * b, n * n), 'prob-with-replacement', (v) => `putting the first one back gives ${sq(v)}, but the first one is not replaced`);
+      T(frac(a * b, n * n), 'prob-with-replacement', (v) => `putting the first one back and counting one order gives ${sq(v)}`);
+      T(frac(a * (a - 1) + b * (b - 1), pairs), 'prob-wrong-event', (v) => `${sq(v)} is the probability that the two are of the same kind`);
+      T(frac(a, n).mul(frac(b, n - 1)).add(frac(a, n)), 'prob-missed-case', (v) => `adding the probability of a first ${ctx.A === 'women' ? 'woman' : ctx.A} draw gives ${sq(v)}, which mixes two events`);
+      explanation = `Two orders work: ${ctx.A1} then ${ctx.B1}, $\\frac{${a}}{${n}} \\times \\frac{${b}}{${n - 1}}$, or ${ctx.B1} then ${ctx.A1}, $\\frac{${b}}{${n}} \\times \\frac{${a}}{${n - 1}}$. Total: $2 \\times \\frac{${a * b}}{${pairs}} = ${correct.toTex()}$.`;
+      check = `one-each ordered pairs $${a} \\times ${b} + ${b} \\times ${a} = ${2 * a * b}$, and same-kind pairs $${a * (a - 1) + b * (b - 1)}$, add up to $${pairs}$.`;
     } else if (ask === 'at-least-one-b') {
       correct = frac(1).sub(frac(a * (a - 1), pairs));
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.atLeast}?`;
-      traps.push({ value: frac(1).sub(frac(a * a, n * n)), trap: 'prob-with-replacement' }, { value: frac(b * (b - 1), pairs), trap: 'prob-and-vs-or' }, { value: frac(a * (a - 1), pairs), trap: 'prob-wrong-event' });
-      explanation = `Use the complement. No ${ctx.B === 'blue' ? 'blue marble' : ctx.B === 'men' ? 'man' : 'defective bulb'} means both are ${ctx.A}: $\\frac{${a}}{${n}} \\times \\frac{${a - 1}}{${n - 1}} = ${frac(a * (a - 1), pairs).toTex()}$. So the probability is $1 - ${frac(a * (a - 1), pairs).toTex()} = ${correct.toTex()}$.
-
-$${frac(b * (b - 1), pairs).toTex()}$ is the probability that both are ${ctx.B}, only one of the ways to get at least one.`;
+      T(frac(1).sub(frac(a * a, n * n)), 'prob-with-replacement', (v) => `putting the first one back gives ${sq(v)}, but the first one is not replaced`);
+      T(frac(b * (b - 1), pairs), 'prob-and-vs-or', (v) => `${sq(v)} is the probability that both are ${ctx.B}, only one of the ways to get at least one`);
+      T(frac(a * (a - 1), pairs), 'prob-wrong-event', (v) => `${sq(v)} is the probability of the complement: none of ${ctx.B}`);
+      T(frac(b, n), 'prob-one-draw', (v) => `${sq(v)} is the probability that the first draw is ${ctx.B}`);
+      T(frac(b * (b - 1) + a * b, pairs), 'prob-missed-case', (v) => `${sq(v)} leaves out the order ${ctx.B1} then ${ctx.A1}`);
+      T(frac(2 * b, n), 'prob-add-probabilities', (v) => `adding $\\frac{${b}}{${n}}$ twice gives ${sq(v)}, which counts the case of two ${ctx.B} twice`);
+      explanation = `Use the complement. No ${ctx.B === 'blue' ? 'blue marble' : ctx.B === 'men' ? 'man' : 'defective bulb'} means both are ${ctx.A}: $\\frac{${a}}{${n}} \\times \\frac{${a - 1}}{${n - 1}} = ${frac(a * (a - 1), pairs).toTex()}$. So the probability is $1 - ${frac(a * (a - 1), pairs).toTex()} = ${correct.toTex()}$.`;
+      check = `${ctx.B} twice, ${ctx.B} then ${ctx.A}, ${ctx.A} then ${ctx.B}: $${b * (b - 1)} + ${a * b} + ${a * b} = ${b * (b - 1) + 2 * a * b}$ out of $${pairs}$.`;
     } else {
       correct = frac(a * (a - 1) + b * (b - 1), pairs);
       stem = `${ctx.setup(a, b)} What is the probability that ${ctx.same}?`;
-      traps.push({ value: frac(a * (a - 1), pairs), trap: 'prob-missed-case' }, { value: frac(a * a + b * b, n * n), trap: 'prob-with-replacement' });
-      explanation = `Add the two cases. Both ${ctx.A}: $\\frac{${a}}{${n}} \\times \\frac{${a - 1}}{${n - 1}} = \\frac{${a * (a - 1)}}{${pairs}}$. Both ${ctx.B}: $\\frac{${b}}{${n}} \\times \\frac{${b - 1}}{${n - 1}} = \\frac{${b * (b - 1)}}{${pairs}}$. Total: $\\frac{${a * (a - 1) + b * (b - 1)}}{${pairs}} = ${correct.toTex()}$.
-
-$${frac(a * (a - 1), pairs).toTex()}$ is only the first case.`;
+      T(frac(a * (a - 1), pairs), 'prob-missed-case', (v) => `${sq(v)} is only the case of two ${ctx.A}`);
+      T(frac(b * (b - 1), pairs), 'prob-missed-case', (v) => `${sq(v)} is only the case of two ${ctx.B}`);
+      T(frac(a * a + b * b, n * n), 'prob-with-replacement', (v) => `putting the first one back gives ${sq(v)}, but the first one is not replaced`);
+      T(frac(2 * a * b, pairs), 'prob-wrong-event', (v) => `${sq(v)} is the probability that the two are different`);
+      T(frac(a * (a - 1) + b * (b - 1), n * n), 'prob-stale-total', (v) => `keeping ${n} in the second denominator gives ${sq(v)}, but one is gone`);
+      explanation = `Add the two cases. Both ${ctx.A}: $\\frac{${a}}{${n}} \\times \\frac{${a - 1}}{${n - 1}} = \\frac{${a * (a - 1)}}{${pairs}}$. Both ${ctx.B}: $\\frac{${b}}{${n}} \\times \\frac{${b - 1}}{${n - 1}} = \\frac{${b * (b - 1)}}{${pairs}}$. Total: $\\frac{${a * (a - 1) + b * (b - 1)}}{${pairs}} = ${correct.toTex()}$.`;
+      check = `same-kind and different-kind probabilities add up to 1: $${correct.toTex()} + ${frac(2 * a * b, pairs).toTex()}$.`;
     }
-    const fillers = rng
-      .shuffle([frac(a * (a - 1), pairs), frac(b * (b - 1), pairs), frac(a, n), frac(b, n), frac(a * b, pairs), frac(1, 2), frac(a * a, n * n)])
-      .concat(Array.from({ length: n - 1 }, (_, k) => frac(k + 1, n)), Array.from({ length: n - 2 }, (_, k) => frac(k + 1, n - 1)))
-      .concat([frac(1, 2), frac(1, 3), frac(2, 3), frac(1, 4), frac(3, 4)].map((f) => correct!.mul(f)), [frac(1, 2), frac(1, 3), frac(1, 4), frac(2, 3), frac(3, 4), frac(1, 5), frac(4, 5)].map((f) => correct!.add(frac(1).sub(correct!).mul(f))))
-      .filter((v) => v.sign() > 0 && v.lt(1));
-    const { choices, answer } = numericChoices(rng, {
-      correct: correct!,
-      traps: traps.filter((t) => t.value.sign() > 0 && t.value.lt(1)),
-      fillers,
-      format: (v) => `$${v.toTex()}$`,
-    });
-    return { params: { a, b, ask, useB }, q: { format: 'mcs', stem, choices, answer, explanation } };
+    const built = trapOnlyChoices(
+      rng,
+      correct,
+      rng.shuffle(traps.filter((t) => t.value.sign() > 0 && t.value.lt(1))),
+      (v) => `$${v.toTex()}$`,
+    );
+    if (!built) return withoutReplacement.generate(rng, d);
+    const cite = rng.pick(built.used);
+    return {
+      params: { a, b, ask, useB },
+      q: {
+        format: 'mcs',
+        stem,
+        choices: built.choices,
+        answer: built.answer,
+        explanation: `${explanation}
+
+Check: ${check}
+
+Trap: ${cite.why(cite.value.toTex())}.
+
+Without replacement, every later draw is made from a smaller group.`,
+      },
+    };
   },
   check(q, { a, b, ask, useB }) {
     const n = a + b;
@@ -501,42 +557,68 @@ const chooseK: Template<ChooseParams> = {
       let fav = 0;
       let favText = '';
       let correct: Frac;
-      const traps: { value: Frac; trap: string }[] = [];
+      const traps: { value: Frac; trap: string; why: (v: string) => string }[] = [];
+      const T = (value: Frac, trap: string, why: (v: string) => string) => traps.push({ value, trap, why });
+      const sq = (v: string) => `$${v}$`;
+      const ordered = nCr(total, p.k) * factorial(p.k); // ordered selections of k points
       if (p.ask === 'all-pos') {
         fav = nCr(pos, 3);
         favText = `all three from the ${pos} points with positive coordinates: $\\binom{${pos}}{3} = ${fav}$`;
         stem = `${word(total).replace(/^./, (c) => c.toUpperCase())} points are shown on the number line above. If 3 of the ${total} points are to be chosen at random, what is the probability that all 3 points chosen will have positive coordinates?`;
-        traps.push({ value: frac(pos ** 3, total ** 3), trap: 'prob-with-replacement' }, { value: frac(pos, total), trap: 'prob-one-draw' }, { value: frac(1, all), trap: 'prob-missed-case' });
+        T(frac(pos ** 3, total ** 3), 'prob-with-replacement', (v) => `putting each point back gives ${sq(v)}, but the points are not replaced`);
+        T(frac(pos, total), 'prob-one-draw', (v) => `${sq(v)} is the probability for one point only`);
+        T(frac(1, all), 'prob-missed-case', (v) => `${sq(v)} counts one favorable choice, but there are ${fav}`);
+        T(frac(fav, ordered), 'prob-order-matters', (v) => `dividing by the ${ordered} ordered selections gives ${sq(v)}, but the favorable choices were counted without order`);
+        T(frac(nPr(pos, 3), all), 'prob-order-matters', (v) => `counting ordered favorable selections gives ${sq(v)}, but the total was counted without order`);
+        T(frac(fav, nCr(total, 2)), 'prob-wrong-denominator', (v) => `dividing by $\\binom{${total}}{2}$ gives ${sq(v)}, but 3 points are chosen, not 2`);
       } else if (p.ask === 'exactly-two-pos') {
         fav = nCr(pos, 2) * neg;
         favText = `2 of the ${pos} positive points and 1 of the ${neg} negative points: $\\binom{${pos}}{2} \\times ${neg} = ${fav}$`;
         stem = `${word(total).replace(/^./, (c) => c.toUpperCase())} points are shown on the number line above. If 3 of the ${total} points are to be chosen at random, what is the probability that exactly 2 of the points chosen will have positive coordinates?`;
-        traps.push({ value: frac(nCr(pos, 2), all), trap: 'prob-missed-factor' }, { value: frac(3 * pos * pos * neg, total ** 3), trap: 'prob-with-replacement' });
+        T(frac(nCr(pos, 2), all), 'prob-missed-factor', (v) => `${sq(v)} leaves out the choice of the negative point`);
+        T(frac(3 * pos * pos * neg, total ** 3), 'prob-with-replacement', (v) => `putting each point back gives ${sq(v)}, but the points are not replaced`);
+        T(frac(pos * neg, all), 'prob-missed-factor', (v) => `choosing 1 positive point instead of 2 gives ${sq(v)}`);
+        T(frac(nPr(pos, 2) * neg, all), 'prob-order-matters', (v) => `counting ordered pairs of positive points gives ${sq(v)}, but order does not matter`);
+        T(frac(fav + nCr(pos, 3), all), 'prob-exactly-vs-at-least', (v) => `counting at least 2 positive points gives ${sq(v)}, which includes all 3`);
+        T(frac(fav, nCr(total, 2)), 'prob-wrong-denominator', (v) => `dividing by $\\binom{${total}}{2}$ gives ${sq(v)}, but 3 points are chosen, not 2`);
       } else if (p.ask === 'product-neg') {
         fav = pos * neg;
         favText = `one positive and one negative point: $${pos} \\times ${neg} = ${fav}$`;
         stem = `${word(total).replace(/^./, (c) => c.toUpperCase())} points are shown on the number line above. If 2 of the ${total} points are to be chosen at random, what is the probability that the product of their coordinates will be negative?`;
-        traps.push({ value: frac(2 * pos * neg, all), trap: 'prob-order-matters' }, { value: frac(pos * neg, total * total), trap: 'prob-with-replacement' }, { value: frac(nCr(neg, 2) + nCr(pos, 2), all), trap: 'prob-wrong-event' });
+        T(frac(2 * pos * neg, all), 'prob-order-matters', (v) => `counting both orders gives ${sq(v)}, but the pair was already counted without order`);
+        T(frac(pos * neg, total * total), 'prob-with-replacement', (v) => `putting each point back gives ${sq(v)}, but the points are not replaced`);
+        T(frac(nCr(neg, 2) + nCr(pos, 2), all), 'prob-wrong-event', (v) => `${sq(v)} is the probability that the product is positive`);
+        T(frac(fav, ordered), 'prob-order-matters', (v) => `dividing by the ${ordered} ordered pairs gives ${sq(v)}, but the favorable pairs were counted without order`);
+        T(frac(neg, total), 'prob-one-draw', (v) => `${sq(v)} is the probability that one point is negative`);
+        T(frac(fav, nCr(total, 3)), 'prob-wrong-denominator', (v) => `dividing by $\\binom{${total}}{3}$ gives ${sq(v)}, but 2 points are chosen, not 3`);
       } else {
         fav = nCr(pos, 2);
         favText = `both from the ${pos} points with positive coordinates: $\\binom{${pos}}{2} = ${fav}$`;
         stem = `${word(total).replace(/^./, (c) => c.toUpperCase())} points are shown on the number line above. If 2 of the ${total} points are to be chosen at random, what is the probability that neither of the points chosen will have a negative coordinate?`;
-        traps.push({ value: frac(pos * pos, total * total), trap: 'prob-with-replacement' }, { value: frac(1).sub(frac(fav, all)), trap: 'prob-wrong-event' });
+        T(frac(pos * pos, total * total), 'prob-with-replacement', (v) => `putting each point back gives ${sq(v)}, but the points are not replaced`);
+        T(frac(1).sub(frac(fav, all)), 'prob-wrong-event', (v) => `${sq(v)} is the probability that at least one point is negative`);
+        T(frac(nCr(neg, 2), all), 'prob-wrong-event', (v) => `${sq(v)} is the probability that both points are negative`);
+        T(frac(fav, ordered), 'prob-order-matters', (v) => `dividing by the ${ordered} ordered pairs gives ${sq(v)}, but the favorable pairs were counted without order`);
+        T(frac(pos, total), 'prob-one-draw', (v) => `${sq(v)} is the probability for one point only`);
+        T(frac(fav, nCr(total, 3)), 'prob-wrong-denominator', (v) => `dividing by $\\binom{${total}}{3}$ gives ${sq(v)}, but 2 points are chosen, not 3`);
       }
       correct = frac(fav, all);
+      const built = trapOnlyChoices(
+        rng,
+        correct,
+        rng.shuffle(traps.filter((t) => t.value.sign() > 0 && t.value.lt(1))),
+        (v) => `$${v.toTex()}$`,
+      );
+      if (!built) return chooseK.generate(rng, d);
+      const cite = rng.pick(built.used);
       explanation = `All choices of ${p.k} points out of ${total}: $\\binom{${total}}{${p.k}} = ${all}$, all equally likely. Favorable: ${favText}. Probability: $\\frac{${fav}}{${all}}${frac(fav, all).d !== all ? ` = ${correct.toTex()}` : ''}$.
 
-The points are chosen without replacement, so the probability is not a power like $\\left(\\frac{${pos}}{${total}}\\right)^{${p.k}}$.`;
-      const fillers = [
-        correct.mul(2),
-        correct.mul(frac(1, 2)),
-        frac(1, 2),
-        ...Array.from({ length: all - 1 }, (_, k) => frac(k + 1, all)),
-        ...[frac(1, 3), frac(2, 3), frac(1, 4)].map((f) => correct.mul(f)),
-        ...[frac(1, 2), frac(1, 3), frac(2, 3)].map((f) => correct.add(frac(1).sub(correct).mul(f))),
-      ].filter((v) => v.sign() > 0 && v.lt(1));
-      const { choices, answer } = numericChoices(rng, { correct, traps: traps.filter((t) => t.value.sign() > 0 && t.value.lt(1)), fillers, format: (v) => `$${v.toTex()}$` });
-      return { params: p, q: { format: 'mcs', stem, figure, choices, answer, explanation } };
+Check: the favorable choices cannot outnumber the ${all} possible ones, and $\\frac{${fav}}{${all}}$ is between 0 and 1.
+
+Trap: ${cite.why(cite.value.toTex())}.
+
+The points are chosen without replacement: favorable choices over all choices, both counted the same way.`;
+      return { params: p, q: { format: 'mcs', stem, figure, choices: built.choices, answer: built.answer, explanation } };
     }
     // trait: expression choices
     const ctx = rng.pick(TRAIT_CTX);
@@ -544,9 +626,9 @@ The points are chosen without replacement, so the probability is not a power lik
     let t: number;
     let r: number;
     do {
-      N = rng.int(8, 12);
-      t = rng.int(2, 4);
-      r = rng.int(3, 4);
+      N = d === 3 ? rng.int(11, 15) : rng.int(8, 10);
+      t = d === 3 ? rng.int(3, 5) : rng.int(2, 3);
+      r = d === 3 ? rng.int(4, 6) : rng.int(3, 4);
     } while (t === r || t + r === N || r > N - t);
     p.N = N;
     p.t = t;
@@ -561,9 +643,9 @@ The points are chosen without replacement, so the probability is not a power lik
         { rc: ratio([[t, 1]], [N, r]), trap: 'prob-missed-factor' },
         { rc: ratio([[t, 1], [N - t, r - 1]], [N, t]), trap: 'prob-wrong-denominator' },
         { rc: { kind: 'binomial', r, p: [t, N], x: 1, complement: false }, trap: 'prob-with-replacement' },
-        { rc: ratio([[t, 1], [N - t, r]], [N, r]) },
+        { rc: ratio([[t, 1], [N - t, r]], [N, r]), trap: 'prob-wrong-size' },
         { rc: ratio([[N - t, r - 1]], [N, r]), trap: 'prob-missed-factor' },
-        { rc: ratio([[t, 2], [N - t, r - 2]], [N, r]) },
+        { rc: ratio([[t, 2], [N - t, r - 2]], [N, r]), trap: 'prob-wrong-event' },
         { rc: ratio([[t, 1]], [N, 1]), trap: 'prob-one-draw' },
       );
       stem = `${ctx.setup(N, t)} If ${r} of the ${N} ${ctx.items} are to be selected at random, without replacement, what is the probability that exactly 1 of the ${r} ${ctx.items} selected ${ctx.has}?`;
@@ -576,7 +658,7 @@ Dropping the factor $\\binom{${N - t}}{${r - 1}}$ forgets that the other ${r - 1
         { rc: ratio([[N - t, r]], [N, r]), trap: 'prob-wrong-event' },
         { rc: ratio([[t, 1]], [N, r]), trap: 'prob-missed-case' },
         { rc: { kind: 'binomial', r, p: [t, N], x: 0, complement: true }, trap: 'prob-with-replacement' },
-        { rc: ratio([[t, r]], [N, r], true) },
+        ...(t >= r ? [{ rc: ratio([[t, r]], [N, r], true), trap: 'prob-wrong-event' }] : []),
         { rc: ratio([[t, 1], [N - t, r - 1]], [N, r]), trap: 'prob-exactly-vs-at-least' },
         { rc: ratio([[t, 1], [N - 1, r - 1]], [N, r]), trap: 'prob-at-least-one-overcount' },
         { rc: ratio([[t, 1]], [N, 1]), trap: 'prob-one-draw' },
@@ -738,6 +820,8 @@ $\\frac{${cell}}{${grand}}$ divides by everyone instead of the given group, and 
 
 $\\frac{${colOthers}}{${grand}}$ divides by all ${grand} ${u}s instead of the ${restT} who meet the condition.`;
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((t) => t.value.eq(answer!))) return twoWayTable.generate(rng, d);
     return {
       params: { rows, cols, cells, ask, r, c },
       q: {
@@ -746,7 +830,7 @@ $\\frac{${colOthers}}{${grand}}$ divides by all ${grand} ${u}s instead of the ${
         stem: `The table shows the distribution of ${grand} ${u}s.\n\n${stem}\n\nGive your answer as a fraction.`,
         answer: answer!,
         fractionBoxes: true,
-        traps: traps.filter((t) => !t.value.eq(answer!)).filter((t, i, arr) => arr.findIndex((x) => x.value.eq(t.value)) === i),
+        traps: traps.filter((t, i, arr) => arr.findIndex((x) => x.value.eq(t.value)) === i),
         explanation,
       },
     };
