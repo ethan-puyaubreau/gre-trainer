@@ -78,7 +78,7 @@ const factorSum: Template<Params> = {
     const values = choices.map((c) => [value, ...picked.map((w) => w.v)].find((v) => `$${num(v)}$` === c.text)!);
     const op = sign > 0 ? '+' : '-';
     const top = sign > 0 && rng.chance(0.5) ? `${term(c, B, y)} + ${term(a, B, x)}` : `${term(a, B, x)} ${op} ${term(c, B, y)}`;
-    const frame = rng.pick(['What is the value of', 'Evaluate', 'What is the value of the expression']);
+    const frame = rng.pick(['What is the value of', 'What is the value of the expression']);
     const numerator = a * B ** x + sign * c * B ** y;
     const slipText: Record<string, string> = {
       'int-divide-first-term-only': 'dividing only the first term by the denominator',
