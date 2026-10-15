@@ -80,12 +80,12 @@ const triples: Template<Params> = {
   format: 'mcm',
   style: 'which sets of three lengths can be the sides of a right triangle',
   generate(rng, d) {
-    const nTrue = rng.int(1, 3);
+    const nTrue = d === 1 ? rng.int(1, 2) : d === 2 ? rng.int(2, 3) : rng.int(1, 3);
     const nFalse = 6 - nTrue;
     const trueItems: Item[] = [];
     const falseItems: Item[] = [];
     const intTriple = (maxScale: number) => {
-      const [a, b, c] = rng.pick(INT_TRIPLES);
+      const [a, b, c] = rng.pick(d === 1 ? INT_TRIPLES.slice(0, 4) : INT_TRIPLES);
       const k = rng.int(1, Math.min(maxScale, Math.floor(45 / c) || 1));
       return [a * k, b * k, c * k] as [number, number, number];
     };
