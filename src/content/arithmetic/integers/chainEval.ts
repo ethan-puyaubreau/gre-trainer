@@ -89,7 +89,7 @@ const SHAPES: Record<string, Shape> = {
       alts: [
         { plain: `(${a}^${b})^${c}-${d}`, trap: 'oo-power-tower' },
         { plain: `${a}^${b}*${c}-${d}`, trap: 'power-as-product' },
-        { plain: `${a}*${b}^${c}-${d}`, trap: 'oo-power-scope' },
+        { plain: `${a}*${b}^${c}-${d}`, trap: 'power-as-product' },
       ],
     };
   },
