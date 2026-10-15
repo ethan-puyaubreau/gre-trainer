@@ -2,16 +2,6 @@
   "data.interpretation.pie-remove": {
     "distractors.trapped": "baseline"
   },
-  "data.interpretation.season-fraction": {
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.season-least-sd": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.season-mean": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.worktime-conversion": {
     "distractors.trapped": "baseline"
   },

@@ -353,6 +353,18 @@ export const probTraps: Record<string, Trap> = {
     label: 'Compared the countries with the wrong share of the total',
     fix: 'Take the stated fraction of the region total given in the title of the bar graph, then compare it with the sum of the bars.',
   },
+  'prob-di-one-fraction': {
+    label: 'Used one of the fractions instead of combining them',
+    fix: 'Take each fraction of its own cell, add the amounts, and divide by the combined total of the same cells.',
+  },
+  'prob-di-sd-two-values': {
+    label: 'Compared only two of the four numbers',
+    fix: 'Standard deviation depends on all four numbers: check how far each one is from the row mean.',
+  },
+  'prob-di-rounding': {
+    label: 'Rounded the estimate to the wrong neighbouring value',
+    fix: 'Compute the share as a decimal first, then pick the choice it is closest to.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

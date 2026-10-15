@@ -5,8 +5,7 @@ import { frac, Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
 import type { Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { valuedChoices } from '../../../engine/build';
-import { nearestIndex, neCheckNum, roundFrac, spacedChoices } from './util';
+import { nearestIndex, neCheckNum, roundFrac, trapChoicesOrPad, trapOnlyChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.season-table';
@@ -79,6 +78,9 @@ function makeSeasonData(rng: Rng, d: Difficulty): SeasonData {
     // A smaller-valued row that is not the flattest (a natural distractor).
     const means = cells.map((r) => r.reduce((s, v) => s + v, 0) / 4);
     if (means.indexOf(Math.min(...means)) === flat) continue;
+    // the fraction question needs three rows per season whose count splits into whole parts (halves ... fifths)
+    const splits = (s: number) => cells.filter((r) => r[s] >= 8 && [2, 3, 4, 5].some((b) => r[s] % b === 0)).length;
+    if (splits(1) < 3 || splits(2) < 3) continue;
     const figure: TableFigure = {
       kind: 'table',
       title: ctx.TITLE,
@@ -121,35 +123,58 @@ const fractionOfTotal: Template<PartParams> = {
   style: 'fractions of several cells as a fraction of their combined total',
   generate(rng, d) {
     const D = makeSeasonData(rng, d);
+    const vals = FR_CHOICES.map(([a, b]) => a / b);
+    const ftext = ([a, b]: [number, number]) => `$\\frac{${a}}{${b}}$`;
+    const nearestFr = (x: number) => nearestIndex(vals, x);
     for (let t = 0; ; t++) {
       const season = rng.pick([1, 2]);
       const rowsUsed = rng.sample([0, 1, 2, 3, 4, 5].filter((k) => D.cells[k][season] >= 8), 3);
       if (rowsUsed.length < 3) continue;
       const opts = rowsUsed.map((k) => ([[1, 2], [1, 3], [1, 4], [2, 3], [3, 4], [2, 5], [3, 5], [1, 5]] as [number, number][]).filter(([, b]) => D.cells[k][season] % b === 0));
-      if (opts.some((o) => !o.length) && t < 2000) continue;
-      const parts = opts.map((o) => (o.length ? rng.pick(o) : ([1, 1] as [number, number])));
+      if (opts.some((o) => !o.length)) continue; // every part must be a whole number of items, and never a part like 1/1
+      const parts = opts.map((o) => rng.pick(o));
       const amounts = rowsUsed.map((k, j) => frac(D.cells[k][season] * parts[j][0], parts[j][1]));
       const total = rowsUsed.reduce((s, k) => s + D.cells[k][season], 0);
       const share = amounts.reduce((s, a) => s.add(a), frac(0)).div(total);
-      const vals = FR_CHOICES.map(([a, b]) => a / b);
-      const idx = nearestIndex(vals, share.toNumber());
+      const idx = nearestFr(share.toNumber());
       if (idx < 0) continue;
       const dists = vals.map((v) => Math.abs(v - share.toNumber())).sort((a, b) => a - b);
       if (dists[1] - dists[0] < 0.03 && t < 300) continue;
-      const avgParts = parts.reduce((s, [a, b]) => s + a / b, 0) / 3;
-      const trapIdx = nearestIndex(vals, avgParts);
-      // The answer at a uniform random position; the averaged-fractions trap first, then the nearest fractions.
-      const ftext = ([a, b]: [number, number]) => `$\\frac{${a}}{${b}}$`;
-      const others = FR_CHOICES.map((fr, k) => ({ fr, k }))
-        .filter(({ k }) => k !== idx)
-        .sort((x, y) => (x.k === trapIdx ? -1 : y.k === trapIdx ? 1 : Math.abs(x.k - idx) - Math.abs(y.k - idx)));
-      const vc = valuedChoices(
-        rng,
-        { text: ftext(FR_CHOICES[idx]), value: vals[idx] },
-        others.map(({ fr, k }) => ({ text: ftext(fr), value: vals[k], ...(k === trapIdx ? { trap: 'prob-di-average-of-averages' } : {}) })),
+      // Each wrong choice is the fraction nearest to the result of one mistake.
+      const nums = parts.map(([a, b]) => a / b);
+      const other = season === 1 ? 2 : 1;
+      const otherTotal = rowsUsed.reduce((s, k) => s + D.cells[k][other], 0);
+      const otherShare = rowsUsed.reduce((s, k, j) => s + (D.cells[k][other] * parts[j][0]) / parts[j][1], 0) / otherTotal;
+      const allTotal = D.cells.reduce((s, r) => s + r[season], 0);
+      const mk = (x: number, trap: string, why: (s: string) => string) => {
+        const k = nearestFr(x);
+        return k < 0 ? null : { k, value: frac(FR_CHOICES[k][0], FR_CHOICES[k][1]), trap, why };
+      };
+      const traps = rng.shuffle(
+        [
+          mk(nums.reduce((s, x) => s + x, 0) / 3, 'prob-di-average-of-averages', (s) => `averaging the three fractions gives ${s}, but the ${D.ctx.unit} are not split evenly among the three ${D.ctx.group}`),
+          ...nums.map((x, j) => mk(x, 'prob-di-one-fraction', (s) => `${s} is only the fraction taken from ${D.rows[rowsUsed[j]]}: the other two ${D.ctx.group} count too`)),
+          mk(Math.max(...nums), 'prob-di-one-fraction', (s) => `the greatest of the three fractions is ${s}, but the other two ${D.ctx.group} matter too`),
+          mk(Math.min(...nums), 'prob-di-one-fraction', (s) => `the least of the three fractions is ${s}, but the other two ${D.ctx.group} matter too`),
+          mk(otherShare, 'prob-di-wrong-column', (s) => `using the ${SEASONS[other].toLowerCase()} totals instead gives ${s}`),
+          mk(amounts.reduce((s, a) => s.add(a), frac(0)).toNumber() / allTotal, 'prob-di-wrong-total', (s) => `dividing by the total of all six ${D.ctx.group} gives ${s}, but the total is for the three ${D.ctx.group} named`),
+          mk(1 - share.toNumber(), 'prob-wrong-event', (s) => `${s} is the fraction that did not happen in that month`),
+        ].filter((x): x is NonNullable<typeof x> => x !== null && x.k !== idx),
       );
-      const choices: Choice[] = vc.choices;
-      const values = vc.choices.map((c) => FR_CHOICES.find((fr) => ftext(fr) === c.text)!);
+      // last resort: the estimate rounded to a neighbouring fraction
+      const neighbours = [1, -1, 2, -2, 3, -3]
+        .filter((o) => idx + o >= 0 && idx + o < FR_CHOICES.length)
+        .map((o) => mk(vals[idx + o], 'prob-di-rounding', (s) => `${s} is a neighbouring fraction: the estimate was rounded the wrong way`))
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      const seenK = new Set<number>();
+      const uniq = [...traps, ...neighbours].filter((x) => (seenK.has(x.k) ? false : (seenK.add(x.k), true)));
+      const built = trapOnlyChoices(rng, frac(FR_CHOICES[idx][0], FR_CHOICES[idx][1]), uniq, (v) => ftext([v.n, v.d]), 5, 0, 'ends');
+      if (!built) {
+        if (t < 400) continue;
+        throw new Error('season-fraction: no choices');
+      }
+      const cite = rng.pick(built.used);
+      const values = built.values.map((v) => [v.n, v.d] as [number, number]);
       const season0 = SEASONS[season].toLowerCase();
       const month = season === 1 ? 'April' : 'July';
       const partText = rowsUsed.map((k, j) => `$\\frac{${parts[j][0]}}{${parts[j][1]}}$ of ${D.ctx.cell(D.rows[k], season0)}`);
@@ -160,11 +185,15 @@ const fractionOfTotal: Template<PartParams> = {
           format: 'mcs',
           figure: D.figure,
           stem: `Suppose that ${listText} ${D.ctx.happened(month)}. ${D.ctx.inMonth(month)} was approximately what fraction of ${D.ctx.total(season0)}?`,
-          choices,
-          answer: vc.answer,
+          choices: built.choices,
+          answer: built.answer,
           explanation: `In ${month}: ${rowsUsed.map((k, j) => `$\\frac{${parts[j][0]}}{${parts[j][1]}} \\times ${D.cells[k][season]} = ${num(amounts[j])}$`).join(', ')}; together $${num(amounts.reduce((s, a) => s.add(a), frac(0)))}$. The ${season0} total for the three is $${rowsUsed.map((k) => D.cells[k][season]).join(' + ')} = ${total}$. The fraction is about $${(share.toNumber()).toFixed(2)}$, closest to $\\frac{${FR_CHOICES[idx][0]}}{${FR_CHOICES[idx][1]}}$.
 
-Averaging the three fractions ignores that the ${D.ctx.unit} are not split evenly among the three ${D.ctx.group}.`,
+Check: $\\frac{${FR_CHOICES[idx][0]}}{${FR_CHOICES[idx][1]}} \\times ${total} \\approx ${num(Math.round((vals[idx] * total) * 10) / 10)}$, near ${num(amounts.reduce((s, a) => s.add(a), frac(0)))}.
+
+Trap: ${cite.why(ftext([cite.value.n, cite.value.d]))}.
+
+Add the amounts first, then divide by the combined total of the same three ${D.ctx.group}.`,
         },
       };
     }
@@ -193,10 +222,24 @@ const leastSpread: Template<SdParams> = {
   generate(rng, d) {
     const D = makeSeasonData(rng, d);
     const means = D.cells.map((r) => r.reduce((s, v) => s + v, 0) / 4);
-    const smallest = means.indexOf(Math.min(...means));
-    const others = [0, 1, 2, 3, 4, 5].filter((k) => k !== D.flat && k !== smallest);
-    const rowsShown = [D.flat, smallest, ...rng.sample(others, 3)].sort((a, b) => a - b);
-    const choices: Choice[] = rowsShown.map((k) => ({ text: D.rows[k], ...(k === smallest ? { trap: 'prob-di-sd-size' } : {}) }));
+    // four tempting rows, each from one wrong rule; a rule that finds a row already taken takes its next best row
+    const rest = [0, 1, 2, 3, 4, 5].filter((k) => k !== D.flat);
+    const taken = new Set<number>();
+    const lures: { k: number; trap: string; why: string }[] = [];
+    const lure = (order: number[], trap: string, why: (k: number) => string) => {
+      const k = order.find((x) => !taken.has(x))!;
+      taken.add(k);
+      lures.push({ k, trap, why: why(k) });
+    };
+    const byMean = [...rest].sort((a, b) => means[a] - means[b]);
+    const cellsOf = (k: number) => D.cells[k].join(', ');
+    lure(byMean, 'prob-di-sd-size', (k) => `${D.rows[k]} (${cellsOf(k)}) has the smallest numbers, but small numbers can still be far from their own mean`);
+    lure([...byMean].reverse(), 'prob-di-sd-size', (k) => `${D.rows[k]} (${cellsOf(k)}) has the greatest numbers, but large numbers can still be far from their own mean`);
+    lure([...rest].sort((a, b) => Math.abs(D.cells[a][0] - D.cells[a][3]) - Math.abs(D.cells[b][0] - D.cells[b][3])), 'prob-di-sd-two-values', (k) => `${D.rows[k]} (${cellsOf(k)}) looks steady if only winter and fall are compared, but spring and summer differ a lot from them`);
+    lure([...rest].sort((a, b) => Math.abs(D.cells[a][1] - D.cells[a][2]) - Math.abs(D.cells[b][1] - D.cells[b][2])), 'prob-di-sd-two-values', (k) => `${D.rows[k]} (${cellsOf(k)}) looks steady if only spring and summer are compared, but winter and fall differ a lot from them`);
+    const rowsShown = [D.flat, ...lures.map((l) => l.k)].sort((a, b) => a - b);
+    const cite = rng.pick(lures);
+    const choices: Choice[] = rowsShown.map((k) => ({ text: D.rows[k], ...(k === D.flat ? {} : { trap: lures.find((l) => l.k === k)!.trap }) }));
     const f = D.cells[D.flat];
     return {
       params: { rowsShown },
@@ -208,7 +251,11 @@ const leastSpread: Template<SdParams> = {
         answer: rowsShown.indexOf(D.flat),
         explanation: `Standard deviation measures how spread out the numbers are around their mean, not how large they are. The ${D.rows[D.flat]} row (${f.join(', ')}) stays within a few units of its mean in every season, while each of the other rows varies a lot. So ${D.rows[D.flat]} has the least standard deviation; no computation is needed.
 
-${D.rows[smallest]} has the smallest numbers, but they are spread out more.`,
+Check: ${D.rows[D.flat]} differs from its mean by at most ${Math.ceil(Math.max(...f) - Math.min(...f))} in any season; every other row has a much wider range.
+
+Trap: ${cite.why}.
+
+Judge spread by how far the numbers are from their mean, all four of them.`,
       },
     };
   },
@@ -243,23 +290,43 @@ const rowMean: Template<MeanParams> = {
       const R = Math.round(mean / step) * step;
       if (Math.abs(mean - R) > 1.5 && t < 100) continue;
       const g = (v: number) => Math.round(v / step) * step;
-      const nonzero = r.filter((v) => v > 0);
-      const trapC: { v: number; trap?: string }[] = [];
-      if (nonzero.length < 4) trapC.push({ v: g(nonzero.reduce((s, v) => s + v, 0) / nonzero.length), trap: 'prob-di-wrong-divisor' });
-      trapC.push({ v: g(r.reduce((s, v) => s + v, 0) / 3), trap: 'prob-di-wrong-divisor' });
-      const { choices, answer, values } = spacedChoices(rng, R, trapC, { step, min: step, format: (v) => `${v}` });
       const sum = r.reduce((s, v) => s + v, 0);
+      const nonzero = r.filter((v) => v > 0);
+      const sortedR = [...r].sort((a, b) => a - b);
+      const median = (sortedR[1] + sortedR[2]) / 2;
+      const mk = (x: number, trap: string, why: (s: string) => string) => ({ value: g(x), trap, why });
+      const traps = rng.shuffle([
+        ...(nonzero.length < 4 ? [mk(sum / nonzero.length, 'prob-di-wrong-divisor', (s) => `dividing by the ${nonzero.length} nonzero seasons gives ${s}, but the seasons with 0 count too`)] : []),
+        mk(sum / 3, 'prob-di-wrong-divisor', (s) => `dividing by 3 seasons gives ${s}, but there are 4`),
+        mk(sum, 'prob-di-no-divide', (s) => `${s} is the total of the four seasons, not their average`),
+        mk(median, 'stat-mean-is-median', (s) => `the middle of the four numbers is ${s}, but the mean uses every number`),
+        mk(Math.max(...r), 'prob-di-range', (s) => `${s} is the greatest season, not the average`),
+        mk((r[1] + r[2]) / 2, 'prob-di-wrong-column', (s) => `averaging only spring and summer gives ${s}`),
+        mk((r[0] + r[3]) / 2, 'prob-di-wrong-column', (s) => `averaging only winter and fall gives ${s}`),
+        ...[0, 1, 2, 3, 4, 5]
+          .filter((k) => k !== row)
+          .map((k) => mk(D.cells[k].reduce((a, b) => a + b, 0) / 4, 'prob-di-wrong-column', (s) => `reading the ${D.rows[k]} row instead gives ${s}`)),
+      ]).filter((x) => x.value >= step);
+      const built = trapChoicesOrPad(rng, R, traps, { step, minGap: step, min: step, pad: t >= 60, format: (v) => `${v}` });
+      if (!built) continue;
+      const cite = rng.pick(built.used.length ? built.used : traps);
       return {
-        params: { row, values },
+        params: { row, values: built.values },
         q: {
           format: 'mcs',
           figure: D.figure,
           stem: `The average (arithmetic mean) number of ${D.ctx.of(D.rows[row])} per season was closest to which of the following?`,
-          choices,
-          answer,
+          choices: built.choices,
+          answer: built.answer,
           explanation: `Add the four seasons and divide by 4: $\\frac{${r.join(' + ')}}{4} = \\frac{${sum}}{4} = ${num(mean)}$, closest to ${R}.${
             r.includes(0) ? ` The seasons with 0 still count: divide by 4, not by ${nonzero.length}.` : ''
-          }`,
+          }
+
+Check: four seasons at ${R} each make ${R * 4}, near the actual total of ${sum}.
+
+Trap: ${cite.why(String(cite.value))}.
+
+An average divides the total by the number of values, zeros included.`,
         },
       };
     }
@@ -299,7 +366,14 @@ const percentIncrease: Template<IncParams> = {
           if (roundFrac(v, 0)) cands.push({ row, from, to, v });
         }
         }
-    const { row, from, to, v } = rng.pick(cands);
+    const wrongOf = (c: { row: number; from: number; to: number }) => {
+      const a0 = D.cells[c.row][c.from];
+      const b0 = D.cells[c.row][c.to];
+      return [roundFrac(frac(100 * (b0 - a0), b0), 0), frac(b0 - a0), roundFrac(frac(100 * b0, a0), 0)];
+    };
+    // a mistake that gives the answer is not a mistake: prefer rows where all of them differ
+    const okCands = cands.filter((c) => !wrongOf(c).some((w) => w && w.eq(roundFrac(c.v, 0)!)));
+    const { row, from, to, v } = rng.pick(okCands.length ? okCands : cands);
     const answer = roundFrac(v, 0)!;
     const a = D.cells[row][from];
     const b = D.cells[row][to];
