@@ -633,6 +633,7 @@ function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionB
           { r: [a, b], trap: 'geo-sim-linear-area' },
           { r: [b * b, a * a], trap: 'geo-sim-inverted' },
           { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
+          { r: [b, a], trap: 'geo-sim-inverted' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the length of each side of $T$ to the length of the corresponding side of $U$ is $${a}$ to $${b}$. What is the ratio of the area of $T$ to the area of $U$?`;
         explanation = `For similar figures, every length scales by $${rt(a, b)}$ and every area by $\\left(${rt(a, b)}\\right)^2 = ${rt(a * a, b * b)}$. So the ratio of the areas is $${a * a}$ to $${b * b}$.`;
@@ -641,6 +642,7 @@ function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionB
           { r: [a * a, b * b], trap: 'geo-sim-perimeter-squared' },
           { r: [b, a], trap: 'geo-sim-inverted' },
           { r: [b * b, a * a], trap: 'geo-sim-inverted' },
+          { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the area of $T$ to the area of $U$ is $${a * a}$ to $${b * b}$. What is the ratio of the perimeter of $T$ to the perimeter of $U$?`;
         explanation = `Areas scale by the square of the scale factor, so the scale factor for lengths is $\\sqrt{${rt(a * a, b * b)}} = ${rt(a, b)}$. Perimeters are lengths, so their ratio is $${a}$ to $${b}$.`;
