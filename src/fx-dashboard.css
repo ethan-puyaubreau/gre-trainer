@@ -17,10 +17,15 @@
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
 }
-.skill-tile .mastery-ring .level-dot {
+.skill-tile .mastery-ring .level-dot,
+.legend .mastery-ring .level-dot {
   width: 10px;
   height: 10px;
   border-radius: 2px;
+}
+/* The legend spans are inline flex boxes; the sample ring keeps its grid. */
+.legend .mastery-ring {
+  display: grid;
 }
 
 /* Daily goal: a ring filled with today's answers, drawn in on arrival with the motion tokens. */

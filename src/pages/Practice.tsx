@@ -53,6 +53,8 @@ function scopeTitle(scope: PracticeScope): string {
   }
 }
 
+const DIFF_NAMES = ['easy', 'medium', 'hard'];
+
 const REASON: Record<Pick['reason'], [string, string]> = {
   repair: ['Comeback after a miss', 'chip-warn'],
   review: ['Spaced review', 'chip-accent'],
@@ -323,6 +325,7 @@ export function Practice({ route }: { route: string[] }) {
   const mixed = scope.kind !== 'skill';
   const showLabels = !mixed || !!result;
   const reveal = mixed ? ' label-reveal' : '';
+  const diffText = `Difficulty: ${DIFF_NAMES[question.difficulty - 1]} (${question.difficulty} of 3)`;
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
   const stepHint = () => setHintLevel((l) => Math.min(l + 1, FULL_CARD) as HintLevel);
   const last = lastHint(skill.id);
@@ -359,7 +362,9 @@ export function Practice({ route }: { route: string[] }) {
               </span>
             </>
           )}
-          <span className="chip">{'●'.repeat(question.difficulty) + '○'.repeat(3 - question.difficulty)}</span>
+          <span className="chip" role="img" aria-label={diffText} title={diffText}>
+            {'●'.repeat(question.difficulty) + '○'.repeat(3 - question.difficulty)}
+          </span>
           <span className="spacer" />
           {store.settings.showTimer || result ? (
             <PaceBar
@@ -456,6 +461,9 @@ export function Practice({ route }: { route: string[] }) {
             </button>
           </>
         )}
+      </div>
+      <div className="muted small" style={{ marginTop: 6 }}>
+        Difficulty dots: ●○○ easy, ●●○ medium, ●●● hard. Easy questions do not count toward mastery.
       </div>
     </div>
   );

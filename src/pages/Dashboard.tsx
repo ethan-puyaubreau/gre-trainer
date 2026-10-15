@@ -141,6 +141,12 @@ export function Dashboard() {
                   <i className={`level-dot level-${i}`} /> {n} {stats.counts[i]}
                 </span>
               ))}
+              <span title="On each skill, the square shows its level and the ring fills as it gets closer to the next level.">
+                <span className="mastery-ring" style={{ '--p': 0.6, '--ring': 'var(--level-3)' } as CSSProperties} aria-hidden="true">
+                  <i className="level-dot level-2" />
+                </span>
+                Ring: progress to the next level
+              </span>
             </div>
           </div>
           <GoalRing done={stats.today} goal={settings.dailyGoal ?? DEFAULT_DAILY_GOAL} />
@@ -238,7 +244,7 @@ export function Dashboard() {
                         const st = states[s.id];
                         const lvl = st?.level ?? 0;
                         const p = progressToNext(st ?? newSkillState(), requirementsFor(templatesBySkill.get(s.id) ?? []), now);
-                        const label = lvl === 4 ? LEVEL_NAMES[4] : `${LEVEL_NAMES[lvl]}, ${Math.round(100 * p)}% to ${LEVEL_NAMES[lvl + 1]}`;
+                        const label = lvl === 4 ? LEVEL_NAMES[4] : `${LEVEL_NAMES[lvl]}, ring ${Math.round(100 * p)}% full toward ${LEVEL_NAMES[lvl + 1]}`;
                         return (
                           <button
                             key={s.id}
@@ -442,7 +448,9 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
         <span className="chip chip-accent">
           <i className={`level-dot level-${st.level}`} /> {LEVEL_NAMES[st.level]}
         </span>
-        <span className="chip">difficulty {'●'.repeat(st.difficulty)}</span>
+        <span className="chip" title={`Questions on this skill are ${DIFF_NAMES[st.difficulty - 1]} right now. This goes up after clean streaks and down after a miss.`}>
+          difficulty {'●'.repeat(st.difficulty) + '○'.repeat(3 - st.difficulty)}
+        </span>
         {acc !== null && <span className="chip">{acc}% correct</span>}
         {avg !== null && <span className={`chip ${avg > settings.paceSec * 1000 ? 'chip-bad' : 'chip-good'}`}>avg {formatClock(avg)}</span>}
       </div>
