@@ -3,6 +3,7 @@ import { consecutiveTemplates } from './consecutive';
 import { divisibilityTemplates } from './divisibility';
 import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
+import { exponentsConvertTemplates, exponentsConvertTraps } from './exponentsConvert';
 import { factorsTemplates } from './factors';
 import { factorsSelectTemplates, factorsSelectTraps } from './factorsSelect';
 import { gcdLcmPairTemplates, gcdLcmPairTraps } from './gcdLcmPair';
@@ -23,6 +24,7 @@ export const integersTemplates: Template<any>[] = [
   ...remainderCycleTemplates,
   ...consecutiveTemplates,
   ...exponentTemplates,
+  ...exponentsConvertTemplates,
   ...evaluateTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...exponentsConvertTraps };
