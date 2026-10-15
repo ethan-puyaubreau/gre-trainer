@@ -8,6 +8,7 @@ import { exponentTemplates } from './exponents';
 import { factorsTemplates } from './factors';
 import { factorsSelectTemplates, factorsSelectTraps } from './factorsSelect';
 import { groupingCompareTemplates, groupingCompareTraps } from './groupingCompare';
+import { functionEvalTemplates, functionEvalTraps } from './functionEval';
 import { gcdLcmPairTemplates, gcdLcmPairTraps } from './gcdLcmPair';
 import { lcmGcdTemplates } from './lcm-gcd';
 import { populationTemplates, populationTraps } from './populationTotals';
@@ -30,5 +31,6 @@ export const integersTemplates: Template<any>[] = [
   ...groupingCompareTemplates,
   ...barEntryTemplates,
   ...chainEvalTemplates,
+  ...functionEvalTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps };
