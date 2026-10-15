@@ -86,20 +86,20 @@ const filteredNE: Template<Params> = {
       const seen = new Set<string>();
       const kept = traps.filter((t) => !t.value.eq(answer) && !seen.has(t.value.toString()) && !!seen.add(t.value.toString()));
       const prop = r === 0 ? `multiples of ${m}` : `leave a remainder of ${r} when divided by ${m}`;
-      const range = exclusive ? `between ${lo} and ${hi}` : `from ${lo} to ${hi}, inclusive,`;
+      const range = exclusive ? `greater than ${lo} and less than ${hi}` : `from ${lo} to ${hi}, inclusive,`;
       const set =
         r === 0
           ? `the integers ${range} that are ${prop}`
           : `the integers ${range} that ${prop}`;
       const what = ask === 'mean' ? 'average (arithmetic mean)' : 'sum';
-      const edge = `the ends of the range, ${lo} and ${hi}, are not members`;
+      const edge = exclusive ? `${lo} and ${hi} themselves are excluded` : `the ends of the range, ${lo} and ${hi}, are not members`;
       const member = (x: number) => (r === 0 ? `${x} = ${m} \\times ${x / m}` : `${x} = ${m} \\times ${(x - r) / m} + ${r}`);
       const shownTrap = kept[0];
       const trapLine =
         shownTrap.trap === 'stat-filter-endpoints'
-          ? `Averaging the ends of the range gives $${fTex(shownTrap.value)}$, but ${lo} and ${hi} are not members.`
+          ? `Averaging the ends of the range gives $${fTex(shownTrap.value)}$, but ${lo} and ${hi} ${exclusive ? 'are excluded' : 'are not members'}.`
           : shownTrap.trap === 'stat-filter-range-end'
-            ? `Pairing the first member with ${hi} gives $${fTex(shownTrap.value)}$, but ${hi} is not a member.`
+            ? `Pairing the first member with ${hi} gives $${fTex(shownTrap.value)}$, but ${hi} ${exclusive ? 'is excluded' : 'is not a member'}.`
             : shownTrap.trap === 'stat-filter-sum-as-mean'
               ? `The sum, $${fTex(shownTrap.value)}$, is not an average.`
               : shownTrap.trap === 'stat-filter-mean-as-sum'
