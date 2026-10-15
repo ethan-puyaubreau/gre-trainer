@@ -122,14 +122,5 @@
   },
   "data.spread.sd-linear": {
     "distractors.trapped": "baseline"
-  },
-  "data.weighted.group-size": {
-    "artifacts.coef-1": "baseline",
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline",
-    "distractors.cited": "baseline"
-  },
-  "data.weighted.grouped-ne": {
-    "artifacts.coef-1": "baseline"
   }
 }

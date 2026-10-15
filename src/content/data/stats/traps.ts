@@ -167,6 +167,22 @@ export const statsTraps: Record<string, Trap> = {
     label: 'Used the ratio of the two groups as the fraction of the whole',
     fix: 'If the groups are in the ratio $p : q$, the first group is $\\frac{p}{p + q}$ of the total, not $\\frac{p}{q}$.',
   },
+  'stat-answered-part': {
+    label: 'Gave one group instead of the whole',
+    fix: 'Reread what is asked: when the question asks for everyone, add the known group and the one you found.',
+  },
+  'stat-weighted-no-divide': {
+    label: 'Multiplied by one distance but never divided by the other',
+    fix: 'The sizes are in the ratio of the distances from the overall average: scale the known size by one distance and divide by the other.',
+  },
+  'stat-weighted-whole-gap': {
+    label: 'Divided by the whole gap between the two averages',
+    fix: 'The overall average splits the gap into two pieces, and the group sizes are in the ratio of those two pieces, not of one piece to the whole gap.',
+  },
+  'stat-ratio-one-part': {
+    label: 'Took one part as the share',
+    fix: 'A ratio $q : p$ has $q + p$ parts in all; the first group has $q$ of them, so its share is $\\frac{q}{q + p}$.',
+  },
   'stat-answered-total': {
     label: 'Gave the total instead of the part asked for',
     fix: 'Reread the question: it asks for one group, not for both groups together.',

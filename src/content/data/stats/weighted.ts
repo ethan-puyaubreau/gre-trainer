@@ -1,8 +1,10 @@
-import { flaggedChoices, numericChoices, qcFromSamples, textChoices } from '../../../engine/build';
+import { flaggedChoices, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
+import { term } from '../../../engine/text';
 import { num, usd } from '../../../engine/tex';
-import type { Choice, Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
+import type { Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
+import { trapOnlyChoices } from '../prob/util';
 import { fTex, QC_WORDS } from './util';
 
 const rel = (a: Frac | number, b: Frac | number): QCChoice => qcFromSamples([[a, b]]);
@@ -266,10 +268,11 @@ Averaging the three group averages (about $${unweighted.toNumber().toFixed(1)}$)
         const top = Math.max(...values);
         const extra = rng.int(2, 20);
         const target = new Frac(total + extra * top, N + extra);
-        if (!target.isInt() || target.eq(top)) continue;
+        if (!target.isInt() || top - target.n < 2) continue; // each newcomer must add more than 1 above the target
         const shortfall = target.mul(N).sub(total);
         const wrong = shortfall.div(top);
-        const traps = wrong.eq(extra) ? [] : [{ value: wrong, trap: 'stat-shortfall-divided' }];
+        if (wrong.eq(extra)) continue;
+        const traps = [{ value: wrong, trap: 'stat-shortfall-divided' }];
         return {
           params: { mode, counts, values, target: target.n, extraValue: top },
           q: {
@@ -279,7 +282,7 @@ Averaging the three group averages (about $${unweighted.toNumber().toFixed(1)}$)
             traps,
             explanation: `At present the total is $${num(total)}$ for $${N}$ ${ctx.who.split(' ')[0]}. With $n$ more at $${num(top)}$ each, the average is $\\dfrac{${num(total)} + ${num(top)}n}{${N} + n}$.
 
-Set it equal to $${fTex(target)}$: $${num(total)} + ${num(top)}n = ${fTex(target)}(${N} + n)$, so $${num(top - target.n)}n = ${num(target.n * N - total)}$ and $n = ${extra}$.
+Set it equal to $${fTex(target)}$: $${num(total)} + ${num(top)}n = ${fTex(target)}(${N} + n)$, so $${term(top - target.n, 'n')} = ${num(target.n * N - total)}$ and $n = ${extra}$.
 
 Each newcomer adds only $${num(top)} - ${fTex(target)} = ${num(top - target.n)}$ above the target average, so divide the shortfall $${num(target.n * N - total)}$ by $${num(top - target.n)}$, not by $${num(top)}$.`,
           },
@@ -288,12 +291,12 @@ Each newcomer adds only $${num(top)} - ${fTex(target)} = ${num(top - target.n)}$
 
       if (!avg.mul(100).isInt()) continue;
       const unweighted = new Frac(values.reduce((s, v) => s + v, 0), nG);
-      if (unweighted.eq(avg)) continue;
       const byGroups = new Frac(total, nG);
+      if (unweighted.eq(avg) || byGroups.eq(avg)) continue;
       const traps = [
         { value: unweighted, trap: 'stat-unweighted-mean' },
         { value: byGroups, trap: 'stat-divided-by-groups' },
-      ].filter((t) => !t.value.eq(avg));
+      ];
       return {
         params: { mode, counts, values, target: 0, extraValue: 0 },
         q: {
@@ -351,6 +354,8 @@ type SizeCtx = 'class' | 'mixture' | 'fraction';
 
 interface SizeParams {
   ctx: SizeCtx;
+  /** Which count is asked for: the unknown group, or the whole (class or mixture). */
+  ask: 'part' | 'total';
   nA: number;
   a: number;
   b: number;
@@ -374,92 +379,93 @@ const groupSize: Template<SizeParams> = {
       const c = a + p * unit;
       const b = c + q * unit;
       if (ctx !== 'mixture' && b > 99) continue;
+      const mk = (value: Frac | number, trap: string, why: (v: string) => string) => ({ value, trap, why });
       if (ctx === 'fraction') {
         // share of group A = q / (p + q)
         const share = new Frac(q, p + q);
-        const wrong: Choice[] = [
-          { text: `$${new Frac(p, p + q).toTex({ dfrac: true })}$`, trap: 'stat-weighted-inverted' },
-          { text: `$${new Frac(1, 2).toTex({ dfrac: true })}$`, trap: 'stat-weighted-midpoint' },
-          { text: `$${new Frac(Math.min(p, q), Math.max(p, q)).toTex({ dfrac: true })}$`, trap: 'stat-ratio-as-fraction' },
-          { text: `$${new Frac(q, p + q + 1).toTex({ dfrac: true })}$` },
-          { text: `$${new Frac(p + 1, p + q + 2).toTex({ dfrac: true })}$` },
-          { text: `$${new Frac(1, 3).toTex({ dfrac: true })}$` },
-          { text: `$${new Frac(3, 4).toTex({ dfrac: true })}$` },
+        const dfrac = (f: Frac) => `$${f.toTex({ dfrac: true })}$`;
+        const traps = [
+          mk(new Frac(p, p + q), 'stat-weighted-inverted', (v) => `taking the ratio the other way round gives $${v}$, but the group whose average is closer to the overall average is the larger one`),
+          mk(new Frac(1, 2), 'stat-weighted-midpoint', (v) => `$${v}$ would need equal group sizes, and the overall average is not halfway between the two averages`),
+          mk(new Frac(Math.min(p, q), Math.max(p, q)), 'stat-ratio-as-fraction', (v) => `reading a ratio as a fraction gives $${v}$, but a share is a part over the whole, $${q}$ over $${p + q}$`),
+          mk(new Frac(1, p + q), 'stat-ratio-one-part', (v) => `taking one part out of $${p + q}$ gives $${v}$, but sales has $${q}$ of the $${p + q}$ parts`),
         ];
-        const correctText = `$${share.toTex({ dfrac: true })}$`;
-        const pool = wrong.filter((w, i) => w.text !== correctText && wrong.findIndex((x) => x.text === w.text) === i);
-        const chosen = [...pool.slice(0, 2), ...rng.sample(pool.slice(2), 2)];
-        const built = textChoices(rng, correctText, chosen, 'keep');
-        // order by value, the GRE way
-        const val = (t: string) => {
-          const m = /\\dfrac\{(\d+)\}\{(\d+)\}/.exec(t);
-          return m ? Number(m[1]) / Number(m[2]) : Number(t.replace(/\$/g, ''));
-        };
-        const ordered = built.choices.map((ch, i) => ({ ch, ok: i === built.answer })).sort((x, y) => val(x.ch.text) - val(y.ch.text));
+        const built = trapOnlyChoices(rng, share, traps, (v) => dfrac(v));
+        if (!built) continue;
+        const cite = rng.pick(built.used);
         const sal = (v: number) => usd(v * 1000);
         return {
-          params: { ctx, nA: 0, a, b, c },
+          params: { ctx, ask: 'part', nA: 0, a, b, c },
           q: {
             format: 'mcs',
             stem: `Each employee of a company works in either the sales department or the service department. The average (arithmetic mean) annual salary is ${sal(a)} for the employees in sales and ${sal(b)} for the employees in service. If the average annual salary of all the employees is ${sal(c)}, what fraction of the employees work in sales?`,
-            choices: ordered.map((o) => o.ch),
-            answer: ordered.findIndex((o) => o.ok),
-            explanation: `The overall average is ${sal(c - a)} above the sales average and ${sal(b - c)} below the service average. The distances are in the inverse ratio of the group sizes, so sales : service $= ${num(b - c)} : ${num(c - a)}${b - c === q ? '' : ` = ${q} : ${p}`}$.
+            choices: built.choices,
+            answer: built.answer,
+            explanation: `The overall average lies between the two group averages, closer to the larger group's.
 
-So $\\frac{${q}}{${q} + ${p}} = ${share.toTex()}$ of the employees work in sales.
+It is ${sal(c - a)} above the sales average and ${sal(b - c)} below the service average, so the group sizes are in the inverse ratio: sales : service $= ${num(b - c)} : ${num(c - a)}${b - c === q ? '' : ` = ${q} : ${p}`}$. Sales is therefore $\\frac{${q}}{${q} + ${p}} = ${share.toTex()}$ of the employees.
 
-Check: $${share.toTex()}(${num(a)}) + ${new Frac(p, p + q).toTex()}(${num(b)}) = ${num(c)}$ (in thousands). The larger group is the one whose average is closer to the overall average; taking the ratio the other way round gives $${new Frac(p, p + q).toTex()}$.`,
+Check: $${share.toTex()}(${num(a)}) + ${new Frac(p, p + q).toTex()}(${num(b)}) = ${num(c)}$ (in thousands).
+
+Trap: ${cite.why(Frac.of(cite.value).toTex())}.
+
+The distances to the overall average are inversely proportional to the group sizes.`,
           },
         };
       }
+
       const nA = q * rng.int(2, 8) * (ctx === 'mixture' ? 1 : p);
       if (nA > 60) continue;
       const nB = (nA * p) / q;
-      const inverted = (nA * q) / p;
-      const traps = [
-        { value: inverted, trap: 'stat-weighted-inverted' },
-        { value: nA, trap: 'stat-weighted-midpoint' },
-        { value: nA + nB, trap: 'stat-answered-total' },
-      ].filter((t) => Number.isInteger(t.value) && t.value !== nB);
-      const { choices, answer } = numericChoices(rng, {
-        correct: nB,
-        traps: rng.sample(traps, rng.int(1, traps.length)),
-        fillers: rng.shuffle([nB + q, nB - q, 2 * nB, nB + 2 * q, nB - 2 * q, Math.round(nB / 2), nB + 1, nB - 1]).filter((v) => v > 0),
-        format: (v) => `$${fTex(v)}$`,
-      });
-      if (ctx === 'class') {
-        return {
-          params: { ctx, nA, a, b, c },
-          q: {
-            format: 'mcs',
-            stem: `In a class, the ${nA} students who sit in the front rows had an average (arithmetic mean) score of $${a}$ on a test, and the students who sit in the back rows had an average score of $${b}$. If the average score of the entire class was $${c}$, how many students sit in the back rows?`,
-            choices,
-            answer,
-            explanation: `Let $n$ be the number of back-row students. Total score $= ${a}(${nA}) + ${b}n = ${c}(${nA} + n)$, so $${b - c}n = ${c - a}(${nA})$ and $n = \\dfrac{${(c - a) * nA}}{${b - c}} = ${nB}$.
-
-Faster: the overall average is $${c - a}$ above $${a}$ and $${b - c}$ below $${b}$, so the group sizes are in the ratio front : back $= ${b - c} : ${c - a}$, giving $${nA} \\times \\frac{${c - a}}{${b - c}} = ${nB}$.
-
-Flipping that ratio gives $${fTex(new Frac(nA * q, p))}$, the classic slip: the group whose average is closer to the overall average is the larger one.`,
-          },
-        };
-      }
+      const ask: SizeParams['ask'] = d === 1 ? 'part' : rng.chance(0.5) ? 'part' : 'total';
+      const cls = ctx === 'class';
+      const cand = (x: Frac) => (x.isInt() && x.n > 0 ? [x.n] : []);
+      const [invA] = cand(new Frac(nA * q, p));
+      const [gap] = cand(new Frac(nA * p, p + q));
+      const noDivide = `multiplying by $${c - a}$ and never dividing by $${b - c}$`;
+      const traps =
+        ask === 'part'
+          ? [
+              ...(invA ? [mk(invA, 'stat-weighted-inverted', (v) => `flipping the ratio gives $${v}$, but the group whose average is closer to the overall average is the larger one`)] : []),
+              mk(nA, 'stat-weighted-midpoint', (v) => `assuming two equal groups gives $${v}$, but the overall average is not halfway between ${cls ? `$${a}$ and $${b}$` : `${usd(a)} and ${usd(b)}`}`),
+              mk(nA + nB, 'stat-answered-total', (v) => `$${v}$ is the ${cls ? 'class' : 'mixture'} total, but the question asks for ${cls ? 'the back rows' : 'the cashews'} only`),
+              mk(nA * (c - a), 'stat-weighted-no-divide', (v) => `${noDivide} gives $${v}$`),
+              ...(gap ? [mk(gap, 'stat-weighted-whole-gap', (v) => `dividing by the whole gap $${b - a}$ between the averages gives $${v}$, but the sizes are in the ratio of the two distances to the overall average`)] : []),
+            ]
+          : [
+              mk(nB, 'stat-answered-part', (v) => `$${v}$ is ${cls ? 'the back rows' : 'the cashews'} alone, but the question asks for the ${cls ? 'whole class' : 'whole mixture'}`),
+              mk(nA, 'stat-answered-part', (v) => `$${v}$ is ${cls ? 'the front rows' : 'the peanuts'}, which the problem already gives`),
+              mk(2 * nA, 'stat-weighted-midpoint', (v) => `assuming two equal groups gives $${v}$, but the overall average is not halfway between ${cls ? `$${a}$ and $${b}$` : `${usd(a)} and ${usd(b)}`}`),
+              ...(invA ? [mk(nA + invA, 'stat-weighted-inverted', (v) => `flipping the ratio gives $${v}$, but the group whose average is closer to the overall average is the larger one`)] : []),
+              ...(rng.chance(0.4) ? [mk(nA + nA * (c - a), 'stat-weighted-no-divide', (v: string) => `${noDivide} makes the second group $${nA * (c - a)}$ and the total $${v}$`)] : []),
+            ];
+      const built = trapOnlyChoices(rng, ask === 'part' ? nB : nA + nB, traps, (v) => `$${fTex(v)}$`);
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      const times = b - c === 1 ? num(c - a) : `\\frac{${num(c - a)}}{${num(b - c)}}`;
       return {
-        params: { ctx, nA, a, b, c },
+        params: { ctx, ask, nA, a, b, c },
         q: {
           format: 'mcs',
-          stem: `A grocer mixes ${nA} pounds of peanuts that cost ${usd(a)} per pound with some cashews that cost ${usd(b)} per pound. The mixture costs ${usd(c)} per pound. How many pounds of cashews are in the mixture?`,
-          choices,
-          answer,
-          explanation: `Let $n$ be the pounds of cashews. Cost: $${a}(${nA}) + ${b}n = ${c}(${nA} + n)$, so $${b - c}n = ${(c - a) * nA}$ and $n = ${nB}$.
+          stem: cls
+            ? `In a class, the ${nA} students who sit in the front rows had an average (arithmetic mean) score of $${a}$ on a test, and the students who sit in the back rows had an average score of $${b}$. If the average score of the entire class was $${c}$, how many students ${ask === 'part' ? 'sit in the back rows' : 'are in the class'}?`
+            : `A grocer mixes ${nA} pounds of peanuts that cost ${usd(a)} per pound with some cashews that cost ${usd(b)} per pound. The mixture costs ${usd(c)} per pound. How many pounds ${ask === 'part' ? 'of cashews are in the mixture' : 'does the mixture weigh'}?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `A mix of two groups: the overall ${cls ? 'average' : 'price'} sits closer to the average of the larger group.
 
-Faster: the mixture price is ${usd(c - a)} above the peanut price and ${usd(b - c)} below the cashew price, so peanuts : cashews $= ${b - c} : ${c - a}$ and $n = ${nA} \\times \\frac{${c - a}}{${b - c}} = ${nB}$.
+It is ${cls ? `$${c - a}$` : usd(c - a)} above ${cls ? `$${a}$` : usd(a)} and ${cls ? `$${b - c}$` : usd(b - c)} below ${cls ? `$${b}$` : usd(b)}, so the sizes are in the inverse ratio: ${cls ? 'front' : 'peanuts'} : ${cls ? 'back' : 'cashews'} $= ${num(b - c)} : ${num(c - a)}$. Then ${cls ? 'the back rows have' : 'the cashews weigh'} $${nA} \\times ${times} = ${nB}$${ask === 'part' ? '' : `, and the ${cls ? 'class' : 'mixture'} has $${nA} + ${nB} = ${nA + nB}$`}.
 
-The ingredient whose price is closer to the mixture price is used in the larger amount.`,
+Check: $${num(a)}(${nA}) + ${num(b)}(${nB}) = ${num(a * nA + b * nB)} = ${num(c)}(${nA + nB})$.
+
+Trap: ${cite.why(num(cite.value))}.
+
+In a mix, the distances to the overall average are inversely proportional to the group sizes.`,
         },
       };
     }
   },
-  check(q, { ctx, nA, a, b, c }) {
+  check(q, { ctx, ask, nA, a, b, c }) {
     if (q.format !== 'mcs') return 'wrong format';
     if (ctx === 'fraction') {
       // Search small group sizes giving exactly the overall average.
@@ -472,7 +478,10 @@ The ingredient whose price is closer to the mixture price is used in the larger 
       return 'no sizes found';
     }
     for (let n = 1; n <= 2000; n++)
-      if (a * nA + b * n === c * (nA + n)) return q.choices[q.answer].text === `$${num(n)}$` ? null : `expected ${n}`;
+      if (a * nA + b * n === c * (nA + n)) {
+        const expected = ask === 'part' ? n : nA + n;
+        return q.choices[q.answer].text === `$${num(expected)}$` ? null : `expected ${expected}`;
+      }
     return 'no size found';
   },
 };
@@ -560,7 +569,9 @@ const overallQC: Template<OvParams> = {
       while (nB === nA);
       const overall = new Frac(nA * a + nB * b, nA + nB);
       const target = rng.pick(['A', 'B', 'C'] as QCChoice[]);
-      if (target === 'C' && overall.isTerminating() && overall.mul(100).isInt()) other = overall;
+      // Compared with the midpoint, only the larger class matters; otherwise the exact average is needed.
+      if (rng.chance(d === 1 ? 0.5 : d === 2 ? 0.4 : 0.3)) other = mid;
+      else if (target === 'C' && overall.isTerminating() && overall.mul(100).isInt()) other = overall;
       else if (target === 'B') other = frac(Math.floor(overall.toNumber()) + 1);
       else other = frac(overall.isInt() ? overall.n - 1 : Math.floor(overall.toNumber()));
       info = `${intro} There are ${nA} students in Class A and ${nB} students in Class B.`;
@@ -569,7 +580,15 @@ const overallQC: Template<OvParams> = {
         overall.isTerminating() ? ` = ${fTex(overall)}` : ` \\approx ${num(Math.round(overall.toNumber() * 100) / 100)}`
       }$. Compare it with $${fTex(other)}$.`;
       const naive = rel(mid, other);
-      if (naive !== ansA) trapsA = { [naive]: 'stat-unweighted-mean' };
+      if (other.eq(mid)) {
+        const bigAvg = nA > nB ? a : b;
+        why = `Compare with the midpoint $${fTex(mid)}$ of the two class averages. Class ${nA > nB ? 'A' : 'B'} has more students, so the overall average is closer to $${bigAvg}$ than to the other class average: ${bigAvg > mid.toNumber() ? 'greater' : 'less'} than $${fTex(mid)}$, with no arithmetic needed.
+
+Check: $\\dfrac{${nA}(${a}) + ${nB}(${b})}{${nA + nB}} = \\dfrac{${num(nA * a + nB * b)}}{${nA + nB}} \\approx ${num(Math.round(overall.toNumber() * 100) / 100)}$.
+
+Trap: the midpoint $${fTex(mid)}$ is the overall average only when the classes have equal sizes, and ${nA} is not ${nB}.`;
+        trapsA = { C: 'stat-weighted-midpoint' };
+      } else if (naive !== ansA) trapsA = { [naive]: 'stat-unweighted-mean' };
     } else {
       const bound = new Frac(k * a + b, k + 1);
       other = bound;
