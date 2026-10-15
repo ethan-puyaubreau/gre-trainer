@@ -1,8 +1,8 @@
-import { flaggedChoices, numericChoices, qcCompare, textChoices } from '../../../engine/build';
+import { flaggedChoices, qcCompare, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num, paren, poly } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, abs, add, close, sideFill, someTraps, times, div, evalEx, intExcept, mul, polyEx, pow, qcEnd, qcSamples, texEx, type Ex } from './util';
+import { N, V, abs, add, close, times, div, evalEx, intExcept, mul, polyEx, pow, qcEnd, qcSamples, texEx, trapChoices, type Ex } from './util';
 
 const horner = (c: number[], x: number) => c.reduce((s, a) => s * x + a, 0);
 const hornerF = (c: number[], x: Frac) => c.reduce((s: Frac, a) => s.mul(x).add(a), new Frac(0));
@@ -56,7 +56,9 @@ const composeNE: Template<ComposeParams> = {
 
 Then $${o}(${num(inner)}) = ${substitute(kind === 'fg' ? f : g, inner)} = ${num(answer)}$.
 
-Applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)}$.`;
+Trap: applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)}$, which is a different number.
+
+Rule: in $${o}(${i}(${k}))$ the function next to the number acts first.`;
       if (!other.eq(answer)) traps.push({ value: other, trap: 'alg-composition-order' });
       const prod = F(frac(k)).mul(G(frac(k)));
       if (!prod.eq(answer) && !prod.eq(other)) traps.push({ value: prod, trap: 'alg-composition-product' });
@@ -64,8 +66,12 @@ Applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)
       const inner = F(frac(k));
       answer = F(inner);
       stem = `If ${defs} for all values of $x$, what is the value of $f(f(${k}))$?`;
-      explanation = `First $f(${k}) = ${substitute(f, frac(k))} = ${num(inner)}$. Then $f(${num(inner)}) = ${substitute(f, inner)} = ${num(answer)}$.`;
       const sq = inner.mul(inner);
+      explanation = `Work from the inside out. First $f(${k}) = ${substitute(f, frac(k))} = ${num(inner)}$. Then $f(${num(inner)}) = ${substitute(f, inner)} = ${num(answer)}$.
+
+Trap: $f(f(${k}))$ is not $f(${k}) \\cdot f(${k})$; that would give $${num(sq)}$. The result of the first step is the INPUT of the second.
+
+Rule: feed each result back into the rule.`;
       if (!sq.eq(answer)) traps.push({ value: sq, trap: 'alg-composition-product' });
     } else {
       // f(g(x)) = m, linear: f(g(x)) = f0 (g0 x + g1) + f1
@@ -79,7 +85,11 @@ Applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)
       const b = f[0] * g[1] + f[1];
       explanation = `Build $f(g(x))$: replace $x$ in $f$ by $g(x)$: $f(g(x)) = ${times(f[0], poly(g))} ${f[1] < 0 ? '-' : '+'} ${Math.abs(f[1])} = ${poly([a, b])}$.
 
-Solve $${poly([a, b])} = ${num(m)}$: $${lin([[a, 'x']])} = ${num(m - b)}$, so $x = ${x0.toTex()}${x0.isInt() ? '' : ` = ${x0.toDecimalString()}`}$.`;
+Solve $${poly([a, b])} = ${num(m)}$: $${lin([[a, 'x']])} = ${num(m - b)}$, so $x = ${x0.toTex()}${x0.isInt() ? '' : ` = ${x0.toDecimalString()}`}$.
+
+Check: $g(${x0.toTex()}) = ${G(x0).toTex()}$ and $f(${G(x0).toTex()}) = ${num(m)}$.
+
+Trap: solving $g(x) = ${num(m)}$ instead, which gives $x = ${new Frac(m - g[1], g[0]).toTex()}$, ignores $f$: the equation is about $f(g(x))$.`;
       const wrongInner = new Frac(m - g[1], g[0]); // solved g(x) = m instead
       if (!wrongInner.eq(answer) && wrongInner.isTerminating()) traps.push({ value: wrongInner, trap: 'alg-composition-inner-only' });
     }
@@ -286,7 +296,9 @@ ${qcEnd(answer)}`;
       if (bKind === 'swap' && answer !== 'C' && !traps.C) traps.C = 'alg-assumed-commutative';
       const pa = poly([polyA[3], polyA[2], polyA[1], polyA[0]]);
       const pb = bKind === 'swap' ? poly([polyB[3], polyB[2], polyB[1], polyB[0]]) : num(bNum);
-      const pd = poly([P[3], P[2], P[1], P[0]]);
+      const pd0 = poly([P[3], P[2], P[1], P[0]]);
+      const intRoots = P[3] === 0 && P[2] !== 0 && roots.length === 2 && roots.every((r) => Number.isInteger(r));
+      const pd = intRoots ? `${pd0} = ${P[2] === 1 ? '' : P[2] === -1 ? '-' : P[2]}${[...roots].sort((u, w) => (u === 0 ? -1 : w === 0 ? 1 : u - w)).map((r) => (r === 0 ? 'x' : `(x ${r > 0 ? '-' : '+'} ${Math.abs(r)})`)).join('')}` : pd0;
       const critText = inside.length
         ? dExample(P, lo, hi)
         : isZero
@@ -334,7 +346,7 @@ function dExample(P: number[], lo: number | null, hi: number | null): string {
   for (const b of [lo, hi]) if (b !== null) for (let j = -100; j <= 100; j++) cands.push(new Frac(b * 100 + j, 100));
   const ok = cands
     .filter((x) => (lo === null || x.gt(lo)) && (hi === null || x.lt(hi)))
-    .sort((u, w) => u.abs().cmp(w.abs()) || u.d - w.d);
+    .sort((u, w) => u.d - w.d || u.abs().cmp(w.abs())); // simple values first
   const val = (x: Frac) => hornerF([P[3], P[2], P[1], P[0]], x);
   const sign = (x: Frac) => val(x).sign();
   const first = ok.find((x) => sign(x) !== 0)!;
@@ -380,141 +392,161 @@ const tableMCS: Template<TableParams> = {
   format: 'mcs',
   style: 'read a function from a table',
   generate(rng, d) {
-    const kind: TableParams['kind'] = rng.pick(d === 1 ? ['compose', 'linear'] : ['compose', 'linear', 'formula']);
-    if (kind === 'compose') {
-      const xs = [1, 2, 3, 4, 5];
-      let fs: number[];
-      let gs: number[];
-      let k: number;
-      do {
-        fs = xs.map(() => rng.int(1, 5));
-        gs = xs.map(() => rng.int(1, 5));
-        k = rng.pick(xs);
-      } while (fs[gs[k - 1] - 1] === gs[fs[k - 1] - 1] || new Set(fs).size < 3 || new Set(gs).size < 3);
-      const inner = gs[k - 1];
-      const answer = fs[inner - 1];
-      const other = gs[fs[k - 1] - 1];
-      const traps = [
-        { value: other, trap: 'alg-composition-order' },
-        { value: fs[k - 1], trap: 'alg-composition-inner-only' },
-        { value: fs[k - 1] * gs[k - 1], trap: 'alg-composition-product' },
-      ].filter((t) => t.value !== answer);
-      const { choices, answer: idx } = numericChoices(rng, {
-        correct: answer,
-        traps: someTraps(rng, traps.map((t) => ({ value: t.value, trap: t.trap }))),
-        fillers: [...sideFill(rng, answer).filter((v) => v.sign() > 0), ...rng.shuffle([1, 2, 3, 4, 5, 6, 7, inner])],
-        format: (v) => `$${num(v)}$`,
-      });
-      const values = choices.map((c) => Number(c.text.replace(/\$/g, '')));
-      return {
-        params: { kind, xs, fs, gs, k, values, formulas: [] },
-        q: {
-          format: 'mcs',
-          figure: { kind: 'table', headers: ['$x$', '$f(x)$', '$g(x)$'], rows: xs.map((x, i) => [`$${x}$`, `$${fs[i]}$`, `$${gs[i]}$`]) },
-          stem: `The table shows some values of the functions $f$ and $g$. What is the value of $f(g(${k}))$?`,
-          choices,
-          answer: idx,
-          explanation: `Work from the inside out. In the row $x = ${k}$, $g(${k}) = ${inner}$. Then in the row $x = ${inner}$, $f(${inner}) = ${answer}$.
+    for (;;) {
+      const kind: TableParams['kind'] = rng.pick(d === 1 ? ['compose', 'linear'] : ['compose', 'linear', 'formula']);
+      if (kind === 'compose') {
+        const xs = [1, 2, 3, 4, 5];
+        let fs: number[];
+        let gs: number[];
+        let k: number;
+        do {
+          fs = xs.map(() => rng.int(1, 5));
+          gs = xs.map(() => rng.int(1, 5));
+          k = rng.pick(xs);
+        } while (fs[gs[k - 1] - 1] === gs[fs[k - 1] - 1] || new Set(fs).size < 3 || new Set(gs).size < 3);
+        const inner = gs[k - 1];
+        const answer = fs[inner - 1];
+        const other = gs[fs[k - 1] - 1];
+        const fk = fs[k - 1];
+        const wrongs = [
+          { value: other, trap: 'alg-composition-order', why: `computing $g(f(${k}))$ instead of $f(g(${k}))$` },
+          { value: fk, trap: 'alg-composition-inner-only', why: `reading only $f(${k})$ and skipping $g$` },
+          { value: inner, trap: 'alg-composition-inner-only', why: `stopping at $g(${k})$ without applying $f$` },
+          { value: fk * inner, trap: 'alg-composition-product', why: `multiplying $f(${k})$ by $g(${k})$` },
+          { value: fk + inner, trap: 'alg-composition-product', why: `adding $f(${k})$ and $g(${k})$` },
+          { value: fs[fk - 1], trap: 'alg-composition-same-function', why: `applying $f$ twice, $f(f(${k}))$` },
+          { value: gs[inner - 1], trap: 'alg-composition-same-function', why: `applying $g$ twice, $g(g(${k}))$` },
+        ];
+        const res = trapChoices(rng, answer, wrongs, (v) => `$${v.n}$`);
+        if (!res) continue;
+        const cited = res.kept[0];
+        return {
+          params: { kind, xs, fs, gs, k, values: res.values.map((v) => v.n), formulas: [] },
+          q: {
+            format: 'mcs',
+            figure: { kind: 'table', headers: ['$x$', '$f(x)$', '$g(x)$'], rows: xs.map((x, i) => [`$${x}$`, `$${fs[i]}$`, `$${gs[i]}$`]) },
+            stem: `The table shows some values of the functions $f$ and $g$. What is the value of $f(g(${k}))$?`,
+            choices: res.choices,
+            answer: res.answer,
+            explanation: `A composition is read from the inside out: the output of $g$ becomes the input of $f$. In the row $x = ${k}$, $g(${k}) = ${inner}$. Then in the row $x = ${inner}$, $f(${inner}) = ${answer}$.
 
-So $f(g(${k})) = ${answer}$. Reading the functions in the other order gives $g(f(${k})) = g(${fs[k - 1]}) = ${other}$.`,
-        },
-      };
-    }
-    if (kind === 'linear') {
-      const m = intExcept(rng, -5, 6, 0);
-      const b = rng.int(-9, 12);
-      const start = rng.int(-2, 3);
-      const step = rng.pick([1, 2, 3]);
-      const xs = [0, 1, 2].map((i) => start + i * step);
-      const fs = xs.map((x) => m * x + b);
-      const k = xs[2] + step * rng.int(2, 6);
-      const answer = m * k + b;
-      const x1 = xs.find((x) => x !== 0) ?? xs[1];
-      const prop = new Frac(m * x1 + b, x1).mul(k);
-      const traps: { value: Frac; trap: string }[] = [];
-      if (!prop.eq(answer)) traps.push({ value: prop, trap: 'alg-linear-as-proportional' });
-      if (m * k !== answer) traps.push({ value: frac(m * k), trap: 'alg-forgot-intercept' });
-      const { choices, answer: idx } = numericChoices(rng, {
-        correct: answer,
-        traps: someTraps(rng, traps),
-        fillers: [...sideFill(rng, answer, Math.abs(m)), answer + b, answer + 1],
-        format: (v) => `$${v.toTex()}$`,
+Check the order: $f(g(${k}))$ uses the $g$ column first, then the $f$ column.
+
+Trap: $${cited.value.n}$ comes from ${cited.why}. The question asks for $f(g(${k})) = f(${inner}) = ${answer}$.
+
+Rule: apply the inner function first and look its result up as the next input.`,
+          },
+        };
+      }
+      if (kind === 'linear') {
+        const m = intExcept(rng, -5, 6, 0);
+        const b = intExcept(rng, -9, 12, 0);
+        if (m === 1 && b === 0) continue;
+        const start = rng.int(-2, 3);
+        const step = rng.pick([1, 2, 3]);
+        const xs = [0, 1, 2].map((i) => start + i * step);
+        const fs = xs.map((x) => m * x + b);
+        const k = xs[2] + step * rng.int(2, 6);
+        const answer = m * k + b;
+        const x1 = xs.find((x) => x !== 0) ?? xs[1];
+        const prop = new Frac(m * x1 + b, x1).mul(k);
+        const wrongs: { value: Frac; trap: string; why: string }[] = [
+          { value: prop, trap: 'alg-linear-as-proportional', why: `treating $f$ as proportional: $f(${num(x1)}) = ${num(m * x1 + b)}$ scaled up to $x = ${k}$` },
+          { value: frac(m * k), trap: 'alg-forgot-intercept', why: `using the slope ${num(m)} but forgetting the constant $${num(b)}$` },
+          { value: frac(b * k + m), trap: 'alg-swapped-coefficients', why: `swapping the slope and the constant` },
+          { value: frac(m * k - b), trap: 'alg-sign-slip', why: `losing the sign of the constant $${num(b)}$` },
+        ];
+        if (step > 1) wrongs.push({ value: frac(fs[2] + (fs[2] - fs[1]) * (k - xs[2])), trap: 'alg-step-count', why: `adding the change per table step ${num(fs[2] - fs[1])} once for every unit of $x$` });
+        const res = trapChoices(rng, answer, wrongs, (v) => `$${v.toTex()}$`);
+        if (!res) continue;
+        const cited = res.kept[0];
+        const slopeTex = step === 1 ? `${num(fs[1] - fs[0])}` : `\\frac{${num(fs[1] - fs[0])}}{${step}} = ${num(m)}`;
+        return {
+          params: { kind, xs, fs, gs: [], k, values: res.values.map((v) => v.toNumber()), formulas: [] },
+          q: {
+            format: 'mcs',
+            figure: { kind: 'table', headers: ['$x$', '$f(x)$'], rows: xs.map((x, i) => [`$${num(x)}$`, `$${num(fs[i])}$`]) },
+            stem: `The table shows three values of a linear function $f$. What is the value of $f(${k})$?`,
+            choices: res.choices,
+            answer: res.answer,
+            explanation: `A linear function changes by the same amount for each equal step in $x$. From $x = ${num(xs[0])}$ to $x = ${num(xs[1])}$, $f$ changes by $${num(fs[1] - fs[0])}$ over ${step} unit${step > 1 ? 's' : ''}, so the slope is $${slopeTex}$, and $f(x) = ${poly([m, b])}$.
+
+Check: $f(${num(xs[2])}) = ${num(fs[2])}$. Then $f(${k}) = ${substitute([m, b], frac(k))} = ${num(answer)}$.
+
+Trap: $${cited.value.toTex()}$ comes from ${cited.why}. The constant $${num(b)}$ is not zero, so $f$ is not proportional.
+
+Rule: find the slope, then the constant, then substitute.`,
+          },
+        };
+      }
+      // formula: which rule fits the table
+      const quadratic = rng.chance(0.5);
+      const a = intExcept(rng, -3, 4, 0);
+      const c = intExcept(rng, -6, 6, 0);
+      const xs = quadratic ? [0, 1, 2, 3].slice(rng.int(0, 1), undefined).slice(0, 3) : [1, 2, 3];
+      const truth = quadratic ? polyEx([a, 0, c]) : polyEx([a, c]);
+      const fs = xs.map((x) => evalEx(truth, { x }));
+      const f0 = fs[0];
+      const x0 = xs[0];
+      // wrong rules that fit the first row (or the first two rows) only
+      const cands: { e: Ex; trap: string }[] = [];
+      const lineThrough = (slope: number) => polyEx([slope, f0 - slope * x0]);
+      const quadThrough = (lead: number) => polyEx([lead, 0, f0 - lead * x0 * x0]);
+      if (quadratic) {
+        cands.push({ e: lineThrough(a * (x0 + xs[1])), trap: 'alg-matched-one-row' });
+        cands.push({ e: quadThrough(a + 1), trap: 'alg-matched-one-row' });
+        cands.push({ e: quadThrough(-a), trap: 'alg-matched-one-row' });
+        cands.push({ e: quadThrough(a - 1), trap: 'alg-matched-one-row' });
+        cands.push({ e: lineThrough(a + 2), trap: 'alg-matched-one-row' });
+        cands.push({ e: polyEx([a, 0, 0]), trap: 'alg-forgot-intercept' });
+      } else {
+        cands.push({ e: lineThrough(a + 1), trap: 'alg-matched-one-row' });
+        cands.push({ e: lineThrough(a - 1), trap: 'alg-matched-one-row' });
+        if (x0 !== 0) cands.push({ e: polyEx([new Frac(f0, x0), 0]), trap: 'alg-linear-as-proportional' });
+        cands.push({ e: polyEx([a, 0]), trap: 'alg-forgot-intercept' });
+        cands.push({ e: quadThrough(1), trap: 'alg-matched-one-row' });
+        cands.push({ e: lineThrough(-a), trap: 'alg-matched-one-row' });
+      }
+      const seen = new Set([texEx(truth)]);
+      const wrong = rng.shuffle(cands).filter((w) => {
+        const t = texEx(w.e);
+        if (seen.has(t)) return false;
+        if (xs.every((x) => close(evalEx(w.e, { x }), evalEx(truth, { x })))) return false;
+        if (/\\frac/.test(t)) return false;
+        seen.add(t);
+        return true;
       });
-      const values = choices.map((c) => parseNum(c.text));
+      if (wrong.length < 4) continue;
+      const { choices, answer } = textChoices(
+        rng,
+        `$f(x) = ${texEx(truth)}$`,
+        wrong.slice(0, 4).map((w) => ({ text: `$f(x) = ${texEx(w.e)}$`, trap: w.trap })),
+      );
+      const all = [truth, ...wrong.slice(0, 4).map((w) => w.e)];
+      const formulas = choices.map((ch: Choice) => all.find((e) => `$f(x) = ${texEx(e)}$` === ch.text)!);
+      const w0 = wrong[0];
+      const badRow = xs.slice(1).find((x) => !close(evalEx(w0.e, { x }), evalEx(truth, { x })))!;
       return {
-        params: { kind, xs, fs, gs: [], k, values, formulas: [] },
+        params: { kind, xs, fs, gs: [], k: 0, values: [], formulas },
         q: {
           format: 'mcs',
           figure: { kind: 'table', headers: ['$x$', '$f(x)$'], rows: xs.map((x, i) => [`$${num(x)}$`, `$${num(fs[i])}$`]) },
-          stem: `The table shows three values of a linear function $f$. What is the value of $f(${k})$?`,
+          stem: 'The table shows three values of the function $f$. Which of the following could define $f$?',
           choices,
-          answer: idx,
-          explanation: `A linear function changes by the same amount for each step in $x$. From $x = ${num(xs[0])}$ to $x = ${num(xs[1])}$, $f$ changes by $${num(fs[1] - fs[0])}$, so the slope is $\\frac{${num(fs[1] - fs[0])}}{${step}} = ${num(m)}$. Then $f(x) = ${poly([m, b])}$ (check: $f(${num(xs[2])}) = ${num(fs[2])}$).
+          answer,
+          explanation: `A rule must fit EVERY row of the table, so test each choice on all the rows. Several choices fit the first row; only $f(x) = ${texEx(truth)}$ also gives ${xs
+            .slice(1)
+            .map((x, i) => `$f(${num(x)}) = ${num(fs[i + 1])}$`)
+            .join(' and ')}.
 
-So $f(${k}) = ${substitute([m, b], frac(k))} = ${num(answer)}$. A linear function is not proportional unless its graph passes through the origin.`,
+Check: ${xs.map((x) => `$f(${num(x)}) = ${num(evalEx(truth, { x }))}$`).join(', ')}.
+
+Trap: $f(x) = ${texEx(w0.e)}$ comes from ${w0.trap === 'alg-linear-as-proportional' ? 'treating the function as proportional' : w0.trap === 'alg-forgot-intercept' ? 'dropping the constant' : 'matching the first row only'}. It gives $f(${num(badRow)}) = ${num(evalEx(w0.e, { x: badRow }))}$, not $${num(evalEx(truth, { x: badRow }))}$.
+
+Rule: one matching row proves nothing; a rule must fit all of them.`,
         },
       };
     }
-    // formula: which rule fits the table
-    const quadratic = rng.chance(0.5);
-    const a = intExcept(rng, -3, 4, 0);
-    const c = rng.int(-6, 6);
-    const xs = quadratic ? [0, 1, 2, 3].slice(rng.int(0, 1), undefined).slice(0, 3) : [1, 2, 3];
-    const truth = quadratic ? polyEx([a, 0, c]) : polyEx([a, c]);
-    const fs = xs.map((x) => evalEx(truth, { x }));
-    const f0 = fs[0];
-    const x0 = xs[0];
-    // wrong rules that fit the first row (or the first two rows) only
-    const cands: { e: Ex; trap?: string }[] = [];
-    const lineThrough = (slope: number) => polyEx([slope, f0 - slope * x0]);
-    const quadThrough = (lead: number) => polyEx([lead, 0, f0 - lead * x0 * x0]);
-    if (quadratic) {
-      cands.push({ e: lineThrough(a * (x0 + xs[1])), trap: 'alg-matched-one-row' });
-      cands.push({ e: polyEx([a, 0, c + 1]) });
-      cands.push({ e: quadThrough(a + 1), trap: 'alg-matched-one-row' });
-      cands.push({ e: quadThrough(-a), trap: 'alg-matched-one-row' });
-      cands.push({ e: quadThrough(a - 1), trap: 'alg-matched-one-row' });
-      cands.push({ e: lineThrough(a + 2), trap: 'alg-matched-one-row' });
-    } else {
-      cands.push({ e: lineThrough(a + 1), trap: 'alg-matched-one-row' });
-      cands.push({ e: lineThrough(a - 1), trap: 'alg-matched-one-row' });
-      if (x0 !== 0) cands.push({ e: polyEx([new Frac(f0, x0), 0]), trap: 'alg-linear-as-proportional' });
-      cands.push({ e: polyEx([a, c + a]) });
-      cands.push({ e: quadThrough(1), trap: 'alg-matched-one-row' });
-      cands.push({ e: lineThrough(-a), trap: 'alg-matched-one-row' });
-    }
-    const seen = new Set([texEx(truth)]);
-    const wrong = cands.filter((w) => {
-      const t = texEx(w.e);
-      if (seen.has(t)) return false;
-      if (xs.every((x) => close(evalEx(w.e, { x }), evalEx(truth, { x })))) return false;
-      if (/\\frac/.test(t)) return false;
-      seen.add(t);
-      return true;
-    });
-    const { choices, answer } = textChoices(
-      rng,
-      `$f(x) = ${texEx(truth)}$`,
-      wrong.slice(0, 4).map((w) => ({ text: `$f(x) = ${texEx(w.e)}$`, ...(w.trap ? { trap: w.trap } : {}) })),
-    );
-    const all = [truth, ...wrong.map((w) => w.e)];
-    const formulas = choices.map((ch: Choice) => all.find((e) => `$f(x) = ${texEx(e)}$` === ch.text)!);
-    return {
-      params: { kind, xs, fs, gs: [], k: 0, values: [], formulas },
-      q: {
-        format: 'mcs',
-        figure: { kind: 'table', headers: ['$x$', '$f(x)$'], rows: xs.map((x, i) => [`$${num(x)}$`, `$${num(fs[i])}$`]) },
-        stem: 'The table shows three values of the function $f$. Which of the following could define $f$?',
-        choices,
-        answer,
-        explanation: `A rule must fit EVERY row of the table, so test each choice on all three rows. Several choices fit the first row; only $f(x) = ${texEx(truth)}$ also gives ${xs
-          .slice(1)
-          .map((x, i) => `$f(${num(x)}) = ${num(fs[i + 1])}$`)
-          .join(' and ')}.
-
-Checking a single row is the trap: ${quadratic ? 'the values do not change by a constant amount, so the rule is not linear.' : 'many lines pass through one point.'}`,
-      },
-    };
   },
   check(q, { kind, xs, fs, gs, k, values, formulas }) {
     if (q.format !== 'mcs') return 'wrong format';

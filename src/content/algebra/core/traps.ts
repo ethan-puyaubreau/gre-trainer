@@ -367,6 +367,10 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Composed the functions in the wrong order',
     fix: '$f(g(3))$ means: compute $g(3)$ first, then apply $f$ to that result. $g(f(3))$ is usually different.',
   },
+  'alg-composition-same-function': {
+    label: 'Applied the same function twice',
+    fix: '$f(g(3))$ uses $g$ first and then $f$: two different functions, in that order.',
+  },
   'alg-composition-product': {
     label: 'Multiplied the functions instead of composing them',
     fix: '$f(g(x))$ feeds the output of $g$ into $f$; it is not $f(x) \\cdot g(x)$.',

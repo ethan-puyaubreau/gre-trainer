@@ -14,10 +14,6 @@
     "bank.size": "baseline",
     "bank.difficulty": "baseline"
   },
-  "alg.functions.table-mcs": {
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
   "alg.graphs.intersection": {
     "distractors.trapped": "baseline"
   },
