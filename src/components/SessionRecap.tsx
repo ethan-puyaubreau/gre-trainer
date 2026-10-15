@@ -149,7 +149,7 @@ export function SessionRecap({
 
       {up.length > 0 && (
         <>
-          <h3>Moved up</h3>
+          <h3>{up.every((m) => m.from === 0) ? 'Started' : 'Moved up'}</h3>
           <ul className="recap-list">
             {up.map((m, i) => (
               <MoveRow key={m.skillId} move={m} index={upAt + i} />
