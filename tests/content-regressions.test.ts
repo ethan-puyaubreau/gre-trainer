@@ -154,3 +154,35 @@ describe('arith.exponents.negative-exponent-qc', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('alg.inequalities.abs-qc', () => {
+  it('every value tried in the explanation satisfies the condition on m, and the cases shown support the answer', () => {
+    const bad: string[] = [];
+    let linear = 0;
+    let restricted = 0;
+    for (const { seed, d, q, params } of bodies('alg.inequalities.abs-qc')) {
+      const { kind, k, cond } = params as { kind: string; k: number[]; cond: string };
+      if (q.format !== 'qc' || kind !== 'abs-vs-linear' || k[2] === 2) continue; // 'same' form: no values tried
+      linear++;
+      if (cond !== 'none') restricted++;
+      const K = k[0];
+      const plus = k[1] === 1;
+      const allowed = (m: number) => (cond === 'none' ? true : cond === 'pos' ? m > 0 : m < 0);
+      const shown = [...(q.explanation ?? '').matchAll(/For \$m = (-?\d+)\$: Quantity A is (-?\d+) and Quantity B is (-?\d+)\./g)].map((x) => ({ m: Number(x[1]), a: Number(x[2]), b: Number(x[3]) }));
+      const where = `seed ${seed} d${d} (${cond})`;
+      if (shown.length === 0) bad.push(`${where}: no value tried`);
+      for (const s of shown) {
+        if (!allowed(s.m)) bad.push(`${where}: tries m = ${s.m}`);
+        const a = Math.abs(plus ? s.m + K : s.m - K);
+        const b = plus ? K - s.m : s.m + K;
+        if (a !== s.a || b !== s.b) bad.push(`${where}: m = ${s.m} gives ${a} and ${b}, not ${s.a} and ${s.b}`);
+      }
+      const rel = new Set(shown.map((s) => (s.a > s.b ? 'A' : s.a < s.b ? 'B' : 'C')));
+      if (rel.size > 1 && q.answer !== 'D') bad.push(`${where}: the cases disagree but the answer is ${q.answer}`);
+      if (rel.size === 1 && q.answer !== 'D' && !rel.has(q.answer)) bad.push(`${where}: the case shown gives ${[...rel]} but the answer is ${q.answer}`);
+    }
+    expect(linear).toBeGreaterThan(100);
+    expect(restricted).toBeGreaterThan(50);
+    expect(bad).toEqual([]);
+  });
+});

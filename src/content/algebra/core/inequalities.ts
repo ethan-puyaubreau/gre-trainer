@@ -309,14 +309,21 @@ const absQC: Template<AbsParams> = {
           if (!traps.C) traps.C = 'tested-one-value';
         }
         const here = cond === 'none' ? 'Nothing fixes the sign of $m$, and the two cases give different answers.' : cond === 'pos' ? 'Here $m > 0$.' : 'Here $m < 0$.';
-        explanation =
+        // only values of m that satisfy the condition are tried, and only the cases that can occur are argued
+        const tried = (cond === 'none' ? [1, -1] : cond === 'pos' ? [1] : [-1])
+          .map((m) => `For $m = ${num(m)}$: Quantity A is ${Math.abs(form === 'plus' ? m + K : m - K)} and Quantity B is ${form === 'plus' ? K - m : m + K}.`)
+          .join(' ');
+        const ifPos =
           form === 'plus'
-            ? `Try values. For $m = 1$: Quantity A is ${K + 1} and Quantity B is ${K - 1}. For $m = -1$: Quantity A is ${Math.abs(K - 1)} and Quantity B is ${K + 1}.
+            ? `if $m > 0$ then $|m + ${K}| = m + ${K}$, which is greater than $${K} - m$.`
+            : `if $m > 0$ then $|m - ${K}|$, the difference of two positive numbers, is less than their sum $m + ${K}$.`;
+        const ifNeg =
+          form === 'plus'
+            ? `If $m < 0$, then $${K} - m = ${K} + |m|$, and adding a negative number to ${K} gives something smaller in size: $|m + ${K}| < ${K} + |m|$.`
+            : `If $m < 0$, then $|m - ${K}| = ${K} - m$, which is greater than $${K} + m$.`;
+        explanation = `Try values. ${tried}
 
-In general, if $m > 0$ then $|m + ${K}| = m + ${K}$, which is greater than $${K} - m$. If $m < 0$, then $${K} - m = ${K} + |m|$, and adding a negative number to ${K} gives something smaller in size: $|m + ${K}| < ${K} + |m|$. ${here} ${qcEnd(answer)}`
-            : `Try values. For $m = 1$: Quantity A is ${Math.abs(1 - K)} and Quantity B is ${K + 1}. For $m = -1$: Quantity A is ${K + 1} and Quantity B is ${K - 1}.
-
-In general, if $m > 0$ then $|m - ${K}|$, the difference of two positive numbers, is less than their sum $m + ${K}$. If $m < 0$, then $|m - ${K}| = ${K} - m$, which is greater than $${K} + m$. ${here} ${qcEnd(answer)}`;
+In general, ${cond === 'neg' ? ifNeg.replace(/^If/, 'if') : ifPos}${cond === 'none' ? ` ${ifNeg}` : ''} ${here} ${qcEnd(answer)}`;
         k = [K, form === 'plus' ? 1 : -1, form === 'plus' ? 0 : 1];
       }
     } else {
