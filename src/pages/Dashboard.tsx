@@ -453,8 +453,13 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
         <span className="chip chip-accent">
           <i className={`level-dot level-${st.level}`} /> {LEVEL_NAMES[st.level]}
         </span>
-        <span className="chip" title={`Questions on this skill are ${DIFF_NAMES[st.difficulty - 1]} right now. This goes up after clean streaks and down after a miss.`}>
-          difficulty {'●'.repeat(st.difficulty) + '○'.repeat(3 - st.difficulty)}
+        <span
+          className="chip"
+          role="img"
+          aria-label={`Difficulty: ${DIFF_NAMES[st.difficulty - 1]} (${st.difficulty} of 3)`}
+          title={`Questions on this skill are ${DIFF_NAMES[st.difficulty - 1]} right now. This goes up after clean streaks and down after a miss.`}
+        >
+          difficulty {DIFF_NAMES[st.difficulty - 1]} {'●'.repeat(st.difficulty) + '○'.repeat(3 - st.difficulty)}
         </span>
         {acc !== null && <span className="chip">{acc}% correct</span>}
         {avg !== null && <span className={`chip ${avg > settings.paceSec * 1000 ? 'chip-bad' : 'chip-good'}`}>avg {formatClock(avg)}</span>}
