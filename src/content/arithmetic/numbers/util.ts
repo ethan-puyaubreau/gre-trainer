@@ -149,6 +149,12 @@ export function numChoices(
     count?: number;
     /** Allow negative or zero distractors (default: only if the correct value is not positive). */
     allowNonPositive?: boolean;
+    /**
+     * 'asc' (default): ascending order; the answer's rank is drawn among the ranks that keep at least half of
+     * the wrong choices named. 'shuffled': all the traps are kept (up to count - 1) and the choices are
+     * shuffled; use it when the real mistakes all fall on one side of the answer.
+     */
+    order?: 'asc' | 'shuffled';
   },
 ): NumChoices {
   const count = opts.count ?? 5;
@@ -169,16 +175,25 @@ export function numChoices(
   };
   const below: Item[] = [];
   const above: Item[] = [];
-  let target = rng.int(0, count - 1);
-  for (const t of opts.traps ?? []) {
-    if (!usable(t.value)) continue;
-    const lower = t.value.lt(correct);
-    const side = lower ? below : above;
-    const cap = lower ? target : count - 1 - target;
-    if (side.length < cap) {
-      accept(t.value);
-      side.push({ v: t.value, trap: t.trap });
-    }
+  // Named traps first. In ascending order the rank of the answer is drawn among the ranks that keep at least
+  // half of the wrong choices named; in shuffled order every trap is kept.
+  const shuffled = opts.order === 'shuffled';
+  const trapPool: { value: Frac; trap: string }[] = [];
+  for (const t of opts.traps ?? []) if (usable(t.value) && !trapPool.some((u) => u.value.eq(t.value))) trapPool.push(t);
+  const lowT = trapPool.filter((t) => t.value.lt(correct));
+  const upT = trapPool.filter((t) => t.value.gt(correct));
+  const need = count - 1;
+  const named = (t: number) => Math.min(t, lowT.length) + Math.min(need - t, upT.length);
+  const minNamed = shuffled ? Math.min(need, lowT.length + upT.length) : Math.min(Math.ceil(need / 2), lowT.length + upT.length);
+  const ranks = Array.from({ length: need + 1 }, (_, t) => t).filter((t) => named(t) >= minNamed);
+  let target = ranks.length ? rng.pick(ranks) : rng.int(0, need);
+  for (const t of lowT.slice(0, target)) {
+    accept(t.value);
+    below.push({ v: t.value, trap: t.trap });
+  }
+  for (const t of upT.slice(0, need - target)) {
+    accept(t.value);
+    above.push({ v: t.value, trap: t.trap });
   }
   const fillers = opts.fillers ?? [];
   const step = syntheticStep(correct);
@@ -206,8 +221,9 @@ export function numChoices(
   if (shortBelow > 0) target -= shortBelow;
   const shortAbove = take(false, count - 1 - target - above.length);
   if (shortAbove > 0) take(true, shortAbove);
-  const items: Item[] = [...below, { v: correct, ok: true }, ...above].sort((a, b) => a.v.cmp(b.v));
+  let items: Item[] = [...below, { v: correct, ok: true }, ...above].sort((a, b) => a.v.cmp(b.v));
   if (items.length !== count) throw new Error('numChoices: could not fill choices');
+  if (shuffled) items = rng.shuffle(items);
   return {
     choices: items.map((it) => ({ text: opts.format(it.v), ...(it.trap ? { trap: it.trap } : {}) })),
     answer: items.findIndex((it) => it.ok),

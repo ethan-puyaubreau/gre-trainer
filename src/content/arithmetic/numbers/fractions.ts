@@ -346,15 +346,23 @@ const compareFractions: Template<CmpParams> = {
         // Trap: extreme numerator (largest for "greatest", smallest for "least") must not be the answer.
         const nums = fracs.map(([p]) => p);
         const trapIdx = extremeIndex(nums, mode === 'greatest' ? 'max' : 'min');
-        if (trapIdx === target || (trapIdx < 0 && d > 1)) continue;
+        if (trapIdx === target || trapIdx < 0) continue;
+        // second slip: judging by the denominator alone (smallest denominator for "greatest", largest for "least")
+        const denIdx = extremeIndex(
+          fracs.map(([, q]) => q),
+          mode === 'greatest' ? 'min' : 'max',
+        );
+        if (denIdx === target || denIdx === trapIdx || denIdx < 0) continue;
         const order = fracs.map((f, i) => ({ f, i })).sort((a, b) => a.f[1] - b.f[1] || a.f[0] - b.f[0]);
         const sorted = order.map((o) => o.f);
         const answer = order.findIndex((o) => o.i === target);
         const trapPos = order.findIndex((o) => o.i === trapIdx);
-        const choices = sorted.map(([p, q], i) => ({ text: `$${F(p, q).toTex()}$`, ...(i === trapPos ? { trap: 'num-compare-parts' } : {}) }));
+        const denPos = order.findIndex((o) => o.i === denIdx);
+        const choices = sorted.map(([p, q], i) => ({ text: `$${F(p, q).toTex()}$`, ...(i === trapPos || i === denPos ? { trap: 'num-compare-parts' } : {}) }));
         const [ap, aq] = sorted[answer];
         const lines = sorted.map(([p, q]) => `$${F(p, q).toTex()} ${approx(p, q)}$`).join(', ');
         const [tp, tq] = trapPos >= 0 ? sorted[trapPos] : [0, 0];
+        const [dp, dq] = sorted[denPos];
         return {
           params: { mode, fracs: sorted },
           q: {
@@ -362,13 +370,13 @@ const compareFractions: Template<CmpParams> = {
             stem: `Which of the following fractions is ${mode}?`,
             choices,
             answer,
-            explanation: `Convert each fraction to a decimal (or cross-multiply in pairs): ${lines}.
+            explanation: `Compare values, not parts: convert each fraction to a decimal (or cross-multiply in pairs): ${lines}.
 
-The ${mode} is $${F(ap, aq).toTex()}$.${
-              trapPos >= 0
-                ? `\n\n$${F(tp, tq).toTex()}$ has the ${mode === 'greatest' ? 'largest' : 'smallest'} numerator, but its denominator is ${mode === 'greatest' ? 'large' : 'small'} too: compare values, not numerators.`
-                : ''
-            }`,
+The ${mode} is $${F(ap, aq).toTex()}$.
+
+Check: $${F(ap, aq).toTex()} ${approx(ap, aq)}$ is ${mode === 'greatest' ? 'above' : 'below'} every other decimal in the list.
+
+Trap: $${F(tp, tq).toTex()}$ has the ${mode === 'greatest' ? 'largest' : 'smallest'} numerator, but its denominator is ${mode === 'greatest' ? 'large' : 'small'} too; $${F(dp, dq).toTex()}$ has the ${mode === 'greatest' ? 'smallest' : 'largest'} denominator, but its numerator is ${mode === 'greatest' ? 'small' : 'large'} too. Neither part alone decides.`,
           },
         };
       }
@@ -395,15 +403,24 @@ The ${mode} is $${F(ap, aq).toTex()}$.${
       const lower = rng.shuffle(outside.filter(([p, q]) => F(p, q).lt(F(...lo))));
       const upper = rng.shuffle(outside.filter(([p, q]) => F(p, q).gt(F(...hi))));
       if (lower.length < rank || upper.length < 4 - rank) continue;
-      const trapPick = partsTrap.filter(([p, q]) => (F(p, q).lt(F(...lo)) ? rank > 0 : rank < 4));
-      const wrong: [number, number][] = trapPick.length ? [rng.pick(trapPick)] : [];
-      const firstLow = wrong.length && F(...wrong[0]).lt(F(...lo)) ? 1 : 0;
-      const firstHigh = wrong.length - firstLow;
       const same = (a: [number, number], b: [number, number]) => a[0] === b[0] && a[1] === b[1];
-      wrong.push(...lower.filter((f) => !wrong.some((w) => same(w, f))).slice(0, rank - firstLow));
-      wrong.push(...upper.filter((f) => !wrong.some((w) => same(w, f))).slice(0, 4 - rank - firstHigh));
+      const wrong: [number, number][] = [];
+      let nl = 0;
+      let nh = 0;
+      for (const f of rng.shuffle(partsTrap)) {
+        if (wrong.length >= 2) break;
+        if (F(...f).lt(F(...lo)) ? nl < rank : nh < 4 - rank) {
+          wrong.push(f);
+          if (F(...f).lt(F(...lo))) nl++;
+          else nh++;
+        }
+      }
+      if (wrong.length < 2) continue; // two choices must be tempting for their numerator or denominator
+      const nTrap = wrong.length;
+      wrong.push(...lower.filter((f) => !wrong.some((w) => same(w, f))).slice(0, rank - nl));
+      wrong.push(...upper.filter((f) => !wrong.some((w) => same(w, f))).slice(0, 4 - rank - nh));
       if (wrong.length < 4) continue;
-      const all = [{ f: good, ok: true, trap: false }, ...wrong.map((f, i) => ({ f, ok: false, trap: i === 0 && trapPick.length > 0 }))].sort(
+      const all = [{ f: good, ok: true, trap: false }, ...wrong.map((f, i) => ({ f, ok: false, trap: i < nTrap }))].sort(
         (x, y) => x.f[0] / x.f[1] - y.f[0] / y.f[1],
       );
       const choices = all.map((c) => ({ text: `$${F(...c.f).toTex()}$`, ...(c.trap ? { trap: 'num-compare-parts' } : {}) }));
@@ -422,9 +439,7 @@ The ${mode} is $${F(ap, aq).toTex()}$.${
             .join(', ')}.
 
 Only $${F(...good).toTex()}$ lies strictly between them.${
-            trapPick.length
-              ? ` Having a numerator or a denominator between those of the two fractions proves nothing: compare the values.`
-              : ''
+            ` Trap: having a numerator or a denominator between those of the two fractions proves nothing: compare the values.`
           }`,
         },
       };

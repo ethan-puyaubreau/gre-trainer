@@ -1,6 +1,7 @@
 import { flaggedChoices, qcCompare } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { num, plain, usd } from '../../../engine/tex';
+import { term } from '../../../engine/text';
 import type { Choice, Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import {
   close,
@@ -16,6 +17,7 @@ import {
   qcEnd,
   qcFromFloatSamples,
   plainNum,
+  QC_REL,
   spreadFillers,
   swapQC,
 } from './util';
@@ -229,7 +231,7 @@ ${qcEnd(rel)}`,
 
 /* ================================================================== 2. Percent of, swapped percents, greater vs less (QC) */
 
-type POMode = 'estimate' | 'swap' | 'greater-less' | 'chain';
+type POMode = 'estimate' | 'swap' | 'greater-less' | 'chain' | 'unknown';
 
 interface POParams {
   mode: POMode;
@@ -253,6 +255,7 @@ const percentOfQC: Template<POParams> = {
             ['estimate', 5],
             ['swap', 2],
             ['greater-less', 1],
+            ['unknown', 1.5],
           ]
         : d === 2
           ? [
@@ -260,12 +263,14 @@ const percentOfQC: Template<POParams> = {
               ['swap', 1.5],
               ['greater-less', 3],
               ['chain', 1],
+              ['unknown', 3],
             ]
           : [
               ['estimate', 1.5],
               ['swap', 1],
               ['greater-less', 3],
               ['chain', 3],
+              ['unknown', 3],
             ],
     );
     const swap = rng.chance(0.4);
@@ -302,6 +307,41 @@ const percentOfQC: Template<POParams> = {
           explanation: `$${pct(p)}$ of ${plain(n)} is $${dec(F(p, 100))} \\times ${num(n)} = ${dec(V)}$.${bench}
 
 Compare $${dec(V)}$ with $${dec(m)}$. ${qcEnd(answer)}`,
+        },
+      };
+    }
+    if (mode === 'unknown') {
+      // n is not known to be positive: p% of n and q% of kn compare in the same way for every n only when they are equal
+      const k = rng.pick(d === 1 ? [1, 2] : [1, 2, 3, 4]);
+      const pcts = [5, 10, 12, 15, 20, 25, 30, 40, 50, 60, 75];
+      const p = rng.pick(k > 1 ? pcts.filter((x) => x % k === 0) : pcts);
+      // equal quantities only when k > 1 (q% of kn with q = p / k); otherwise two different percents
+      const q = k > 1 && rng.chance(0.35) ? p / k : rng.pick(pcts.filter((x) => x * k !== p));
+      const equal = p === q * k;
+      const rel: QCChoice = equal ? 'C' : 'D';
+      const answer = rel;
+      const naive: QCChoice = qcCompare(p, q * k);
+      const traps: QCQuestion['traps'] = rel === 'D' ? { [naive]: 'tested-one-value' } : { D: 'num-sign-rules' };
+      const qa = `$${pct(p)}$ of $n$`;
+      const qb = k === 1 ? `$${pct(q)}$ of $n$` : `$${pct(q)}$ of $${k}n$`;
+      return {
+        params: { mode, p, n: q, m: F(k), dir: 'greater', swap },
+        q: {
+          format: 'qc',
+          info: d === 1 ? '$n$ is a nonzero integer.' : '$n$ is a number and $n \\ne 0$.',
+          quantityA: swap ? qb : qa,
+          quantityB: swap ? qa : qb,
+          answer,
+          traps,
+          explanation: `Write both quantities as multiples of $n$: Quantity A is $${term(F(p, 100), 'n')}$ and Quantity B is $${term(F(q * k, 100), 'n')}$.
+
+${
+            equal
+              ? `The two multiples are equal, so the quantities are equal whatever $n$ is. (C)`
+              : `Since $n$ may be positive or negative, the bigger multiple is the greater quantity only for positive $n$. For $n = 100$ Quantity ${p > q * k ? (swap ? 'B' : 'A') : swap ? 'A' : 'B'} is greater; for $n = -100$ it is the other one. The relationship cannot be determined. (D)
+
+Trap: the first value you try, usually a positive $n$, suggests ${QC_REL[swap ? swapQC(naive) : naive]}; a sign is a case to test.`
+          }`,
         },
       };
     }
@@ -368,7 +408,7 @@ ${dir === 'greater' ? 'The base for "less than $x$" is the larger number $x$, so
         quantityA: swap ? qb : qa,
         quantityB: swap ? qa : qb,
         answer,
-        explanation: `$x = ${dec(F(p, 100))}y$ and $y = ${dec(F(n, 100))}z$, so $x = ${dec(F(p, 100))} \\times ${dec(F(n, 100))}z = ${dec(r.div(100))}z$, which is $${pct(r)}$ of $z$. Percents of percents multiply; they do not add.
+        explanation: `$x = ${dec(F(p, 100))}y$ and $y = ${dec(F(n, 100))}z$, so $x = ${dec(F(p, 100))} \\times ${dec(F(n, 100))}z = ${term(r.div(100), 'z')}$, which is $${pct(r)}$ of $z$. Percents of percents multiply; they do not add.
 
 Since $z > 0$, compare $${pct(r)}$ with $${pct(finalM)}$. ${qcEnd(answer)}`,
       },
@@ -376,7 +416,10 @@ Since $z > 0$, compare $${pct(r)}$ with $${pct(finalM)}$. ${qcEnd(answer)}`,
   },
   check(q, { mode, p, n, m, dir, swap }) {
     let samples: [number, number][];
-    if (mode === 'estimate') samples = [[(p / 100) * n, m.toNumber()]];
+    if (mode === 'unknown') {
+      // n runs over negative and positive values; m holds the multiplier k and n holds q
+      samples = [-12, -3, -1, 1, 4, 25].map((nn) => [(p / 100) * nn, (n / 100) * m.toNumber() * nn] as [number, number]);
+    } else if (mode === 'estimate') samples = [[(p / 100) * n, m.toNumber()]];
     else if (mode === 'swap') samples = [[(p / 100) * n, (n / 100) * p]];
     else if (mode === 'greater-less')
       samples = [3, 10, 77, 1000].map((y) => {
@@ -421,9 +464,17 @@ const expressionMCS: Template<ExParams> = {
   generate(rng, d) {
     const modes: ExMode[] = d === 1 ? ['tax', 'discount', 'tip'] : d === 2 ? ['tax', 'discount', 'tip', 'commission'] : ['commission', 'original', 'discount', 'tax'];
     const mode = rng.pick(modes);
-    const p = mode === 'original' ? rng.pick([20, 50, 60, 75, 80]) : mode === 'tax' ? rng.pick([4, 5, 6, 7, 9]) : mode === 'tip' ? rng.pick([15, 18, 20]) : mode === 'commission' ? rng.pick([3, 4, 5, 6, 8]) : rng.pick([10, 15, 20, 25, 30, 35]);
+    // Each level has its own percents, so the same wording never appears at two levels.
+    const lists: Record<ExMode, Record<1 | 2 | 3, number[]>> = {
+      tax: { 1: [4, 5, 6], 2: [7, 8, 9], 3: [3, 11, 12] },
+      tip: { 1: [15, 20], 2: [18, 25], 3: [18, 25] },
+      discount: { 1: [10, 20, 25], 2: [15, 30, 35], 3: [12, 18, 45] },
+      commission: { 1: [4], 2: [3, 5, 7], 3: [4, 6, 8, 9] },
+      original: { 1: [20], 2: [20], 3: [20, 50, 60, 75, 80] },
+    };
+    const p = rng.pick(lists[mode][d as 1 | 2 | 3]);
     const t = F(p, 100);
-    const base = mode === 'commission' ? rng.pick([300, 400, 500, 600, 750]) : 0;
+    const base = mode === 'commission' ? rng.pick(d === 2 ? [300, 400, 500] : [600, 750, 900, 1200]) : 0;
     const coef = (a: Frac) => (a.eq(1) ? 's' : `${dec(a)}s`);
     const L = (a: Frac, b: Frac, trap?: string, text?: string): LinChoice => ({
       a,
@@ -440,15 +491,30 @@ const expressionMCS: Template<ExParams> = {
       wrong = [L(t, F(0), 'num-change-only'), L(F(1), t, 'num-percent-as-number'), L(F(1), F(p), 'num-percent-as-number'), L(F(p), F(0), 'num-decimal-shift'), L(F(1).add(t.mul(10)), F(0), 'num-decimal-shift')];
       stem =
         mode === 'tax'
-          ? `Which of the following represents the total amount, in dollars, that a customer pays for an item with a price of $s$ dollars when a ${P(p)} sales tax is added to the price?`
-          : `A diner adds a ${P(p)} tip to a restaurant bill of $s$ dollars. Which of the following represents the total amount, in dollars, that the diner pays?`;
+          ? [
+              `Which of the following represents the total amount, in dollars, that a customer pays for an item with a price of $s$ dollars when a ${P(p)} sales tax is added to the price?`,
+              `A diner's meal costs $s$ dollars before tax. If a ${P(p)} sales tax is added, which of the following represents the total, in dollars?`,
+              `The price of a book is $s$ dollars. A ${P(p)} sales tax is added at the register. Which of the following represents the total cost of the book, in dollars?`,
+              `A ticket costs $s$ dollars before a ${P(p)} service tax is added. Which of the following represents the amount paid for the ticket, in dollars?`,
+            ][rng.int(0, 3)]
+          : [
+              `A diner adds a ${P(p)} tip to a restaurant bill of $s$ dollars. Which of the following represents the total amount, in dollars, that the diner pays?`,
+              `A taxi fare is $s$ dollars, and the passenger adds a ${P(p)} tip. Which of the following represents the total paid, in dollars?`,
+              `After a haircut that costs $s$ dollars, a customer leaves a ${P(p)} tip. Which of the following represents the total amount, in dollars, that the customer spends?`,
+              `The bill for a group is $s$ dollars. The group pays the bill plus a ${P(p)} tip. Which of the following represents the amount paid, in dollars?`,
+            ][rng.int(0, 3)];
       expl = `The ${mode === 'tax' ? 'tax' : 'tip'} is ${P(p)} of $s$, that is, $${dec(t)}s$. The total is the price plus the ${mode === 'tax' ? 'tax' : 'tip'}: $s + ${dec(t)}s = ${dec(F(1).add(t))}s$.
 
 $${dec(t)}s$ is only the ${mode === 'tax' ? 'tax' : 'tip'}, and $s + ${dec(t)}$ adds a fixed amount instead of a percent of $s$.`;
     } else if (mode === 'discount') {
       correct = L(F(1).sub(t), F(0));
       wrong = [L(t, F(0), 'num-change-only'), L(F(1), t.neg(), 'num-percent-as-number'), L(F(1).add(t), F(0)), L(F(1), F(-p), 'num-percent-as-number'), L(F(1).sub(t.div(10)), F(0), 'num-decimal-shift')];
-      stem = `The regular price of a coat is $s$ dollars. Which of the following represents the price, in dollars, of the coat after a ${P(p)} discount?`;
+      stem = [
+        `The regular price of a coat is $s$ dollars. Which of the following represents the price, in dollars, of the coat after a ${P(p)} discount?`,
+        `A jacket is marked $s$ dollars. Which of the following represents its price, in dollars, after a ${P(p)} discount?`,
+        `During a sale, every item is reduced by ${P(p)}. Which of the following represents the sale price, in dollars, of an item that regularly sells for $s$ dollars?`,
+        `A store takes ${P(p)} off the regular price of a lamp. If the regular price is $s$ dollars, which of the following represents the new price, in dollars?`,
+      ][rng.int(0, 3)];
       expl = `The discount is $${dec(t)}s$, so the new price is $s - ${dec(t)}s = ${dec(F(1).sub(t))}s$.
 
 $${dec(t)}s$ is the amount saved, not the new price.`;
@@ -461,7 +527,10 @@ $${dec(t)}s$ is the amount saved, not the new price.`;
         L(F(1), F(base).add(t), 'num-percent-as-number', `$${dec(F(base).add(t))} + s$`),
         L(F(1), F(base + p), 'num-percent-as-number', `$${base + p} + s$`),
       ];
-      stem = `A salesperson's weekly pay is ${usd(base)} plus ${P(p)} of the salesperson's total sales for the week. If the salesperson's sales for one week were $s$ dollars, which of the following represents the salesperson's pay, in dollars, for that week?`;
+      stem = [
+        `A salesperson's weekly pay is ${usd(base)} plus ${P(p)} of the salesperson's total sales for the week. If the salesperson's sales for one week were $s$ dollars, which of the following represents the salesperson's pay, in dollars, for that week?`,
+        `An agent earns a fixed ${usd(base)} per week plus ${P(p)} of the value of the sales made that week. If the sales were $s$ dollars, which of the following represents the agent's earnings, in dollars, for the week?`,
+      ][rng.int(0, 1)];
       expl = `The commission is ${P(p)} of $s$, that is, $${dec(t)}s$. Add the fixed ${usd(base)}: $${base} + ${dec(t)}s$.
 
 Writing ${p}s treats ${P(p)} as ${p}, and $${dec(t)}(${base} + s)$ takes the percent of the fixed pay as well.`;
@@ -475,7 +544,10 @@ Writing ${p}s treats ${P(p)} as ${p}, and $${dec(t)}(${base} + s)$ takes the per
         L(F(1), F(p), 'num-percent-as-number'),
         L(t, F(0), 'num-change-only'),
       ];
-      stem = `After a ${P(p)} discount, the sale price of a chair is $s$ dollars. Which of the following represents the price, in dollars, of the chair before the discount?`;
+      stem = [
+        `After a ${P(p)} discount, the sale price of a chair is $s$ dollars. Which of the following represents the price, in dollars, of the chair before the discount?`,
+        `A television is on sale for $s$ dollars after a ${P(p)} reduction. Which of the following represents the price, in dollars, before the reduction?`,
+      ][rng.int(0, 1)];
       expl = `If the original price is $x$, the sale price is $${dec(F(1).sub(t))}x = s$, so $x = \\frac{s}{${dec(F(1).sub(t))}} = ${dec(k)}s$.
 
 Adding ${P(p)} back gives $${dec(F(1).add(t))}s$, which is too small: the ${P(p)} was taken on the original price $x$, not on $s$. Check: $${dec(F(1).sub(t))} \\times ${dec(k)}s = s$.`;
@@ -702,13 +774,11 @@ const rateChangeMCS: Template<RCParams> = {
     const points = p2.sub(p1).abs();
     const ratio = p2.mul(100).div(p1);
     const newBase = p2.sub(p1).abs().mul(100).div(p2);
-    const allTraps = [
-      { value: points, trap: 'num-percentage-points', keep: 0.75 },
-      { value: ratio, trap: 'num-ratio-as-change', keep: 0.55 },
-      { value: newBase, trap: 'num-percent-wrong-base', keep: 0.5 },
+    const rcTraps = [
+      { value: points, trap: 'num-percentage-points' },
+      { value: ratio, trap: 'num-ratio-as-change' },
+      { value: newBase, trap: 'num-percent-wrong-base' },
     ];
-    let rcTraps = allTraps.filter((t) => rng.chance(t.keep)).map(({ value, trap }) => ({ value, trap }));
-    if (!rcTraps.length) rcTraps = [{ value: points, trap: 'num-percentage-points' }];
     const steps = [F(10), F(20), F(25), F(50), F(75), F(100)];
     const { choices, answer, values } = numChoices(rng, {
       correct,
@@ -721,7 +791,9 @@ const rateChangeMCS: Template<RCParams> = {
         steps.map((x) => correct.add(x)),
       ),
       format: (v) => `$${pct(v)}$`,
+      order: 'shuffled',
     });
+    const shown = (v: Frac) => !v.eq(correct) && values.some((x) => x.eq(v));
     const y1 = 2019 + rng.int(0, 2);
     const y2 = y1 + rng.int(2, 4);
     return {
@@ -731,9 +803,19 @@ const rateChangeMCS: Template<RCParams> = {
         stem: `In ${y1}, ${P(p1)} of the ${ctx.who} ${ctx.what}. In ${y2}, ${P(p2)} of the ${ctx.again} ${ctx.what}. By what percent did the percentage of ${ctx.group} ${up ? 'increase' : 'decrease'} from ${y1} to ${y2}?`,
         choices,
         answer,
-        explanation: `Percent change = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$, with the old value ${P(p1)} as the base: $\\frac{${dec(p2)} - ${dec(p1)}}{${dec(p1)}} \\times 100 = ${change.isInt() ? change.toNumber() : dec(change)}$, ${up ? 'an increase' : 'a decrease'} of $${pct(correct)}$.
+        explanation: `A percentage changes like any other quantity: percent change = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$, with the old value as the base.
 
-The change of ${dec(points)} is in percentage points, not percent. ${up ? `And ${P(p2)} is $${pct(ratio)}$ OF ${P(p1)}, which is not the same as $${pct(correct)}$ MORE than it.` : `Dividing by the new value ${P(p2)} uses the wrong base.`}`,
+Here $\\frac{${dec(p2)} - ${dec(p1)}}{${dec(p1)}} \\times 100 = ${change.isInt() ? change.toNumber() : dec(change)}$, ${up ? 'an increase' : 'a decrease'} of $${pct(correct)}$.
+
+Check with 10,000 ${ctx.group.includes('trees') ? 'trees' : 'people'}: ${plain(p1.toNumber() * 100)} become ${plain(p2.toNumber() * 100)}, ${up ? 'a rise' : 'a drop'} of ${plain(Math.abs(p2.toNumber() - p1.toNumber()) * 100)}, which is $${pct(correct)}$ of ${plain(p1.toNumber() * 100)}.
+
+Trap: ${[
+          shown(points) ? `${dec(points)} is the change in percentage points, not in percent` : '',
+          shown(ratio) ? `$${pct(ratio)}$ is ${P(p2)} as a percent OF ${P(p1)}, which is not the percent ${up ? 'more' : 'less'}` : '',
+          shown(newBase) ? `dividing by the new value ${P(p2)} uses the wrong base ($${pct(newBase)}$)` : '',
+        ]
+          .filter(Boolean)
+          .join('; ')}.`,
       },
     };
   },
@@ -826,13 +908,21 @@ const weightedMCS: Template<WParams> = {
       const mean = F(rates.reduce((s, r) => s + r, 0), rates.length);
       if (!overall.isInt() || !mean.isInt() || overall.eq(mean) || new Set(rates).size < rates.length) continue;
       const biggest = shares.reduce((bi, w, i) => (w.gt(shares[bi]) ? i : bi), 0);
+      // Real slips: the plain average of the percents, the percent of the largest group alone, the shares matched to the wrong groups.
+      const reversed = [...shares].reverse().reduce((sum, w, i) => sum.add(w.mul(rates[i])), F(0));
+      const traps = [
+        { value: mean, trap: 'num-unweighted-mean' },
+        { value: F(rates[biggest]), trap: 'num-largest-group-only' },
+        { value: reversed, trap: 'num-weights-swapped' },
+      ].filter((t, i, arr) => !t.value.eq(overall) && arr.findIndex((u) => u.value.eq(t.value)) === i);
+      if (traps.length < 2) continue;
       const { choices, answer, values } = numChoices(rng, {
         correct: overall,
-        traps: [{ value: mean, trap: 'num-unweighted-mean' }],
+        traps,
         fillers: spreadFillers(
           rng,
           overall,
-          [mean],
+          traps.map((t) => t.value),
           [F(rates[biggest]), ...[5, 10, 15, 20].map((x) => overall.sub(x))].filter((x) => x.sign() > 0),
           [F(rates[biggest]), ...[5, 10, 15, 20].map((x) => overall.add(x))].filter((x) => x.lt(100)),
         ),
@@ -858,7 +948,13 @@ const weightedMCS: Template<WParams> = {
 
 For example, out of ${N0} ${ctx.noun}: $${shares.map((w, i) => `${w.mul(N0).toNumber()} \\times ${dec(F(rates[i], 100))}`).join(' + ')} = ${overall.mul(N0).div(100).toNumber()}$, which is ${P(overall)} of ${N0}.
 
-The plain average of the percents, ${P(mean.isInt() ? mean.toNumber() : Number(mean.toNumber().toFixed(1)))}, ignores that the groups have different sizes.`,
+Trap: ${[
+          traps.some((t) => t.trap === 'num-unweighted-mean') ? `the plain average of the percents, ${P(mean.isInt() ? mean.toNumber() : Number(mean.toNumber().toFixed(1)))}, ignores that the groups have different sizes` : '',
+          traps.some((t) => t.trap === 'num-largest-group-only') ? `${P(rates[biggest])} is only the percent of the largest group` : '',
+          traps.some((t) => t.trap === 'num-weights-swapped') ? `${P(Number(reversed.toNumber().toFixed(1)))} comes from matching the shares to the wrong groups` : '',
+        ]
+          .filter(Boolean)
+          .join('; ')}.`,
         },
       };
     }

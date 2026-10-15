@@ -241,11 +241,16 @@ const finalValueMCS: Template<FVParams> = {
       // For discount-then-tax, "adding the percents" and "tax on the regular price" give the same number.
       const traps: { value: Frac; trap: string }[] = [{ value: added, trap: mode === 'discount-tax' ? 'num-second-on-original' : 'num-add-percents' }];
       if (changes.length === 2 && changes[0] === -changes[1]) traps.push({ value: F(start), trap: 'num-percent-cancel' });
+      // stopped after the first change(s), the last change applied to the starting value, one change in the wrong direction
+      const early = ms.slice(0, -1).reduce((v, m) => v.mul(m), F(start));
+      const lastOnly = ms[ms.length - 1].mul(start);
+      const flipped = ms.reduce((v, m, i) => v.mul(i === 1 ? mult(-changes[i]) : m), F(start));
+      traps.push({ value: early, trap: 'num-stopped-early' }, { value: lastOnly, trap: 'num-second-on-original' }, { value: flipped, trap: 'num-change-direction' });
       const oneStep = ms[0].mul(start);
       const fmt = (v: Frac) => (money ? `$${usdM(v, !v.isInt())}$` : `$${num(v.toNumber())}$`);
       const { choices, answer, values } = numChoices(rng, {
         correct: fin,
-        traps,
+        traps: traps.filter((t) => t.value.mul(100).isInt()),
         fillers: (() => {
           const delta = money ? F(start >= 1000 ? 100 : 10) : F(1000);
           const pool = [oneStep, F(start), ms[1].mul(start), ...[1, 2, 3].flatMap((k) => [fin.add(delta.mul(k)), fin.sub(delta.mul(k))])].filter((x) => x.sign() > 0);
@@ -258,9 +263,21 @@ const finalValueMCS: Template<FVParams> = {
           );
         })(),
         format: fmt,
+        order: 'shuffled',
       });
+      const shown = (v: Frac) => !v.eq(fin) && values.some((x) => x.eq(v));
       const chain = ms.map((m) => dec(m)).join(' \\times ');
       const startTex = money ? usdM(F(start)) : num(start);
+      const bits = [
+        shown(added)
+          ? mode === 'discount-tax'
+            ? `${fmt(added)} puts the tax on the regular price (or adds the percents, a net change of −${Math.abs(sum)}%), but the tax applies to the sale price`
+            : `${fmt(added)} adds the percents first (a net change of ${sum >= 0 ? '+' : '−'}${Math.abs(sum)}%), but each change applies to the new amount`
+          : '',
+        shown(early) ? `${fmt(early)} stops before the last change` : '',
+        shown(flipped) ? `${fmt(flipped)} treats the second change as the opposite of what it is` : '',
+        shown(F(start)) ? `${fmt(F(start))} assumes the changes cancel` : '',
+      ].filter(Boolean);
       return {
         params: { mode, start, changes, values },
         q: {
@@ -268,13 +285,11 @@ const finalValueMCS: Template<FVParams> = {
           stem,
           choices,
           answer,
-          explanation: `Turn each change into a multiplier (${changes.map((c) => `${c > 0 ? '+' : '−'}${Math.abs(c)}% → $${dec(mult(c))}$`).join(', ')}) and multiply, because each change applies to the amount produced by the previous one: $${startTex} \\times ${chain} = ${money ? usdM(fin, !fin.isInt()) : num(fin.toNumber())}$.
+          explanation: `Each change applies to the amount produced by the previous one, so turn every change into a multiplier (${changes.map((c) => `${c > 0 ? '+' : '−'}${Math.abs(c)}% → $${dec(mult(c))}$`).join(', ')}) and multiply: $${startTex} \\times ${chain} = ${money ? usdM(fin, !fin.isInt()) : num(fin.toNumber())}$.
 
-${
-            mode === 'discount-tax'
-              ? `Computing the tax on the regular price (or, equivalently, adding the percents for a net change of −${Math.abs(sum)}%) gives ${fmt(added)}, which is wrong: the tax applies to the sale price.`
-              : `Adding the percents first (a net change of ${sum >= 0 ? '+' : '−'}${Math.abs(sum)}%) gives ${fmt(added)}, which is wrong.`
-          }`,
+Check the direction: ${changes.map((c) => (c > 0 ? 'a rise' : 'a fall')).join(' then ')}, so the result ${fin.gt(start) ? 'ends above' : 'ends below'} ${fmt(F(start))}, as it should.
+
+Trap: ${bits.slice(0, 2).join('; ')}.`,
         },
       };
     }
@@ -328,8 +343,11 @@ Do not combine the two changes into a single ${Math.abs(tax - disc)}% ${tax > di
         };
       }
     }
-    const a = rng.pick([10, 15, 20, 25, 30, 40]) * (rng.chance(0.5) ? 1 : -1);
-    const b = rng.pick([5, 8, 10, 12, 15, 20, 25]) * (a > 0 ? -1 : 1) * (d === 3 && rng.chance(0.3) ? -1 : 1);
+    const a = rng.pick([10, 12, 15, 20, 25, 30, 35, 40, 50]) * (rng.chance(0.5) ? 1 : -1);
+    const b = rng.pick([5, 8, 10, 12, 15, 18, 20, 25, 30]) * (a > 0 ? -1 : 1) * (d === 3 && rng.chance(0.3) ? -1 : 1);
+    // Each level has its own objects, so the same numbers never give the same question at two levels.
+    const item = rng.pick(d === 1 ? ['television', 'bicycle', 'jacket', 'guitar'] : ['laptop', 'camera', 'sofa', 'watch']);
+    const group = rng.pick(d === 2 ? ['members of a club', 'students in a choir', 'players on a team', 'subscribers to a magazine'] : ['visitors to a museum', 'cars in a parking lot', 'books in a library', 'riders on a bus line']);
     const m = mult(a).mul(mult(b));
     const added = 100 + a + b;
     if (mode === 'percent-of') {
@@ -338,7 +356,7 @@ Do not combine the two changes into a single ${Math.abs(tax - disc)}% ${tax > di
         params: { mode, changes: [a, b], paid: F(0) },
         q: {
           format: 'ne',
-          stem: `The price of a television was ${changeWord(a)} by ${Math.abs(a)}%, and then the new price was ${changeWord(b)} by ${Math.abs(b)}%. The final price was what percent of the original price?`,
+          stem: `The price of a ${item} was ${changeWord(a)} by ${Math.abs(a)}%, and then the new price was ${changeWord(b)} by ${Math.abs(b)}%. The final price was what percent of the original price?`,
           answer: ans,
           suffix: '%',
           traps: ans.eq(added) ? [] : [{ value: F(added), trap: 'num-add-percents' }],
@@ -356,13 +374,13 @@ Adding the percents gives ${added}%, which ignores that the second change is app
       params: { mode, changes: [a, b], paid: F(0) },
       q: {
         format: 'ne',
-        stem: `The number of members of a club ${changeWord(a)} by ${Math.abs(a)}% in one year and then ${changeWord(b)} by ${Math.abs(b)}% the next year. Over the two years, by what percent did the number of members ${up ? 'increase' : 'decrease'}?`,
+        stem: `The number of ${group} ${changeWord(a)} by ${Math.abs(a)}% in one year and then ${changeWord(b)} by ${Math.abs(b)}% the next year. Over the two years, by what percent did the number ${up ? 'increase' : 'decrease'}?`,
         answer: net.abs(),
         suffix: '%',
         traps: naive !== 0 && !net.abs().eq(naive) ? [{ value: F(naive), trap: 'num-add-percents' }] : [],
-        explanation: `Overall multiplier: $${dec(mult(a))} \\times ${dec(mult(b))} = ${dec(m)}$. The number of members is $${dec(m.mul(100))}\\%$ of the original, so it ${up ? 'increased' : 'decreased'} by $${dec(net.abs())}\\%$.
+        explanation: `Overall multiplier: $${dec(mult(a))} \\times ${dec(mult(b))} = ${dec(m)}$. The number is $${dec(m.mul(100))}\\%$ of the original, so it ${up ? 'increased' : 'decreased'} by $${dec(net.abs())}\\%$.
 
-Adding the percents gives ${a + b > 0 ? 'an increase' : 'a decrease'} of ${naive}%, but the second change applies to the new number of members, not the original.`,
+Adding the percents gives ${a + b > 0 ? 'an increase' : 'a decrease'} of ${naive}%, but the second change applies to the new number, not the original.`,
       },
     };
   },

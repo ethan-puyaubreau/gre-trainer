@@ -74,6 +74,14 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Counted the wrong number of equal units',
     fix: 'Write every segment in one unit $u$ and add ALL of them: $AB + BC + CD$.',
   },
+  'num-wrong-segment': {
+    label: 'Used the wrong segment as the step',
+    fix: 'Each point is reached by adding the length of the segment BEFORE it: B = A + AB, with AB the first part of the ratio, not the middle one.',
+  },
+  'num-abs-vs-one': {
+    label: 'Compared |x| with 1 without locating x between the ticks',
+    fix: '|x| < 1 exactly when x lies between the ticks -1 and 1, whatever its sign. A negative number between -1 and 0 has |x| < 1.',
+  },
   'num-wrong-point': {
     label: 'Found the coordinate of the wrong point',
     fix: 'Re-read which point is asked for and check that your answer lies between its neighbors.',
@@ -143,6 +151,14 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Used new ÷ old as the percent change',
     fix: '12 is 300% OF 4, but it is 200% MORE than 4. Percent change = $\\frac{\\text{new} - \\text{old}}{\\text{old}} \\times 100$.',
   },
+  'num-largest-group-only': {
+    label: 'Used the percent of the largest group only',
+    fix: 'Every group counts, in proportion to its size: 0.5(40%) + 0.25(70%) + 0.25(90%) = 60%, not the 40% of the biggest group.',
+  },
+  'num-weights-swapped': {
+    label: 'Matched the shares to the wrong groups',
+    fix: 'Pair each percent with the share of ITS OWN group before adding: the percent of the larger group gets the larger weight.',
+  },
   'num-unweighted-mean': {
     label: 'Averaged the percents without weighting them',
     fix: 'When the groups have different sizes, multiply each percent by its share of the whole and add: $0.5(40\\%) + 0.25(70\\%) + 0.25(90\\%) = 60\\%$, not the plain average.',
@@ -155,6 +171,14 @@ export const numbersTraps: Record<string, Trap> = {
   'num-percent-cancel': {
     label: 'Thought +x% then −x% cancel out',
     fix: '$(1 + x)(1 - x) = 1 - x^2 < 1$: the decrease is taken on a larger amount, so you end BELOW the start (+20% then −20% gives 96%).',
+  },
+  'num-stopped-early': {
+    label: 'Stopped before the last change',
+    fix: 'Apply every change in the question, one after another: 1000 up 10%, down 20%, then up 5% needs all three multipliers.',
+  },
+  'num-change-direction': {
+    label: 'Applied a change in the wrong direction',
+    fix: 'A decrease uses a multiplier below 1 (−20% → 0.8) and an increase one above 1 (+20% → 1.2). Read each word: "rose", "fell", "added", "reduced".',
   },
   'num-order-of-changes': {
     label: 'Thought the order of the changes matters',

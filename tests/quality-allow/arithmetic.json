@@ -5,36 +5,6 @@
   "arith.exponents.common-base-qc": {
     "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
   },
-  "arith.fractions.compare-mcs": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.number-line.farthest": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.number-line.segment-ratio": {
-    "artifacts.coef-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "arith.number-line.signs-mcm": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.number-line.tick-marks": {
-    "bank.size": "baseline"
-  },
-  "arith.percent.expression-mcs": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.percent.percent-of-qc": {
-    "artifacts.coef-1": "baseline",
-    "qc.never-d": "baseline"
-  },
-  "arith.percent.rate-change-mcs": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.percent.weighted-mcs": {
-    "distractors.trapped": "baseline"
-  },
   "arith.rates.approx-cost-mcs": {
     "distractors.trapped": "baseline"
   },
@@ -67,13 +37,5 @@
   },
   "arith.roots.combine-qc": {
     "qc.never-d": "Both quantities are fixed numbers, so D (cannot be determined) is impossible."
-  },
-  "arith.successive-percent.final-value-mcs": {
-    "distractors.trapped": "baseline",
-    "distractors.cited": "baseline"
-  },
-  "arith.successive-percent.overall-ne": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
   }
 }

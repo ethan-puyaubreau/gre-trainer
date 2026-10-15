@@ -2,6 +2,7 @@ import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build'
 import { Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { decimal, num } from '../../../engine/tex';
+import { term } from '../../../engine/text';
 import type { Difficulty, NumberLineFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { expectMCM, expectMCS, expectNE, expectQC, extremeIndex, F, numChoices, pickWeighted, qcEnd, qcFromFloatSamples, spreadFillers, swapQC } from './util';
 
@@ -89,11 +90,16 @@ const segmentRatio: Template<SegParams> = {
     const u2 = len.div(total - 1);
     const fewer = ask === 'B' ? A.add(u2.mul(r[0])) : D.sub(u2.mul(r[2]));
     const style = d === 1 ? 'decimal' : 'fraction';
+    // the middle segment used as the step, and the whole length divided by the middle part only
+    const wrongStep = ask === 'B' ? A.add(u.mul(r[1])) : D.sub(u.mul(r[1]));
+    const partOfPart = ask === 'B' ? A.add(len.mul(r[0]).div(r[1])) : D.sub(len.mul(r[2]).div(r[1]));
     const trapList = [
       { value: thirds, trap: 'num-equal-segments' },
       { value: fewer, trap: 'num-segment-count' },
       { value: other, trap: 'num-wrong-point' },
-    ];
+      { value: wrongStep, trap: 'num-wrong-segment' },
+      { value: partOfPart, trap: 'num-ratio-part-whole' },
+    ].filter((t) => t.value.gt(A) && t.value.lt(D));
     const offs = [u.div(2), u.div(3), u, u.mul(3).div(2), u.mul(2).div(3), u.div(4)];
     const inside = (x: Frac) => x.gt(A) && x.lt(D) && (d > 1 || x.isInt());
     const { choices, answer, values } = numChoices(rng, {
@@ -125,8 +131,16 @@ const segmentRatio: Template<SegParams> = {
         { at: D.toNumber(), name: 'D', value: `$${Dt}$` },
       ],
     };
-    const units = isEnds ? `Let $AB = CD = u$. Then $BC = ${r[1]}u$` : `Let $AB = ${r[0]}u$, $BC = ${r[1]}u$, and $CD = ${r[2]}u$`;
-    const sumU = isEnds ? `u + ${r[1]}u + u` : `${r[0]}u + ${r[1]}u + ${r[2]}u`;
+    const shownVal = (v: Frac) => !v.eq(correct) && values.some((x) => x.eq(v));
+    const trapBits = [
+      shownVal(thirds) ? `splitting $AD$ into three equal parts gives $${coordTex(thirds, style)}$, but the segments are not equal` : '',
+      shownVal(fewer) ? `using ${total - 1} parts instead of ${total} gives $${coordTex(fewer, style)}$` : '',
+      shownVal(other) ? `$${coordTex(other, style)}$ is the coordinate of the other point, $${ask === 'B' ? 'C' : 'B'}$` : '',
+      shownVal(wrongStep) ? `$${coordTex(wrongStep, style)}$ uses the middle segment as the step` : '',
+    ].filter(Boolean);
+    const trapLine = trapBits.length ? `Trap: ${trapBits.slice(0, 2).join('; ')}.` : '';
+    const units = isEnds ? `Let $AB = CD = u$. Then $BC = ${term(r[1], 'u')}$` : `Let $AB = ${term(r[0], 'u')}$, $BC = ${term(r[1], 'u')}$, and $CD = ${term(r[2], 'u')}$`;
+    const sumU = isEnds ? `u + ${term(r[1], 'u')} + u` : `${term(r[0], 'u')} + ${term(r[1], 'u')} + ${term(r[2], 'u')}`;
     const find =
       ask === 'B'
         ? `$B = A + ${r[0] === 1 ? '' : r[0]}u = ${At} + ${paren(coordTex(u.mul(r[0]), style))} = ${coordTex(B, style)}$`
@@ -143,7 +157,9 @@ const segmentRatio: Template<SegParams> = {
 
 ${find}.
 
-Splitting $AD$ into three equal parts gives $${coordTex(thirds, style)}$, but the segments are not equal.`,
+Check: $AB + BC + CD = ${coordTex(B.sub(A), style)} + ${coordTex(C.sub(B), style)} + ${coordTex(D.sub(C), style)} = ${coordTex(len, style)}$.
+
+${trapLine}`,
       },
     };
   },
@@ -217,27 +233,44 @@ const farthestClosest: Template<FarParams> = {
       const dist = vals.map((v) => v.sub(c).abs().toNumber());
       const target = extremeIndex(dist, mode === 'far' ? 'max' : 'min');
       if (target < 0) continue;
-      // Trap: the biggest number on the same side as c (far), or the mirror image -c side (close).
-      const trapIdx =
+      // Real slips: the greatest size, the greatest (or least) value, the biggest number on the same side as c (far);
+      // the size closest to 0, the size closest to |c| on the other side of 0 (close).
+      type Slip = 'maxAbs' | 'maxVal' | 'minVal' | 'sameSide' | 'minAbs' | 'mirror';
+      const uniq = (xs: number[], kind: 'max' | 'min') => extremeIndex(xs, kind);
+      const slipIdx: { i: number; kind: Slip }[] =
         mode === 'far'
-          ? extremeIndex(
-              vals.map((v) => (v.sign() === c.sign() ? v.abs().toNumber() : -1)),
-              'max',
-            )
-          : extremeIndex(
-              vals.map((v) => (v.sign() === -c.sign() ? v.add(c).abs().toNumber() : 1e9)),
-              'min',
-            );
-      if (trapIdx === target || trapIdx < 0) {
-        if (d > 1) continue;
-      }
+          ? [
+              { i: uniq(vals.map((v) => v.abs().toNumber()), 'max'), kind: 'maxAbs' },
+              { i: uniq(vals.map((v) => v.toNumber()), 'max'), kind: 'maxVal' },
+              { i: uniq(vals.map((v) => v.toNumber()), 'min'), kind: 'minVal' },
+              { i: uniq(vals.map((v) => (v.sign() === c.sign() ? v.abs().toNumber() : -1)), 'max'), kind: 'sameSide' },
+            ]
+          : [
+              { i: uniq(vals.map((v) => v.abs().toNumber()), 'min'), kind: 'minAbs' },
+              { i: uniq(vals.map((v) => (v.sign() === -c.sign() ? v.add(c).abs().toNumber() : 1e9)), 'min'), kind: 'mirror' },
+            ];
+      const slipMap = new Map<number, Slip>();
+      for (const sl of slipIdx) if (sl.i >= 0 && sl.i !== target && !slipMap.has(sl.i)) slipMap.set(sl.i, sl.kind);
+      if (slipMap.size < 2) continue;
       // Second-best must be clearly different for the "close" questions at d1/d2.
       const sortedD = [...dist].sort((x, y) => (mode === 'far' ? y - x : x - y));
       if (Math.abs(sortedD[0] - sortedD[1]) < (d === 3 ? 0.05 : 0.2)) continue;
       const fmt = (v: Frac) => coordTex(v, style);
-      const choices = vals.map((v, i) => ({ text: `$${fmt(v)}$`, ...(i === trapIdx && i !== target ? { trap: 'num-distance-abs' } : {}) }));
+      const choices = vals.map((v, i) => ({ text: `$${fmt(v)}$`, ...(slipMap.has(i) ? { trap: 'num-distance-abs' } : {}) }));
       const ct = fmt(c);
       const lines = vals.map((v, i) => `$|${fmt(v)} - ${paren(ct)}| = ${coordTex(v.sub(c).abs(), style)}$${i === target ? ' ←' : ''}`).join(', ');
+      const away = (i: number) => coordTex(vals[i].sub(c).abs(), style);
+      const best = coordTex(vals[target].sub(c).abs(), style);
+      const noteOf = (i: number, kind: Slip) =>
+        ({
+          maxAbs: `$${fmt(vals[i])}$ has the greatest size, but size is the distance from 0, not from $${ct}$: it is $${away(i)}$ away`,
+          maxVal: `$${fmt(vals[i])}$ is the greatest number, but "farthest" means the greatest distance from $${ct}$, not the greatest value ($${away(i)}$ away)`,
+          minVal: `$${fmt(vals[i])}$ is the least number, but "farthest" means the greatest distance from $${ct}$ ($${away(i)}$ away)`,
+          sameSide: `$${fmt(vals[i])}$ is the greatest in size on the same side of 0 as $${ct}$, so it is close to $${ct}$: only $${away(i)}$ away`,
+          minAbs: `$${fmt(vals[i])}$ is closest to 0, but the question is about distance from $${ct}$: it is $${away(i)}$ away`,
+          mirror: `$${fmt(vals[i])}$ has the size closest to that of $${ct}$, but it is on the other side of 0, so it is $${away(i)}$ away`,
+        })[kind];
+      const notes = [...slipMap].slice(0, 2).map(([i, kind]) => noteOf(i, kind));
       return {
         params: { mode, c, values: vals },
         q: {
@@ -245,15 +278,11 @@ const farthestClosest: Template<FarParams> = {
           stem: `Which of the following numbers is ${mode === 'far' ? 'farthest from' : 'closest to'} the number $${ct}$ on the number line?`,
           choices,
           answer: target,
-          explanation: `The distance between $x$ and $${ct}$ is $|x - ${paren(ct)}|$. For the choices: ${lines}.
+          explanation: `The distance between $x$ and $${ct}$ is $|x - ${paren(ct)}|$, so compute it for every choice: ${lines}.
 
-The ${mode === 'far' ? 'greatest' : 'least'} distance belongs to $${fmt(vals[target])}$.${
-            trapIdx >= 0 && trapIdx !== target
-              ? mode === 'far'
-                ? ` Note that $${fmt(vals[trapIdx])}$ is the greatest in size (absolute value) among the numbers on the same side of 0 as $${ct}$, but it is on that side, so it is only $${coordTex(vals[trapIdx].sub(c).abs(), style)}$ away, less than $${coordTex(vals[target].sub(c).abs(), style)}$.`
-                : ` Note that $${fmt(vals[trapIdx])}$ has the size closest to that of $${ct}$ among the numbers on the other side of 0, but it is on the other side of 0, so it is $${coordTex(vals[trapIdx].sub(c).abs(), style)}$ away, more than $${coordTex(vals[target].sub(c).abs(), style)}$.`
-              : ''
-          }`,
+The ${mode === 'far' ? 'greatest' : 'least'} distance, $${best}$, belongs to $${fmt(vals[target])}$.
+
+Trap: ${notes.join('; ')}. Distance is always measured from the given number.`,
         },
       };
     }
@@ -443,7 +472,7 @@ function stmtTrap(s: Stmt, L: Letter[]): string | undefined {
   const reg = L[s.xs[0]].region;
   if (s.fam === 'sq' || s.fam === 'cube') return reg === 3 || reg === 4 ? 'fraction-power-grows' : 'negative-fraction-sign';
   if (s.fam === 'recip') return 'reciprocal-direction';
-  if (s.fam === 'abs') return undefined;
+  if (s.fam === 'abs') return 'num-abs-vs-one';
   return 'num-sign-rules';
 }
 
@@ -611,10 +640,10 @@ const tickMarks: Template<TickParams> = {
     let m: number;
     let style: 'decimal' | 'fraction' = 'decimal';
     if (d === 1) {
-      m = rng.pick([4, 5]);
-      const width = rng.pick([1, 2]);
+      m = rng.pick([4, 5, 8, 10]);
+      const width = rng.pick([1, 2, 3]);
       s = F(width, m);
-      a = F(rng.int(-2, 2));
+      a = F(rng.int(-5, 3));
     } else if (d === 2) {
       m = rng.pick([3, 4, 5, 6]);
       s = rng.pick([F(1, 5), F(1, 4), F(3, 10), F(2, 5), F(1, 20), F(3, 20)]);
