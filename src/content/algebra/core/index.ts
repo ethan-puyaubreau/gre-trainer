@@ -23,3 +23,6 @@ Object.assign(coreTraps, crossTermTraps);
 import { simplifyFractionTemplate, simplifyFractionTraps } from './simplifyFraction';
 coreTemplates.push(simplifyFractionTemplate);
 Object.assign(coreTraps, simplifyFractionTraps);
+import { sumProductTemplate, sumProductTraps } from './sumProduct';
+coreTemplates.push(sumProductTemplate);
+Object.assign(coreTraps, sumProductTraps);
