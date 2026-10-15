@@ -70,6 +70,8 @@ interface Actions {
     traps: string[];
     mode: Mode;
     response?: Response;
+    /** The repair entry the pick of this question carried: only that one is served by this attempt. */
+    repair?: Remediation;
   }): AttemptOutcome;
   recordSection(rec: SectionRecord): void;
   updateSettings(patch: Partial<Settings>): void;
@@ -93,6 +95,14 @@ export function initialData(now = Date.now()): ProgressData {
     seq: 0,
     settings: { paceSec: DEFAULT_PACE_SEC, showTimer: true, theme: 'system' },
   };
+}
+
+/** The queue without the first entry equal to `served` (an entry saved before stages existed counts as stage 1). */
+function withoutOne(queue: Remediation[], served: Remediation): Remediation[] {
+  const same = (r: Remediation) =>
+    r.skillId === served.skillId && r.missedTemplate === served.missedTemplate && r.dueSeq === served.dueSeq && (r.stage ?? 1) === (served.stage ?? 1);
+  const i = queue.findIndex(same);
+  return i < 0 ? queue : queue.filter((_, j) => j !== i);
 }
 
 export const NOT_AN_EXPORT = 'This file is not a GRE Trainer progress export.';
@@ -128,7 +138,7 @@ export const useProgress = create<ProgressData & Actions>()(
     (set, get) => ({
       ...initialData(),
 
-      recordAttempt({ question, correct, timeMs: rawMs, hintLevel, traps, mode, response }) {
+      recordAttempt({ question, correct, timeMs: rawMs, hintLevel, traps, mode, response, repair }) {
         const timeMs = Math.min(rawMs, MAX_ATTEMPT_MS);
         const s = get();
         const prev = s.skills[question.skillId] ?? newSkillState();
@@ -149,11 +159,13 @@ export const useProgress = create<ProgressData & Actions>()(
           s.settings.paceSec,
         );
         const seq = s.seq + 1;
-        // Served repairs for this skill are done; a new miss schedules a fresh one.
-        let remediation = s.remediation.filter((r) => !(r.skillId === question.skillId && r.dueSeq <= seq));
+        // The repair this question came from is done (any other entry of the skill stays queued). A miss replaces the skill's
+        // queue with a fresh first comeback; a first comeback answered right leaves the next-day comeback in another style.
+        let remediation = repair ? withoutOne(s.remediation, repair) : s.remediation;
         if (!correct) {
-          remediation = remediation.filter((r) => r.skillId !== question.skillId);
-          remediation.push(scheduleRepair(createRng(randomSeed()), question.skillId, question.templateId, seq));
+          remediation = [...remediation.filter((r) => r.skillId !== question.skillId), scheduleRepair(createRng(randomSeed()), question.skillId, question.templateId, seq)];
+        } else if (repair && (repair.stage ?? 1) === 1) {
+          remediation = [...remediation, scheduleRepair(createRng(randomSeed()), question.skillId, repair.missedTemplate, seq, 2)];
         }
         const record: AttemptRecord = {
           qid: question.id,

@@ -139,6 +139,7 @@ export function Practice({ route }: { route: string[] }) {
       traps: g.traps,
       mode: 'practice',
       response,
+      repair: current.pick.remediation,
     });
     // Rewards (traps dodged, streak) go to clean answers only; an unclean correct answer neither earns nor breaks the streak.
     const earned = earnsReward({
