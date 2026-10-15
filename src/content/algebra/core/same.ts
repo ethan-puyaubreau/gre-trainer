@@ -145,4 +145,130 @@ Rule: a rewrite is safe only when the same operation is applied to both sides, a
   },
 };
 
-export const sameTemplates: Template<any>[] = [sameSolutionMCM];
+/* ================================================================== Equations that follow from a system (MCM) */
+
+Object.assign(sameTraps, {
+  'alg-sys-rhs-unscaled': {
+    label: 'Multiplied one equation on the left side only',
+    fix: 'When you multiply an equation by a number, multiply BOTH sides, including the number on the right: $2(x + y = 5)$ is $2x + 2y = 10$.',
+  },
+  'alg-sys-rhs-sign': {
+    label: 'Subtracted the left sides but added the right sides',
+    fix: 'Subtracting two equations subtracts BOTH sides: $(a - b)$ on the left goes with $(c - f)$ on the right.',
+  },
+  'alg-sys-lhs-sign': {
+    label: 'Changed the sign of one term of the left side only',
+    fix: 'A combination of the equations keeps each coefficient exactly as it comes from the sum. Flipping one sign changes the equation.',
+  },
+} satisfies Record<string, Trap>);
+
+type Row = [number, number, number]; // P x + Q y = R
+const rowStr = ([P, Q, R]: Row) => `${lin([[P, 'x'], [Q, 'y']])} = ${num(R)}`;
+
+interface ConsequenceParams {
+  e1: Row;
+  e2: Row;
+  rows: Row[];
+}
+
+const consequenceMCM: Template<ConsequenceParams> = {
+  id: 'alg.systems.consequence-mcm',
+  skill: 'alg.systems',
+  format: 'mcm',
+  style: 'which equations must also be true for the solution of the system',
+  generate(rng, d) {
+    for (;;) {
+      const x0 = intExcept(rng, -8, 8, 0);
+      const y0 = intExcept(rng, -8, 8, 0, x0);
+      const co = () => intExcept(rng, d === 1 ? 1 : -6, d === 1 ? 5 : 6, 0);
+      const a = co();
+      const b = co();
+      const dd = co();
+      const e = co();
+      const det = a * e - b * dd;
+      if (Math.abs(det) < 2) continue;
+      const c = a * x0 + b * y0;
+      const f = dd * x0 + e * y0;
+      const e1: Row = [a, b, c];
+      const e2: Row = [dd, e, f];
+      const combos: [number, number][] = d === 1 ? [[1, 1], [1, -1]] : d === 2 ? [[1, 1], [1, -1], [2, 1], [1, 2], [2, -1], [1, -2]] : [[2, 1], [1, 2], [2, -1], [1, -2], [3, 1], [3, -1], [2, 3], [3, -2], [-1, 2]];
+      const good: Row[] = [];
+      const bad: { row: Row; trap: string }[] = [];
+      for (const [al, be] of rng.shuffle(combos)) {
+        const P = al * a + be * dd;
+        const Q = al * b + be * e;
+        const R = al * c + be * f;
+        if (P === 0 && Q === 0) continue;
+        good.push([P, Q, R]);
+        if (al !== 1) bad.push({ row: [P, Q, c + be * f], trap: 'alg-sys-rhs-unscaled' });
+        if (be < 0) bad.push({ row: [P, Q, al * c - be * f], trap: 'alg-sys-rhs-sign' });
+        bad.push({ row: [P, -Q, R], trap: 'alg-sys-lhs-sign' });
+      }
+      const holds = (r: Row) => r[0] * x0 + r[1] * y0 === r[2];
+      const seen = new Set([rowStr(e1), rowStr(e2)]);
+      const fresh = (r: Row) => {
+        const s = rowStr(r);
+        if (seen.has(s) || (r[0] === 0 && r[1] === 0)) return false;
+        seen.add(s);
+        return true;
+      };
+      const goods = good.filter((r) => holds(r) && fresh(r));
+      const bads = bad.filter((b) => !holds(b.row) && fresh(b.row));
+      const total = d === 1 ? 4 : d === 2 ? 5 : 6;
+      const nGood = d === 1 ? rng.int(1, 2) : d === 2 ? rng.int(2, 3) : rng.int(2, 4);
+      const nBad = total - nGood;
+      const pickedBad: typeof bads = [];
+      for (const bd of rng.shuffle(bads)) if (!pickedBad.some((x) => x.trap === bd.trap) && pickedBad.length < nBad) pickedBad.push(bd);
+      for (const bd of bads) if (!pickedBad.includes(bd) && pickedBad.length < nBad) pickedBad.push(bd);
+      if (goods.length < nGood || pickedBad.length < nBad) continue;
+      const items = rng.shuffle([
+        ...goods.slice(0, nGood).map((r) => ({ row: r, ok: true, trap: undefined as string | undefined })),
+        ...pickedBad.map((bd) => ({ row: bd.row, ok: false, trap: bd.trap as string | undefined })),
+      ]);
+      const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${rowStr(it.row)}$`, correct: it.ok, ...(it.trap ? { trap: it.trap } : {}) })));
+      const lines = items.map((it, i) => {
+        const l = it.row[0] * x0 + it.row[1] * y0;
+        return `- ${letter(i)}: the left side is $${num(l)}$ and the right side is $${num(it.row[2])}$, so it ${it.ok ? 'holds' : 'fails'}.`;
+      });
+      const wi = items.findIndex((it) => !it.ok);
+      const trapLine: Record<string, string> = {
+        'alg-sys-rhs-unscaled': `choice ${letter(wi)} has a correct left side, but the right side was not multiplied by the same number.`,
+        'alg-sys-rhs-sign': `choice ${letter(wi)} subtracts the left sides but adds the right sides.`,
+        'alg-sys-lhs-sign': `choice ${letter(wi)} flips the sign of the $y$ term of a correct combination.`,
+      };
+      const explanation = `If $x$ and $y$ satisfy both equations, solve for them and test each choice. To eliminate $y$, multiply the first equation by $${num(e)}$ and the second by $${num(b)}$, then subtract: $${lin([[det, 'x']])} = ${num(c * e - b * f)}$, so $x = ${num(x0)}$. Then $y = ${num(y0)}$ from the first equation.
+
+Substitute $x = ${num(x0)}$ and $y = ${num(y0)}$ into each choice:
+${lines.join('\n')}
+
+Trap: ${trapLine[items[wi].trap!]}
+
+Rule: a true equation made from the system is a combination done on both sides; a mismatch in one coefficient or in the right side makes it false.`;
+      return {
+        params: { e1, e2, rows: items.map((it) => it.row) },
+        q: {
+          format: 'mcm',
+          stem: `$$${rowStr(e1)}$$
+$$${rowStr(e2)}$$
+
+If $x$ and $y$ satisfy the system of equations above, which of the following equations must also be true?`,
+          instruction: 'Indicate all such equations.',
+          choices,
+          answer,
+          explanation,
+        },
+      };
+    }
+  },
+  check(q, { e1, e2, rows }) {
+    if (q.format !== 'mcm') return 'wrong format';
+    const det = e1[0] * e2[1] - e1[1] * e2[0];
+    if (det === 0) return 'singular system';
+    const x = (e1[2] * e2[1] - e1[1] * e2[2]) / det;
+    const y = (e1[0] * e2[2] - e1[2] * e2[0]) / det;
+    const expected = rows.flatMap((r, i) => (Math.abs(r[0] * x + r[1] * y - r[2]) < 1e-9 ? [i] : []));
+    return JSON.stringify(expected) === JSON.stringify(q.answer) ? null : `expected ${JSON.stringify(expected)}, keyed ${JSON.stringify(q.answer)}`;
+  },
+};
+
+export const sameTemplates: Template<any>[] = [sameSolutionMCM, consequenceMCM];
