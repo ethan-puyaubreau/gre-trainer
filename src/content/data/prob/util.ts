@@ -291,8 +291,18 @@ export function trapChoicesOrPad<T extends { value: number; trap: string }>(
   traps: T[],
   opts: { step: number; minGap: number; min?: number; max?: number; pad: boolean; ends?: boolean; format: (v: number) => string },
 ): { choices: Choice[]; answer: number; used: T[]; values: number[] } | null {
-  const named = trapOnlyChoices(rng, correct, traps, (v) => opts.format(v.toNumber()), 5, opts.minGap, opts.ends ? 'ends' : false);
-  if (named) return { choices: named.choices, answer: named.answer, used: named.used, values: named.values.map((v) => v.toNumber()) };
+  // choices that are multiples of a half or a hundredth are exact as Fracs in hundredths
+  const hundredths = (x: number) => new Frac(Math.round(x * 100), 100);
+  const named = trapOnlyChoices(
+    rng,
+    hundredths(correct),
+    traps.map((t) => ({ ...t, value: hundredths(t.value) })),
+    (v) => opts.format(v.toNumber()),
+    5,
+    opts.minGap,
+    opts.ends ? 'ends' : false,
+  );
+  if (named) return { choices: named.choices, answer: named.answer, used: named.used.map((u) => traps.find((t) => t.trap === u.trap && hundredths(t.value).eq(u.value))!), values: named.values.map((v) => v.toNumber()) };
   if (!opts.pad) return null;
   const sc = spacedChoices(rng, correct, traps.map((t) => ({ v: t.value, trap: t.trap })), opts);
   return { choices: sc.choices, answer: sc.answer, used: traps.filter((t) => sc.choices.some((c) => c.trap === t.trap)), values: sc.values };
