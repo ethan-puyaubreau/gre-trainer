@@ -220,7 +220,8 @@ const recursiveSeq: Template<RecParams> = {
           { value: frac(seq[k - 2]), trap: 'algw-seq-off-by-one' },
           { value: frac(seq[k]), trap: 'algw-seq-off-by-one' },
           { value: frac(wrong[k - 1]), trap: 'algw-recursion-order' },
-        ].filter((t) => !t.value.eq(ans));
+        ];
+        if (traps.some((t) => t.value.eq(ans))) continue;
         const steps = seq
           .slice(1, k)
           .map((v, i) => `$${sub(i + 2)} = ${p === 1 ? '' : p === -1 ? '-' : p}(${num(seq[i])}) ${q < 0 ? '-' : '+'} ${Math.abs(q)} = ${num(v)}$`)
@@ -256,16 +257,18 @@ So $${sub(k)} = ${num(ans)}$. Count carefully: $${sub(k)}$ needs ${k - 1} applic
         const ans = seq[k - 1];
         if (a1 === a2 || Math.abs(ans) > 500 || new Set(seq.slice(0, k)).size < 4) continue;
         const ruleTex = `${u === 1 ? '' : u === -1 ? '-' : u}${sub('n-1')} ${v < 0 ? '-' : '+'} ${Math.abs(v) === 1 ? '' : Math.abs(v)}${sub('n-2')}`;
+        const traps = [
+          { value: frac(seq[k - 2]), trap: 'algw-seq-off-by-one' },
+          { value: frac(seq[k]), trap: 'algw-seq-off-by-one' },
+        ];
+        if (traps.some((t) => t.value.eq(ans))) continue;
         return {
           params: { ...base, u, v, start: [a1, a2], target: k },
           q: {
             format: 'ne',
             stem: `In the sequence $a_1, a_2, a_3, \\ldots$, $a_1 = ${num(a1)}$, $a_2 = ${num(a2)}$, and $a_n = ${ruleTex}$ for all $n \\ge 3$. What is the value of $${sub(k)}$?`,
             answer: frac(ans),
-            traps: [
-              { value: frac(seq[k - 2]), trap: 'algw-seq-off-by-one' },
-              { value: frac(seq[k]), trap: 'algw-seq-off-by-one' },
-            ].filter((t) => !t.value.eq(ans)),
+            traps,
             explanation: `Each term uses the two terms before it. Listing the terms: $${seq
               .slice(0, k)
               .map((x, i) => `${sub(i + 1)} = ${num(x)}`)
@@ -293,6 +296,7 @@ So $${sub(k)} = ${num(ans)}$.`,
         for (let i = g; i > 1; i--) w = w.div(p).sub(q);
         const traps: { value: Frac; trap: string }[] = [{ value: frac(forwardTrap), trap: 'algw-recursion-backward' }, { value: frac(seq[1]), trap: 'algw-seq-off-by-one' }];
         if (w.isTerminating()) traps.push({ value: w, trap: 'algw-recursion-order' });
+        if (traps.some((t) => t.value.eq(a1))) continue;
         const back = seq
           .slice(0, g - 1)
           .reverse()
@@ -304,7 +308,7 @@ So $${sub(k)} = ${num(ans)}$.`,
             format: 'ne',
             stem: `In the sequence $a_1, a_2, a_3, \\ldots$, each term after the first is defined by $a_n = ${linRule(p, q)}$. If $${sub(g)} = ${num(ag)}$, what is the value of $a_1$?`,
             answer: frac(a1),
-            traps: traps.filter((t) => !t.value.eq(a1)),
+            traps,
             explanation: `Undo the rule: from $a_n = ${linRule(p, q)}$ we get $${sub('n-1')} = \\frac{a_n ${q < 0 ? '+' : '-'} ${Math.abs(q)}}{${p}}$ (undo the ${q < 0 ? 'subtraction' : 'addition'} first, then the multiplication).
 
 Going back from $${sub(g)} = ${num(ag)}$: ${back}.

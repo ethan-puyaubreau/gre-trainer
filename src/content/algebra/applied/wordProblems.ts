@@ -89,17 +89,10 @@ const setupSolve: Template<SetupParams> = {
       const fah = (9 * cel) / 5 + 32;
       const ans = toF ? fah : cel;
       const traps: { value: Frac; trap: string }[] = [];
-      if (toF) {
-        const w1 = frac(5 * cel, 9).add(32);
-        if (w1.isTerminating() && !w1.eq(ans)) traps.push({ value: w1, trap: 'algw-formula-order' });
-        const w2 = frac(9 * (cel + 32), 5);
-        if (w2.isTerminating() && !w2.eq(ans)) traps.push({ value: w2, trap: 'algw-formula-order' });
-      } else {
-        const w1 = frac(5 * fah, 9).sub(32);
-        if (w1.isTerminating() && !w1.eq(ans)) traps.push({ value: w1, trap: 'algw-formula-order' });
-        const w2 = frac(9 * (fah - 32), 5);
-        if (w2.isTerminating() && !w2.eq(ans)) traps.push({ value: w2, trap: 'algw-formula-order' });
-      }
+      const slips = toF ? [frac(5 * cel, 9).add(32), frac(9 * (cel + 32), 5)] : [frac(5 * fah, 9).sub(32), frac(9 * (fah - 32), 5)];
+      // A slip that lands on the key would make "changes the result" false: draw again.
+      if (slips.some((w) => w.eq(ans))) return setupSolve.generate(rng, d);
+      for (const w of slips) if (w.isTerminating()) traps.push({ value: w, trap: 'algw-formula-order' });
       const given = toF ? `$${num(cel)}$ degrees Celsius` : `$${num(fah)}$ degrees Fahrenheit`;
       return {
         params: { ...base, cel, fah, toF },
@@ -181,7 +174,7 @@ There are ${Y} ${ctx.small} and $${mult}(${Y}) ${k > 0 ? '+' : '-'} ${Math.abs(k
       else stem = `A taxi ride costs ${cents(fee)} plus ${cents(rate)} for each $\\frac{1}{5}$ mile traveled. If a taxi ride cost ${cents(total)}, how many miles long was the ride?`;
       const traps: { value: Frac; trap: string }[] = [];
       const noFee = frac(total, rate * per);
-      if (noFee.isTerminating() && !noFee.eq(ans)) traps.push({ value: noFee, trap: 'algw-forgot-fixed-fee' });
+      if (noFee.isTerminating()) traps.push({ value: noFee, trap: 'algw-forgot-fixed-fee' });
       if (per > 1) traps.push({ value: frac(n), trap: 'algw-units-mismatch' });
       const unitWord = which === 'rental' ? 'miles' : which === 'plumber' ? 'half hours' : 'fifths of a mile';
       return {
@@ -196,7 +189,7 @@ There are ${Y} ${ctx.small} and $${mult}(${Y}) ${k > 0 ? '+' : '-'} ${Math.abs(k
             per > 1 ? ` That is $\\frac{${n}}{${per}} = ${dx(ans)}$ ${FEE_CONTEXTS[which].unit}.` : ''
           }
 
-${noFee.isTerminating() && !noFee.eq(ans) ? `Dividing the whole charge by the rate ignores the fixed ${which === 'taxi' ? 'fare' : 'fee'}.` : 'The fixed part is paid once, whatever the length of the job.'}${per > 1 ? ` And ${n} is the number of ${unitWord}, not of ${FEE_CONTEXTS[which].unit}.` : ''}`,
+Dividing the whole charge by the rate ignores the fixed ${which === 'taxi' ? 'fare' : 'fee'}, which is paid once whatever the length.${per > 1 ? ` And ${n} is the number of ${unitWord}, not of ${FEE_CONTEXTS[which].unit}.` : ''}`,
         },
       };
     }

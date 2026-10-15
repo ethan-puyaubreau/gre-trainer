@@ -531,7 +531,7 @@ Trap: $${b * b}^{${w}} = ${b} \\cdot ${b}^{${w}}$ is tempting because $${b * b} 
 Rule: write every base as a power of the same number, then use $(a^m)^n = a^{mn}$.`;
       traps = [{ value: frac(b * v + sign * b ** n * v), trap: 'alg-power-base-mult' }];
     }
-    traps = traps.filter((t) => !t.value.eq(answer));
+    if (traps.some((t) => t.value.eq(answer))) return powerFactorNE.generate(rng, d);
     return {
       params: { kind, b, v, m, n, sign },
       q: { format: 'ne', stem, answer: frac(answer), traps, explanation },

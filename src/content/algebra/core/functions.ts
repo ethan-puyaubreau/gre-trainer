@@ -59,9 +59,10 @@ Then $${o}(${num(inner)}) = ${substitute(kind === 'fg' ? f : g, inner)} = ${num(
 Trap: applying the functions in the other order gives $${i}(${o}(${k})) = ${num(other)}$, which is a different number.
 
 Rule: in $${o}(${i}(${k}))$ the function next to the number acts first.`;
-      if (!other.eq(answer)) traps.push({ value: other, trap: 'alg-composition-order' });
       const prod = F(frac(k)).mul(G(frac(k)));
-      if (!prod.eq(answer) && !prod.eq(other)) traps.push({ value: prod, trap: 'alg-composition-product' });
+      if (other.eq(answer) || prod.eq(answer)) return composeNE.generate(rng, d);
+      traps.push({ value: other, trap: 'alg-composition-order' });
+      if (!prod.eq(other)) traps.push({ value: prod, trap: 'alg-composition-product' });
     } else if (kind === 'ff') {
       const inner = F(frac(k));
       answer = F(inner);
@@ -72,7 +73,8 @@ Rule: in $${o}(${i}(${k}))$ the function next to the number acts first.`;
 Trap: $f(f(${k}))$ is not $f(${k}) \\cdot f(${k})$; that would give $${num(sq)}$. The result of the first step is the INPUT of the second.
 
 Rule: feed each result back into the rule.`;
-      if (!sq.eq(answer)) traps.push({ value: sq, trap: 'alg-composition-product' });
+      if (sq.eq(answer)) return composeNE.generate(rng, d);
+      traps.push({ value: sq, trap: 'alg-composition-product' });
     } else {
       // f(g(x)) = m, linear: f(g(x)) = f0 (g0 x + g1) + f1
       let x0: Frac;
@@ -91,7 +93,8 @@ Check: $g(${x0.toTex()}) = ${G(x0).toTex()}$ and $f(${G(x0).toTex()}) = ${num(m)
 
 Trap: solving $g(x) = ${num(m)}$ instead, which gives $x = ${new Frac(m - g[1], g[0]).toTex()}$, ignores $f$: the equation is about $f(g(x))$.`;
       const wrongInner = new Frac(m - g[1], g[0]); // solved g(x) = m instead
-      if (!wrongInner.eq(answer) && wrongInner.isTerminating()) traps.push({ value: wrongInner, trap: 'alg-composition-inner-only' });
+      if (wrongInner.eq(answer)) return composeNE.generate(rng, d);
+      if (wrongInner.isTerminating()) traps.push({ value: wrongInner, trap: 'alg-composition-inner-only' });
     }
     return {
       params: { kind, f, g, k, m },

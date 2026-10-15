@@ -578,7 +578,7 @@ const readGraph: Template<ReadParams> = {
         const fa = f(a);
         answer = f(fa);
         if (!Number.isInteger(answer) || answer === 0 || answer === 1) continue;
-        if (fa !== answer) traps = [{ value: frac(fa), trap: 'algw-composite-once' }];
+        traps = [{ value: frac(fa), trap: 'algw-composite-once' }];
         stem = `The graph of the function $f$, defined for $-4 \\le x \\le 4$, is shown in the $xy$-plane above. What is the value of $f(f(${num(a)}))$?`;
         explanation = `Work from the inside out. The graph passes through $${ptTex(a, fa)}$, so $f(${num(a)}) = ${num(fa)}$.
 
@@ -638,6 +638,7 @@ The graph of $g$ is the graph of $f$ moved ${Math.abs(s)} unit${Math.abs(s) === 
       ];
       const far = corners.find(([cx, cy]) => [cx - 1.2, cx, cx + 1.2].every((x) => Math.abs(f(Math.max(-4, Math.min(4, x))) - cy) > 1.3));
       if (!far) continue;
+      if (traps.some((t) => t.value.eq(answer))) continue;
       const figure: GeometryFigure = {
         kind: 'geometry',
         points: { L: knots[0], R: knots[knots.length - 1] },
@@ -649,7 +650,7 @@ The graph of $g$ is the graph of $f$ moved ${Math.abs(s)} unit${Math.abs(s) === 
       };
       return {
         params: { kind, a, c, s, v },
-        q: { format: 'ne', figure, stem, answer: frac(answer), traps: traps.filter((t) => !t.value.eq(answer)), explanation },
+        q: { format: 'ne', figure, stem, answer: frac(answer), traps, explanation },
       };
     }
   },
