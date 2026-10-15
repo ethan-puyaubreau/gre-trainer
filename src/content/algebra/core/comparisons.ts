@@ -204,9 +204,22 @@ const squareQC: Template<SquareParams> = {
           ? `With $${bound}$, $x$ ${gap === 0 ? 'is never' : `is more than ${gap} away from`} $${h}$${gap === 0 ? '' : ''}, so $${sq} > ${gap * gap}$ and the difference is greater than $${gap * gap + kk}$${gap * gap + kk === 0 ? '' : ', a positive number'}.`
           : `With $${bound}$, $x$ can be close to the bound, where the difference is about $${gap * gap + kk}$ (negative), or far away, where it is positive.`;
       }
+      // Concrete allowed values, for the check (determined) or the two cases (D).
+      const diffAt = (x: number) => (x - h) * (x - h) + kk;
+      const allowedX = Array.from({ length: 121 }, (_, i) => i - 60).filter((x) => (lo !== null ? x > lo : hi !== null ? x < hi : true));
+      const byDistance = [...allowedX].sort((u, v) => Math.abs(u - h) - Math.abs(v - h) || u - v);
+      const near = byDistance[0];
+      const neg = byDistance.find((x) => diffAt(x) <= 0);
+      const pos = byDistance.find((x) => diffAt(x) > 0)!;
+      const lesson =
+        answer === 'D'
+          ? `Two cases: at $x = ${num(neg ?? near)}$ the difference is $${num(diffAt(neg ?? near))}$, but at $x = ${num(pos)}$ it is $${num(diffAt(pos))}$.\n\nTrap: one test value cannot show that the sign changes. Rule: write the difference as a square plus a constant and ask whether the allowed $x$ can make it zero or negative.`
+          : `Check: at $x = ${num(near)}$, the allowed value closest to $${h}$, the difference is $${num(diffAt(near))}$ and it only grows farther away.\n\nTrap: answering D because $x$ is unknown overlooks that the completed square keeps the difference on one side of 0. Rule: write the difference as a square plus a constant.`;
       explanation = `Subtract: $(${qa}) - (${qb}) = ${lin([[1, 'x^2'], [-2 * h, 'x'], [p - q, '']])} = ${diff}$, by completing the square ($${sq} = ${lin([[1, 'x^2'], [-2 * h, 'x'], [h * h, '']])}$).
 
-${why} ${qcEnd(answer)}`;
+${why} ${qcEnd(answer)}
+
+${lesson}`;
       k = [p, h, q, kk];
     } else {
       // y = s x^2 + b x + c with s = ±1; y - x = s x^2 + (b - 1) x + c
@@ -241,7 +254,13 @@ ${
         yMinusX === 'D'
           ? `At $x = ${xs[0]}$, $y - x = ${val(xs[0])}$; at $x = ${xs[1]}$, $y - x = ${val(xs[1])}$. The sign changes${kk === 0 ? ' (or is 0)' : ''}, so the comparison depends on $x$.`
           : `Since ${s > 0 ? `$${sqTerm} \\ge 0$, the difference is at least ${kk}` : `$-${sqTerm} \\le 0$, the difference is at most $${kk}$`}: $y$ is always ${s > 0 ? 'greater' : 'less'} than $x$.`
-      } ${qcEnd(answer)}`;
+      } ${qcEnd(answer)}
+
+${
+        yMinusX === 'D'
+          ? `Trap: one value of $x$ cannot show that the sign changes. Rule: write $y - x$ as a square plus a constant and ask whether it can be zero or change sign.`
+          : `Check: at $x = ${hh}$ the difference is $${kk}$, already on the claimed side of 0.\n\nTrap: answering D because $x$ is unknown overlooks that the completed square keeps $y - x$ on one side of 0. Rule: write $y - x$ as a square plus a constant.`
+      }`;
     }
     return {
       params: { kind, k: k!, swap, lo, hi },
@@ -393,9 +412,17 @@ const signCasesQC: Template<SignParams> = {
         traps.D = 'alg-qc-variable-d';
         if (pair === 'squares' || pair === 'ratios') traps[answer === 'A' ? 'B' : 'A'] = 'alg-magnitude-vs-value';
       }
+      const trapLine =
+        answer === 'D'
+          ? 'Trap: one pair cannot decide; a second pair that reverses it settles D. Rule: when the condition leaves signs or sizes free, test two pairs.'
+          : pair === 'squares' || pair === 'ratios'
+            ? 'Trap: comparing sizes as if the numbers were positive ignores their signs. Rule: reduce the comparison to the sign of a product or difference, then use the condition.'
+            : 'Trap: because $x$ and $y$ are unknown, D is tempting, but the condition fixes every sign involved. Rule: reduce the comparison to the sign of one expression.';
       explanation = `${PAIR_REASON[pair]} With $${SIGN_COND_TEX[cond]}$: ${signReason(pair, cond, answer)}
 
-${exampleText} ${qcEnd(answer)}`;
+${exampleText} ${qcEnd(answer)}
+
+${trapLine}`;
     } else if (kind === 'rational') {
       const form = rng.pick([0, 1]);
       if (form === 0) {
@@ -412,7 +439,11 @@ ${exampleText} ${qcEnd(answer)}`;
         traps.C = 'tested-one-value';
         explanation = `Split Quantity B into two fractions: $\\dfrac{${lin([[1, 'x'], [c, '']])}}{x^2} = \\dfrac{x}{x^2} ${c > 0 ? '+' : '-'} \\dfrac{${Math.abs(c)}}{x^2} = \\dfrac{1}{x} ${c > 0 ? '+' : '-'} \\dfrac{${Math.abs(c)}}{x^2}$.
 
-Both quantities contain $\\dfrac{1}{x}$, and $\\dfrac{${Math.abs(c)}}{x^2}$ is positive for every nonzero $x$, so Quantity B is ${c > 0 ? 'greater' : 'less'} than Quantity A whatever the sign of $x$. ${qcEnd(answer)}`;
+Both quantities contain $\\dfrac{1}{x}$, and $\\dfrac{${Math.abs(c)}}{x^2}$ is positive for every nonzero $x$, so Quantity B is ${c > 0 ? 'greater' : 'less'} than Quantity A whatever the sign of $x$. ${qcEnd(answer)}
+
+Check: at $x = ${cond0 === 'pos' ? 1 : -1}$, Quantity A is $${cond0 === 'pos' ? 1 : -1}$ and Quantity B is $${num((cond0 === 'pos' ? 1 : -1) + c)}$.
+
+Trap: the extra fraction $\\dfrac{${Math.abs(c)}}{x^2}$ is positive for negative $x$ too, so the sign of $x$ does not flip the answer. Rule: split a fraction before comparing.`;
         k = [0, c];
       } else {
         // A = x/(x+1), B = (x+1)/(x+2): B - A = 1/((x+1)(x+2))
@@ -436,7 +467,11 @@ The sign depends only on the denominator. ${
             : region === 'pos'
               ? 'For $x > 0$ both factors are positive, so the difference is positive.'
               : 'For $x < -2$ both factors are negative, so their product is positive and the difference is positive.'
-        } ${qcEnd(answer)}`;
+        } ${qcEnd(answer)}
+
+Check: at $x = ${region === 'pos' ? '1' : region === 'mid' ? '-1.5' : '-3'}$, Quantity A is $${region === 'pos' ? '\\frac{1}{2}' : region === 'mid' ? '3' : '1.5'}$ and Quantity B is $${region === 'pos' ? '\\frac{2}{3}' : region === 'mid' ? '-1' : '2'}$.
+
+Trap: multiplying both sides by the denominators keeps the order only when they are positive. Rule: subtract, then study the sign of the difference.`;
         k = [1, 0];
       }
     } else {
@@ -460,15 +495,25 @@ The sign depends only on the denominator. ${
         traps.C = 'alg-same-numbers-equal';
         traps.D = 'alg-qc-variable-d';
       } else traps.D = 'alg-qc-variable-d';
+      const xv = sgnYX !== null && sgnYX < 0 ? 1 : sgnYX === 0 ? 1 : 0; // a pair that satisfies the stated relation
+      const yv = sgnYX !== null && sgnYX < 0 ? 0 : 1;
       explanation = `Expand both: Quantity A is $${lin([[1, 'xy'], [b, 'x'], [a, 'y'], [a * b, '']])}$ and Quantity B is $${lin([[1, 'xy'], [a, 'x'], [b, 'y'], [a * b, '']])}$. Subtract the common terms $xy$ and $${a * b}$: compare $${lin([[b, 'x'], [a, 'y']])}$ with $${lin([[a, 'x'], [b, 'y']])}$, that is, $${lin([[a - b, 'y']])}$ with $${lin([[a - b, 'x']])}$.
 
 So Quantity A minus Quantity B is $${times(a - b, 'y - x')}$. ${
         sgnYX === null
-          ? 'Nothing tells whether $y$ is greater than $x$: with $x = y$ the quantities are equal, and otherwise they differ.'
+          ? 'Nothing tells whether $y$ is greater than $x$.'
           : sgnYX === 0
             ? 'With $x = y$ the difference is 0.'
             : `Here $y - x$ is ${sgnYX > 0 ? 'positive' : 'negative'} and $${a - b}$ is ${a - b > 0 ? 'positive' : 'negative'}.`
-      } ${qcEnd(answer)}`;
+      } ${qcEnd(answer)}
+
+${
+        sgnYX === null
+          ? `Two cases: for $x = y = 1$ the quantities are both $${(1 + a) * (1 + b)}$; for $x = 0$ and $y = 1$ they are $${a * (1 + b)}$ and $${b * (1 + a)}$.`
+          : `Check: for $x = ${xv}$ and $y = ${yv}$, Quantity A is $${(xv + a) * (yv + b)}$ and Quantity B is $${(xv + b) * (yv + a)}$.`
+      }
+
+Trap: the two products use the same two numbers, but on different variables, so they are not necessarily equal. Rule: expand, cancel the common terms, and read the sign of what is left.`;
       k = [a, b, sgnYX === null ? 9 : sgnYX];
     }
     return {
@@ -617,9 +662,12 @@ const translateQC: Template<WordParams> = {
         const line = (n: number) => `for $n = ${num(n)}$, Quantity A is $${num(m * n + S)}$ and Quantity B is $${num(bExpr(n))}$, so ${relWord(relAt(n))}`;
         explanation = `Write the ${m} ${kind2}: $${listTex}$. Their sum is $${sumTex}$ (the offsets ${offsets} add up to ${S}).
 
-Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: ${S} versus $${term(e, 'n')}$. The comparison depends on $n$: ${line(n1)}; ${line(n2)}. Two allowed values disagree. ${qcEnd('D')}`;
+Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: ${S} versus $${term(e, 'n')}$. The comparison depends on $n$: ${line(n1)}; ${line(n2)}. ${qcEnd('D')}
+
+Trap: one value of $n$ settles nothing. Rule: turn the words into algebra, subtract the common part, then test two allowed values.`;
       } else {
         traps.D = 'alg-qc-variable-d';
+        const n0 = step === 2 ? 2 : 1;
         if (wrongRel.size === 1) {
           const w = [...wrongRel][0];
           if (w !== answer) traps[w] = 'alg-consecutive-offset';
@@ -630,12 +678,16 @@ Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: ${S} versus $${term(e
 
 Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: $${S}$ versus $${num(delta)}$. ${qcEnd(answer)}
 
-Leaving out the offsets gives $${m}n$ and a different comparison.`
+Check: for $n = ${n0}$, the sum is $${num(m * n0 + S)}$ and Quantity B is $${num(bExpr(n0))}$.
+
+Trap: leaving out the offsets gives $${m}n$, and the comparison changes. Rule: list the numbers, add them, then subtract the common part.`
             : `Write the ${m} ${kind2}: $${listTex}$. Their sum is $${sumTex}$.
 
 Compare $${sumTex}$ with ${B}; subtract $${m}n$ from both: $${S}$ versus $${term(e, 'n')}$. Every allowed $n$ is at least $${num(lower!)}$, so $${term(e, 'n')} \\ge ${num(e * lower!)} > ${S}$ and Quantity B is greater. ${qcEnd(answer)}
 
-Leaving out the offsets gives $${m}n$ against ${B}, which is not the sum.`;
+Check: for $n = ${num(lower!)}$, the sum is $${num(m * lower! + S)}$ and Quantity B is $${num(bExpr(lower!))}$.
+
+Trap: leaving out the offsets gives $${m}n$ against ${B}, which is not the sum. Rule: list the numbers, add them, then use the bound on $n$.`;
       }
       k = [m, step, e, delta, lower ?? NaN, mode];
     } else if (kind === 'chain') {
@@ -664,7 +716,9 @@ Leaving out the offsets gives $${m}n$ against ${B}, which is not the sum.`;
         traps[relY(y1)] = 'tested-one-value';
         explanation = `Write everything with $y$: $x = y + ${p}$ and $z = y - ${q}$.
 
-Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$, which depends on $y$: ${line(y1)}; ${line(y2)}. Two allowed values disagree. ${qcEnd('D')}`;
+Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$, which depends on $y$: ${line(y1)}; ${line(y2)}. Two allowed values disagree. ${qcEnd('D')}
+
+Trap: one value of $y$ settles nothing when the difference depends on $y$. Rule: write every quantity with one variable, then test two allowed values.`;
       } else {
         traps.D = 'alg-qc-variable-d';
         const w = wrongRel(ys[0]);
@@ -675,10 +729,16 @@ Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$, wh
 
 So Quantity A is $z + ${p + q}$ and Quantity B is $z + ${delta}$: compare ${p + q} with ${delta}. ${qcEnd(answer)}
 
-Writing $z = y + ${q}$ (the "less than" reversed) gives $x - z = ${p - q}$, a different comparison.`
+Check: for $y = 10$, $x = ${10 + p}$ and $z = ${10 - q}$, so $x - z = ${p + q}$.
+
+Trap: writing $z = y + ${q}$ (the "less than" reversed) gives $x - z = ${p - q}$, a different comparison. Rule: translate "less than" by subtracting.`
             : `Write everything with $y$: $x = y + ${p}$ and $z = y - ${q}$. Quantity A minus Quantity B is $(y + ${p}) - 2(y - ${q}) = ${p + 2 * q} - y$.
 
-Since $y > ${num(t)} \\ge ${threshold}$, this is negative. ${qcEnd(answer)}`;
+Since $y > ${num(t)} \\ge ${threshold}$, this is negative. ${qcEnd(answer)}
+
+Check: for $y = ${num(t + 1)}$, $x = ${num(t + 1 + p)}$ and $2z = ${num(2 * (t + 1 - q))}$, so Quantity B is larger.
+
+Trap: answering D because $y$ is unknown overlooks the bound $y > ${num(t)}$. Rule: use the given bound before testing values.`;
       }
       k = [p, q, delta, t, mode];
     } else if (kind === 'older-by') {
@@ -691,7 +751,11 @@ Since $y > ${num(t)} \\ge ${threshold}$, this is negative. ${qcEnd(answer)}`;
       if (answer !== 'D') traps.D = 'alg-qc-variable-d';
       explanation = `Let $p$ be ${P}'s age now. Then ${Q}'s age now is $p + ${dd}$, and ${P}'s age ${plural(shift, 'year')} from now is $p + ${shift}$.
 
-Subtract $p$ from both: compare ${shift} with ${dd}. ${qcEnd(answer)}`;
+Subtract $p$ from both: compare ${shift} with ${dd}. ${qcEnd(answer)}
+
+Check: if ${P} is 10 now, ${Q} is ${10 + dd} now, and ${P} will be ${10 + shift} in ${plural(shift, 'year')}.
+
+Trap: answering D because the ages are unknown overlooks that only the offsets matter, since both quantities are measured from the same $p$. Rule: name one unknown age and express everything with it.`;
       k = [dd, shift];
     } else if (kind === 'twice') {
       const t = rng.int(3, 10);
@@ -705,7 +769,11 @@ Subtract $p$ from both: compare ${shift} with ${dd}. ${qcEnd(answer)}`;
         traps.D = 'alg-qc-variable-d';
         explanation = `Let $p$ be ${P}'s age now, so ${Q} is $2p$. In ${t} years: Quantity A is $2(p + ${t}) = 2p + ${2 * t}$ and Quantity B is $2p + ${t}$.
 
-The difference is ${t} years, always. ${qcEnd(answer)}`;
+The difference is ${t} years, always. ${qcEnd(answer)}
+
+Check: if ${P} is 10 now, ${Q} is 20; in ${t} years Quantity A is $${20 + 2 * t}$ and Quantity B is $${20 + t}$.
+
+Trap: ${Q} stays twice as old only now: in ${t} years ${Q} is $2p + ${t}$, not $2(p + ${t})$. Rule: add the years to each person separately.`;
       } else {
         A = `${P}'s age plus ${t}`;
         B = `${Q}'s age`;
@@ -713,7 +781,9 @@ The difference is ${t} years, always. ${qcEnd(answer)}`;
         traps.C = 'tested-one-value';
         explanation = `Let $p$ be ${P}'s age, so ${Q}'s age is $2p$. Compare $p + ${t}$ with $2p$, that is (subtracting $p$), ${t} with $p$.
 
-${P}'s age could be less than ${t}, equal to it, or greater. ${qcEnd(answer)}`;
+${P}'s age could be less than ${t}, equal to it, or greater. For $p = 1$, Quantity A is $${1 + t}$ and Quantity B is $2$, so Quantity A is greater; for $p = ${2 * t}$, they are $${3 * t}$ and $${4 * t}$, so Quantity B is greater. ${qcEnd(answer)}
+
+Trap: one age settles nothing, since the answer changes with $p$. Rule: test one value on each side of the point where the sides are equal.`;
       }
       k = [t, variant === 'future' ? 1 : 0];
     } else {
@@ -733,7 +803,9 @@ ${P}'s age could be less than ${t}, equal to it, or greater. ${qcEnd(answer)}`;
 
 Compare $${coefTex(r)}x^2$ with $${coefTex(Bcoef)}x^2$: since $x^2 > 0$, only the coefficients matter. ${qcEnd(answer)}
 
-Reading "$x$ percent" as $x$ (instead of $\\frac{x}{100}$) gives $${n}x^2$.`;
+Check: for $x = 10$, Quantity A is $10$ percent of $${10 * n}$, that is $${n}$, and Quantity B is $${num(Bcoef.mul(100))}$.
+
+Trap: reading "$x$ percent" as $x$ (instead of $\\frac{x}{100}$) gives $${n}x^2$. Rule: "$x$ percent of" means "$\\frac{x}{100}$ times".`;
       k = [n, Bcoef.n, Bcoef.d];
     }
     return {
