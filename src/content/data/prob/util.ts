@@ -214,3 +214,52 @@ export function commas(x: number, maxDec = 2): string {
   const int = i.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return (neg ? '-' : '') + int + (d ? '.' + d : '');
 }
+
+/**
+ * Select-one choices made only of the right value and named mistakes, ascending, the right one at a
+ * random rank (uniform, pulled into the ranks the mistakes allow). A mistake that gives the right value is
+ * not a distractor and is left out; a `must` mistake (one the explanation cites) that gives the right
+ * value, or too few different mistakes, make this return null so the generator draws again.
+ * Mistakes are used in the order given, `must` ones first on their side of the right value.
+ * `used` lists the mistakes that became choices, so an explanation can cite one of them.
+ */
+export function trapOnlyChoices<T extends { value: Frac | number; trap: string; must?: boolean }>(
+  rng: Rng,
+  correct: Frac | number,
+  traps: T[],
+  format: (v: Frac) => string,
+  count = 5,
+): { choices: Choice[]; answer: number; used: T[] } | null {
+  const right = Frac.of(correct);
+  const seen: { v: Frac; item: T; must: boolean }[] = [];
+  for (const t of traps) {
+    const v = Frac.of(t.value);
+    if (v.eq(right)) {
+      if (t.must) return null;
+      continue;
+    }
+    const dup = seen.find((x) => x.v.eq(v));
+    if (dup) dup.must ||= !!t.must;
+    else seen.push({ v, item: t, must: !!t.must });
+  }
+  const below = seen.filter((x) => x.v.lt(right));
+  const above = seen.filter((x) => x.v.gt(right));
+  const mustBelow = below.filter((x) => x.must).length;
+  const mustAbove = above.filter((x) => x.must).length;
+  // Rank of the right value: uniform, then pulled into the range the mistakes allow (as numericChoices does).
+  const lo = Math.max(mustBelow, count - 1 - above.length);
+  const hi = Math.min(below.length, count - 1 - mustAbove);
+  if (lo > hi) return null;
+  const r = Math.min(Math.max(rng.int(0, count - 1), lo), hi);
+  const take = (list: typeof seen, k: number) => [...list.filter((x) => x.must), ...list.filter((x) => !x.must)].slice(0, k);
+  const all = [
+    ...take(below, r).map((x) => ({ v: x.v, item: x.item, ok: false })),
+    { v: right, item: null, ok: true },
+    ...take(above, count - 1 - r).map((x) => ({ v: x.v, item: x.item, ok: false })),
+  ].sort((a, b) => a.v.cmp(b.v));
+  return {
+    choices: all.map((x) => ({ text: format(x.v), ...(x.item ? { trap: x.item.trap } : {}) })),
+    answer: all.findIndex((x) => x.ok),
+    used: all.flatMap((x) => (x.item ? [x.item] : [])),
+  };
+}

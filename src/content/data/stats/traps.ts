@@ -34,6 +34,22 @@ export const statsTraps: Record<string, Trap> = {
     label: 'Assumed the mean equals the median',
     fix: 'Mean and median are equal for symmetric data (like evenly spaced lists), not in general. Extreme values pull the mean but not the median.',
   },
+  'stat-median-boundary': {
+    label: 'Misplaced the edge of the allowed values by one',
+    fix: 'Test the edge itself and the value just beyond it: the median is the target exactly as long as $x$ does not move past the neighbouring known number.',
+  },
+  'stat-median-known-number': {
+    label: 'Picked a number already in the list',
+    fix: 'Put $x$ in order with the others and read the new median or mean. A value that is already in the list is not a solution unless it passes that test.',
+  },
+  'stat-median-no-double': {
+    label: 'Forgot that the median of an even list is an average',
+    fix: 'With an even count the median is the average of the two middle numbers: $\\frac{\\text{middle} + x}{2} = m$ gives $x = 2m - \\text{middle}$, not $m - \\text{middle}$.',
+  },
+  'stat-median-wrong-middle': {
+    label: 'Paired $x$ with the wrong known number',
+    fix: 'One of the two middle numbers is a fixed known number; $x$ is paired with that one, not with its neighbour on the other side.',
+  },
   'stat-median-position': {
     label: 'Thought the median could not be located without the values',
     fix: 'Only the order matters for the median: in increasing order the negative numbers come first, so count positions to see which numbers are in the middle.',
@@ -75,12 +91,56 @@ export const statsTraps: Record<string, Trap> = {
     fix: 'To make the largest value as small as possible, share the leftover total as evenly as possible among the values allowed to grow.',
   },
   'stat-extreme-direction': {
-    label: 'Made some values small while trying to make the average large',
+    label: 'Pushed some values the wrong way for the average asked',
     fix: 'For the greatest average, push every value as high as the conditions allow; for the least average, push every value as low as allowed.',
+  },
+  'stat-extreme-short': {
+    label: 'Stopped short of the limit the conditions allow',
+    fix: 'A value that is free to grow must be taken as high as its neighbours allow: here every integer above the median can equal the greatest one.',
+  },
+  'stat-extreme-top-ignored': {
+    label: 'Ignored the stated greatest integer',
+    fix: 'The greatest integer is given: it is in the list at exactly that value, so the integers between the median and it can be as small as the median, but the last one cannot.',
+  },
+  'stat-extreme-median-twice': {
+    label: 'Counted the median twice',
+    fix: 'The median is one of the integers: it appears once in the sum, so subtract it once.',
+  },
+  'stat-extreme-rounding': {
+    label: 'Rounded the shared total the wrong way',
+    fix: 'When the leftover total cannot be split evenly, the larger share goes to the larger value: round the greatest value up, not down.',
+  },
+  'stat-extreme-median-missing': {
+    label: 'Left the median out of the list',
+    fix: 'The median is one of the integers (the middle one): it counts in the total and in the number of integers.',
   },
   'stat-overlap-ignored': {
     label: 'Counted the shared integers twice',
     fix: 'Different integers in two lists = (size of first) + (size of second) − (number in both).',
+  },
+  'stat-overlap-nested': {
+    label: 'Assumed the shorter list lies inside the longer one',
+    fix: 'Lists of consecutive integers nest only when they are centered on the same integer. Place both on a number line from the anchor the problem gives.',
+  },
+  'stat-overlap-wrong-anchor': {
+    label: 'Read the condition tying the two lists as a different condition',
+    fix: 'Put the numbers of the two lists on a line using exactly the stated condition: the median of one list at the start, at the end, or at the middle of the other.',
+  },
+  'stat-overlap-half': {
+    label: 'Took half of a list as the shared part',
+    fix: 'Count the shared integers from the anchor: the median itself plus the integers on the side where the lists meet, up to the end of the shorter side.',
+  },
+  'stat-overlap-other-count': {
+    label: 'Answered the other count: shared integers instead of different ones, or the reverse',
+    fix: 'Shared (in both lists) is the overlap; different (in either list) is the total minus the overlap. Reread which one is asked.',
+  },
+  'stat-overlap-subtract-twice': {
+    label: 'Subtracted the shared integers twice',
+    fix: 'Add the two lengths, then subtract the overlap once: the shared integers were counted twice, so one copy of them must go, not both.',
+  },
+  'stat-overlap-single': {
+    label: 'Assumed the lists share only the integer they are tied at',
+    fix: 'The anchor gives one shared integer, but the lists keep running the same way on that side: count the integers of the shorter side up to its end.',
   },
   'stat-overlap-off-by-one': {
     label: 'Miscounted the integers from one point to another',

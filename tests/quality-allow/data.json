@@ -1,13 +1,4 @@
 {
-  "data.center.consecutive-lists": {
-    "distractors.trapped": "baseline"
-  },
-  "data.center.extreme-value": {
-    "distractors.trapped": "baseline"
-  },
-  "data.center.which-values": {
-    "distractors.trapped": "baseline"
-  },
   "data.counting.codes": {
     "distractors.trapped": "baseline",
     "distractors.cited": "baseline",
