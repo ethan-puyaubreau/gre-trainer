@@ -200,16 +200,12 @@ const farthestClosest: Template<FarParams> = {
   style: 'which number is farthest from (or closest to) a point',
   generate(rng, d) {
     const style = d === 3 ? 'fraction' : 'decimal';
+    const mode: FarParams['mode'] = rng.chance(d === 1 ? 0.5 : 0.4) ? 'far' : 'close';
     for (;;) {
-      const mode: FarParams['mode'] = rng.chance(d === 1 ? 0.5 : 0.4) ? 'far' : 'close';
       let c: Frac;
       let vals: Frac[];
-      if (d === 1 && mode === 'far') {
-        c = F(rng.int(1, 6) * rng.sign());
-        const s = rng.pick([4, 6, 8, 12]);
-        vals = [-2 * s, -s, 0, s, 2 * s].map((x) => F(x));
-      } else if (d === 1) {
-        c = F(rng.int(2, 9) * rng.sign());
+      if (d === 1) {
+        c = F(rng.int(mode === 'far' ? 1 : 2, mode === 'far' ? 6 : 9) * rng.sign());
         vals = rng.sample(
           Array.from({ length: 25 }, (_, i) => F(i - 12)),
           5,
@@ -229,28 +225,31 @@ const farthestClosest: Template<FarParams> = {
         vals = rng.sample(uniq, 5);
       }
       if (vals.some((v) => v.eq(c))) continue;
-      vals.sort((x, y) => x.cmp(y));
+      vals = rng.shuffle(vals); // the farthest number is always an end of a sorted list: a mixed order spreads the key over A to E
       const dist = vals.map((v) => v.sub(c).abs().toNumber());
       const target = extremeIndex(dist, mode === 'far' ? 'max' : 'min');
       if (target < 0 || vals[target].eq(0)) continue; // 0 as the key would be a giveaway
-      // Real slips: the greatest size, the greatest (or least) value, the biggest number on the same side as c (far);
-      // the size closest to 0, the size closest to |c| on the other side of 0 (close).
-      type Slip = 'maxAbs' | 'maxVal' | 'minVal' | 'sameSide' | 'minAbs' | 'mirror';
-      const uniq = (xs: number[], kind: 'max' | 'min') => extremeIndex(xs, kind);
+      // Real slips, in priority order. Far: the biggest number on c's side of 0, the greatest size, the largest gap between sizes,
+      // the greatest or least value. Close: the size nearest that of c on the other side of 0, the size nearest 0.
+      type Slip = 'sameSide' | 'maxAbs' | 'sizeGap' | 'maxVal' | 'minVal' | 'mirror' | 'minAbs';
+      const abs = vals.map((v) => v.abs().toNumber());
+      const num = vals.map((v) => v.toNumber());
+      const sizeGap = abs.map((a) => Math.abs(a - Math.abs(c.toNumber())));
       const slipIdx: { i: number; kind: Slip }[] =
         mode === 'far'
           ? [
-              { i: uniq(vals.map((v) => v.abs().toNumber()), 'max'), kind: 'maxAbs' },
-              { i: uniq(vals.map((v) => v.toNumber()), 'max'), kind: 'maxVal' },
-              { i: uniq(vals.map((v) => v.toNumber()), 'min'), kind: 'minVal' },
-              { i: uniq(vals.map((v) => (v.sign() === c.sign() ? v.abs().toNumber() : -1)), 'max'), kind: 'sameSide' },
+              { i: extremeIndex(vals.map((v) => (v.sign() === c.sign() ? v.abs().toNumber() : -1)), 'max'), kind: 'sameSide' },
+              { i: extremeIndex(abs, 'max'), kind: 'maxAbs' },
+              { i: extremeIndex(sizeGap, 'max'), kind: 'sizeGap' },
+              { i: extremeIndex(num, 'max'), kind: 'maxVal' },
+              { i: extremeIndex(num, 'min'), kind: 'minVal' },
             ]
           : [
-              { i: uniq(vals.map((v) => v.abs().toNumber()), 'min'), kind: 'minAbs' },
-              { i: uniq(vals.map((v) => (v.sign() === -c.sign() ? v.add(c).abs().toNumber() : 1e9)), 'min'), kind: 'mirror' },
+              { i: extremeIndex(vals.map((v) => (v.sign() === -c.sign() ? v.add(c).abs().toNumber() : 1e9)), 'min'), kind: 'mirror' },
+              { i: extremeIndex(abs, 'min'), kind: 'minAbs' },
             ];
       const slipMap = new Map<number, Slip>();
-      for (const sl of slipIdx) if (sl.i >= 0 && sl.i !== target && !slipMap.has(sl.i)) slipMap.set(sl.i, sl.kind);
+      for (const sl of slipIdx) if (sl.i >= 0 && sl.i !== target && !slipMap.has(sl.i) && slipMap.size < 2) slipMap.set(sl.i, sl.kind);
       if (slipMap.size < 2) continue;
       // Second-best must be clearly different for the "close" questions at d1/d2.
       const sortedD = [...dist].sort((x, y) => (mode === 'far' ? y - x : x - y));
@@ -266,11 +265,12 @@ const farthestClosest: Template<FarParams> = {
           maxAbs: `$${fmt(vals[i])}$ has the greatest size, but size is the distance from 0, not from $${ct}$: it is $${away(i)}$ away`,
           maxVal: `$${fmt(vals[i])}$ is the greatest number, but "farthest" means the greatest distance from $${ct}$, not the greatest value ($${away(i)}$ away)`,
           minVal: `$${fmt(vals[i])}$ is the least number, but "farthest" means the greatest distance from $${ct}$ ($${away(i)}$ away)`,
-          sameSide: `$${fmt(vals[i])}$ is the greatest in size on the same side of 0 as $${ct}$, so it is close to $${ct}$: only $${away(i)}$ away`,
+          sameSide: `$${fmt(vals[i])}$ is the greatest in size among the numbers on the same side of 0 as $${ct}$, but that side is where $${ct}$ is: only $${away(i)}$ away`,
+          sizeGap: `$${fmt(vals[i])}$ has the largest gap between its size and that of $${ct}$, but distance is $|x - ${paren(ct)}|$, not a gap between sizes: it is $${away(i)}$ away`,
           minAbs: `$${fmt(vals[i])}$ is closest to 0, but the question is about distance from $${ct}$: it is $${away(i)}$ away`,
-          mirror: `$${fmt(vals[i])}$ has the size closest to that of $${ct}$, but it is on the other side of 0, so it is $${away(i)}$ away`,
+          mirror: `$${fmt(vals[i])}$ has the size closest to that of $${ct}$ among the numbers on the other side of 0, but it is across 0, so it is $${away(i)}$ away`,
         })[kind];
-      const notes = [...slipMap].slice(0, 2).map(([i, kind]) => noteOf(i, kind));
+      const notes = [...slipMap].map(([i, kind]) => noteOf(i, kind));
       return {
         params: { mode, c, values: vals },
         q: {

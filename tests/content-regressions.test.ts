@@ -43,7 +43,19 @@ describe('arith.number-line.farthest', () => {
     bodies('arith.number-line.farthest').flatMap(({ seed, d, q, params }) => {
       if (q.format !== 'mcs') return [];
       const { mode, c, values } = params as Far;
-      return [{ seed, d, mode, c: c.toNumber(), vals: values.map((v) => v.toNumber()), tagged: q.choices.findIndex((ch) => ch.trap), ex: q.explanation ?? '' }];
+      return [
+        {
+          seed,
+          d,
+          mode,
+          c: c.toNumber(),
+          vals: values.map((v) => v.toNumber()),
+          tagged: q.choices.findIndex((ch) => ch.trap),
+          flagged: q.choices.flatMap((ch, i) => (ch.trap ? [i] : [])),
+          texts: q.choices.map((ch) => ch.text),
+          ex: q.explanation ?? '',
+        },
+      ];
     });
 
   it('never claims the greatest absolute value for a number that does not have it', () => {
@@ -53,24 +65,29 @@ describe('arith.number-line.farthest', () => {
     expect(bad).toEqual([]);
   });
 
-  it('describes the real trap criterion: same side of 0 as c (far), other side of 0 (close)', () => {
+  it('flags only real slips, and the explanation names the criterion of the main one (same side of 0 as c for far, other side of 0 for close)', () => {
     const bad: string[] = [];
     let far = 0;
     let close = 0;
     for (const r of rows()) {
-      if (r.tagged < 0) continue;
-      const v = r.vals[r.tagged];
+      const all = r.vals.map((v, i) => ({ v, i })).filter(({ i }) => r.flagged.includes(i));
+      if (all.length === 0) continue;
       const same = r.vals.filter((x) => Math.sign(x) === Math.sign(r.c));
       const other = r.vals.filter((x) => Math.sign(x) === -Math.sign(r.c));
-      if (r.mode === 'far') {
-        far++;
-        if (Math.abs(v) !== Math.max(...same.map(Math.abs))) bad.push(`seed ${r.seed} d${r.d}: far trap ${v} is not the largest in size on c's side`);
-        if (!r.ex.includes('among the numbers on the same side of 0 as')) bad.push(`seed ${r.seed} d${r.d}: far explanation does not state the criterion`);
-      } else {
-        close++;
-        const gap = (x: number) => Math.abs(Math.abs(x) - Math.abs(r.c));
-        if (gap(v) !== Math.min(...other.map(gap))) bad.push(`seed ${r.seed} d${r.d}: close trap ${v} is not the closest in size to c on the other side`);
-        if (!r.ex.includes('among the numbers on the other side of 0')) bad.push(`seed ${r.seed} d${r.d}: close explanation does not state the criterion`);
+      const gap = (x: number) => Math.abs(Math.abs(x) - Math.abs(r.c));
+      if (r.mode === 'far') far++;
+      else close++;
+      for (const { v, i } of all) {
+        const sameSide = Math.abs(v) === Math.max(...same.map(Math.abs)) && Math.sign(v) === Math.sign(r.c);
+        const mirror = Math.sign(v) === -Math.sign(r.c) && gap(v) === Math.min(...other.map(gap));
+        const real =
+          r.mode === 'far'
+            ? sameSide || Math.abs(v) === Math.max(...r.vals.map(Math.abs)) || gap(v) === Math.max(...r.vals.map(gap)) || v === Math.max(...r.vals) || v === Math.min(...r.vals)
+            : mirror || Math.abs(v) === Math.min(...r.vals.map(Math.abs));
+        if (!real) bad.push(`seed ${r.seed} d${r.d}: ${r.mode} flagged ${v} is not a slip of the kinds the explanation describes`);
+        if (!r.ex.includes(r.texts[i])) bad.push(`seed ${r.seed} d${r.d}: flagged ${v} is not discussed in the explanation`);
+        if (r.mode === 'far' && sameSide && !r.ex.includes('among the numbers on the same side of 0 as')) bad.push(`seed ${r.seed} d${r.d}: far explanation does not state the same-side criterion`);
+        if (r.mode === 'close' && mirror && !r.ex.includes('among the numbers on the other side of 0')) bad.push(`seed ${r.seed} d${r.d}: close explanation does not state the other-side criterion`);
       }
     }
     expect(far).toBeGreaterThan(50);
