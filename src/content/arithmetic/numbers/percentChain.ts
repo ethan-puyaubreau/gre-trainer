@@ -163,7 +163,7 @@ const percentChainMCS: Template<Params> = {
           explanation: `Each percent is taken of the group named just before it, so go down one group at a time.
 
 ${steps.map((s) => `- $${s}$`).join('\n')}${
-            kind === 'not' ? `\n- ${num(x1.toNumber())} − ${num(x2.toNumber())} = ${num(answerV.toNumber())}, the part of the first group left out.` : ''
+            kind === 'not' ? `\n- $${num(x1.toNumber())} - ${num(x2.toNumber())} = ${num(answerV.toNumber())}$, the part of the first group left out.` : ''
           }
 
 The answer is ${num(answerV.toNumber())}.${shown.length ? ` Trap: ${shown.slice(0, 2).map(note).join('; ')}.` : ''} A percent of a percent is a product of the fractions, applied to the group in front of it.`,

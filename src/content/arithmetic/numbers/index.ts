@@ -3,6 +3,7 @@ import { compoundGrowthTemplates, compoundGrowthTraps } from './compoundGrowth';
 import { decimalTemplates } from './decimals';
 import { decimalExtraTemplates } from './decimalsMore';
 import { fractionTemplates } from './fractions';
+import { missingChangeTemplates } from './missingChange';
 import { numberLineTemplates } from './numberLine';
 import { percentChainTemplates, percentChainTraps } from './percentChain';
 import { percentTemplates } from './percent';
@@ -14,5 +15,5 @@ import { stackedDiscountTemplates } from './stackedDiscount';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...compoundGrowthTemplates, ...percentChainTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...compoundGrowthTemplates, ...percentChainTemplates, ...missingChangeTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
 export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...compoundGrowthTraps, ...percentChainTraps };
