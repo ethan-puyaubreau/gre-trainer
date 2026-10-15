@@ -12,9 +12,10 @@ import { ratioTemplates } from './ratios';
 import { ratioTotalTemplates, ratioTotalTraps } from './ratioTotals';
 import { rateTemplates } from './rates';
 import { wholeCountTemplates, wholeCountTraps } from './wholeCountNe';
+import { unorderedTemplates, unorderedTraps } from './unorderedQc';
 import { realNumberTemplates } from './realNumbers';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...complexFractionTemplates, ...wholeCountTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
-export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps, ...complexFractionTraps, ...wholeCountTraps };
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...complexFractionTemplates, ...wholeCountTemplates, ...unorderedTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
+export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps, ...complexFractionTraps, ...wholeCountTraps, ...unorderedTraps };
