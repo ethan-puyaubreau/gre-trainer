@@ -293,8 +293,17 @@ export function trapChoices<T extends { value: FracLike; trap: string }>(
     if (v.eq(c) || uniq.some((u) => u.value.eq(v))) continue;
     uniq.push({ ...t, value: v });
   }
-  const below = uniq.filter((u) => u.value.lt(c));
-  const above = uniq.filter((u) => u.value.gt(c));
+  // A second trap with the same id waits behind the first ones of every other id (more variety among the choices).
+  const seenId = new Map<string, number>();
+  const rank = new Map<T, number>();
+  for (const u of uniq) {
+    const r = seenId.get(u.trap) ?? 0;
+    seenId.set(u.trap, r + 1);
+    rank.set(u, r);
+  }
+  const byRank = [...uniq].sort((a, b) => rank.get(a)! - rank.get(b)!);
+  const below = byRank.filter((u) => u.value.lt(c));
+  const above = byRank.filter((u) => u.value.gt(c));
   if (below.length + above.length < count - 1) return null;
   const target = Math.max(count - 1 - above.length, Math.min(rng.int(0, count - 1), below.length));
   const kept = [...below.slice(0, target), ...above.slice(0, count - 1 - target)];

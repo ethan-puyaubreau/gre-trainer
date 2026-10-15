@@ -196,6 +196,30 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Divided the equations in the wrong order',
     fix: 'Write the division out: $\\frac{xy^2}{xy} = y$, so $y = \\frac{\\text{first value}}{\\text{second value}}$, not the reciprocal.',
   },
+  'alg-operation-swapped': {
+    label: 'Multiplied where the problem needs a quotient, or the reverse',
+    fix: 'Ask which combination of the equations cancels what you do not want: $\\frac{x^2y}{xy^2} = \\frac{x}{y}$ needs a division, $x^2y \\cdot xy^2 = (xy)^3$ needs a product.',
+  },
+  'alg-wrong-operation-on-equations': {
+    label: 'Added or subtracted product equations',
+    fix: 'Sums and differences of $x^2y$ and $xy^2$ isolate nothing. Divide the equations for a ratio, multiply them for a power of $xy$.',
+  },
+  'alg-added-factor': {
+    label: 'Added the factor instead of multiplying by it',
+    fix: 'If the second equation is 3 times the first, each number is MULTIPLIED by 3, not increased by 3.',
+  },
+  'alg-exponent-slip': {
+    label: 'Used the wrong power of the other variable',
+    fix: 'From $xy^2 = A$ and $y = c$ you divide by $y$ once to use $xy = B$; check by substituting both values back in.',
+  },
+  'alg-ratio-factor-only': {
+    label: 'Gave the factor between the equations instead of the coefficient',
+    fix: 'The factor $m$ only tells you how the second equation scales; the coefficient asked for is $m$ times the matching coefficient of the first.',
+  },
+  'alg-wrong-ratio-pair': {
+    label: 'Matched the wrong pair of numbers',
+    fix: 'Parallel lines need proportional coefficients of $x$ and $y$ but NOT proportional constants; the same line needs all three proportional.',
+  },
   'alg-forgot-root': {
     label: 'Forgot to take the root',
     fix: 'Undo a power with the matching root: $(xy)^3 = 216$ gives $xy = 6$, and $(x - 2)^2 = 9$ gives $x - 2 = 3$ or $x - 2 = -3$.',

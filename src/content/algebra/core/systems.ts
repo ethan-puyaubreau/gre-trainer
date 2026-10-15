@@ -1,8 +1,8 @@
-import { numericChoices, qcCompare } from '../../../engine/build';
+import { qcCompare } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { close, intExcept, qcEnd, qcSamples, sideFill, someTraps, times } from './util';
+import { close, intExcept, qcEnd, qcSamples, times, trapChoices } from './util';
 
 /** a x + b y = c */
 type Eq = [number, number, number];
@@ -101,69 +101,90 @@ const productMCS: Template<ProductParams> = {
   format: 'mcs',
   style: 'divide two product equations',
   generate(rng, d) {
-    const kind: ProductParams['kind'] = rng.pick(d === 1 ? ['x-from-xy2', 'y-from-x2y'] : d === 2 ? ['x-from-xy2', 'y-from-x2y', 'ratio'] : ['x-from-xy2', 'ratio', 'product']);
-    let A: number;
-    let B: number;
-    let answer: Frac;
-    let stem: string;
-    let explanation: string;
-    const traps: { value: Frac; trap: string }[] = [];
-    const fillers: Frac[] = [];
-    if (kind === 'x-from-xy2' || kind === 'y-from-x2y') {
-      // xy^2 = A, xy = B  (or x^2 y = A, xy = B, roles swapped)
-      const other = rng.int(2, 6); // y (or x)
-      let Bv: number;
-      do Bv = rng.int(1, 12);
-      while (Bv % other === 0 && rng.chance(0.7));
-      B = Bv;
-      A = B * other;
-      answer = new Frac(B, other);
-      const [u, w] = kind === 'x-from-xy2' ? ['x', 'y'] : ['y', 'x'];
-      const first = kind === 'x-from-xy2' ? 'xy^2' : 'x^2y';
-      stem = `If $${first} = ${A}$ and $xy = ${B}$, what is the value of $${u}$?`;
-      explanation = `Divide the first equation by the second: $\\dfrac{${first}}{xy} = ${w}$, so $${w} = \\dfrac{${A}}{${B}} = ${other}$.
+    for (;;) {
+      const kind: ProductParams['kind'] = rng.pick(d === 1 ? ['x-from-xy2', 'y-from-x2y'] : d === 2 ? ['x-from-xy2', 'y-from-x2y', 'ratio'] : ['x-from-xy2', 'ratio', 'product']);
+      let A: number;
+      let B: number;
+      let answer: Frac;
+      let stem: string;
+      let method: string;
+      const wrongs: { value: Frac; trap: string; why: string; refute: string }[] = [];
+      if (kind === 'x-from-xy2' || kind === 'y-from-x2y') {
+        // xy^2 = A, xy = B  (or x^2 y = A, xy = B, roles swapped)
+        const other = rng.int(2, 6); // y (or x)
+        const Bv = rng.int(2, 12);
+        B = Bv;
+        A = B * other;
+        answer = new Frac(B, other);
+        if (answer.eq(1)) continue;
+        const [u, w] = kind === 'x-from-xy2' ? ['x', 'y'] : ['y', 'x'];
+        const first = kind === 'x-from-xy2' ? 'xy^2' : 'x^2y';
+        stem = `If $${first} = ${A}$ and $xy = ${B}$, what is the value of $${u}$?`;
+        method = `Two product equations: divide one by the other so that a common factor cancels. $\\dfrac{${first}}{xy} = ${w}$, so $${w} = \\dfrac{${A}}{${B}} = ${other}$ (the ratio of the two right sides). Then $${u} \\cdot ${other} = ${B}$ gives $${u} = ${answer.toTex()}$.
 
-Then $${u} \\cdot ${other} = ${B}$ gives $${u} = ${answer.toTex()}$.
-
-Careful: the question asks for $${u}$, not $${w}$.`;
-      traps.push({ value: frac(other), trap: 'alg-answered-other-variable' });
-      traps.push({ value: new Frac(other, B), trap: 'alg-divided-wrong-way' });
-      fillers.push(new Frac(1, other), new Frac(A, 1), new Frac(A - B, 1), new Frac(B * B, 1), new Frac(A, B * B + 1));
-    } else {
-      let x0: number;
-      let y0: number;
-      do {
-        x0 = rng.int(1, 6);
-        y0 = rng.int(1, 6);
-      } while (x0 === y0);
-      A = x0 * x0 * y0;
-      B = x0 * y0 * y0;
-      if (kind === 'ratio') {
-        answer = new Frac(x0, y0);
-        stem = `If $x^2y = ${A}$ and $xy^2 = ${B}$, what is the value of $\\dfrac{x}{y}$?`;
-        explanation = `Divide the first equation by the second: $\\dfrac{x^2y}{xy^2} = \\dfrac{x}{y}$, so $\\dfrac{x}{y} = \\dfrac{${A}}{${B}} = ${answer.toTex()}$.
-
-There is no need to find $x$ and $y$ themselves. Dividing in the other order gives $\\frac{y}{x}$.`;
-        traps.push({ value: new Frac(y0, x0), trap: 'alg-divided-wrong-way' });
-        fillers.push(frac(x0), frac(y0), new Frac(A - B, 1).abs(), new Frac(x0 * y0, 1), new Frac(x0 + 1, y0));
+Check: $${u} \\cdot ${w}^2 = ${answer.toTex()} \\cdot ${other * other} = ${num(answer.mul(other * other))}$ and $${u}${w} = ${B}$.`;
+        const refute = (t: Frac) => `If $${u} = ${t.toTex()}$, then $${w} = ${new Frac(B).div(t).toTex()}$ and $${first} = ${t.mul(new Frac(B).div(t).pow(2)).toTex()}$, not ${A}.`;
+        wrongs.push({ value: frac(other), trap: 'alg-answered-other-variable', why: `giving $${w}$ instead of $${u}$`, refute: `The question asks for $${u}$; $${w} = ${other}$ is only the middle step.` });
+        wrongs.push({ value: new Frac(other, B), trap: 'alg-divided-wrong-way', why: `dividing $${w}$ by ${B} instead of ${B} by $${w}$`, refute: refute(new Frac(other, B)) });
+        wrongs.push({ value: new Frac(B, A), trap: 'alg-divided-wrong-way', why: 'dividing the second equation by the first', refute: refute(new Frac(B, A)) });
+        wrongs.push({ value: frac(A), trap: 'alg-operation-swapped', why: `multiplying ${B} by $${w}$ instead of dividing`, refute: refute(frac(A)) });
+        wrongs.push({ value: frac(B), trap: 'alg-forgot-divide', why: `stopping at $${u}${w} = ${B}$ without dividing by $${w}$`, refute: refute(frac(B)) });
+        wrongs.push({ value: frac(A - B), trap: 'alg-wrong-operation-on-equations', why: 'subtracting the equations instead of dividing them', refute: refute(frac(A - B)) });
+        wrongs.push({ value: new Frac(1, B), trap: 'alg-divided-wrong-way', why: `turning $${u}${w} = ${B}$ upside down`, refute: refute(new Frac(1, B)) });
+        wrongs.push({ value: new Frac(B, other * other), trap: 'alg-exponent-slip', why: `dividing ${B} by $${w}^2$ where $${w}$ was needed`, refute: refute(new Frac(B, other * other)) });
       } else {
-        answer = frac(x0 * y0);
-        stem = `If $x^2y = ${A}$ and $xy^2 = ${B}$, what is the value of $xy$?`;
-        explanation = `Multiply the two equations: $x^2y \\cdot xy^2 = x^3y^3 = (xy)^3$, so $(xy)^3 = ${A} \\cdot ${B} = ${num(A * B)}$.
+        let x0: number;
+        let y0: number;
+        do {
+          x0 = rng.int(1, 6);
+          y0 = rng.int(1, 6);
+        } while (x0 === y0);
+        A = x0 * x0 * y0;
+        B = x0 * y0 * y0;
+        if (kind === 'ratio') {
+          answer = new Frac(x0, y0);
+          stem = `If $x^2y = ${A}$ and $xy^2 = ${B}$, what is the value of $\\dfrac{x}{y}$?`;
+          method = `The ratio $\\frac{x}{y}$ appears when the first equation is divided by the second, with no need to find $x$ and $y$: $\\dfrac{x^2y}{xy^2} = \\dfrac{x}{y}$, so $\\dfrac{x}{y} = \\dfrac{${A}}{${B}} = ${answer.toTex()}$.
 
-The cube root gives $xy = ${x0 * y0}$.`;
-        traps.push({ value: frac(A * B), trap: 'alg-forgot-root' });
-        fillers.push(frac(A + B), new Frac(A, B), frac(x0 * y0 + 1), frac(x0 * y0 * x0), frac(Math.max(1, x0 * y0 - 2)));
+Check: $x = ${x0}$ and $y = ${y0}$ give $x^2y = ${A}$, $xy^2 = ${B}$ and $\\frac{x}{y} = ${answer.toTex()}$.`;
+          const refute = (t: Frac) => `$\\frac{x}{y}$ is $\\frac{${A}}{${B}}$, which is not $${t.toTex()}$.`;
+          wrongs.push({ value: new Frac(y0, x0), trap: 'alg-divided-wrong-way', why: 'dividing the equations in the wrong order', refute: `Dividing the second by the first gives $\\frac{y}{x}$, not $\\frac{x}{y}$.` });
+          wrongs.push({ value: frac(x0), trap: 'alg-answered-one-variable', why: 'giving $x$', refute: refute(frac(x0)) });
+          wrongs.push({ value: frac(y0), trap: 'alg-answered-one-variable', why: 'giving $y$', refute: refute(frac(y0)) });
+          wrongs.push({ value: frac(A * B), trap: 'alg-operation-swapped', why: 'multiplying the equations instead of dividing them', refute: refute(frac(A * B)) });
+          wrongs.push({ value: frac(Math.abs(A - B)), trap: 'alg-wrong-operation-on-equations', why: 'subtracting the equations', refute: refute(frac(Math.abs(A - B))) });
+        } else {
+          answer = frac(x0 * y0);
+          stem = `If $x^2y = ${A}$ and $xy^2 = ${B}$, what is the value of $xy$?`;
+          method = `The product of the two left sides is a power of $xy$: $x^2y \\cdot xy^2 = x^3y^3 = (xy)^3$, so $(xy)^3 = ${A} \\cdot ${B} = ${num(A * B)}$. The cube root gives $xy = ${x0 * y0}$.
+
+Check: $${x0 * y0}^3 = ${num((x0 * y0) ** 3)} = ${num(A * B)}$.`;
+          const refute = (t: Frac) => `$(xy)^3 = ${num(A * B)}$, but $${t.toTex()}^3 = ${t.pow(3).toTex()}$.`;
+          wrongs.push({ value: frac(A * B), trap: 'alg-forgot-root', why: `stopping at $(xy)^3 = ${num(A * B)}$ without taking the cube root`, refute: `That is the value of $(xy)^3$, not of $xy$.` });
+          wrongs.push({ value: frac(x0), trap: 'alg-answered-one-variable', why: 'giving $x$', refute: refute(frac(x0)) });
+          wrongs.push({ value: frac(y0), trap: 'alg-answered-one-variable', why: 'giving $y$', refute: refute(frac(y0)) });
+          wrongs.push({ value: new Frac(A, B), trap: 'alg-operation-swapped', why: 'dividing the equations when a product was needed', refute: refute(new Frac(A, B)) });
+          wrongs.push({ value: frac(A + B), trap: 'alg-wrong-operation-on-equations', why: 'adding the equations', refute: refute(frac(A + B)) });
+        }
       }
+      const res = trapChoices(rng, answer, wrongs.filter((w) => w.value.sign() > 0), (v) => `$${v.toTex()}$`);
+      if (!res) continue;
+      const cited = res.kept[0];
+      return {
+        params: { kind, A: A!, B: B!, values: res.values.map((v) => [v.n, v.d] as [number, number]) },
+        q: {
+          format: 'mcs',
+          stem: stem!,
+          choices: res.choices,
+          answer: res.answer,
+          explanation: `${method!}
+
+Trap: $${cited.value.toTex()}$ comes from ${cited.why}. ${cited.refute}
+
+Rule: to isolate a variable from product equations, divide or multiply them so that the other factors cancel.`,
+        },
+      };
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: someTraps(rng, traps.filter((t) => !t.value.eq(answer))),
-      fillers: [...sideFill(rng, answer!, answer!.isInt() ? 1 : new Frac(1, answer!.d)).filter((v) => v.sign() > 0), ...rng.shuffle(fillers)],
-      format: (v) => `$${v.toTex()}$`,
-    });
-    const values = choices.map((c) => parseFracTex(c.text));
-    return { params: { kind, A: A!, B: B!, values }, q: { format: 'mcs', stem: stem!, choices, answer: idx, explanation: explanation! } };
   },
   check(q, { kind, A, B, values }) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -187,13 +208,6 @@ The cube root gives $xy = ${x0 * y0}$.`;
     return hits[0] === q.answer ? null : `expected ${hits[0]}`;
   },
 };
-
-function parseFracTex(t: string): [number, number] {
-  const s = t.replace(/\$/g, '').replace(/\{,\}/g, '');
-  const m = /^(-?)\\frac\{(\d+)\}\{(\d+)\}$/.exec(s);
-  if (m) return [(m[1] ? -1 : 1) * Number(m[2]), Number(m[3])];
-  return [Number(s), 1];
-}
 
 /* ================================================================== 3. Compare the unknowns of a system (QC) */
 
@@ -277,7 +291,7 @@ Compare $x = ${num(x0)}$ with $y = ${num(y0)}$. ${qcEnd(answer)}`;
       }
       const [r1, r2] = [Math.min(y1, y2), Math.max(y1, y2)];
       explanation = askY
-        ? `Substitute $x = y ${a > 0 ? '-' : '+'} ${Math.abs(a)}$ into $xy = ${num(k)}$: $y^2 ${a > 0 ? '-' : '+'} ${Math.abs(a)}y = ${num(k)}$, so $${lin([[1, 'y^2'], [-a, 'y'], [-k, '']])} = 0$ and $(y ${r1 < 0 ? '+' : '-'} ${Math.abs(r1)})(y ${r2 < 0 ? '+' : '-'} ${Math.abs(r2)}) = 0$.
+        ? `Substitute $x = y ${a > 0 ? '-' : '+'} ${Math.abs(a)}$ into $xy = ${num(k)}$: $${lin([[1, 'y^2'], [-a, 'y']])} = ${num(k)}$, so $${lin([[1, 'y^2'], [-a, 'y'], [-k, '']])} = 0$ and $(y ${r1 < 0 ? '+' : '-'} ${Math.abs(r1)})(y ${r2 < 0 ? '+' : '-'} ${Math.abs(r2)}) = 0$.
 
 So $y = ${num(r1)}$ or $y = ${num(r2)}$ (with $x = ${num(r1 - a)}$ or $x = ${num(r2 - a)}$). ${
             answer === 'D' ? 'One value of $y$ is negative and the other positive.' : `Both values of $y$ are ${r1 > 0 ? 'positive' : 'negative'}.`
@@ -385,7 +399,7 @@ interface CountParams {
   e1: Eq;
   /** second equation with the unknown constant marked by NaN */
   e2: [number, number, number];
-  values: number[];
+  values: [number, number][];
 }
 
 const solutionCountMCS: Template<CountParams> = {
@@ -394,75 +408,98 @@ const solutionCountMCS: Template<CountParams> = {
   format: 'mcs',
   style: 'constant that gives no solution or infinitely many',
   generate(rng, d) {
-    const kind: CountParams['kind'] = rng.pick(['none', 'infinite']);
-    const a1 = rng.int(1, 6);
-    let b1: number;
-    do b1 = rng.int(-6, 6);
-    while (b1 === 0 || Math.abs(b1) === a1);
-    let c1: number;
-    do c1 = rng.int(-9, 12);
-    while (c1 === 0);
-    const m = rng.pick(d === 1 ? [2, 3] : [2, 3, -2, -3, 4]);
-    let stem: string;
-    let explanation: string;
-    let answer: number;
-    let e2: [number, number, number];
-    const traps: { value: number; trap: string }[] = [];
-    const fillers: number[] = [];
-    if (kind === 'none') {
-      const b2 = m * b1;
-      let c2: number;
-      do c2 = rng.int(-15, 20);
-      while (c2 === m * c1);
-      answer = m * a1;
-      e2 = [NaN, b2, c2];
-      stem = `$$${eqTex([a1, b1, c1])}$$
+    for (;;) {
+      const kind: CountParams['kind'] = rng.pick(['none', 'infinite']);
+      const a1 = rng.int(2, 6);
+      let b1: number;
+      do b1 = rng.int(-6, 6);
+      while (b1 === 0 || Math.abs(b1) === a1);
+      let c1: number;
+      do c1 = rng.int(-9, 12);
+      while (c1 === 0 || Math.abs(c1) === 1);
+      const m = rng.pick(d === 1 ? [2, 3] : [2, 3, -2, -3, 4]);
+      let stem: string;
+      let method: string;
+      let rule: string;
+      let answer: Frac;
+      let e2: [number, number, number];
+      const wrongs: { value: Frac; trap: string; why: string }[] = [];
+      if (kind === 'none') {
+        const b2 = m * b1;
+        let c2: number;
+        do c2 = rng.int(-15, 20);
+        while (c2 === m * c1 || c2 === 0);
+        answer = frac(m * a1);
+        e2 = [NaN, b2, c2];
+        stem = `$$${eqTex([a1, b1, c1])}$$
 $$${lin([[1, 'kx'], [b2, 'y']])} = ${num(c2)}$$
 
 In the system of equations above, $k$ is a constant. For what value of $k$ does the system have no solution?`;
-      explanation = `Two linear equations have no solution when their left sides are proportional but the right sides are not (parallel lines). The $y$-coefficients give the factor: $${num(b2)} = ${m}(${num(b1)})$.
+        method = `No solution means parallel lines: the left sides are proportional but the right sides are not. The $y$-coefficients give the factor, $${num(b2)} = ${m}(${num(b1)})$, so $k = ${m}(${a1}) = ${num(answer)}$.
 
-So $k = ${m}(${a1}) = ${num(answer)}$. Then the left side of the second equation is $${m}$ times the left side of the first, while $${num(c2)} \\ne ${m}(${num(c1)})$, so no pair $(x, y)$ satisfies both.`;
-      traps.push({ value: -answer, trap: 'alg-proportional-sign' });
-      if (Number.isInteger(a1 / m)) traps.push({ value: a1 / m, trap: 'alg-ratio-inverted' });
-      fillers.push(a1, answer + m, answer - 1, answer + 1, b2, answer * 2);
-    } else {
-      answer = m * c1;
-      e2 = [m * a1, m * b1, NaN];
-      stem = `$$${eqTex([a1, b1, c1])}$$
+Check: the second left side is then $${m}$ times the first, but $${num(c2)} \\ne ${m}(${num(c1)}) = ${num(m * c1)}$, so no pair $(x, y)$ satisfies both.`;
+        rule = 'No solution: same slope, different constant.';
+        wrongs.push({ value: frac(-m * a1), trap: 'alg-proportional-sign', why: 'losing the sign of the factor' });
+        wrongs.push({ value: new Frac(a1, m), trap: 'alg-ratio-inverted', why: `dividing ${a1} by $${m}$ instead of multiplying` });
+        wrongs.push({ value: frac(a1), trap: 'alg-ignored-scaling', why: 'ignoring the factor between the equations' });
+        wrongs.push({ value: frac(m), trap: 'alg-ratio-factor-only', why: 'giving the factor itself' });
+        wrongs.push({ value: frac(m * c1), trap: 'alg-wrong-ratio-pair', why: 'scaling the constant of the first equation instead of its $x$-coefficient' });
+        wrongs.push({ value: frac(b2), trap: 'alg-wrong-ratio-pair', why: 'copying the $y$-coefficient of the second equation' });
+        wrongs.push({ value: frac(a1 * b2), trap: 'alg-operation-swapped', why: `multiplying ${a1} by ${num(b2)} where the ratio ${num(b2)}/${num(b1)} was needed` });
+        wrongs.push({ value: frac(a1 + m), trap: 'alg-added-factor', why: 'adding the factor instead of multiplying by it' });
+        wrongs.push({ value: new Frac(a1 * c2, c1), trap: 'alg-wrong-ratio-pair', why: 'matching the constants on the right instead of the $y$-coefficients' });
+      } else {
+        answer = frac(m * c1);
+        e2 = [m * a1, m * b1, NaN];
+        stem = `$$${eqTex([a1, b1, c1])}$$
 $$${lin([[m * a1, 'x'], [m * b1, 'y']])} = k$$
 
 In the system of equations above, $k$ is a constant. For what value of $k$ does the system have infinitely many solutions?`;
-      explanation = `The left side of the second equation is $${m}$ times the left side of the first. The system has infinitely many solutions when the second equation is exactly $${m}$ times the first, that is, when $k = ${m}(${num(c1)}) = ${num(answer)}$. For any other $k$ there is no solution.`;
-      traps.push({ value: c1, trap: 'alg-ignored-scaling' });
-      traps.push({ value: -answer, trap: 'alg-proportional-sign' });
-      fillers.push(answer + m, answer - m, answer + 1, c1 + m, answer * 2);
+        method = `Infinitely many solutions mean the same line twice: the second equation must be exactly $${m}$ times the first, constant included. The left side is already $${m}$ times the first, so $k = ${m}(${num(c1)}) = ${num(answer)}$.
+
+Check: with $k = ${num(answer)}$ the second equation divided by $${m}$ gives back $${eqTex([a1, b1, c1])}$. For any other $k$ the lines are parallel and there is no solution.`;
+        rule = 'Infinitely many solutions: every number of the first equation is multiplied by the same factor.';
+        wrongs.push({ value: frac(c1), trap: 'alg-ignored-scaling', why: 'forgetting to multiply the constant by the factor' });
+        wrongs.push({ value: frac(-m * c1), trap: 'alg-proportional-sign', why: 'losing the sign of the factor' });
+        wrongs.push({ value: new Frac(c1, m), trap: 'alg-ratio-inverted', why: `dividing ${num(c1)} by $${m}$ instead of multiplying` });
+        wrongs.push({ value: frac(m * a1), trap: 'alg-wrong-ratio-pair', why: 'copying the new $x$-coefficient instead of scaling the constant' });
+        wrongs.push({ value: frac(m * b1), trap: 'alg-wrong-ratio-pair', why: 'copying the new $y$-coefficient instead of scaling the constant' });
+        wrongs.push({ value: frac(m), trap: 'alg-ratio-factor-only', why: 'giving the factor itself' });
+        wrongs.push({ value: frac(c1 + m), trap: 'alg-added-factor', why: 'adding the factor to the constant instead of multiplying' });
+      }
+      const res = trapChoices(rng, answer, wrongs, (v) => `$${num(v)}$`);
+      if (!res) continue;
+      const cited = res.kept[0];
+      return {
+        params: { kind, e1: [a1, b1, c1], e2: e2!, values: res.values.map((v) => [v.n, v.d] as [number, number]) },
+        q: {
+          format: 'mcs',
+          stem,
+          choices: res.choices,
+          answer: res.answer,
+          explanation: `${method}
+
+Trap: $${num(cited.value)}$ comes from ${cited.why}; it does not make the second equation ${kind === 'none' ? 'parallel to' : 'a copy of'} the first.
+
+Rule: ${rule}`,
+        },
+      };
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: someTraps(rng, traps.filter((t) => t.value !== answer).map((t) => ({ value: t.value, trap: t.trap }))),
-      fillers: [...sideFill(rng, answer, rng.pick([1, Math.abs(m)])), ...rng.shuffle(fillers.filter((f) => f !== answer))],
-      format: (v) => `$${num(v)}$`,
-    });
-    const values = choices.map((c) => Number(c.text.replace(/\$|\{,\}/g, '')));
-    return {
-      params: { kind, e1: [a1, b1, c1], e2: e2!, values },
-      q: { format: 'mcs', stem, choices, answer: idx, explanation },
-    };
   },
   check(q, { kind, e1, e2, values }) {
     if (q.format !== 'mcs') return 'wrong format';
-    if (values.some((v, i) => q.choices[i].text !== `$${num(v)}$`)) return 'choice text mismatch';
-    // Classify by determinants (Cramer / rank), independently of the ratio argument.
-    const classify = (f: Eq): 'one' | 'none' | 'infinite' => {
-      const det = e1[0] * f[1] - e1[1] * f[0];
-      if (det !== 0) return 'one';
-      const dx = e1[2] * f[1] - e1[1] * f[2];
-      const dy = e1[0] * f[2] - e1[2] * f[0];
-      return dx === 0 && dy === 0 ? 'infinite' : 'none';
+    if (values.some(([n, dd], i) => q.choices[i].text !== `$${num(new Frac(n, dd))}$`)) return 'choice text mismatch';
+    // Classify by determinants (Cramer / rank), independently of the ratio argument, in exact arithmetic.
+    const classify = (f: [Frac, Frac, Frac]): 'one' | 'none' | 'infinite' => {
+      const det = f[1].mul(e1[0]).sub(f[0].mul(e1[1]));
+      if (!det.eq(0)) return 'one';
+      const dx = f[1].mul(e1[2]).sub(f[2].mul(e1[1]));
+      const dy = f[2].mul(e1[0]).sub(f[0].mul(e1[2]));
+      return dx.eq(0) && dy.eq(0) ? 'infinite' : 'none';
     };
-    const hits = values.flatMap((v, i) => {
-      const f: Eq = [Number.isNaN(e2[0]) ? v : e2[0], e2[1], Number.isNaN(e2[2]) ? v : e2[2]];
+    const hits = values.flatMap(([n, dd], i) => {
+      const v = new Frac(n, dd);
+      const f: [Frac, Frac, Frac] = [Number.isNaN(e2[0]) ? v : new Frac(e2[0]), new Frac(e2[1]), Number.isNaN(e2[2]) ? v : new Frac(e2[2])];
       return classify(f) === kind ? [i] : [];
     });
     if (hits.length !== 1) return `${hits.length} matching choices`;

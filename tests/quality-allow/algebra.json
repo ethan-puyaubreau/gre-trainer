@@ -71,16 +71,6 @@
     "artifacts.sign": "baseline",
     "distractors.trapped": "baseline"
   },
-  "alg.systems.compare-qc": {
-    "artifacts.coef-1": "baseline"
-  },
-  "alg.systems.product-mcs": {
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "alg.systems.solution-count-mcs": {
-    "distractors.trapped": "baseline"
-  },
   "alg.word-problems.in-terms-of": {
     "distractors.trapped": "baseline",
     "bank.size": "baseline",
