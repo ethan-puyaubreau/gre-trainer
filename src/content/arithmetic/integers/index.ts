@@ -1,6 +1,7 @@
 import type { Template, Trap } from '../../../engine/types';
 import { consecutiveTemplates } from './consecutive';
 import { countMultiplesTemplates, countMultiplesTraps } from './countMultiples';
+import { recurrenceTemplates } from './cycleRecurrence';
 import { patternCountTemplates, cycleCountTraps } from './cycleCount';
 import { cycleUnitsCompareTemplates, cycleUnitsCompareTraps } from './cycleUnitsCompare';
 import { divisibilityTemplates } from './divisibility';
@@ -38,5 +39,6 @@ export const integersTemplates: Template<any>[] = [
   ...remainderLcmTemplates,
   ...cycleUnitsCompareTemplates,
   ...patternCountTemplates,
+  ...recurrenceTemplates,
 ];
 export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps };
