@@ -204,14 +204,14 @@ const regionQc: Template<Params> = {
       figure: fig.build(true),
       info: `${S.info('s')} ${cond}`,
       quantityA: S.a,
-      quantityB: `$${kTex}$`,
+      quantityB: `$${kTex}$ square meters`,
       answer,
       traps: qcTraps(answer, tr),
       explanation: `The first quantity is an area, a number times $s^2$; the second is a length, a number times $s$. They do not grow together, so write both in terms of $s$.
 
 ${S.steps} The leftover region has area $${area} \\approx ${S.c.toFixed(3)}s^2$.
 
-Quantity A is greater exactly when $${S.c.toFixed(3)}s^2 > ${kc}s$, that is (dividing by $s > 0$) when $s > \\frac{${kv}}{${S.c.toFixed(3)}} \\approx ${fmt(T)}$. ${verdict}
+${mode === 'exact' ? '' : `Quantity A is greater exactly when $${S.c.toFixed(3)}s^2 > ${kc}s$, that is (dividing by $s > 0$) when $s > \\frac{${kv}}{${S.c.toFixed(3)}} \\approx ${fmt(T)}$. `}${verdict}
 
 Trap: comparing only the coefficients, $${S.c.toFixed(2)}$ and $${kv}$, as if $s$ did not matter.
 
