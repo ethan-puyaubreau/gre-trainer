@@ -3,6 +3,8 @@ import { evaluate, formatCalc } from '../src/engine/calc';
 import { Frac, frac, parseDecimal } from '../src/engine/frac';
 import { grade } from '../src/engine/grade';
 import { parseRich } from '../src/engine/rich';
+import { lin, poly } from '../src/engine/tex';
+import { minus, plural, term } from '../src/engine/text';
 import type { NEQuestion } from '../src/engine/types';
 
 const ne = (answer: Frac, fractionBoxes = false): NEQuestion => ({
@@ -115,5 +117,40 @@ describe('money formatting', () => {
       expect(p.segments[0].value).toBe('It costs $1,381 or ');
       expect(p.segments[1]).toEqual({ type: 'math', value: '\\$2{,}500.00' });
     }
+  });
+});
+
+describe('text helpers', () => {
+  it('pluralizes counts', () => {
+    expect(plural(1, 'year')).toBe('1 year');
+    expect(plural(2, 'year')).toBe('2 years');
+    expect(plural(0, 'year')).toBe('0 years');
+    expect(plural(1, 'foot', 'feet')).toBe('1 foot');
+    expect(plural(3, 'foot', 'feet')).toBe('3 feet');
+    expect(plural(1200, 'mile')).toBe('1,200 miles');
+  });
+
+  it('hides coefficients 1 and 0', () => {
+    expect(term(1, 'x')).toBe('x');
+    expect(term(-1, 'x')).toBe('-x');
+    expect(term(3, 'x')).toBe('3x');
+    expect(term(frac(1, 2), 'x')).toBe('\\frac{1}{2}x');
+    expect(term(frac(-2, 2), 'y')).toBe('-y');
+    expect(term(0, 'x')).toBe('');
+    expect(term(1, '')).toBe('1');
+  });
+
+  it('folds the sign of a subtracted number', () => {
+    expect(minus('a', 3)).toBe('a - 3');
+    expect(minus('a', -3)).toBe('a + 3');
+    expect(minus('a', frac(-1, 2))).toBe('a + \\frac{1}{2}');
+    expect(minus('a', 0)).toBe('a');
+  });
+
+  it('never prints a denominator or an exponent 1', () => {
+    expect(frac(6, 3).toTex()).toBe('2');
+    expect(frac(-4, 1).toTex({ dfrac: true })).toBe('-4');
+    expect(poly([1, -1, 1])).toBe('x^{2} - x + 1');
+    expect(lin([[-1, 'x'], [-2, '']])).toBe('-x - 2');
   });
 });
