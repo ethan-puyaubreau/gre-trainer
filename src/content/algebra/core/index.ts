@@ -35,3 +35,6 @@ Object.assign(coreTraps, comparePowersTraps);
 import { fractionalExponentTemplate, fractionalExponentTraps } from './fractionalExponent';
 coreTemplates.push(fractionalExponentTemplate);
 Object.assign(coreTraps, fractionalExponentTraps);
+import { powerRelationTemplate, powerRelationTraps } from './powerRelation';
+coreTemplates.push(powerRelationTemplate);
+Object.assign(coreTraps, powerRelationTraps);
