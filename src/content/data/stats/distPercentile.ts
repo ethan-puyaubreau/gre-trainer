@@ -51,7 +51,7 @@ const percentileValue: Template<PctParams> = {
         z2 = rng.pick([-2, -1, 1, 2]);
         z3 = rng.pick(zs.filter((z) => z !== 0 && z !== z2));
       } else {
-        const pairs = d === 2 ? [[-1, 1], [0, 2], [-2, 0], [-2, 2], [-1, 1], [0, -2], [2, 0]] : [[1, 2], [-2, -1], [-1, 2], [-2, 1], [2, -1], [1, -2], [-1, 0], [0, 1]];
+        const pairs = d === 2 ? [[-1, 1], [-2, 2], [1, -1], [2, -2], [-1, 1]] : [[1, 2], [-2, -1], [-1, 2], [-2, 1], [2, -1], [1, -2], [-1, 0], [0, 1]];
         [z1, z2] = rng.pick(pairs);
         z3 = rng.pick(zs.filter((z) => z !== z1 && z !== z2));
         if (d === 2 && z3 === 0 && rng.chance(0.5)) continue;
@@ -73,7 +73,7 @@ const percentileValue: Template<PctParams> = {
       // the explanation cites the first trap that is distinct from the answer
       const cite = traps[0];
       if (!cite) continue;
-      const lin = (base: number, z: number) => `${num(base)} ${z > 0 ? '+' : '-'} ${Math.abs(z) === 1 ? '' : `${Math.abs(z)} \times `}${num(sigma)}`;
+      const lin = (base: number, z: number) => `${num(base)} ${z > 0 ? '+' : '-'} ${Math.abs(z) === 1 ? '' : `${Math.abs(z)} \\times `}${num(sigma)}`;
       const known = (z: number, v: number) => (z === 0 && d === 1 ? `The mean is $${num(v)}$ ${ctx.unit}` : `The ${ordinal(PCT[z])} percentile is $${num(v)}$ ${ctx.unit}`);
       const second = `the ${ordinal(PCT[z2])} percentile is $${num(val(z2))}$ ${ctx.unit}`;
       const intro = `The figure shows a normal distribution with mean 0 and standard deviation 1, with the approximate percent of the distribution in each of the six regions.`;
@@ -81,13 +81,13 @@ const percentileValue: Template<PctParams> = {
       const askName = z3 === 0 ? 'median' : `${ordinal(PCT[z3])} percentile`;
       const stem = `${intro}\n\nThe ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed. ${first}, and ${second}. What is the ${askName} of the ${ctx.noun}?`;
       const steps = [
-        `From the figure, the percent of the distribution below each tick mark is $-2$: 2%, $-1$: 16%, $0$: 50%, $1$: 84%, $2$: 98%. So the ${z1 === 0 && d === 1 ? 'mean' : `${ordinal(PCT[z1])} percentile`} is at $z = ${z1}$ and the ${ordinal(PCT[z2])} percentile is at $z = ${z2}$.`,
+        `Adding the regions of the figure from the left gives the percent below each tick mark: $-2$: 2%, $-1$: 2 + 14 = 16%, $0$: 16 + 34 = 50%, $1$: 50 + 34 = 84%, $2$: 84 + 14 = 98%. So the ${z1 === 0 && d === 1 ? 'mean' : `${ordinal(PCT[z1])} percentile`} is at $z = ${z1}$ and the ${ordinal(PCT[z2])} percentile is at $z = ${z2}$.`,
         `The values are $${num(Math.abs(gap))}$ apart and ${Math.abs(dz)} standard deviation${Math.abs(dz) === 1 ? '' : 's'} apart, so one standard deviation is $${num(Math.abs(gap))} \\div ${Math.abs(dz)} = ${num(sigma)}$ ${ctx.unit}.${z1 === 0 ? '' : ` The mean is $${lin(val(z1), -z1)} = ${num(mu)}$.`}`,
         `The ${askName} is at $z = ${z3}$: $${lin(mu, z3)} = ${num(answer)}$.`,
       ];
       const trapText =
         cite.trap === 'stat-pct-gap-one-sd'
-          ? `Trap: taking the gap as one standard deviation gives $${num(cite.value.n)}$, but the gap spans ${Math.abs(dz)} of them.`
+          ? `Trap: taking the gap of $${num(sigmaWrong)}$ as one standard deviation puts the mean at $${num(muWrong)}$ and gives $${num(cite.value.n)}$, but the gap spans ${Math.abs(dz)} of them.`
           : cite.trap === 'stat-pct-mirror'
             ? `Trap: stepping the wrong way from the mean gives $${num(cite.value.n)}$; the ${askName} is ${z3 < 0 ? 'below' : 'above'} the mean.`
             : `Trap: adding to ${z1 === 0 ? 'the' : 'the given'} value as if it were the mean gives $${num(cite.value.n)}$.`;
