@@ -333,6 +333,22 @@ export const probTraps: Record<string, Trap> = {
     label: 'Forgot to multiply by the number of items',
     fix: 'The tax on every item sold is the rate times the total of the prices: mean times the number of items.',
   },
+  'prob-di-decimal-point': {
+    label: 'Misplaced the decimal point',
+    fix: 'Estimate the size of the answer first (a rough ratio or product), then place the decimal point to match it.',
+  },
+  'prob-di-inverted': {
+    label: 'Divided the wrong way round',
+    fix: '"How many times A is B" is A divided by B: the larger over the smaller when A is the larger.',
+  },
+  'prob-di-forgot-subtract': {
+    label: 'Compared with the total instead of the unlisted amount',
+    fix: 'The categories not listed are the total minus the listed ones: find that amount first, then compare each category with it.',
+  },
+  'prob-di-misread-graph': {
+    label: 'Misread a bar by one gridline',
+    fix: 'Read each bar against the axis and take the value at the top of the bar before computing.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

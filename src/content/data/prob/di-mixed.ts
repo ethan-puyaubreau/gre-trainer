@@ -3,9 +3,10 @@
 
 import { flaggedChoices, valuedChoices } from '../../../engine/build';
 import type { Rng } from '../../../engine/rng';
+import { parseDecimal } from '../../../engine/frac';
 import { num } from '../../../engine/tex';
 import type { BarChartFigure, Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { commas, mcmCheck, nearestIndex, spacedChoices } from './util';
+import { commas, mcmCheck, nearestIndex, trapChoicesOrPad, trapOnlyChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.revenue-mixed-units';
@@ -90,31 +91,50 @@ const timesMixed: Template<TimesParams> = {
     const D = makeMixedData(rng, d);
     const bigs = D.units.map((u, k) => (u >= 1000 ? k : -1)).filter((k) => k >= 0);
     const smalls = D.units.map((u, k) => (u < 1000 ? k : -1)).filter((k) => k >= 0);
-    const a = rng.pick(bigs);
-    const b = rng.pick(smalls);
-    const ratio = D.units[a] / D.units[b];
-    // Round to 1 significant digit (2 if it starts with 1) and offer neighbors by powers of ten.
-    const mag = 10 ** Math.floor(Math.log10(ratio));
-    const lead = ratio / mag < 1.5 ? Math.round((ratio / mag) * 10) / 10 : Math.round(ratio / mag);
-    const R = lead * mag;
-    const first = -rng.int(0, 4);
-    const powers = [0, 1, 2, 3, 4].map((k) => first + k);
-    const values = powers.map((p) => Number((R * 10 ** p).toPrecision(3)));
-    const fmt = (v: number) => (v >= 1 ? num(Math.round(v * 100) / 100) : String(Number(v.toPrecision(2))));
-    const choices: Choice[] = values.map((v, k) => ({ text: `$${fmt(v)}$`, ...(powers[k] === -3 ? { trap: 'prob-di-thousands' } : {}) }));
-    return {
-      params: { a, b, values },
-      q: {
-        format: 'mcs',
-        figure: D.figure,
-        stem: `In ${D.years[3]}, the number of ${kind(D.cats[a])} containers sold by Company M was approximately how many times the number of ${kind(D.cats[b])} containers sold?`,
-        choices,
-        answer: powers.indexOf(0),
-        explanation: `Put both in millions: ${unitText(D.units[a])} = ${num(D.units[a])} million, and ${unitText(D.units[b])}. Ratio: $\\frac{${num(D.units[a])}}{${num(D.units[b])}} \\approx ${num(Math.round(ratio * 100) / 100)}$, closest to $${fmt(R)}$.
+    for (let tries = 0; tries < 2000; tries++) {
+      const a = rng.pick(bigs);
+      const b = rng.pick(smalls);
+      const ratio = D.units[a] / D.units[b];
+      // Round to 1 significant digit (2 if it starts with 1).
+      const mag = 10 ** Math.floor(Math.log10(ratio));
+      const lead = ratio / mag < 1.5 ? Math.round((ratio / mag) * 10) / 10 : Math.round(ratio / mag);
+      const R = Number((lead * mag).toPrecision(3));
+      const clean = (v: number) => (v >= 1 ? Math.round(v * 100) / 100 : Number(v.toPrecision(2))); // as displayed
+      const toFrac = (v: number) => parseDecimal(String(clean(v)))!;
+      const fmt = (v: number) => (v >= 1 ? num(clean(v)) : String(clean(v)));
+      const mk = (value: number, trap: string, why: (s: string) => string) => ({ value: toFrac(value), trap, why });
+      const traps = rng.shuffle([
+        mk(R / 1000, 'prob-di-thousands', (s) => `dividing ${(D.units[a] / 1000).toFixed(1)} by ${num(D.units[b])} without converting billions to millions gives ${s}, about 1,000 times too small`),
+        mk(R * 1000, 'prob-di-thousands', (s) => `converting the millions entry to billions twice gives ${s}, about 1,000 times too large`),
+        mk(R / 100, 'prob-di-decimal-point', (s) => `${s} puts the decimal point two places off`),
+        mk(R / 10, 'prob-di-decimal-point', (s) => `${s} puts the decimal point one place off`),
+        mk(R * 10, 'prob-di-decimal-point', (s) => `${s} puts the decimal point one place off`),
+        mk(R * 100, 'prob-di-decimal-point', (s) => `${s} puts the decimal point two places off`),
+        mk(1 / ratio, 'prob-di-inverted', (s) => `dividing the smaller entry by the larger gives ${s}, the reverse ratio`),
+        mk(D.units[a], 'prob-di-no-divide', (s) => `${s} is the larger entry in millions, not its ratio to the smaller`),
+      ]).filter((t) => t.value.sign() > 0 && Math.abs(Math.log10(t.value.toNumber() / R)) >= 0.3);
+      const built = trapOnlyChoices(rng, toFrac(R), traps, (x) => `$${fmt(x.toNumber())}$`);
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      return {
+        params: { a, b, values: built.values.map((x) => x.toNumber()) },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem: `In ${D.years[3]}, the number of ${kind(D.cats[a])} containers sold by Company M was approximately how many times the number of ${kind(D.cats[b])} containers sold?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `Put both in millions: ${unitText(D.units[a])} = ${num(D.units[a])} million, and ${unitText(D.units[b])}. Ratio: $\\frac{${num(D.units[a])}}{${num(D.units[b])}} \\approx ${num(Math.round(ratio * 100) / 100)}$, closest to $${fmt(R)}$.
 
-Dividing ${(D.units[a] / 1000).toFixed(1)} by ${num(D.units[b])} without converting billions to millions gives a number about 1,000 times too small.`,
-      },
-    };
+Check: $${fmt(R)} \\times ${num(D.units[b])} \\approx ${num(Math.round(R * D.units[b]))}$ million, near ${unitText(D.units[a])}.
+
+Trap: ${cite.why(`$${fmt(cite.value.toNumber())}$`)}.
+
+Convert both entries to the same unit before dividing.`,
+        },
+      };
+    }
+    throw new Error('mixed-times: no choices');
   },
   check(q, { a, b, values }) {
     const { units } = readMixed(q);
@@ -227,38 +247,61 @@ const revenueGrowth: Template<GrowthParams> = {
   style: 'approximate percent increase read from a bar graph',
   generate(rng, d) {
     const D = makeMixedData(rng, d);
-    const [from, to] = d === 1 ? [0, 3] : rng.pick([
-      [0, 3],
-      [0, 2],
-      [1, 3],
-    ] as [number, number][]);
     const r = D.revenue;
-    const exact = ((r[to] - r[from]) / r[from]) * 100;
-    const step = 10;
-    const R = Math.round(exact / 5) * 5;
-    const g = (x: number) => Math.round(x / 5) * 5;
-    const sc = spacedChoices(
-      rng,
-      R,
-      [
-        { v: g(((r[to] - r[from]) / r[to]) * 100), trap: 'prob-percent-wrong-base' },
-        { v: g((r[to] / r[from]) * 100), trap: 'prob-percent-ratio-as-change' },
-      ],
-      { step, min: 5, format: (v) => `${v}%` },
-    );
-    return {
-      params: { from, to, values: sc.values },
-      q: {
-        format: 'mcs',
-        figure: D.figure,
-        stem: `Approximately what was the percent increase in Company M's annual revenue from ${D.years[from]} to ${D.years[to]}?`,
-        choices: sc.choices,
-        answer: sc.answer,
-        explanation: `Read the bars: about \\$${r[from]} billion in ${D.years[from]} and \\$${r[to]} billion in ${D.years[to]}. Increase: $\\frac{${r[to]} - ${r[from]}}{${r[from]}} \\times 100 \\approx ${Math.round(exact)}$%, closest to ${R}%.
+    for (let tries = 0; ; tries++) {
+      const [from, to] = d === 1 ? [0, 3] : rng.pick([
+        [0, 3],
+        [0, 2],
+        [1, 3],
+      ] as [number, number][]);
+      const exact = ((r[to] - r[from]) / r[from]) * 100;
+      const R = Math.round(exact / 5) * 5;
+      const g = (x: number) => Math.round(x / 5) * 5;
+      const mk = (x: number, trap: string, why: (s: string) => string) => ({ value: g(x), trap, why });
+      const pc = (f: number, t: number) => ((r[t] - r[f]) / r[f]) * 100;
+      const traps = rng.shuffle([
+        mk(((r[to] - r[from]) / r[to]) * 100, 'prob-percent-wrong-base', (s) => `dividing by the ${D.years[to]} bar instead of the ${D.years[from]} bar gives ${s}%`),
+        mk((r[to] / r[from]) * 100, 'prob-percent-ratio-as-change', (s) => `${s}% is the ${D.years[to]} revenue as a percent of the ${D.years[from]} revenue, not the increase`),
+        mk((r[to] - r[from]) * 10, 'prob-count-as-percent', (s) => `reading the rise of \\$${r[to] - r[from]} billion as a percent gives ${s}%`),
+        mk(((r[to] - r[from]) / Math.max(...r)) * 100, 'prob-percent-wrong-base', (s) => `dividing by the tallest bar gives ${s}%, but the base is the ${D.years[from]} bar`),
+        mk(((r[to] - r[from]) / (r.reduce((t, x) => t + x, 0) / r.length)) * 100, 'prob-percent-wrong-base', (s) => `dividing by the average of the bars gives ${s}%, but the base is the ${D.years[from]} bar`),
+        mk(2 * pc(from, to), 'prob-double-count', (s) => `counting the rise twice gives ${s}%`),
+        mk(((r[to] - r[from]) / Math.min(...r)) * 100, 'prob-percent-wrong-base', (s) => `dividing by the shortest bar gives ${s}%, but the base is the ${D.years[from]} bar`),
+        mk(((r[to] + 1 - r[from]) / r[from]) * 100, 'prob-di-misread-graph', (s) => `reading the ${D.years[to]} bar one gridline too high gives ${s}%`),
+        mk(((r[to] - (r[from] + 1)) / (r[from] + 1)) * 100, 'prob-di-misread-graph', (s) => `reading the ${D.years[from]} bar one gridline too high gives ${s}%`),
+        mk(pc(to - 1, to), 'prob-di-one-step', (s) => `using only the last year's growth gives ${s}%, not the whole increase`),
+        mk(pc(from, from + 1), 'prob-di-one-step', (s) => `using only the first year's growth gives ${s}%, not the whole increase`),
+        mk(pc(from, to) / (to - from), 'prob-di-wrong-divisor', (s) => `dividing the percent increase by the ${to - from} years gives ${s}%, a yearly figure`),
+        ...[
+          [from + 1, to],
+          [from, to - 1],
+          [from - 1, to],
+          [from, to + 1],
+        ]
+          .filter(([f, t]) => f >= 0 && t <= 3 && t > f)
+          .map(([f, t]) => mk(pc(f, t), 'prob-di-wrong-column', (s) => `reading the ${D.years[f]} and ${D.years[t]} bars instead gives ${s}%`)),
+      ]).filter((t) => t.value >= 5);
+      const built = trapChoicesOrPad(rng, R, traps, { step: 10, minGap: 10, min: 5, pad: tries >= 60, format: (v) => `${v}%` });
+      if (!built) continue;
+      const cite = rng.pick(built.used.length ? built.used : traps);
+      return {
+        params: { from, to, values: built.values },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem: `Approximately what was the percent increase in Company M's annual revenue from ${D.years[from]} to ${D.years[to]}?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `Read the bars: about \\$${r[from]} billion in ${D.years[from]} and \\$${r[to]} billion in ${D.years[to]}. Increase: $\\frac{${r[to]} - ${r[from]}}{${r[from]}} \\times 100 \\approx ${Math.round(exact)}$%, closest to ${R}%.
 
-Dividing by the ${D.years[to]} value uses the wrong base.`,
-      },
-    };
+Check: ${R}% of \\$${r[from]} billion is about \\$${num(Math.round(((R * r[from]) / 100) * 100) / 100)} billion, near the rise of \\$${num(r[to] - r[from])} billion.
+
+Trap: ${cite.why(String(cite.value))}.
+
+A percent increase divides the rise by the starting value.`,
+        },
+      };
+    }
   },
   check(q, { from, to, values }) {
     const { revenue } = readMixed(q);
@@ -281,9 +324,10 @@ const smallerThanRest: Template<Record<string, never>> = {
     const listed = D.units.reduce((s, v) => s + v, 0);
     const rest = D.total - listed;
     const { choices, answer } = flaggedChoices(
-      D.cats.map((c, k) => ({ text: c, correct: D.units[k] < rest, ...(D.units[k] >= 1000 ? { trap: 'prob-di-thousands' } : {}) })),
+      D.cats.map((c, k) => ({ text: c, correct: D.units[k] < rest, ...(D.units[k] < rest ? {} : { trap: D.units[k] >= 1000 ? 'prob-di-thousands' : 'prob-di-forgot-subtract' }) })),
     );
     const parts = D.units.map((u) => num(u)).join(' + ');
+    const wrongNames = D.cats.filter((_, k) => D.units[k] >= rest);
     return {
       params: {},
       q: {
@@ -295,7 +339,13 @@ const smallerThanRest: Template<Record<string, never>> = {
         answer,
         explanation: `Convert everything to millions. Listed categories: $${parts} = ${num(listed)}$ million. Total: ${unitText(D.total)} = ${num(D.total)} million. Not listed: $${num(D.total)} - ${num(listed)} = ${num(rest)}$ million.
 
-The categories with fewer than ${num(rest)} million containers are ${D.cats.filter((_, k) => D.units[k] < rest).join(', ')}. An entry such as ${unitText(Math.max(...D.units))} is ${num(Math.max(...D.units))} million, far more.`,
+The categories with fewer than ${num(rest)} million containers are ${D.cats.filter((_, k) => D.units[k] < rest).join(', ')}.
+
+Check: ${wrongNames.length ? `${wrongNames[0]} has ${num(D.units[D.cats.indexOf(wrongNames[0])])} million, not less than ${num(rest)} million.` : 'every other category is larger.'}
+
+Trap: ${wrongNames.length ? (D.units[D.cats.indexOf(wrongNames[0])] >= 1000 ? `${wrongNames[0]} is ${unitText(D.units[D.cats.indexOf(wrongNames[0])])} = ${num(D.units[D.cats.indexOf(wrongNames[0])])} million, far more than ${num(rest)} million, even though the number ${(D.units[D.cats.indexOf(wrongNames[0])] / 1000).toFixed(1)} looks small next to a number of millions` : `${wrongNames[0]} is below the ${num(D.total)} million total but not below the ${num(rest)} million not listed`) : 'comparing with the total instead of the unlisted amount would keep too many categories'}.
+
+Put every entry in the same unit before comparing.`,
       },
     };
   },

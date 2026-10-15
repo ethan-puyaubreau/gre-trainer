@@ -1,13 +1,4 @@
 {
-  "data.interpretation.mixed-growth": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.mixed-select": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.mixed-times": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.pie-remove": {
     "distractors.trapped": "baseline"
   },
