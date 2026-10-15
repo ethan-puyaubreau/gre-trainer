@@ -156,7 +156,7 @@ const transferMcs: Template<Params> = {
         ];
         ask = `What was the ${ctx.one === 'crate' ? 'weight' : ctx.money ? 'hourly wage' : 'score'} of the ${ctx.one} ${ctx.one === 'crate' ? 'that' : 'who'} moved?`;
         info = `${ctx.P} has ${n} ${ctx.members}, and ${ctx.Q} has ${m} ${ctx.members} with an ${ctx.what} of ${val(b)}. One ${ctx.one} moves from ${ctx.P} to ${ctx.Q}, and the ${ctx.what} of ${ctx.Q} then ${r > 0 ? 'rises' : 'falls'} by ${val(Math.abs(r))}.`;
-        steps = `${ctx.Q} now has $${m + 1}$ ${ctx.members} and its average moved by $${r}$, so its total moved by $${m + 1} \\times ${r} = ${(m + 1) * r}$ from $${tTotal}$. The new total is $${(m + 1) * (b + r)}$, and the moved value is the difference: $${(m + 1) * (b + r)} - ${tTotal} = ${sc}$.`;
+        steps = `${ctx.Q} now has $${m + 1}$ ${ctx.members} and its new average is $${b} ${r > 0 ? '+' : '-'} ${Math.abs(r)} = ${b + r}$, so its new total is $${m + 1} \\times ${b + r} = ${(m + 1) * (b + r)}$. The old total was $${m} \\times ${b} =${tTotal}$, and the moved value is the difference: $${(m + 1) * (b + r)} - ${tTotal} = ${sc}$.`;
       } else {
         // chain: the average of P changes; find the moved value, then the new average of Q
         const a2 = rng.int(ctx.lo, ctx.hi);
@@ -193,10 +193,13 @@ const transferMcs: Template<Params> = {
         'stat-move-other-group': `Updating the other group gives $${fTex(usedV)}$, which is not the group asked about.`,
         'stat-move-unchanged': `Keeping the old average gives $${fTex(usedV)}$, but the moved value is not equal to the average.`,
         'stat-move-direction': `Putting the value on the wrong side of the total gives $${fTex(usedV)}$.`,
-        'stat-move-not-scaled': `Using the change in the average as the value gives $${fTex(usedV)}$, but the total moved by the change times the count.`,
+        'stat-move-not-scaled': `Using only the rise in the total, the change times the new count, gives $${fTex(usedV)}$, but the moved value also includes the old average of ${val(b)}.`,
         'stat-move-new-avg-as-value': `Using the new average gives $${fTex(usedV)}$, but one member must move the whole total.`,
         'stat-move-stopped-early': `The moved value, $${fTex(usedV)}$, is only the first step.`,
-        'stat-move-count-forgotten': `Ignoring the change in group size gives $${fTex(usedV)}$.`,
+        'stat-move-count-forgotten':
+          mode === 'chain'
+            ? `Applying the drop in the average to all ${n} members gives $${fTex(usedV)}$, but ${ctx.P} has ${n - 1} ${ctx.members} after the move.`
+            : `Multiplying the change by ${m + 2} members gives $${fTex(usedV)}$, but ${ctx.Q} has ${m + 1} ${ctx.members} after the move.`,
       };
       return {
         params: { mode, n, m, a, b, s, x, money: ctx.money },
