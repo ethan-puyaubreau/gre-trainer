@@ -5,6 +5,7 @@ import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
 import { factorsTemplates } from './factors';
 import { factorsSelectTemplates, factorsSelectTraps } from './factorsSelect';
+import { gcdLcmPairTemplates, gcdLcmPairTraps } from './gcdLcmPair';
 import { lcmGcdTemplates } from './lcm-gcd';
 import { populationTemplates, populationTraps } from './populationTotals';
 import { primesTemplates } from './primes';
@@ -17,10 +18,11 @@ export const integersTemplates: Template<any>[] = [
   ...factorsTemplates,
   ...factorsSelectTemplates,
   ...lcmGcdTemplates,
+  ...gcdLcmPairTemplates,
   ...populationTemplates,
   ...remainderCycleTemplates,
   ...consecutiveTemplates,
   ...exponentTemplates,
   ...evaluateTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps };
