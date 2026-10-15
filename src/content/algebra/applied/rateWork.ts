@@ -2,7 +2,7 @@ import { qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { clock, num } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dx, valuedChoices, expectMcs, expectQc, NAMES, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dx, expectMcs, expectQc, NAMES, qcEnd, trapChoices, uniqueIndex } from './util';
 
 /** Pairs of times whose combined time a*b/(a+b) is a terminating decimal. */
 function pairsWithNiceTogether(maxT: number, integerOnly: boolean): [number, number][] {
@@ -36,6 +36,11 @@ const MACHINES = [
   { A: 'Machine A', B: 'Machine B', job: 'fill a production order', both: 'Machines A and B' },
   { A: 'Printer P', B: 'Printer Q', job: 'print a batch of brochures', both: 'Printers P and Q' },
   { A: 'Pump X', B: 'Pump Y', job: 'fill a tank', both: 'Pumps X and Y' },
+  { A: 'Worker A', B: 'Worker B', job: 'paint a fence', both: 'Workers A and B' },
+  { A: 'Faucet F', B: 'Faucet G', job: 'fill a bathtub', both: 'Faucets F and G' },
+  { A: 'Copier C', B: 'Copier D', job: 'copy a stack of reports', both: 'Copiers C and D' },
+  { A: 'Crew P', B: 'Crew Q', job: 'pave a section of road', both: 'Crews P and Q' },
+  { A: 'Hose H', B: 'Hose K', job: 'fill a swimming pool', both: 'Hoses H and K' },
 ];
 
 const combinedWork: Template<WorkParams> = {
@@ -149,7 +154,7 @@ Subtracting times (${b} − ${t}) ignores the work ${m.A} did; always track the 
 
 $$\\frac{1}{${a}} - \\frac{1}{${b}} = \\frac{${b - a}}{${a * b}}$$
 
-of a tank per hour. Filling it takes $\\frac{${a * b}}{${b - a}} = ${dx(T)}$ hours, longer than the pipe alone (${a} hours), as it must be.`,
+of a tank per hour. Filling it takes $${b - a === 1 ? num(a * b) : `\\frac{${a * b}}{${b - a}} = ${dx(T)}`}$ hours, longer than the pipe alone (${a} hours), as it must be.`,
         },
       };
     }
@@ -176,6 +181,8 @@ interface AloneParams {
   /** Time for the whole team, and time for the known part of the team (one machine, or two pumps). */
   together: Frac;
   known: Frac;
+  /** The question asks for the fraction of the job done per hour instead of the time. */
+  rate: boolean;
   values: Frac[];
 }
 
@@ -245,22 +252,59 @@ Check: $\\frac{${a} \\cdot ${y}}{${a} + ${y}} = ${dx(Tt)}$. A time alone shorter
 
 $$\\frac{1}{${T3}} - \\frac{1}{${T2}} = \\frac{${T2 - T3}}{${T2 * T3}}$$
 
-of the tank per hour. Alone it needs $\\frac{${T2 * T3}}{${T2 - T3}} = ${dx(correct)}$ hours.
+of the tank per hour. Alone it needs $${T2 - T3 === 1 ? num(T2 * T3) : `\\frac{${T2 * T3}}{${T2 - T3}} = ${dx(correct)}`}$ hours.
 
 $${T2} - ${T3} = ${T2 - T3}$ subtracts times instead of rates, and any answer below ${T3} hours would make pump ${names[2]} faster than all three pumps together.`;
     }
-    const dir = rng.sign();
-    const fillers = [correct.add(dir), correct.add(2 * dir), correct.sub(dir)].filter((v) => v.sign() > 0);
-    const { choices, answer, values } = valuedChoices(rng, { correct, traps: rng.shuffle(traps).slice(0, 3), fillers, format: fmtDec, positive: true });
-    return { params: { kind, together, known, values }, q: { format: 'mcs', stem, choices, answer, explanation } };
+    traps.push({ value: together, trap: 'algw-answered-together' }, { value: known, trap: 'algw-answered-given' });
+    // Half of the questions ask for the rate (the fraction of the job done in one hour), so the key is often the smallest choice.
+    const rate = rng.chance(0.5);
+    const toRate = (t: Frac) => frac(1).div(t);
+    const ansV = rate ? toRate(correct) : correct;
+    const trapsV = rate
+      ? [...traps.filter((t) => t.value.sign() > 0).map((t) => ({ ...t, value: toRate(t.value) })), { value: correct, trap: 'algw-time-for-rate' }, { value: toRate(together.div(2)), trap: 'algw-alone-faster' }]
+      : traps;
+    if (rate) stem = stem.replace(/How many hours would it take (.+?), working alone at its constant rate, to .+?$/, 'What fraction of the job does $1, working alone at its constant rate, complete in one hour?');
+    const fmtV = rate ? (v: Frac) => `$${v.toTex()}$` : fmtDec;
+    const WHY: Record<string, string> = {
+      'algw-subtract-times': 'subtracting the times instead of the rates',
+      'algw-average-times': 'a slip when combining the times, instead of combining the rates',
+      'algw-add-times': 'adding the times',
+      'algw-alone-faster': 'halving the time together, as if the two worked at equal speeds',
+      'algw-answered-together': 'giving the time together, which is the information supplied',
+      'algw-answered-given': 'giving the time of the worker whose time was already known',
+      'algw-time-for-rate': 'giving the time in hours instead of the fraction of the job done per hour',
+    };
+    const res = trapChoices(
+      rng,
+      ansV,
+      trapsV.filter((t) => t.value.sign() > 0 && !t.value.eq(1) && (rate || t.value.mul(100).isInt())),
+      fmtV,
+    );
+    if (!res) return aloneTime.generate(rng, d);
+    const cited = res.kept[0];
+    return {
+      params: { kind, together, known, rate, values: res.values },
+      q: {
+        format: 'mcs',
+        stem,
+        choices: res.choices,
+        answer: res.answer,
+        explanation: `${explanation}${rate ? `
+
+The question asks for the rate: the reciprocal of the time, $\\frac{1}{${dx(correct)}}$ of the job per hour.` : ''}
+
+Trap: $${rate ? cited.value.toTex() : dx(cited.value)}$ comes from ${WHY[cited.trap]}.`,
+      },
+    };
   },
-  check(q, { together, known, values }) {
-    const err = choiceValuesMatch(q, values, fmtDec);
+  check(q, { together, known, rate, values }) {
+    const err = choiceValuesMatch(q, values, rate ? (v) => `$${v.toTex()}$` : fmtDec);
     if (err) return err;
     // A choice is right when its rate plus the known rate is the team's rate.
     return expectMcs(
       q,
-      uniqueIndex(values, (v) => v.sign() > 0 && frac(1).div(known).add(frac(1).div(v)).eq(frac(1).div(together))),
+      uniqueIndex(values, (v) => v.sign() > 0 && frac(1).div(known).add(rate ? v : frac(1).div(v)).eq(frac(1).div(together))),
     );
   },
 };
@@ -484,6 +528,18 @@ const meetCatch: Template<MeetParams> = {
           const w = frac(D, Math.abs(v - u)).mul(60);
           if (w.isInt() && w.toNumber() < 600) wrong.push({ t: t0 + w.toNumber(), trap: 'algw-relative-speed-sign' });
         }
+        for (const sp of [u, v]) {
+          const w1 = frac(D, sp).mul(60);
+          if (w1.isInt()) wrong.push({ t: t0 + w1.toNumber(), trap: 'algw-one-speed' });
+        }
+        const wAvg = frac(2 * D, u + v).mul(60);
+        if (wAvg.isInt()) wrong.push({ t: t0 + wAvg.toNumber(), trap: 'algw-average-speeds' });
+        const wHalf = frac(D, 2 * (u + v)).mul(60);
+        if (wHalf.isInt()) wrong.push({ t: t0 + wHalf.toNumber(), trap: 'algw-half-distance' });
+        for (const sp of [Math.max(u, v), Math.min(u, v)]) {
+          const w2 = frac(D, 2 * sp).mul(60);
+          if (w2.isInt()) wrong.push({ t: t0 + w2.toNumber(), trap: 'algw-one-speed' });
+        }
         stem = `${n1} and ${n2} live ${D} miles apart. At ${clock(t0, 'short')} they start driving toward each other on the same road, ${n1} at a constant speed of ${u} miles per hour and ${n2} at a constant speed of ${v} miles per hour. At what time do they meet?`;
         explanation = `They close the gap at $${u} + ${v} = ${u + v}$ miles per hour (approaching, the speeds add). Time to meet: $\\frac{${D}}{${u + v}} = ${hrs(hours)}$ ${hours.eq(1) ? 'hour' : 'hours'}, that is, ${hours.mul(60).toNumber()} minutes after ${clock(t0, 'short')}, so they meet at ${clock(meet, 'short')}`;
       } else if (kind === 'catch') {
@@ -498,6 +554,17 @@ const meetCatch: Template<MeetParams> = {
         const w1 = gap.div(u + v).mul(60);
         if (w1.isInt()) wrong.push({ t: t0 + delay + w1.toNumber(), trap: 'algw-relative-speed-sign' });
         wrong.push({ t: t0 + mins.toNumber(), trap: 'algw-wrong-start-time' });
+        for (const sp of [u, v]) {
+          const w1 = gap.div(sp).mul(60);
+          if (w1.isInt()) wrong.push({ t: t0 + delay + w1.toNumber(), trap: 'algw-one-speed' });
+        }
+        const wAvg = gap.mul(2).div(u + v).mul(60);
+        if (wAvg.isInt()) wrong.push({ t: t0 + delay + wAvg.toNumber(), trap: 'algw-average-speeds' });
+        const wBig = frac(v * delay, 60).div(v - u).mul(60);
+        if (wBig.isInt()) wrong.push({ t: t0 + delay + wBig.toNumber(), trap: 'algw-head-start-speed' });
+        wrong.push({ t: t0 + 2 * delay + mins.toNumber(), trap: 'algw-delay-twice' });
+        wrong.push({ t: t0 + delay + 2 * mins.toNumber(), trap: 'algw-gap-doubled' });
+        if (mins.toNumber() % 2 === 0) wrong.push({ t: t0 + delay + mins.toNumber() / 2, trap: 'algw-gap-doubled' });
         stem = `${n1} leaves a rest stop at ${clock(t0, 'short')} and drives along a highway at a constant speed of ${u} miles per hour. ${n2} leaves the same rest stop at ${clock(
           t0 + delay,
           'short',
@@ -516,9 +583,18 @@ Adding the speeds would be right only if they drove toward each other, and the c
         const ignore = frac(D, u + v).mul(60);
         if (ignore.isInt()) {
           wrong.push({ t: t0 + delay + ignore.toNumber(), trap: 'algw-head-start' });
-          wrong.push({ t: t0 + ignore.toNumber() });
+          wrong.push({ t: t0 + ignore.toNumber(), trap: 'algw-head-start' });
+        }
+        if (v !== u) {
+          const wSub = frac(D, Math.abs(v - u)).mul(60);
+          if (wSub.isInt() && wSub.toNumber() < 600) wrong.push({ t: t0 + delay + wSub.toNumber(), trap: 'algw-relative-speed-sign' });
+        }
+        for (const sp of [u, v]) {
+          const w1 = frac(D, sp).mul(60);
+          if (w1.isInt()) wrong.push({ t: t0 + delay + w1.toNumber(), trap: 'algw-one-speed' });
         }
         wrong.push({ t: t0 + hoursAfter.mul(60).toNumber(), trap: 'algw-wrong-start-time' });
+        wrong.push({ t: t0 + 2 * delay + hoursAfter.mul(60).toNumber(), trap: 'algw-delay-twice' });
         stem = `Towns P and Q are ${D} miles apart. At ${clock(t0, 'short')}, ${n1} leaves P and drives toward Q at a constant speed of ${u} miles per hour. At ${clock(
           t0 + delay,
           'short',
@@ -530,20 +606,41 @@ Ignoring ${n1}'s head start, or adding the travel time to ${clock(t0, 'short')} 
       // Choices: correct, traps, and half/quarter-hour neighbors, listed in time order, with the
       // correct time at a random position.
       const valid = (t: number) => t > t0 && t < 24 * 60 && t !== meet;
-      const below = [...wrong.filter((w) => w.t < meet && valid(w.t)), ...[30, 60, 15, 45, 90, 120].map((x) => ({ t: meet - x }))].filter((w) => valid(w.t));
-      const above = [...wrong.filter((w) => w.t > meet && valid(w.t)), ...[30, 60, 15, 45, 90, 120].map((x) => ({ t: meet + x }))].filter((w) => valid(w.t));
-      let target = rng.int(0, 4);
+      // Every wrong time comes from a named slip; there are no made-up neighbours.
+      const below = wrong.filter((w) => w.t < meet && valid(w.t));
+      const above = wrong.filter((w) => w.t > meet && valid(w.t));
       const uniqB = below.filter((w, i) => below.findIndex((x) => x.t === w.t) === i);
       const uniqA = above.filter((w, i) => above.findIndex((x) => x.t === w.t) === i);
-      target = Math.max(4 - uniqA.length, Math.min(target, uniqB.length));
+      if (uniqA.length + uniqB.length < 4) continue;
+      // The slips of 'toward' mostly overshoot the meeting time and those of the other kinds undershoot it, so each kind
+      // leans to the end of its feasible range that the others cannot reach (keeps A to E balanced overall).
+      const lo = Math.max(0, 4 - uniqA.length);
+      const hi = Math.min(4, uniqB.length);
+      const lean = kind === 'toward' ? Math.min : Math.max;
+      const target = lean(rng.int(lo, hi), rng.int(lo, hi));
       const opts = new Map<number, string | undefined>([[meet, undefined]]);
       for (const w of [...uniqB.slice(0, target), ...uniqA.slice(0, 4 - target)]) opts.set(w.t, 'trap' in w ? (w.trap as string | undefined) : undefined);
       if (opts.size < 5 || meet > 22 * 60) continue;
       const times = [...opts.keys()].sort((x, y) => x - y);
       const choices: Choice[] = times.map((t) => ({ text: clock(t, 'short'), ...(opts.get(t) ? { trap: opts.get(t)! } : {}) }));
+      const WHY: Record<string, string> = {
+        'algw-gap-doubled': 'miscounting the head start: twice or half the distance to make up',
+        'algw-delay-twice': 'adding the delay a second time',
+        'algw-half-distance': 'letting each traveler cover only half the distance without halving the closing speed',
+        'algw-head-start-speed': 'computing the head start with the faster traveler speed',
+        'algw-relative-speed-sign': kind === 'catch' ? 'adding the speeds although both drive the same way' : 'subtracting the speeds although they approach each other',
+        'algw-one-speed': 'dividing by the speed of only one traveler',
+        'algw-average-speeds': 'dividing by the average of the two speeds instead of their sum',
+        'algw-wrong-start-time': 'counting the travel time from the wrong departure time',
+        'algw-head-start': 'ignoring the head start of the first traveler',
+      };
+      const citedT = [...opts.entries()].find(([t, tr]) => t !== meet && tr);
+      const trapText = citedT ? `
+
+Trap: ${clock(citedT[0], 'short')} comes from ${WHY[citedT[1]!] ?? 'a slip in the setup'}.` : '';
       return {
         params: { kind, D, u, v, t0, delay, times },
-        q: { format: 'mcs', stem, choices, answer: times.indexOf(meet), explanation },
+        q: { format: 'mcs', stem, choices, answer: times.indexOf(meet), explanation: `${explanation}${trapText}` },
       };
     }
   },

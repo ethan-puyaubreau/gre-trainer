@@ -305,7 +305,8 @@ export function trapChoices<T extends { value: FracLike; trap: string }>(
   const below = byRank.filter((u) => u.value.lt(c));
   const above = byRank.filter((u) => u.value.gt(c));
   if (below.length + above.length < count - 1) return null;
-  const target = Math.max(count - 1 - above.length, Math.min(rng.int(0, count - 1), below.length));
+  // Uniform over the positions the available traps allow (not a clamped uniform draw, which piles up in the middle).
+  const target = rng.int(Math.max(0, count - 1 - above.length), Math.min(count - 1, below.length));
   const kept = [...below.slice(0, target), ...above.slice(0, count - 1 - target)];
   const items = [{ value: c, trap: '', ok: true }, ...kept.map((k) => ({ value: k.value, trap: k.trap, ok: false }))].sort((a, b) => a.value.cmp(b.value));
   const texts = items.map((it) => format(it.value));

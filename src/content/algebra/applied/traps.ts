@@ -378,6 +378,38 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Added the rate of the drain',
     fix: 'A drain works against the pipe: net rate = filling rate − draining rate.',
   },
+  'algw-time-for-rate': {
+    label: 'Gave the time instead of the fraction of the job per hour',
+    fix: 'A rate is the reciprocal of a time: a worker who needs 10 hours does $\\frac{1}{10}$ of the job per hour.',
+  },
+  'algw-answered-together': {
+    label: 'Gave the time for both workers together',
+    fix: 'The time together is part of the data. The question asks for the time ONE worker needs alone.',
+  },
+  'algw-answered-given': {
+    label: 'Gave the time that was already given',
+    fix: 'Read what is asked: the time of the OTHER worker, which you get by subtracting rates.',
+  },
+  'algw-gap-doubled': {
+    label: 'Made up twice (or half) the head start',
+    fix: 'The head start is the distance the first traveler covers before the second leaves: speed times delay, counted once.',
+  },
+  'algw-delay-twice': {
+    label: 'Added the delay a second time',
+    fix: 'The second traveler leaves after the delay. Count the delay once when you convert a travel time into a clock time.',
+  },
+  'algw-half-distance': {
+    label: 'Halved the distance but kept the full closing speed',
+    fix: 'When two travelers approach, together they cover the whole distance at the sum of their speeds. Do not halve the distance unless you also halve the speed.',
+  },
+  'algw-head-start-speed': {
+    label: 'Computed the head start with the wrong speed',
+    fix: 'The head start is the distance the FIRST traveler covers alone: use that traveler\'s speed and the time before the second one leaves.',
+  },
+  'algw-one-speed': {
+    label: 'Used the speed of only one traveler',
+    fix: 'Two travelers close the gap together: add their speeds when they approach, subtract them when they chase.',
+  },
   'algw-average-speeds': {
     label: 'Averaged the speeds',
     fix: 'Average speed = total distance ÷ total time. Over equal distances more time is spent at the lower speed, so the average speed is below the average of the speeds.',
