@@ -16,7 +16,8 @@ import { pigeonTemplates, pigeonTraps } from './pigeon';
 import { oddsTemplates, oddsTraps } from './odds';
 import { arrangementTemplates, arrangementTraps } from './arrangements';
 import { setsExtremesTemplates, setsExtremesTraps } from './setsExtremes';
+import { setsConditionalTemplates, setsConditionalTraps } from './setsConditional';
 
 export { probSkills };
-export const probTraps = { ...baseProbTraps, ...pigeonTraps, ...oddsTraps, ...arrangementTraps, ...setsExtremesTraps };
-export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates, ...pigeonTemplates, ...oddsTemplates, ...arrangementTemplates, ...setsExtremesTemplates];
+export const probTraps = { ...baseProbTraps, ...pigeonTraps, ...oddsTraps, ...arrangementTraps, ...setsExtremesTraps, ...setsConditionalTraps };
+export const probTemplates: Template<any>[] = [...countingTemplates, ...probabilityTemplates, ...setsTemplates, ...changeTemplates, ...homesTemplates, ...regionTemplates, ...workTemplates, ...seasonTemplates, ...decadeTemplates, ...mixedTemplates, ...singleDITemplates, ...pigeonTemplates, ...oddsTemplates, ...arrangementTemplates, ...setsExtremesTemplates, ...setsConditionalTemplates];
