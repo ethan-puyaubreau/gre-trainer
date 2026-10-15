@@ -46,8 +46,6 @@ export const integersTemplates: Template<any>[] = [
   ...barEntryTemplates,
   ...chainEvalTemplates,
   ...functionEvalTemplates,
-];
-export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps};
   ...missingDigitTemplates,
   ...countMultiplesTemplates,
   ...primeExpressionTemplates,
@@ -56,3 +54,5 @@ export const integersTraps: Record<string, Trap> = {...integerTraps, ...populati
   ...cycleUnitsCompareTemplates,
   ...patternCountTemplates,
   ...recurrenceTemplates,
+];
+export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps};
