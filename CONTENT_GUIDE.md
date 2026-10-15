@@ -45,7 +45,7 @@ const myTemplate: Template<MyParams> = {
 | format | rules |
 |---|---|
 | `qc` Quantitative comparison | `info` (centered, optional), `quantityA`, `quantityB`, `answer` A/B/C/D. Vary the answer across seeds. If both quantities are fixed numbers, D is impossible. |
-| `mcs` Select one | exactly 5 choices. Numeric choices in ascending order (`numericChoices`). |
+| `mcs` Select one | exactly 5 choices. Numeric choices in ascending order (`numericChoices`). Only exception: when every natural wrong value falls on one side of the key (ratio parts, remaining amounts), ascending order would pin the key to one end of the list, so pass `order: 'random'` to `numericChoices` (never a hand-rolled shuffle) and say why in a comment. |
 | `mcm` Select one or more | 3 to 8 choices, `instruction` like "Indicate all such values.", answer = ascending indices. |
 | `ne` Numeric entry | `answer` is an exact `Frac`. It must be a terminating decimal unless `fractionBoxes: true`. Use `prefix` / `suffix` for "x + y =" or "employees". |
 
