@@ -120,6 +120,8 @@ export const groupingCompareQC: Template<Params> = {
       const rels = xs.map((x) => ({ x, rel: qcCompare(pair.fA(x), pair.fB(x)) }));
       const answer: QCChoice = new Set(rels.map((r) => r.rel)).size > 1 ? 'D' : rels[0].rel;
       if (d === 3 && rng.chance(answer === 'D' ? 0.55 : 0.4)) continue; // level 3 leans on the hidden threshold, without becoming all D
+      // the sign discussion of the distributing pair only matters while x can vary
+      const why = pair.why.replace(/ Its sign depends on whether.*$/, answer === 'D' ? ' Its sign depends on whether $x$ is below 1, equal to 1, or above 1.' : d === 1 ? '' : ' For every allowed value of $x$ it has the same sign.');
       const show = (x: number, which: 'A' | 'B') => {
         const plain = which === 'A' ? pair.plainA : pair.plainB;
         const v = (which === 'A' ? pair.fA : pair.fB)(x);
@@ -135,14 +137,14 @@ export const groupingCompareQC: Template<Params> = {
         const c2 = sorted.find((r) => r.rel !== c1.rel)!;
         const line = (c: { x: number; rel: QCChoice }) => `- $x = ${c.x}$: A is $${pair.fA(c.x).toTex()}$ and B is $${pair.fB(c.x).toTex()}$, so ${QC_WORDS[c.rel]}.`;
         traps[c1.rel] = 'tested-one-value';
-        body = `The statement allows several values of $x$, so test allowed values.\n\n${line(c1)}\n${line(c2)}\n\n${pair.why}\n\nTwo allowed values disagree, so the relationship cannot be determined. (D)`;
+        body = `The statement allows several values of $x$, so test allowed values.\n\n${line(c1)}\n${line(c2)}\n\n${why}\n\nTwo allowed values disagree, so the relationship cannot be determined. (D)`;
         trapLine = `\n\nTrap: stopping after $x = ${c1.x}$ would suggest that ${QC_WORDS[c1.rel]}. A comparison that holds for one allowed value is not enough.`;
       } else {
         const x = xs[Math.min(1, xs.length - 1)];
         const slip = qcCompare(evalExpr(substitute(strip(pair.plainA), { x })), evalExpr(substitute(strip(pair.plainB), { x })));
         if (slip !== answer) traps[slip] = 'oo-grouping-ignored';
         const lead = d === 1 ? `Substitute $x = ${x}$ and evaluate the parentheses first.` : `Every allowed value gives the same comparison, so test one value (here $x = ${x}$) and explain why with the algebra.`;
-        body = `${lead}\n\n- Quantity A: ${show(x, 'A')}\n- Quantity B: ${show(x, 'B')}\n\n${pair.why}\n\n${upper(QC_WORDS[answer])}. (${answer})`;
+        body = `${lead}\n\n- Quantity A: ${show(x, 'A')}\n- Quantity B: ${show(x, 'B')}\n\n${why}\n\n${upper(QC_WORDS[answer])}. (${answer})`;
         trapLine = slip !== answer ? `\n\nTrap: reading $${plainToTex(pair.plainB)}$ without its parentheses, as $${plainToTex(strip(pair.plainB))}$, would suggest that ${QC_WORDS[slip]}.` : '';
       }
       return {
