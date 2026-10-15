@@ -62,6 +62,14 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Used run over rise for the slope',
     fix: 'Slope is rise over run: $\\frac{y_2 - y_1}{x_2 - x_1}$ (change in $y$ divided by change in $x$).',
   },
+  'algw-quadrant-sign-slip': {
+    label: 'Misread a sign and placed the line in a quadrant it does not reach',
+    fix: 'Mark the intercepts first: the sign of the y-intercept says where the line meets the y-axis, the sign of the slope says which way it tilts. Then follow it through the axes.',
+  },
+  'algw-quadrant-complement': {
+    label: 'Listed the quadrants the line DOES pass through',
+    fix: 'The question asks for the quadrants the line does NOT pass through. Find the ones it crosses, then name the others.',
+  },
   'algw-slope-sign': {
     label: 'Wrong sign of the slope',
     fix: 'A line that goes DOWN from left to right has a negative slope; one that goes up has a positive slope.',

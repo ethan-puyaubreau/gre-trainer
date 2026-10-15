@@ -1,18 +1,10 @@
 {
-  "alg.coordinate.above-below-qc": {
-    "qc.never-d": "baseline"
-  },
   "alg.coordinate.parallel-perpendicular": {
     "distractors.trapped": "baseline"
   },
   "alg.coordinate.points-on-line": {
     "artifacts.frac-1": "baseline",
     "distractors.trapped": "baseline"
-  },
-  "alg.coordinate.quadrants": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
   },
   "alg.graphs.intersection": {
     "distractors.trapped": "baseline"

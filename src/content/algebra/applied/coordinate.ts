@@ -158,6 +158,16 @@ const SIDE_CMPS: SideCmp[] = [
   },
 ];
 
+// Comparisons that the figure does not settle: they depend on how far the points are from the line.
+SIDE_CMPS.push(
+  { id: '1h', m: 1, needsR: false, ans: 'D', A: (L) => `${L.p1} + ${L.p2}`, B: (L) => `${L.q1} + ${L.q2}`, val: (P, Q) => [P[0] + P[1], Q[0] + Q[1]], why: () => '' },
+  { id: '1j', m: 1, needsR: true, ans: 'D', A: (L) => `${L.r1} + ${L.q1}`, B: (L) => `${L.r2} + ${L.p1}`, val: (P, Q, R) => [R[0] + Q[0], R[1] + P[0]], why: () => '' },
+  { id: '2h', m: -1, needsR: false, ans: 'D', A: (L) => `${L.p1} - ${L.q1}`, B: (L) => `${L.p2} - ${L.q2}`, val: (P, Q) => [P[0] - Q[0], P[1] - Q[1]], why: () => '' },
+  { id: '2j', m: -1, needsR: true, ans: 'D', A: (L) => `${L.r2} - ${L.q2}`, B: (L) => `${L.r1} + ${L.q1}`, val: (_P, Q, R) => [R[1] - Q[1], R[0] + Q[0]], why: () => '' },
+  { id: '3g', m: 2, needsR: false, ans: 'D', A: (L) => `${L.p1} + ${L.q1}`, B: (L) => `${L.p2} + ${L.q2}`, val: (P, Q) => [P[0] + Q[0], P[1] + Q[1]], why: () => '' },
+  { id: '3i', m: 2, needsR: true, ans: 'D', A: (L) => `${L.r1} + ${L.q1}`, B: (L) => `${L.r2} + ${L.q2}`, val: (_P, Q, R) => [R[0] + Q[0], R[1] + Q[1]], why: () => '' },
+);
+
 const LETTER_PAIRS: [string, string][] = [
   ['a', 'b'],
   ['c', 'd'],
@@ -272,7 +282,34 @@ const aboveBelowQC: Template<SideParams> = {
     const eq = m === 1 ? 'y = x' : m === -1 ? 'y = -x' : 'y = 2x';
     const rhs = (xs: string) => (m === 1 ? xs : m === -1 ? `-${xs}` : `2${xs}`);
     const answer = cmp.ans;
-    const traps: QCQuestion['traps'] = answer === 'C' ? { D: 'algw-point-on-line' } : { [answer === 'A' ? 'B' : 'A']: 'algw-swap-coordinates' };
+    const traps: QCQuestion['traps'] = answer === 'C' ? { D: 'algw-point-on-line' } : answer === 'D' ? {} : { [answer === 'A' ? 'B' : 'A']: 'algw-swap-coordinates' };
+    // For a D comparison: the figure's points give one relation; other points on the same sides of the line give another.
+    let dText = '';
+    if (answer === 'D') {
+      const relOf = (p: Pt, qq: Pt, rr: Pt): QCChoice => {
+        const [u, w] = cmp.val(p, qq, rr);
+        return u > w ? 'A' : u < w ? 'B' : 'C';
+      };
+      const figRel = relOf(P, Q, R ?? [0, 0]);
+      const fmtCfg = (p: Pt, qq: Pt, rr: Pt | null) =>
+        `$${L.p1} = ${num(p[0])}$, $${L.p2} = ${num(p[1])}$, $${L.q1} = ${num(qq[0])}$, $${L.q2} = ${num(qq[1])}$${rr ? `, $${L.r1} = ${num(rr[0])}$, $${L.r2} = ${num(rr[1])}$` : ''}`;
+      const word = (r: QCChoice) => (r === 'A' ? 'Quantity A is greater' : r === 'B' ? 'Quantity B is greater' : 'the quantities are equal');
+      const valsText = (p: Pt, qq: Pt, rr: Pt | null) => {
+        const [u, w] = cmp.val(p, qq, rr ?? [0, 0]);
+        return `Quantity A is $${num(u)}$ and Quantity B is $${num(w)}$, so ${word(relOf(p, qq, rr ?? [0, 0]))}`;
+      };
+      let alt: { p: Pt; qq: Pt; rr: Pt | null } | null = null;
+      for (let tries = 0; tries < 4000 && !alt; tries++) {
+        const p: Pt = [rng.int(-6, 6), rng.int(-6, 6)];
+        const qq: Pt = [rng.int(-6, 6), rng.int(-6, 6)];
+        const t = rng.int(-5, 5);
+        const rr: Pt | null = useR ? [t, m * t] : null;
+        if (p[1] - m * p[0] <= 0 || qq[1] - m * qq[0] >= 0 || (rr && t === 0)) continue;
+        if (relOf(p, qq, rr ?? [0, 0]) !== figRel) alt = { p, qq, rr };
+      }
+      if (figRel !== 'D') traps[figRel] = 'tested-one-value';
+      dText = `The figure shows only which side of $\\ell$ each point is on, not how far from it. With the points as drawn (${fmtCfg(P, Q, R)}), ${valsText(P, Q, R)}. But ${alt ? `with ${fmtCfg(alt.p, alt.qq, alt.rr)}, which are placed relative to the line exactly as required, ${valsText(alt.p, alt.qq, alt.rr)}` : 'other points on the same sides of the line give another relation'}. Two placements disagree.`;
+    }
     const facts = `Line $\\ell$ passes through the origin and $${kTex}$, so its equation is $${eq}$. A point is above $\\ell$ when its $y$-coordinate is greater than $${rhs('x')}$ and below $\\ell$ when it is less. From the figure, $(${L.p1}, ${L.p2})$ is above $\\ell$, so $${L.p2} > ${rhs(L.p1)}$, and $(${L.q1}, ${L.q2})$ is below $\\ell$, so $${L.q2} < ${rhs(L.q1)}$.${
       R ? ` The point $(${L.r1}, ${L.r2})$ is on $\\ell$, so $${L.r2} = ${rhs(L.r1)}$.` : ''
     }`;
@@ -288,7 +325,7 @@ const aboveBelowQC: Template<SideParams> = {
         traps,
         explanation: `${facts}
 
-${cmp.why(L)} ${qcEnd(answer)}
+${answer === 'D' ? dText : cmp.why(L)} ${qcEnd(answer)}
 
 You never need the actual coordinates: the position of each point relative to $\\ell$ gives an inequality, and that is enough.`,
       },
@@ -985,11 +1022,13 @@ function SLOPE_REASON(pt: Pt, s: 1 | -1, qa: 'x-int' | 'y-int', ans: QCChoice): 
  * =========================================================================================== */
 
 interface QuadParams {
-  slope: 1 | -1 | 0;
-  /** 'y' / 'x' = sign of that intercept; 'origin' = passes through O; 'point' = through a point in the given quadrant. */
-  given: 'y' | 'x' | 'origin' | 'point';
-  sign: 1 | -1;
-  quadrant: number;
+  family: 'equation' | 'standard' | 'x-slope' | 'both' | 'point';
+  /** Sign of the slope and of the y-intercept (0 = zero) of the line that the description fixes. */
+  sm: 1 | -1 | 0;
+  sb: 1 | -1 | 0;
+  /** equation: [sign m, sign b]; standard: [sign a, sign b, sign c]; x-slope: [sign slope, sign x-int]; both: [sign x-int, sign y-int]; point: [slope sign, quadrant] */
+  signs: number[];
+  ask: 'through' | 'not-through';
 }
 
 const QUAD_NAMES = ['I', 'II', 'III', 'IV'];
@@ -1007,60 +1046,105 @@ function crossedQuadrants(m: number, b: number): Set<number> {
   return out;
 }
 
-/** Quadrants from the sign facts alone: the line passes through the two quadrants next to each intercept. */
-function quadrantsBySigns(slope: 1 | -1 | 0, given: QuadParams['given'], sign: 1 | -1, quadrant: number): number[] {
-  if (slope === 0) return sign > 0 ? [1, 2] : [3, 4];
-  if (given === 'origin') return slope > 0 ? [1, 3] : [2, 4];
-  let ySign: number;
-  let xSign: number;
-  if (given === 'y') [ySign, xSign] = [sign, -sign * slope];
-  else if (given === 'x') [xSign, ySign] = [sign, -sign * slope];
-  else [xSign, ySign] = [quadrant === 1 || quadrant === 4 ? 1 : -1, quadrant <= 2 ? 1 : -1];
-  const set = new Set([...(ySign > 0 ? [1, 2] : [3, 4]), ...(xSign > 0 ? [1, 4] : [2, 3])]);
-  return [...set].sort();
+/** Quadrants from the signs of the slope and of the y-intercept: the line passes through the two quadrants next to each intercept. */
+function quadrantsBySigns(sm: number, sb: number): number[] {
+  if (sm === 0) return sb > 0 ? [1, 2] : [3, 4];
+  if (sb === 0) return sm > 0 ? [1, 3] : [2, 4];
+  const xSign = -sb * sm;
+  return [...new Set([...(sb > 0 ? [1, 2] : [3, 4]), ...(xSign > 0 ? [1, 4] : [2, 3])])].sort();
 }
+
+const signWord = (s: number) => (s > 0 ? 'positive' : s < 0 ? 'negative' : 'zero');
+const LINE_NAMES = ['\\ell', 'k', 'j', 'n'];
 
 const quadrantsCrossed: Template<QuadParams> = {
   id: 'alg.coordinate.quadrants',
   skill: 'alg.coordinate',
   format: 'mcm',
-  style: 'quadrants a line passes through, from signs of its slope and intercept',
+  style: 'quadrants a line passes through, from signs of its slope and intercepts',
   generate(rng, d) {
-    let slope: QuadParams['slope'] = rng.chance(d === 1 ? 0.15 : 0.08) ? 0 : rng.sign();
-    let given: QuadParams['given'] = d === 1 ? 'y' : d === 2 ? rng.pick(['x', 'x', 'y', 'origin'] as const) : rng.pick(['x', 'point', 'point'] as const);
-    if (slope === 0 && given !== 'y') given = 'y';
-    if (given === 'origin' && slope === 0) slope = 1;
-    const sign: 1 | -1 = rng.sign();
-    // A point fixes the quadrants only when the slope pushes both intercepts away from it:
-    // positive slope through Quadrant II or IV, negative slope through Quadrant I or III.
-    const quadrant = slope > 0 ? rng.pick([2, 4]) : rng.pick([1, 3]);
-    const crossed = new Set(quadrantsBySigns(slope, given, sign, quadrant));
-    const { choices, answer } = flaggedChoices(QUAD_NAMES.map((nm, i) => ({ text: `Quadrant ${nm}`, correct: crossed.has(i + 1) })));
-    const slopeWord = slope > 0 ? 'a positive slope' : slope < 0 ? 'a negative slope' : 'slope 0';
-    const info =
-      given === 'y'
-        ? `${slopeWord} and a ${sign > 0 ? 'positive' : 'negative'} $y$-intercept`
-        : given === 'x'
-          ? `${slopeWord} and a ${sign > 0 ? 'positive' : 'negative'} $x$-intercept`
-          : given === 'origin'
-            ? `${slopeWord} and passes through the origin`
-            : `${slopeWord} and passes through a point $(a, b)$ with $a ${quadrant === 1 || quadrant === 4 ? '>' : '<'} 0$ and $b ${quadrant <= 2 ? '>' : '<'} 0$`;
-    const list = [...crossed].sort().map((i) => QUAD_NAMES[i - 1]);
-    const listText = list.length === 2 ? `${list[0]} and ${list[1]}` : `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
-    const sketch =
-      given === 'origin'
-        ? `A line through the origin with ${slopeWord} goes ${slope > 0 ? 'from the lower left to the upper right' : 'from the upper left to the lower right'}, through Quadrants ${listText} (the origin itself is in no quadrant).`
-        : slope === 0
-          ? `A line with slope 0 is horizontal. It sits ${sign > 0 ? 'above' : 'below'} the $x$-axis and runs through Quadrants ${listText}.`
-          : given === 'point'
-            ? `Start at the point $(a, b)$ in Quadrant ${QUAD_NAMES[quadrant - 1]}. A line with ${slopeWord} ${slope > 0 ? 'rises to the right and falls to the left' : 'falls to the right and rises to the left'}; follow it both ways from that point. It passes through Quadrants ${listText}.`
-            : `Sketch it: mark the ${given === 'y' ? '$y$' : '$x$'}-intercept on the ${sign > 0 ? 'positive' : 'negative'} ${given === 'y' ? '$y$' : '$x$'}-axis and draw a line that ${
-                slope > 0 ? 'rises from left to right' : 'falls from left to right'
-              } through it. Such a line crosses the other axis on its ${
-                given === 'y' ? (-sign * slope > 0 ? 'positive' : 'negative') : -sign * slope > 0 ? 'positive' : 'negative'
-              } side, so it passes through Quadrants ${listText}.`;
+    const family: QuadParams['family'] = d === 1 ? 'equation' : d === 2 ? 'standard' : rng.pick(['x-slope', 'point', 'point', 'both'] as const);
+    const ask: QuadParams['ask'] = rng.chance(0.45) ? 'not-through' : 'through';
+    const name = rng.pick(LINE_NAMES);
+    const lt = (s: number, v: string) => `$${v} ${s > 0 ? '>' : s < 0 ? '<' : '='} 0$`;
+    let sm: number;
+    let sb: number;
+    let signs: number[];
+    let desc: string;
+    let derive: string;
+    if (family === 'equation') {
+      const [lm, lb] = rng.pick([['m', 'b'], ['a', 'c'], ['p', 'q'], ['s', 't']]);
+      sm = rng.sign();
+      sb = rng.sign();
+      signs = [sm, sb];
+      desc = `has the equation $y = ${lm}x + ${lb}$, where ${lt(sm, lm)} and ${lt(sb, lb)}`;
+      derive = `In $y = ${lm}x + ${lb}$ the slope is $${lm}$, which is ${signWord(sm)}, so the line ${sm > 0 ? 'rises' : 'falls'} from left to right; the $y$-intercept is $${lb}$, which is ${signWord(sb)}.`;
+    } else if (family === 'standard') {
+      const [la, lb, lc] = rng.pick([['a', 'b', 'c'], ['p', 'q', 'r'], ['A', 'B', 'C']]);
+      const sa = rng.sign();
+      const sbb = rng.sign();
+      const sc = rng.pick([1, -1, 0] as const);
+      sm = (-sa * sbb) as 1 | -1;
+      sb = (sc * sbb) as 1 | -1 | 0;
+      signs = [sa, sbb, sc];
+      desc = `has the equation $${la}x + ${lb}y = ${lc}$, where ${lt(sa, la)}, ${lt(sbb, lb)}, and ${sc === 0 ? `$${lc} = 0$` : lt(sc, lc)}`;
+      derive = `Solve for $y$: $y = -\\frac{${la}}{${lb}}x + \\frac{${lc}}{${lb}}$. The slope $-\\frac{${la}}{${lb}}$ is ${signWord(sm)} (a ${signWord(sa)} number over a ${signWord(sbb)} one, with a minus sign in front), and the $y$-intercept $\\frac{${lc}}{${lb}}$ is ${signWord(sb)}.`;
+    } else if (family === 'x-slope') {
+      sm = rng.sign();
+      const sx = rng.sign();
+      sb = (-sm * sx) as 1 | -1;
+      signs = [sm, sx];
+      desc = `has ${sm > 0 ? 'a positive' : 'a negative'} slope and ${sx > 0 ? 'a positive' : 'a negative'} $x$-intercept`;
+      derive = `The $x$-intercept is $-\\frac{b}{m}$, so $b = -m \\cdot (x\\text{-intercept})$: with a ${signWord(sm)} slope and a ${signWord(sx)} $x$-intercept, the $y$-intercept $b$ is ${signWord(sb)}.`;
+    } else if (family === 'both') {
+      const sx = rng.sign();
+      const sy = rng.sign();
+      sb = sy as 1 | -1;
+      sm = (-sy * sx) as 1 | -1;
+      signs = [sx, sy];
+      desc = `has ${sx > 0 ? 'a positive' : 'a negative'} $x$-intercept and ${sy > 0 ? 'a positive' : 'a negative'} $y$-intercept`;
+      derive = `Going from the $x$-intercept to the $y$-intercept, the line ${sm > 0 ? 'rises' : 'falls'}: its slope $-\\frac{b}{x\\text{-intercept}}$ is ${signWord(sm)}.`;
+    } else {
+      // through a point: both intercepts are pushed away from the point only for these slope and quadrant pairs
+      sm = rng.sign();
+      const quadrant = sm > 0 ? rng.pick([2, 4]) : rng.pick([1, 3]);
+      const [la, lb] = rng.pick([['a', 'b'], ['s', 't'], ['p', 'q'], ['h', 'k']]);
+      sb = (quadrant <= 2 ? 1 : -1) as 1 | -1;
+      signs = [sm, quadrant];
+      desc = `has ${sm > 0 ? 'a positive' : 'a negative'} slope and passes through a point $(${la}, ${lb})$ with $${la} ${quadrant === 1 || quadrant === 4 ? '>' : '<'} 0$ and $${lb} ${quadrant <= 2 ? '>' : '<'} 0$`;
+      derive = `Start at the point in Quadrant ${QUAD_NAMES[quadrant - 1]}. A line with ${sm > 0 ? 'positive' : 'negative'} slope ${sm > 0 ? 'rises to the right and falls to the left' : 'falls to the right and rises to the left'}, so from there it reaches the $y$-axis on the ${sb > 0 ? 'positive' : 'negative'} side and the $x$-axis on the ${-sb * sm > 0 ? 'positive' : 'negative'} side.`;
+    }
+    const crossed = quadrantsBySigns(sm, sb);
+    const missed = [1, 2, 3, 4].filter((i) => !crossed.includes(i));
+    const correctSet = ask === 'through' ? crossed : missed;
+    const { choices, answer } = flaggedChoices(
+      QUAD_NAMES.map((nm, i) => {
+        const ok = correctSet.includes(i + 1);
+        return { text: `Quadrant ${nm}`, correct: ok, ...(ok ? {} : { trap: ask === 'through' ? 'algw-quadrant-sign-slip' : 'algw-quadrant-complement' }) };
+      }),
+    );
+    const names = (list: number[]) => {
+      const t = list.map((i) => QUAD_NAMES[i - 1]);
+      return t.length === 1 ? t[0] : t.length === 2 ? `${t[0]} and ${t[1]}` : `${t.slice(0, -1).join(', ')}, and ${t[t.length - 1]}`;
+    };
+    // A concrete line with these signs, as a check.
+    const em = sm === 0 ? 0 : sm * 2;
+    const eb = sb === 0 ? 0 : sb * 2;
+    const exLine = em === 0 ? `y = ${eb}` : `${em === 2 ? 'y = 2x' : 'y = -2x'}${eb === 0 ? '' : ` ${eb > 0 ? '+' : '-'} ${Math.abs(eb)}`}`;
+    const exCross = em === 0 ? `it is horizontal at height $${eb}$` : eb === 0 ? 'it passes through the origin' : `it crosses the axes at $(0, ${eb})$ and $(${num(-eb / em)}, 0)$`;
+    const where =
+      sm === 0
+        ? `A horizontal line ${sb > 0 ? 'above' : 'below'} the $x$-axis stays in Quadrants ${names(crossed)}.`
+        : sb === 0
+          ? `A line through the origin that ${sm > 0 ? 'rises' : 'falls'} runs through Quadrants ${names(crossed)} (the origin itself is in no quadrant).`
+          : `So the line crosses the $y$-axis ${sb > 0 ? 'above' : 'below'} the origin and the $x$-axis on the ${-sb * sm > 0 ? 'positive' : 'negative'} side. It passes through Quadrants ${names(crossed)} and misses Quadrant ${names(missed)}.`;
+    const flipped = sm === 0 ? null : -sm;
+    const trapLine =
+      ask === 'through'
+        ? `Trap: Quadrant ${names(missed)} is tempting if one sign is misread; with ${flipped ? `a ${signWord(flipped)} slope` : 'the other side of the axis'} the line would pass through it. Check the signs again.`
+        : `Trap: ${names(crossed)} ${crossed.length > 1 ? 'are' : 'is'} where the line DOES pass; the question asks for the other ${missed.length > 1 ? 'quadrants' : 'quadrant'}.`;
     return {
-      params: { slope, given, sign, quadrant },
+      params: { family, sm: sm as QuadParams['sm'], sb: sb as QuadParams['sb'], signs, ask },
       q: {
         format: 'mcm',
         figure: {
@@ -1075,40 +1159,64 @@ const quadrantsCrossed: Template<QuadParams> = {
             { at: [-0.35, -0.35], text: '$O$' },
           ],
         },
-        stem: `In the $xy$-plane, line $m$ (not shown) has ${info}. Which of the quadrants labeled above does line $m$ pass through?`,
+        stem: `In the $xy$-plane, line $${name}$ (not shown) ${desc}. Which of the quadrants labeled above does line $${name}$ ${ask === 'through' ? 'pass through' : 'not pass through'}?`,
         instruction: 'Indicate all such quadrants.',
         choices,
         answer,
-        explanation: `${sketch}
+        explanation: `${derive}
 
-${given === 'origin' || slope === 0 ? '' : 'A nonhorizontal line that does not pass through the origin always crosses exactly three quadrants; the signs tell you which one it misses.'}`.trim(),
+${where}
+
+Check with $${exLine}$: ${exCross}, and it runs through Quadrants ${names(quadrantsBySigns(sm, sb))}.
+
+${trapLine}`,
       },
     };
   },
-  check(q, { slope, given, sign, quadrant }, rng) {
+  check(q, { family, sm, sb, signs, ask }, rng) {
+    if (q.format !== 'mcm') return 'wrong format';
     let first: string | null = null;
     for (let i = 0; i < 60; i++) {
-      const rep = repLine(slope, given, sign, quadrant, 0.2 + rng.next() * 5, rng.next());
-      const set = [...crossedQuadrants(rep.m, rep.b)].sort().join(',');
+      const mag = 0.2 + rng.next() * 5;
+      const c = 0.5 + 6 * rng.next();
+      let m: number;
+      let b: number;
+      if (family === 'equation') {
+        m = signs[0] * mag;
+        b = signs[1] * c;
+      } else if (family === 'standard') {
+        const [sa, sbb, sc] = signs;
+        const a = sa * mag;
+        const bb = sbb * c;
+        const cc = sc * (0.5 + 6 * rng.next());
+        m = -a / bb;
+        b = cc / bb;
+      } else if (family === 'x-slope') {
+        m = signs[0] * mag;
+        b = -m * signs[1] * c; // x-intercept = -b/m has the given sign
+      } else if (family === 'both') {
+        const xi = signs[0] * c;
+        const yi = signs[1] * (0.5 + 6 * rng.next());
+        m = -yi / xi;
+        b = yi;
+      } else {
+        const quadrant = signs[1];
+        const px = (quadrant === 1 || quadrant === 4 ? 1 : -1) * (0.5 + 4 * rng.next());
+        const py = (quadrant <= 2 ? 1 : -1) * (0.5 + 4 * rng.next());
+        m = signs[0] * mag;
+        b = py - m * px;
+      }
+      const set = [...crossedQuadrants(m, b)].sort().join(',');
       if (first === null) first = set;
       else if (first !== set) return 'quadrants depend on the line chosen';
     }
-    const flags = [1, 2, 3, 4].map((i) => first!.split(',').includes(String(i)));
+    const crossed = first!.split(',').map(Number);
+    const flags = [1, 2, 3, 4].map((i) => (ask === 'through' ? crossed.includes(i) : !crossed.includes(i)));
+    void sm;
+    void sb;
     return expectMcm(q, flags);
   },
 };
-
-/** A concrete line satisfying the sign conditions. `mag` scales the slope, `u` in [0,1) varies the rest. */
-function repLine(slope: 1 | -1 | 0, given: QuadParams['given'], sign: 1 | -1, quadrant: number, mag: number, u = 0.37): { m: number; b: number } {
-  const m = slope * mag;
-  const c = 0.5 + 6 * u;
-  if (given === 'y') return { m, b: sign * c };
-  if (given === 'origin') return { m, b: 0 };
-  if (given === 'x') return { m, b: -m * sign * c };
-  const px = (quadrant === 1 || quadrant === 4 ? 1 : -1) * (0.5 + 4 * u);
-  const py = (quadrant <= 2 ? 1 : -1) * (0.5 + 4 * ((u * 7) % 1));
-  return { m, b: py - m * px };
-}
 
 export const coordinateTemplates: Template<any>[] = [aboveBelowQC, perpendicularLine, distanceMidpoint, pointsOnLine, slopeQC, quadrantsCrossed];
 
