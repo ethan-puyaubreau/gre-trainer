@@ -20,5 +20,7 @@ export default defineConfig({
     environment: 'node',
     // Each content test runs a template on hundreds of seeds; sampling checks can take seconds.
     testTimeout: 120_000,
+    // Separate processes: the long content suites starved the threads pool's RPC on CI (onTaskUpdate timeout).
+    pool: 'forks',
   },
 });
