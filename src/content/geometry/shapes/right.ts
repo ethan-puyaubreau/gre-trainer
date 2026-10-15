@@ -5,6 +5,7 @@ import type { QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, add, bisect, dir, dist, mul, shoelace, sub, unit, type Pt } from './fig';
 import { checkMcs, intChoices, qcTraps, QC_SAY, surd, surdChoices, surdDiv, surdMul, surdTex, surdVal, type Surd } from './util';
 import { Redraw, retryAll } from '../redraw';
+import { trapNotes } from '../notes';
 
 const SKILL = 'geo.right-triangles';
 
@@ -783,6 +784,21 @@ const STACKED: [number, number, number, number][] = [
   [6, 6, 7, 11],
 ];
 
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const TWO_NOTES: Record<string, (vs: string) => string> = {
+  'geo-rt-forgot-hyp': (vs) => `leaving out the hypotenuse gives ${vs}`,
+  'geo-rt-used-area': (vs) => `dividing by the area instead of the perimeter gives ${vs}`,
+  'geo-rt-hyp-only': (vs) => `using only the hypotenuse as the length per triangle gives ${vs}`,
+  'geo-rt-rectangle-perimeter': (vs) => `using the perimeter of a rectangle gives ${vs}`,
+  'geo-rt-ratio-no-k': (vs) => `taking the ratio numbers as the legs gives ${vs}, but the ratio alone does not give the lengths`,
+  'geo-rt-add-legs': (vs) => `adding lengths instead of their squares gives ${vs}`,
+  'geo-tri-no-half': (vs) => `forgetting the $\\frac{1}{2}$ of the area gives ${vs}`,
+  'geo-rt-gave-area': (vs) => `${vs} is the area, not the hypotenuse`,
+  'geo-rt-leg-as-hyp': (vs) => `mixing up when to add the squares and when to subtract them gives ${vs}`,
+  'geo-rt-wrong-triangle': (vs) => `mixing sides of the two triangles gives ${vs}`,
+  'geo-rt-stopped-early': (vs) => `stopping after the first step gives ${vs}`,
+};
+
 const twoStep: Template<TwoParams> = {
   id: 'geo.right-triangles.two-step-mcs',
   skill: SKILL,
@@ -828,7 +844,7 @@ const twoStep: Template<TwoParams> = {
 
 $\\frac{${num(L)}}{${P}} = ${n}$ triangles.
 
-Leaving out the hypotenuse ($${a} + ${b} = ${a + b}$ per triangle) or dividing by the area gives the wrong counts.`,
+${trapNotes(choices, TWO_NOTES)}`,
         },
       };
     }
@@ -865,7 +881,7 @@ Leaving out the hypotenuse ($${a} + ${b} = ${a + b}$ per triangle) or dividing b
 
 The legs are $${a * k}$ and $${b * k}$, and the hypotenuse is $\\sqrt{${a * k}^2 + ${b * k}^2} = \\sqrt{${(a * a + b * b) * k * k}} = ${surdTex(correct)}$.
 
-$${surdTex(surd(1, sq))}$ is the hypotenuse for legs of exactly $${a}$ and $${b}$: the ratio alone does not give the lengths.`,
+${trapNotes(choices, TWO_NOTES)}`,
         },
       };
     }
@@ -945,7 +961,7 @@ $AB$ is the hypotenuse of the first triangle, so subtract its square; $AC$ is th
 
 Then in right triangle $ACD$: $AD^2 = AC^2 + CD^2 = ${x * x + y * y} + ${zz * zz} = ${N}$, so $AD = ${surdTex(correct)}$.
 
-Adding the lengths $${x} + ${y} + ${zz}$ instead of their squares gives the wrong answer.`,
+${trapNotes(choices, TWO_NOTES)}`,
       },
     };
   },

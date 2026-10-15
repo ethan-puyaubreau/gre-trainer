@@ -176,7 +176,7 @@ const angleSum: Template<SumParams> = {
       const after =
         ask === 'x'
           ? ''
-          : `\n\nThe angles are ${vals.map((t) => `$${t}^\\circ$`).join(', ')}, so ${ask === 'largest' ? `the largest is $${mx}^\\circ$` : `the difference is $${mx} - ${mn} = ${correct}$`}. (Stopping at $x = ${x0}$ answers the wrong question.)`;
+          : `\n\nThe angles are ${vals.map((t) => `$${t}^\\circ$`).join(', ')}, so ${ask === 'largest' ? `the largest is $${mx}^\\circ$` : `the difference is $${mx} - ${mn} = ${correct}$`}. (Stopping at $x$ answers the wrong question.)`;
       return {
         params: { v, exprs, ask, values },
         q: {
