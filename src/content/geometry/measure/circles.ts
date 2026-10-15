@@ -399,7 +399,7 @@ Knowing that $RT$ is less than the diameter does not compare it with the radius.
     }
     if (mode === 'circ-diff') {
       const k = rng.int(2, d === 1 ? 6 : 12);
-      const variant = rng.pick(['6k', '6k', '6.3k', '6.28k', 'pi', 'area'] as const);
+      const variant = rng.pick(['6k', '6.3k', '6.28k', 'pi', 'area', 'area'] as const);
       const B = variant === '6k' ? 6 * k : variant === '6.3k' ? 6.3 * k : variant === '6.28k' ? 6.28 * k : 2 * k;
       const BTex = variant === 'pi' ? `$${2 * k}\\pi$` : `$${variant === '6k' ? 6 * k : Number((B).toFixed(2))}$`;
       const answer: QCChoice = variant === '6k' || variant === '6.28k' ? 'A' : variant === '6.3k' ? 'B' : variant === 'pi' ? 'C' : 'D';

@@ -280,7 +280,7 @@ Scaling the area by $${ft(new Frac(n, p))}$ instead of $(${ft(new Frac(n, p))})^
 
 /* ================================================================== 2. Area and perimeter ratios (QC) */
 
-type ARKind = 'trapezoid' | 'given-area' | 'two-sides' | 'perimeter';
+type ARKind = 'trapezoid' | 'given-area' | 'two-sides' | 'perimeter' | 'range';
 interface ARParams {
   kind: ARKind;
   p?: number;
@@ -317,7 +317,8 @@ function twoTriangles(k: number, names: [string, string, string, string, string,
     const map: Record<string, string> = { a: nA, b: nB, c: nC, d: nD, e: nE, f: nF };
     fb.side(map[x], map[y], map[away], tex, 12);
   }
-  return fb.build();
+  // a ratio outside the drawable range is clamped: then the picture is not to scale
+  return fb.build(kk !== k);
 }
 
 const areaRatioQC: Template<ARParams> = {
@@ -327,7 +328,11 @@ const areaRatioQC: Template<ARParams> = {
   style: 'areas and perimeters of similar figures',
   generate(rng, d) {
     const kind: ARKind = rng.pick(
-      d === 1 ? (['given-area', 'perimeter', 'trapezoid'] as const) : d === 2 ? (['trapezoid', 'given-area', 'perimeter', 'two-sides'] as const) : (['trapezoid', 'two-sides', 'given-area', 'perimeter'] as const),
+      d === 1
+        ? (['given-area', 'perimeter', 'trapezoid'] as const)
+        : d === 2
+          ? (['trapezoid', 'given-area', 'perimeter', 'two-sides', 'range'] as const)
+          : (['trapezoid', 'two-sides', 'given-area', 'perimeter', 'range', 'range'] as const),
     );
     if (kind === 'trapezoid') {
       const [p, q] = rng.pick([
@@ -422,6 +427,41 @@ Perimeters scale like sides ($${k}$), not like areas ($${ratio}$).`,
         },
       };
     }
+    if (kind === 'range') {
+      // the scale factor is only known to lie between two whole numbers: the area of DEF lies in an interval
+      const k1 = rng.int(2, 4);
+      const k2 = k1 + 1;
+      const m = rng.int(1, 4);
+      const S = k1 * k1 * k2 * k2 * m;
+      const lo = k1 * k1 * m;
+      const hi = k2 * k2 * m;
+      const which = rng.pick(['A', 'D', 'D', 'B'] as const);
+      const N = which === 'A' ? Math.max(1, lo - rng.int(0, 2)) : which === 'B' ? hi + rng.int(0, 3) : rng.int(lo + 1, hi - 1);
+      const answer: QCChoice = N <= lo ? 'A' : N >= hi ? 'B' : 'D';
+      return {
+        params: { kind, a: k1, b: k2, S, N },
+        q: {
+          format: 'qc',
+          info: `Triangle $ABC$ is similar to triangle $DEF$, and the area of triangle $ABC$ is $${S}$. The ratio of the length of $AB$ to the length of the corresponding side $DE$ is greater than $${k1}$ and less than $${k2}$.`,
+          figure: { ...twoTriangles(1 / ((k1 + k2) / 2), ['A', 'B', 'C', 'D', 'E', 'F']), notToScale: true },
+          quantityA: 'The area of triangle $DEF$',
+          quantityB: `$${N}$`,
+          answer,
+          traps: qcTraps(answer, answer === 'D' ? { A: 'geo-sim-linear-area', B: 'geo-sim-linear-area' } : { D: 'geo-fig-gave-up' }),
+          explanation: `If the ratio of lengths is $r$, the areas are in the ratio $r^2$, so the area of $DEF$ is $\\frac{${S}}{r^2}$. Since $${k1} < r < ${k2}$, we have $${k1 * k1} < r^2 < ${k2 * k2}$, and the area of $DEF$ lies strictly between $\\frac{${S}}{${k2 * k2}} = ${lo}$ and $\\frac{${S}}{${k1 * k1}} = ${hi}$.
+
+${
+            answer === 'A'
+              ? `Every possible area is greater than $${lo}$, and $${N} \\le ${lo}$, so Quantity A is greater. (A)`
+              : answer === 'B'
+                ? `Every possible area is less than $${hi}$, and $${N} \\ge ${hi}$, so Quantity B is greater. (B)`
+                : `$${N}$ lies inside that interval: a ratio just above $${k1}$ gives an area just under $${hi}$, which is greater than $${N}$; a ratio just under $${k2}$ gives an area just over $${lo}$, which is less than $${N}$. (D)`
+          }
+
+Rule: areas go with the square of the ratio of lengths, so square the ends of the range before comparing.`,
+        },
+      };
+    }
     // two-sides: AB = 2DE and BC = 2EF, with or without the included angle
     const extra: 'none' | 'angle' | 'third' = rng.pick(['none', 'none', 'angle', 'third']);
     const k = rng.int(2, 3);
@@ -469,6 +509,9 @@ Perimeters scale like sides ($${k}$), not like areas ($${ratio}$).`,
         const C: Pt = [cx, (2 * p.S!) / p.a!];
         const f = (P: Pt) => mul(rot(P, 37), p.b! / p.a!);
         samples.push([shoelace([f(A), f(B), f(C)]), p.N!]);
+      } else if (p.kind === 'range') {
+        const r = p.a! + (1 - 0.0005) * rnd() + 0.0005;
+        samples.push([p.S! / (r * r), p.N!]);
       } else if (p.kind === 'perimeter') {
         const S: Pt = [0, 0];
         const T: Pt = [2 + 3 * rnd(), 0];

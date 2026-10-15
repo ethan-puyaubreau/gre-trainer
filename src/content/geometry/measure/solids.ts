@@ -637,8 +637,8 @@ const solidQC: Template<SolidQCParams> = {
     const x = rng.next();
     const mode: SolidQCParams['mode'] =
       d === 1
-        ? rng.pick(['swap-num', 'swap-num', 'roll', 'percent-cube', 'percent-cyl', 'min-surface'] as const)
-        : x < 0.15 ? 'swap-num' : x < 0.29 ? 'swap-ordered' : x < 0.37 ? 'swap-free' : x < 0.55 ? 'roll' : x < 0.72 ? 'min-surface' : x < 0.86 ? 'percent-cube' : 'percent-cyl';
+        ? rng.pick(['swap-num', 'swap-free', 'roll', 'percent-cube', 'percent-cyl', 'min-surface', 'swap-num'] as const)
+        : x < 0.15 ? 'swap-num' : x < 0.27 ? 'swap-ordered' : x < 0.40 ? 'swap-free' : x < 0.55 ? 'roll' : x < 0.72 ? 'min-surface' : x < 0.86 ? 'percent-cube' : 'percent-cyl';
     if (mode === 'swap-num') {
       let a: number, b: number;
       do {
@@ -731,7 +731,7 @@ The same sheet gives the same curved surface area both ways, but not the same vo
       const e = rng.int(2, 6);
       const V = e ** 3;
       const S = 6 * e * e;
-      const variant = rng.pick(['free-eq', 'free-less', 'free-less', 'cube', 'square-base'] as const);
+      const variant = rng.pick(['free-eq', 'free-less', 'cube', 'cube', 'square-base'] as const);
       const boxVolume = (v: number) =>
         rng.pick([
           `A rectangular box has a volume of ${plain(v)} cubic centimeters.`,
@@ -936,7 +936,7 @@ const CYL_CHANGES: Change[] = [
   { text: 'Doubling the radius and tripling the height', f: [H2(4), H2(3)] },
   { text: 'Tripling both the radius and the height', f: [H2(9), H2(3)] },
   { text: 'Multiplying the radius by $\\sqrt{3}$', f: [H2(3), H2(1)] },
-  { text: 'Multiplying the radius by $\sqrt{2}$ and the height by 4', f: [H2(2), H2(4)] },
+  { text: 'Multiplying the radius by $\\sqrt{2}$ and the height by 4', f: [H2(2), H2(4)] },
   { text: 'Halving the radius and quadrupling the height', f: [H2(1, 4), H2(4)] },
 ];
 const BOX_CHANGES: Change[] = [

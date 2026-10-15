@@ -783,7 +783,7 @@ const compareQC: Template<CompareParams> = {
   generate(rng, d) {
     const base: CompareParams = { mode: 'coord-square', a: 0, b: 0, h: 0, off: 0, k: 0, kFrac: [0, 1], n1: 0, n2: 0, P1: [0, 1], P2: [0, 1] };
     const r = rng.next();
-    const mode: CompareParams['mode'] = r < 0.25 ? 'coord-square' : r < 0.47 ? 'regular-sides' : r < 0.7 ? 'parallelogram' : r < 0.87 ? 'trapezoid' : 'no-angle';
+    const mode: CompareParams['mode'] = r < 0.22 ? 'coord-square' : r < 0.42 ? 'regular-sides' : r < 0.62 ? 'parallelogram' : r < 0.77 ? 'trapezoid' : 'no-angle';
 
     if (mode === 'coord-square') {
       let a: number, b: number;
@@ -942,7 +942,7 @@ Multiplying the two sides, $${b} \\cdot ${a} = ${a * b}$, uses the slanted side 
       params: { ...base, mode, a, b, k },
       q: {
         format: 'qc',
-        figure: fig.build(false),
+        figure: fig.build(true),
         info: `$ABCD$ is a parallelogram.`,
         quantityA: `The area of $ABCD$`,
         quantityB: `$${num(k)}$`,
