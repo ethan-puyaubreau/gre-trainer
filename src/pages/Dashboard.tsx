@@ -4,7 +4,7 @@ import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
-import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
+import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextCriteria, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
 import { reducedMotion } from '../motion';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
@@ -347,6 +347,7 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
   const { skills: states, history, settings } = useProgress();
   const st = states[skill.id] ?? newSkillState();
   const templates = templatesBySkill.get(skill.id) ?? [];
+  const criteria = nextCriteria(st, requirementsFor(templates), Date.now());
   const mine = history.filter((h) => h.skillId === skill.id);
   const acc = mine.length ? Math.round((100 * mine.filter((h) => h.correct).length) / mine.length) : null;
   const avg = mine.length ? mine.reduce((s, h) => s + h.timeMs, 0) / mine.length : null;
@@ -393,7 +394,25 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
         {acc !== null && <span className="chip">{acc}% correct</span>}
         {avg !== null && <span className={`chip ${avg > settings.paceSec * 1000 ? 'chip-bad' : 'chip-good'}`}>avg {formatClock(avg)}</span>}
       </div>
-      <p>{nextStep(st)}</p>
+      {st.level === 4 ? (
+        <p>{nextStep(st)}</p>
+      ) : (
+        <>
+          <h3>To reach {LEVEL_NAMES[st.level + 1]}</h3>
+          <ul className="list-plain">
+            {criteria.map((c) => (
+              <li key={c.key} className="row">
+                <span style={{ width: 18 }}>{c.done ? '✓' : '·'}</span>
+                <span style={{ flex: 1 }}>
+                  {c.label}
+                  {c.detail && <span className="muted small"> · {c.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {st.level === 3 && criteria.every((c) => c.done) && <p className="small">All set: one more correct answer on pace makes it Mastered.</p>}
+        </>
+      )}
       <a className="btn btn-primary" href={href('practice', 'skill', skill.id)}>
         Practice this skill
       </a>
