@@ -588,11 +588,13 @@ const distanceMidpoint: Template<DistParams> = {
             { value: frac(a + b), trap: 'algw-distance-add' },
             { value: frac(c * c), trap: 'algw-distance-no-root' },
           ],
-          explanation: `The horizontal change is $|${num(Q[0])} - ${paren(P[0])}| = ${a}$ and the vertical change is $|${num(Q[1])} - ${paren(P[1])}| = ${b}$. They are the legs of a right triangle whose hypotenuse is the distance:
+          explanation: `This is a straight-line distance between two points. The horizontal change is $|${num(Q[0])} - ${paren(P[0])}| = ${a}$ and the vertical change is $|${num(Q[1])} - ${paren(P[1])}| = ${b}$. They are the legs of a right triangle whose hypotenuse is the distance:
 
 $$\\sqrt{${a}^2 + ${b}^2} = \\sqrt{${a * a + b * b}} = ${c}$$
 
-Adding the legs (${a + b}) or forgetting the square root (${c * c}) are the usual slips.`,
+Check: ${a * a} + ${b * b} = ${c * c} is the square of ${c}, so ${c} is the length of the hypotenuse.
+
+Trap: adding the legs, ${a} + ${b} = ${a + b}, measures the walk along the grid, not the straight distance, and forgetting the square root leaves ${c * c}. Rule: distance = $\\sqrt{(\\Delta x)^2 + (\\Delta y)^2}$.`,
         },
       };
     }
@@ -611,18 +613,21 @@ Adding the legs (${a + b}) or forgetting the square root (${c * c}) are the usua
               { value: frac(c), trap: 'algw-midpoint-half' },
               { value: frac(2 * (a + b)), trap: 'algw-distance-add' },
             ],
-            explanation: `From $P$ to $M$ the coordinates change by ${a} horizontally and ${b} vertically, so $PM = \\sqrt{${a}^2 + ${b}^2} = ${c}$.
+            explanation: `The midpoint is halfway, so first measure from $P$ to $M$. From $P$ to $M$ the coordinates change by ${a} horizontally and ${b} vertically, so $PM = \\sqrt{${a}^2 + ${b}^2} = ${c}$.
 
 $M$ is the midpoint, so $PQ = 2 \\cdot PM = ${2 * c}$. (Or find $Q = ${ptTex(Q[0], Q[1])}$ first and use the distance formula.)
 
-${c} is only half of the segment.`,
+Check: $Q$ is as far from $M$ as $P$ is, so the segment is ${c} + ${c} = ${2 * c} long.
+
+Trap: ${c} is only the distance from $P$ to the midpoint, half of $PQ$, and adding the legs instead would give ${2 * (a + b)}. Rule: a midpoint cuts the segment into two equal parts.`,
           },
         };
       }
       const sum = Q[0] + Q[1];
       const wrong: Frac = frac(P[0] + M[0], 2).add(frac(P[1] + M[1], 2));
       const traps: { value: Frac; trap: string }[] = [];
-      if (!wrong.eq(sum) && wrong.isTerminating()) traps.push({ value: wrong, trap: 'algw-midpoint-reversed' });
+      if (wrong.eq(sum)) return distanceMidpoint.generate(rng, d);
+      if (wrong.isTerminating()) traps.push({ value: wrong, trap: 'algw-midpoint-reversed' });
       return {
         params: { mode, P, Q, M, y2: 0, c, sign: 1 },
         q: {
@@ -630,22 +635,24 @@ ${c} is only half of the segment.`,
           stem: `In the $xy$-plane, the midpoint of line segment $PQ$ is $${ptTex(M[0], M[1])}$. If $P$ has coordinates $${ptTex(P[0], P[1])}$ and $Q$ has coordinates $(s, t)$, what is the value of $s + t$?`,
           answer: frac(sum),
           traps,
-          explanation: `The midpoint averages the coordinates: $\\frac{${num(P[0])} + s}{2} = ${num(M[0])}$ and $\\frac{${num(P[1])} + t}{2} = ${num(M[1])}$.
+          explanation: `The midpoint is the average of the endpoints, so work backwards from it. The midpoint averages the coordinates: $\\frac{${num(P[0])} + s}{2} = ${num(M[0])}$ and $\\frac{${num(P[1])} + t}{2} = ${num(M[1])}$.
 
 So $s = 2(${num(M[0])}) - ${paren(P[0])} = ${num(Q[0])}$ and $t = 2(${num(M[1])}) - ${paren(P[1])} = ${num(Q[1])}$, giving $s + t = ${num(sum)}$.
 
-Averaging $P$ with $M$ finds a point between them, not the other endpoint.`,
+Check: the average of $P$ and $Q$ is $(${num((P[0] + Q[0]) / 2)}, ${num((P[1] + Q[1]) / 2)})$, which is $M$.
+
+Trap: ${wrong.isTerminating() ? `averaging $P$ with $M$ gives $${num(wrong)}$ for the sum, but that finds a point between them, not the other endpoint.` : 'averaging $P$ with $M$ finds a point between them, not the other endpoint.'} Rule: endpoint = 2 $\\times$ midpoint $-$ other endpoint.`,
         },
       };
     }
     // unknown coordinate: distance from (x1, y1) to (t, y2) is c, with a sign condition on t.
     const x1 = rng.int(-(a - 1), a - 1);
+    if (x1 === 0) return distanceMidpoint.generate(rng, d); // t would equal the horizontal change itself
     const y2 = P[1] + sy * b;
     const sign: 1 | -1 = rng.sign();
     const t = sign > 0 ? x1 + a : x1 - a;
     const traps: { value: Frac; trap: string }[] = [];
-    if (sign * a > 0 && a !== t) traps.push({ value: frac(a), trap: 'algw-difference-as-coordinate' });
-    else if (sign < 0 && -a !== t) traps.push({ value: frac(-a), trap: 'algw-difference-as-coordinate' });
+    traps.push({ value: frac(sign * a), trap: 'algw-difference-as-coordinate' });
     const other = sign > 0 ? x1 - a : x1 + a;
     return {
       params: { mode, P: [x1, P[1]], Q: [t, y2], M: [0, 0], y2, c, sign },
@@ -654,9 +661,13 @@ Averaging $P$ with $M$ finds a point between them, not the other endpoint.`,
         stem: `In the $xy$-plane, the distance between the points $${ptTex(x1, P[1])}$ and $(t, ${num(y2)})$ is ${c}. If $t ${sign > 0 ? '>' : '<'} 0$, what is the value of $t$?`,
         answer: frac(t),
         traps,
-        explanation: `By the distance formula, $(t - ${paren(x1)})^2 + (${num(y2)} - ${paren(P[1])})^2 = ${c}^2$, so $(t - ${paren(x1)})^2 = ${c * c} - ${b * b} = ${a * a}$.
+        explanation: `The distance formula turns the condition into an equation in $t$. By the distance formula, $(t - ${paren(x1)})^2 + (${num(y2)} - ${paren(P[1])})^2 = ${c}^2$, so $(t - ${paren(x1)})^2 = ${c * c} - ${b * b} = ${a * a}$.
 
-Then $t - ${paren(x1)} = ${a}$ or $t - ${paren(x1)} = -${a}$, so $t = ${num(x1 + a)}$ or $t = ${num(x1 - a)}$. Only $${num(t)}$ is ${sign > 0 ? 'positive' : 'negative'}, so $t = ${num(t)}$ (the other value, $${num(other)}$, fails the condition).`,
+Then $t - ${paren(x1)} = ${a}$ or $t - ${paren(x1)} = -${a}$, so $t = ${num(x1 + a)}$ or $t = ${num(x1 - a)}$. Only $${num(t)}$ is ${sign > 0 ? 'positive' : 'negative'}, so $t = ${num(t)}$ (the other value, $${num(other)}$, fails the condition).
+
+Check: from $${ptTex(x1, P[1])}$ to $(${num(t)}, ${num(y2)})$ the changes are $${Math.abs(t - x1)}$ and $${Math.abs(y2 - P[1])}$, and $\\sqrt{${a * a} + ${b * b}} = ${c}$.
+
+Trap: $${num(sign * a)}$ is the horizontal change, not the coordinate $t$, which is that change added to $${num(x1)}$. Rule: a squared equation gives two values, so test each against the condition.`,
       },
     };
   },
