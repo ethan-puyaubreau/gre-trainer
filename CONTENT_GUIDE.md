@@ -155,7 +155,7 @@ yet, so check them yourself.
 
 ## Explanations
 
-An explanation is a small lesson, not only an answer key. Write **60 to 110 words**, in this order:
+An explanation is a small lesson, not only an answer key. Write **60 to 110 words** (a formula counts as one word), in this order:
 
 1. **Recognize.** One sentence on the sign that tells you what kind of problem this is.
 2. **Steps, with the reason.** The fastest correct method first (a sign, a comparison, a parity
@@ -178,21 +178,20 @@ Rules:
 - If the key comes from the code's own rule ("the farthest from zero on the same side"), say that
   rule, not a different one.
 
-A good example, written for a template of `arith.cycles` (110 words, a formula counted symbol by symbol):
+A good example, written for a template of `arith.cycles` (106 words):
 
 > Last digit of a huge power: look for a cycle.
 >
-> A product's last digit depends only on its factors' last digits, so use $3^{58}$ for
-> $13^{58}$. Powers of 3 end in 3, 9, 7, 1, then repeat: cycle length 4. As
-> $58 = 4 \cdot 14 + 2$, we land on the second term, 9.
+> A product's last digit depends only on its factors' last digits, so use $3^{58}$ for $13^{58}$.
+> Powers of 3 end in 3, 9, 7, 1. After 1, times 3 gives 3 again, so the cycle repeats every 4
+> powers. As $58 = 4 \cdot 14 + 2$, we land on the second term, 9.
 >
 > Check: $3^6 = 729$ ends in 9, and 6 leaves remainder 2.
 >
-> Trap: 4, from $3 \times 58 = 174$, tempts. But $3^2 = 9$, not 6: exponents are repeated
-> factors.
+> Trap: 4, from $3 \times 58$, tempts. But $3^2 = 9$, not 6: an exponent counts factors.
 >
-> For a pattern repeating every $k$ steps, divide the position by $k$: the remainder says where
-> you land. Remainder 0 means the last term.
+> For a cycle of length $k$, divide the position by $k$. Remainder 0 means whole cycles are done,
+> so you stand on the last term.
 
 ## Figures
 
@@ -200,9 +199,8 @@ Set `figure` (or an array of figures) on the question. Kinds: `numberLine`, `geo
 segments, polygons, circles, right-angle and angle marks, labels, optional axes/lines/curves,
 `notToScale`), `table`, `bar`, `line`, `pie`, `scatter`, `histogram`, `boxplot`. See `src/engine/types.ts`.
 
-GRE figures are drawn to scale unless the question says otherwise. Draw the figure from the same
-numbers as the labels, or set `notToScale`. A segment labelled 10 must not look shorter than a
-segment labelled 6.
+A figure must never contradict its labels. Draw it from the same numbers as the labels, or set
+`notToScale`. A segment labelled 10 must not look shorter than one labelled 6.
 
 ## Data interpretation sets
 
