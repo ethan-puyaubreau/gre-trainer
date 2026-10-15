@@ -184,34 +184,35 @@ The circumference of the base is $2\\pi r = ${correct.tex()}$.
 
 ${r} is the radius and $${Ex.pi(r * r).tex()}$ is the area of the base, not its circumference.`;
     } else {
-      // tank with a liquid that expands when it freezes [GE-24]
+      // tank with a liquid that expands when it freezes [GE-24]. The depth is a multiple of 5 and must not
+      // overfill, so the key rounds DOWN: the greatest multiple of 5 with depth x (100 + p) <= 100 H.
       let H = 0;
       let p = 0;
-      let v = 0;
+      let low = 0;
       let wrong = 0;
       for (;;) {
         H = 10 * rng.int(6, 30);
         p = rng.pick([10, 15, 20, 25, 30, 40, 50]);
-        v = H / (1 + p / 100);
+        low = 5 * Math.floor((20 * H) / (100 + p));
         wrong = H * (1 - p / 100);
-        const near = Math.round(v / 5) * 5;
-        if (Math.abs(v - near) < 1.2 && Math.round(wrong / 5) * 5 !== near) break;
+        if (Math.floor(wrong / 5) * 5 !== low) break;
       }
       const L = 10 * rng.int(5, 20);
       const W = 10 * rng.int(3, 12);
       dims = [L, W, H, p];
-      const near = Math.round(v / 5) * 5;
-      correct = Ex.of(near);
-      traps.push({ v: Ex.of(Math.round(wrong / 5) * 5), trap: 'geom-solid-percent-subtract' });
-      fillers = [Ex.of(near - 5), Ex.of(near + 5), Ex.of(near - 10), Ex.of(near + 10), Ex.of(near + 15), Ex.of(near - 15)];
+      const v = (100 * H) / (100 + p);
+      const exact = (100 * H) % (100 + p) === 0;
+      correct = Ex.of(low);
+      traps.push({ v: Ex.of(Math.floor(wrong / 5) * 5), trap: 'geom-solid-percent-subtract' });
+      fillers = [Ex.of(low - 5), Ex.of(low + 5), Ex.of(low - 10), Ex.of(low + 10), Ex.of(low + 15), Ex.of(low - 15)];
       step = Ex.of(5);
       drawBox(fig, L, W, H, { L: `$${L}$`, W: `$${W}$`, H: `$${H}$` }, { waterLevel: v });
-      stem = `A rectangular tank with interior dimensions ${L} centimeters by ${W} centimeters by ${H} centimeters (height) stands on level ground. It is to be filled with a liquid that expands by ${p} percent of its volume when it freezes. To the nearest 5 centimeters, what is the greatest depth to which the tank can be filled so that, once frozen, the liquid does not rise above the top of the tank?`;
+      stem = `A rectangular tank with interior dimensions ${L} centimeters by ${W} centimeters by ${H} centimeters (height) stands on level ground. It is to be filled with a liquid that expands by ${p} percent of its volume when it freezes. The depth of the liquid is measured in multiples of 5 centimeters. What is the greatest depth to which the tank can be filled so that, once frozen, the liquid does not rise above the top of the tank?`;
       explanation = `The base area is the same before and after freezing, so heights scale like volumes: a depth $h$ becomes $${new Frac(100 + p, 100).toDecimalString()}h$ when frozen.
 
-$$${new Frac(100 + p, 100).toDecimalString()}h \\le ${H} \\quad\\Rightarrow\\quad h \\le \\frac{${H}}{${new Frac(100 + p, 100).toDecimalString()}} \\approx ${v.toFixed(1)}$$
+$$${new Frac(100 + p, 100).toDecimalString()}h \\le ${H} \\quad\\Rightarrow\\quad h \\le \\frac{${H}}{${new Frac(100 + p, 100).toDecimalString()}} ${exact ? '=' : '\\approx'} ${exact ? v : v.toFixed(1)}$$
 
-The closest choice is ${near}. Taking ${p} percent off the height ($${H} \\times ${new Frac(100 - p, 100).toDecimalString()} = ${Number(wrong.toFixed(2))}$) is wrong: the frozen volume is ${p} percent MORE than the liquid's volume, so divide by $${new Frac(100 + p, 100).toDecimalString()}$. The length and width are not needed.`;
+The depth must be a multiple of 5 that does not exceed ${exact ? v : v.toFixed(1)}, so round down: the answer is ${low}. A depth of ${low + 5} is too much, since the frozen liquid would then stand ${Number((((low + 5) * (100 + p)) / 100).toFixed(2))} centimeters high, above the top of the tank. Taking ${p} percent off the height ($${H} \\times ${new Frac(100 - p, 100).toDecimalString()} = ${Number(wrong.toFixed(2))}$) is wrong: the frozen volume is ${p} percent MORE than the liquid's volume, so divide by $${new Frac(100 + p, 100).toDecimalString()}$. The length and width are not needed.`;
     }
     const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.02, ...(step ? { step } : {}), scales: mode !== 'tank' });
     return {
@@ -258,18 +259,12 @@ The closest choice is ${near}. Taking ${p} percent off the height ($${H} \\times
         break;
       }
       default: {
-        // tank: largest depth (bisection) whose frozen volume fits, then the closest multiple of 5 among the choices
+        // tank: the greatest multiple-of-5 depth whose frozen volume still fits in the tank (integer arithmetic)
         const [L, W, H, pct] = p.dims;
-        let lo = 0;
-        let hi = H;
-        for (let i = 0; i < 60; i++) {
-          const mid = (lo + hi) / 2;
-          if (L * W * mid * (1 + pct / 100) <= L * W * H) lo = mid;
-          else hi = mid;
-        }
-        const vals = p.values.map((v) => Ex.from(v).value());
-        const best = vals.reduce((bi, v, i) => (Math.abs(v - lo) < Math.abs(vals[bi] - lo) ? i : bi), 0);
-        return best === q.answer ? null : `expected choice ${best} (depth ${lo})`;
+        let best = 0;
+        for (let m = 5; m <= H; m += 5) if (L * W * m * (100 + pct) <= L * W * H * 100) best = m;
+        target = best;
+        break;
       }
     }
     return checkChoiceValue(p.values, q.answer, target, 1e-5);
