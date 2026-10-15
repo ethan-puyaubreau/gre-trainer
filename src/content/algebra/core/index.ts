@@ -38,3 +38,6 @@ Object.assign(coreTraps, fractionalExponentTraps);
 import { powerRelationTemplate, powerRelationTraps } from './powerRelation';
 coreTemplates.push(powerRelationTemplate);
 Object.assign(coreTraps, powerRelationTraps);
+import { powerSumTemplate, powerSumTraps } from './powerSum';
+coreTemplates.push(powerSumTemplate);
+Object.assign(coreTraps, powerSumTraps);
