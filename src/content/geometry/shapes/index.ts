@@ -12,9 +12,10 @@ import { squareInTriangleTemplates, squareInTriangleTraps } from './square-in-tr
 import { trapezoidSegmentTemplates, trapezoidSegmentTraps } from './trapezoid-segments';
 import { triangleBoundsTemplates, triangleBoundsTraps } from './triangle-bounds';
 import { staircaseTemplates, staircaseTraps } from './staircase-perimeter';
+import { circleMustTemplates, circleMustTraps } from './circle-must-be-true';
 import { shapesSkillList } from './skills';
 import { shapesTraps as traps } from './traps';
 
 export const shapesSkills: Skill[] = shapesSkillList;
-export const shapesTemplates: Template<any>[] = [...linesTemplates, ...triangleTemplates, ...rightTemplates, ...similarTemplates, ...readingTemplates, ...tripleSetTemplates, ...longestSegmentTemplates, ...altitudeTemplates, ...trapezoidDiagonalTemplates, ...squareInTriangleTemplates, ...trapezoidSegmentTemplates, ...triangleBoundsTemplates, ...staircaseTemplates];
-export const shapesTraps: Record<string, Trap> = { ...traps, ...tripleSetTraps, ...longestSegmentTraps, ...altitudeTraps, ...trapezoidDiagonalTraps, ...squareInTriangleTraps, ...trapezoidSegmentTraps, ...triangleBoundsTraps, ...staircaseTraps };
+export const shapesTemplates: Template<any>[] = [...linesTemplates, ...triangleTemplates, ...rightTemplates, ...similarTemplates, ...readingTemplates, ...tripleSetTemplates, ...longestSegmentTemplates, ...altitudeTemplates, ...trapezoidDiagonalTemplates, ...squareInTriangleTemplates, ...trapezoidSegmentTemplates, ...triangleBoundsTemplates, ...staircaseTemplates, ...circleMustTemplates];
+export const shapesTraps: Record<string, Trap> = { ...traps, ...tripleSetTraps, ...longestSegmentTraps, ...altitudeTraps, ...trapezoidDiagonalTraps, ...squareInTriangleTraps, ...trapezoidSegmentTraps, ...triangleBoundsTraps, ...staircaseTraps, ...circleMustTraps };
