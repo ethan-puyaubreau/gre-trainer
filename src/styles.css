@@ -974,3 +974,67 @@ details summary {
     transform: translateY(8px) scale(0.98);
   }
 }
+.area-bars,
+.rework {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.area-bars {
+  display: grid;
+  gap: 10px;
+}
+.area-bars li {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) 1fr 44px;
+  align-items: center;
+  gap: 12px;
+}
+.area-bars b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.area-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.area-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: bar-grow var(--dur-slow) var(--ease-out);
+}
+@keyframes bar-grow {
+  from {
+    width: 0;
+  }
+}
+.rework li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rework li:first-child {
+  padding-top: 0;
+}
+.rework li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.rework-name {
+  flex: 1;
+  min-width: 160px;
+}
+.results-questions summary {
+  padding: 14px 18px;
+  font-weight: 600;
+}
+.results-questions[open] summary {
+  border-bottom: 1px solid var(--border);
+}

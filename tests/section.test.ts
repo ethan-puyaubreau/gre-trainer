@@ -4,7 +4,7 @@ import { createRng } from '../src/engine/rng';
 import type { Area } from '../src/engine/types';
 import { Frac } from '../src/engine/frac';
 import { grade } from '../src/engine/grade';
-import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, type RunningSection, type SavedRun } from '../src/mastery/section';
+import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, skillsToRework, type RunningSection, type SavedRun } from '../src/mastery/section';
 
 const areas = AREAS.filter((a) => a.templates.length).map((a) => a.area) as Area[];
 
@@ -106,5 +106,21 @@ describe('choice keys', () => {
     const two = choiceKeyResponse(q, 'a', one!);
     expect(two).toEqual({ format: 'mcm', choices: [0, 2] });
     expect(choiceKeyResponse(q, '1', two!)).toEqual({ format: 'mcm', choices: [2] });
+  });
+});
+
+describe('skills to rework', () => {
+  const items = (spec: Record<string, string>) => Object.entries(spec).flatMap(([skillId, marks]) => [...marks].map((m) => ({ skillId, ok: m === '+' })));
+
+  it('lists the most missed skills first, at most three, and skips the ones got right', () => {
+    const out = skillsToRework(items({ a: '+++', b: '-+-', c: '--', d: '-+', e: '+-+-+-' }));
+    expect(out.map((x) => x.skillId)).toEqual(['e', 'c', 'b']);
+    expect(out[0]).toEqual({ skillId: 'e', missed: 3, total: 6 });
+    expect(skillsToRework(items({ a: '++', b: '+' }))).toEqual([]);
+  });
+
+  it('breaks a tie on the lower share right, then on the order met', () => {
+    expect(skillsToRework(items({ a: '-+', b: '-', c: '-+' })).map((x) => x.skillId)).toEqual(['b', 'a', 'c']);
+    expect(skillsToRework(items({ a: '-', b: '-', c: '-', d: '-' }), 2).map((x) => x.skillId)).toEqual(['a', 'b']);
   });
 });

@@ -198,3 +198,18 @@ export function choiceKeyResponse(q: Question, key: string, prev: Response | und
   }
   return null;
 }
+
+/** The skills missed most in a finished test (a blank is a miss), most misses first; a tie goes to the lower share right, then to the first met. */
+export function skillsToRework(items: { skillId: string; ok: boolean }[], limit = 3): { skillId: string; missed: number; total: number }[] {
+  const bySkill = new Map<string, { skillId: string; missed: number; total: number }>();
+  for (const { skillId, ok } of items) {
+    const e = bySkill.get(skillId) ?? { skillId, missed: 0, total: 0 };
+    e.total++;
+    if (!ok) e.missed++;
+    bySkill.set(skillId, e);
+  }
+  return [...bySkill.values()]
+    .filter((e) => e.missed > 0)
+    .sort((a, b) => b.missed - a.missed || b.missed / b.total - a.missed / a.total)
+    .slice(0, limit);
+}

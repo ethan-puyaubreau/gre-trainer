@@ -8,7 +8,7 @@ import { AREA_NAMES, AREAS, skillById } from '../content';
 import { grade, isAnswered, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Area } from '../engine/types';
-import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, type Level, type RunningSection, type SectionResult } from '../mastery/section';
+import { buildSection, choiceKeyResponse, loadRun, routeSection2, saveRun, SPECS, skillsToRework, type Level, type RunningSection, type SectionResult } from '../mastery/section';
 import { href } from '../router';
 import { useProgress, type SectionPart } from '../store/progress';
 
@@ -397,7 +397,10 @@ function Exam({
 
 function Results({ done, onRestart }: { done: SectionResult[]; onRestart: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
-  const all = done.flatMap((d) => d.sec.questions.map((q, i) => ({ q, ok: d.correct[i], r: d.sec.responses[i], t: d.sec.timeSpent[i], s: d.sec.index })));
+  const all = useMemo(
+    () => done.flatMap((d) => d.sec.questions.map((q, i) => ({ q, ok: d.correct[i], r: d.sec.responses[i], t: d.sec.timeSpent[i], s: d.sec.index }))),
+    [done],
+  );
   const correct = all.filter((x) => x.ok).length;
   const byArea = useMemo(() => {
     const m = new Map<Area, { n: number; ok: number }>();
@@ -410,6 +413,7 @@ function Results({ done, onRestart }: { done: SectionResult[]; onRestart: () => 
     }
     return [...m];
   }, [all]);
+  const rework = useMemo(() => skillsToRework(all.map((x) => ({ skillId: x.q.skillId, ok: x.ok }))), [all]);
   return (
     <div>
       <h1>Results</h1>
@@ -431,22 +435,53 @@ function Results({ done, onRestart }: { done: SectionResult[]; onRestart: () => 
               </span>
             </div>
           ))}
+        </div>
+        <h3>By area</h3>
+        <ul className="area-bars">
           {byArea.map(([a, e]) => (
-            <div className="stat" key={a}>
+            <li key={a}>
+              <span>{AREA_NAMES[a]}</span>
+              <span className="area-bar" aria-hidden="true">
+                <i style={{ width: `${(100 * e.ok) / e.n}%` }} />
+              </span>
               <b>
                 {e.ok}/{e.n}
               </b>
-              <span>{AREA_NAMES[a]}</span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
         <p className="muted small" style={{ marginBottom: 0 }}>
           The real test equates the raw score (number correct, no penalty for wrong answers) to a 130–170 scale; ETS does not publish the conversion, so
           this page reports raw results only. Missed skills were added to your repair queue.
         </p>
       </div>
-      <h2>Questions</h2>
-      <div className="card" style={{ padding: 0 }}>
+      {rework.length > 0 && (
+        <>
+          <h2>
+            {rework.length} skill{rework.length > 1 ? 's' : ''} to rework
+          </h2>
+          <div className="card">
+            <ul className="rework">
+              {rework.map((r) => {
+                const name = skillById.get(r.skillId)?.name ?? r.skillId;
+                return (
+                  <li key={r.skillId}>
+                    <span className="rework-name">{name}</span>
+                    <span className="chip chip-bad">
+                      missed {r.missed} of {r.total}
+                    </span>
+                    <a className="btn" href={href('practice', 'skill', r.skillId)} aria-label={`Practice ${name}`}>
+                      Practice
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
+      )}
+      <details className="card results-questions" style={{ padding: 0, marginTop: 24 }}>
+        <summary>Questions ({all.length})</summary>
         <table className="review-table">
           <thead>
             <tr>
@@ -483,7 +518,7 @@ function Results({ done, onRestart }: { done: SectionResult[]; onRestart: () => 
             ))}
           </tbody>
         </table>
-      </div>
+      </details>
       <div className="row" style={{ marginTop: 16 }}>
         <button className="btn btn-primary" onClick={onRestart}>
           New section test
