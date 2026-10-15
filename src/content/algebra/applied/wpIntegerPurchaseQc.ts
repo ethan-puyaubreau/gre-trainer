@@ -72,7 +72,7 @@ export const wpIntegerPurchaseQc: Template<PurchaseParams> = {
       if (everything.length === 0 || T < 25) continue;
       const m = cond === 'max' ? rng.pick(everything.map(([x, y]) => x + y)) : 0;
       const sols = solutions(p, q, T, cond, m);
-      if (sols.length === 0) continue;
+      if (sols.length === 0 || (cond !== 'none' && sols.length === everything.length)) continue;
       const answer: QCChoice = new Set(sols.map(([x, y]) => relation(x, y))).size > 1 ? 'D' : relation(sols[0][0], sols[0][1]);
       if (answer !== wanted) continue;
       // Without the extra condition the counts must still be ambiguous enough to be a fair question.
@@ -90,8 +90,12 @@ export const wpIntegerPurchaseQc: Template<PurchaseParams> = {
               ? ` ${nm} ${store.verb} at least 3 ${store.b}.`
               : ` ${nm} ${store.verb} at most ${m} items in all.`;
       const allSols = everything;
-      const listAll = allSols.map(([x, y]) => `$(${x}, ${y})$`).join(', ');
-      const keep = sols.map(([x, y]) => `$(${x}, ${y})$`).join(', ');
+      const fmt = (l: [number, number][]) => {
+        const t = l.map(([x, y]) => `$(${x}, ${y})$`);
+        return t.length <= 6 ? t.join(', ') : `${t.slice(0, 3).join(', ')}, and so on up to ${t.slice(-2).join(', ')} (${t.length} pairs)`;
+      };
+      const listAll = fmt(allSols);
+      const keep = fmt(sols);
       const word = (r: QCChoice) => (r === 'A' ? `${store.a} outnumber ${store.b}` : r === 'B' ? `${store.b} outnumber ${store.a}` : 'the counts are equal');
       const other = sols.find(([x, y]) => relation(x, y) !== first);
       const why =
