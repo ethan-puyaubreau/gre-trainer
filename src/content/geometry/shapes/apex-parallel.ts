@@ -68,11 +68,11 @@ function triFigure(names: [string, string, string], bAng: number, cAng: number, 
   const [B, C, A] = triFromAngles(bAng, cAng, 5);
   const L: Pt = [A[0] - 3, A[1]];
   const R: Pt = [A[0] + 3, A[1]];
-  const fb = new FigBuilder().pt(top, A).pt(lft, B).pt(rgt, C).pt('L', L).pt('R', R).hide('L', 'R');
-  fb.poly(top, lft, rgt).seg('L', 'R');
+  const fb = new FigBuilder().pt(top, A).pt(lft, B).pt(rgt, C).pt('_l', L).pt('_r', R).hide('_l', '_r');
+  fb.poly(top, lft, rgt).seg('_l', '_r');
   fb.text([R[0] + 0.5, R[1]], '$\\ell$');
-  if (lab.L) fb.angle(top, 'L', lft, lab.L);
-  if (lab.R) fb.angle(top, 'R', rgt, lab.R);
+  if (lab.L) fb.angle(top, '_l', lft, lab.L);
+  if (lab.R) fb.angle(top, '_r', rgt, lab.R);
   if (lab.A) fb.angle(top, lft, rgt, lab.A);
   return fb.build();
 }
@@ -87,7 +87,7 @@ const apexParallel: Template<P> = {
     const [top, lft, rgt] = names;
     const side = rng.pick(['left', 'right'] as const);
     const baseName = side === 'left' ? lft : rgt;
-    const line = `$\\ell$ is parallel to $\\overline{${lft}${rgt}}$`;
+    const line = `line $\\ell$ through $${top}$ is parallel to $\\overline{${lft}${rgt}}$`;
     if (d === 1) {
       const p = rng.int(35, 75);
       const q = rng.int(35, 75);
