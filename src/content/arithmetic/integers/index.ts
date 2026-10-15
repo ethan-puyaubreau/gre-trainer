@@ -7,6 +7,7 @@ import { factorsTemplates } from './factors';
 import { lcmGcdTemplates } from './lcm-gcd';
 import { populationTemplates, populationTraps } from './populationTotals';
 import { primesTemplates } from './primes';
+import { remainderCycleTemplates, remainderCycleTraps } from './remainderCycle';
 import { integerTraps } from './traps';
 
 export const integersTemplates: Template<any>[] = [
@@ -15,8 +16,9 @@ export const integersTemplates: Template<any>[] = [
   ...factorsTemplates,
   ...lcmGcdTemplates,
   ...populationTemplates,
+  ...remainderCycleTemplates,
   ...consecutiveTemplates,
   ...exponentTemplates,
   ...evaluateTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps };
