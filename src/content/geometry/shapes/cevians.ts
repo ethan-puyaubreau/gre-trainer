@@ -100,7 +100,7 @@ const cevians: Template<P> = {
   generate(rng, d) {
     const names = rng.pick(NAMES);
     const [nA, nB, nC] = names;
-    const kind: P['kind'] = d === 1 ? 'fwd-apex' : d === 2 ? rng.pick(['fwd-base', 'reverse'] as const) : 'altitude';
+    const kind: P['kind'] = d === 1 ? 'fwd-base' : d === 2 ? rng.pick(['fwd-apex', 'reverse'] as const) : 'altitude';
     if (kind === 'fwd-apex') {
       const a = 2 * rng.int(20, 60); // 40..120
       const ans = 90 + a / 2;
@@ -133,7 +133,7 @@ Check: the answer is $90 + \\tfrac12(${a}) = ${ans}$, always between $90^\\circ$
 
 ${trapNotes(choices, { 'geo-cev-half-a': (v) => `${v} is only half of $\\angle ${nA}$`, 'geo-cev-supplement': (v) => `${v} is $\\angle ${nB} + \\angle ${nC}$, before the bisectors halve them`, 'geo-cev-minus-half': (v) => `${v} subtracts the half from $90^\\circ$ instead of adding` }, 2)}
 
-Rule: $\\angle BIC = 90^\\circ + \\tfrac12 A$.`;
+Rule: $\\angle ${nB}I${nC} = 90^\\circ + \\tfrac12 \\angle ${nA}$.`;
       return {
         params: { kind, a, b: bAng, c: cAng, values },
         q: {
@@ -220,7 +220,7 @@ Check: $90 + \\tfrac12(${a}) = ${k}$.
 
 ${trapNotes(choices, { 'geo-cev-reverse-half': (v) => `${v} is $${k} - 90$, which is only half of $\\angle ${nA}$`, 'geo-cev-reverse-supp': (v) => `${v} is the sum of the two half base angles`, 'geo-cev-base-sum': (v) => `${v} is $\\angle ${nB} + \\angle ${nC}$, not $\\angle ${nA}$` }, 2)}
 
-Rule: $A = 2(\\angle BIC - 90^\\circ)$.`;
+Rule: $\\angle ${nA} = 2(\\angle ${nB}I${nC} - 90^\\circ)$.`;
       return {
         params: { kind, k, values },
         q: {
@@ -236,7 +236,7 @@ Rule: $A = 2(\\angle BIC - 90^\\circ)$.`;
     // d3: altitude and bisector from the same vertex
     const b = rng.int(40, 80);
     const c = rng.int(40, 80);
-    if ((b - c) % 2 || b - c < 10 || b + c > 150) throw new Redraw('shape');
+    if ((b - c) % 2 || b - c < 10 || b + c > 150 || 180 - b - c === c || 180 - b - c === b) throw new Redraw('shape');
     const a = 180 - b - c;
     const ans = (b - c) / 2;
     const { choices, answer, values } = mixed(
@@ -259,7 +259,7 @@ Rule: $A = 2(\\angle BIC - 90^\\circ)$.`;
     const D = foot(A, B, C);
     const E = bisectorFoot(A, B, C);
     const fb = new FigBuilder().pt(nA, A).pt(nB, B).pt(nC, C).pt('D', D).pt('E', E).poly(nA, nB, nC).seg(nA, 'D').seg(nA, 'E').right(nA, 'D', nC).angle(nB, nC, nA, `$${b}^\\circ$`).angle(nC, nA, nB, `$${c}^\\circ$`);
-    const explanation = `Recognize: the altitude makes a right triangle, so it leaves $90 - ${b} = ${90 - b}^\\circ$ next to side $${nA}${nB}$. The bisector splits $\\angle ${nA} = ${a}^\\circ$ into two $${a / 2}^\\circ$ angles.
+    const explanation = `Recognize: the altitude makes a right triangle, so it leaves $90 - ${b} = ${90 - b}^\\circ$ next to side $${nA}${nB}$. The angle at $${nA}$ is $180 - ${b} - ${c} = ${a}^\\circ$, and the bisector splits it into two $${a / 2}^\\circ$ angles.
 
 Measured from side $${nA}${nB}$, the bisector is at $${a / 2}^\\circ$ and the altitude at $${90 - b}^\\circ$. The gap is $${a / 2} - ${90 - b} = ${ans}^\\circ$.
 

@@ -157,7 +157,7 @@ const trapezoidSegments: Template<Params> = {
 
 ${steps}
 
-Check: the result must lie between the numbers it is built from, or beyond them in the apex case, because the legs spread out as you move toward the longer base.
+Check: ${mode === 'diagarea' ? `the height of triangle $${nA}${nB}E$ is less than ${H}, so its area must be less than $\\frac12 \\cdot ${a} \\cdot ${H} = ${dec(new Frac(a * H, 2))}$.` : 'the result must lie between the numbers it is built from, or beyond them in the apex case, because the legs spread out as you move toward the longer base.'}
 
 Trap: ${ok.length ? ({ 'geo-sim-seg-midline': 'the average of the bases is the length halfway up, nowhere else', 'geo-sim-seg-no-double': 'leaving out the factor 2 gives only one of the two equal parts of the segment', 'geo-sim-seg-no-half': 'the area of a triangle is half of base times height, so the product alone is twice too big', 'geo-sim-seg-wrong-base': 'a distance of ' + t + ' from the other base would give a different length', 'geo-sim-seg-whole-height': 'the height of the trapezoid is shorter than the distance to the apex', 'geo-sim-seg-short-apex': 'the distance from the shorter base leaves out the height', 'geo-sim-seg-area-whole': 'the height of the whole trapezoid is not the height of the small triangle' } as Record<string, string>)[ok[0].trap] : 'compare with the numbers given'}.
 

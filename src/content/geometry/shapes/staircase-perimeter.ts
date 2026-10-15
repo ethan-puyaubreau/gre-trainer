@@ -101,7 +101,7 @@ const staircase: Template<Params> = {
     const traps: { value: Frac; trap: string }[] = [];
     const sum = W + H + nums.reduce((a, b) => a + b, 0) + (bite ? bite[1] + bite[2] : 0);
     if (bite) {
-      traps.push({ value: new Frac(base), trap: 'geo-fig-perim-ignore-bite' }, { value: new Frac(base + 2 * bite[2] + 2 * bite[1]), trap: 'geo-fig-perim-double-p' }, { value: new Frac(base - 2 * bite[2]), trap: 'geo-fig-perim-cut-off' }, { value: new Frac(sum), trap: 'geo-fig-perim-sum-labels' });
+      traps.push({ value: new Frac(base), trap: 'geo-fig-perim-ignore-bite' }, { value: new Frac(base + 2 * bite[2] + bite[1]), trap: 'geo-fig-perim-double-p' }, { value: new Frac(base - 2 * bite[2]), trap: 'geo-fig-perim-cut-off' }, { value: new Frac(sum), trap: 'geo-fig-perim-sum-labels' });
     } else {
       traps.push({ value: new Frac(base - 2 * (sw + sh)), trap: 'geo-fig-perim-cut-off' }, { value: new Frac(base + 2 * (sw + sh)), trap: 'geo-fig-perim-add-notch' }, { value: new Frac(sum), trap: 'geo-fig-perim-sum-labels' }, { value: new Frac(W + H), trap: 'geo-fig-perim-half' });
     }

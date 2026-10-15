@@ -199,16 +199,16 @@ const inscribed: Template<Params> = {
     const built = exChoices(rng, correct, traps, [], { scales: false });
     const notes = trapNotes(built.choices, notesMap, 2);
     const final =
-      ask === 'outside' ? `The space left is the difference: $${outer.tex()} - ${inner.tex()} = ${correct.tex()}$.` : `The volume asked for is $${correct.tex()}$.`;
+      ask === 'outside' ? `The space left is the outer volume minus the inner one: $${correct.tex()}$.` : `The volume asked for is $${correct.tex()}$.`;
     const explanation = `${geometry}${extra}
 
 ${final}
 
-Check: $\\pi \\approx 3.14$, so the answer is about $${num(Math.round(correct.value()))}$.
+Check: ${kind === 'prism' && ask === 'inside' ? `the prism lies inside the cylinder, so $${correct.tex()}$ must be less than the cylinder's volume, about $${num(Math.round(outer.value()))}$.` : `$\\pi \\approx 3.14$, so the answer is about $${num(Math.round(correct.value()))}$.`}
 
 ${notes}
 
-Rule: write the radius from the diameter (or the diagonal), then subtract volumes, never a volume and an area.`;
+Rule: write the radius from the diameter (or the diagonal), ${ask === 'outside' ? 'then subtract volumes, never a volume and an area.' : 'then multiply the base area by the height.'}`;
     return { params: { kind, ask, e, r, h, k, values: built.values }, q: { format: 'mcs', stem, figure: fig.build(), choices: built.choices, answer: built.answer, explanation } };
   },
   check(q, p) {
