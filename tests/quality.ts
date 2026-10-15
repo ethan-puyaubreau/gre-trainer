@@ -11,6 +11,8 @@ import type { Difficulty, Figure, QuestionBody, Template } from '../src/engine/t
 export const QUALITY_SEEDS = 150;
 /** Seeds for the bank-size and difficulty-spread gate (the app serves 500; 300 keeps the test fast). */
 export const BANK_SEEDS = 300;
+/** Largest share of the smaller bank two consecutive difficulties may have in common. */
+const MAX_OVERLAP = 0.5;
 const DIFFS: Difficulty[] = [1, 2, 3];
 
 /** Every rule a template can break; these are the keys of the allowlist files. */
@@ -253,7 +255,12 @@ export function labelLength(label: string): number | null {
   return null;
 }
 
-/** Worst ratio between the drawn/labelled scales of the numerically labelled segments (1 = to scale). */
+/**
+ * Worst ratio between the drawn/labelled scales of the numerically labelled segments (1 = to scale).
+ * Coverage: only geometry figures with two or more segments labelled with a number are measured (about
+ * 13% of the geometry figures, 6% of all figures, on 2026-10-15). Lengths given in the stem, variable
+ * labels and angles are not checked, so a passing run does NOT mean the other figures are drawn to scale.
+ */
 export function figureScaleSpread(f: Figure): number {
   if (f.kind !== 'geometry' || f.notToScale || !f.segments) return 1;
   const ks: number[] = [];
@@ -305,7 +312,7 @@ export function templateGateFailures(t: Template<any>): Map<Gate, string> {
   const fail = (g: Gate, msg: string) => {
     if (!fails.has(g)) fails.set(g, msg);
   };
-  const stems: Map<number, number>[] = DIFFS.map(() => new Map()); // seed -> presented hash
+  const stems: Set<number>[] = DIFFS.map(() => new Set()); // presented hashes per difficulty
   let n = 0;
   let trivial = 0;
   let qcD = 0;
@@ -314,7 +321,7 @@ export function templateGateFailures(t: Template<any>): Map<Gate, string> {
   for (const d of DIFFS) {
     for (let seed = 1; seed <= BANK_SEEDS; seed++) {
       const q = generateBody(t, seed, d).q;
-      stems[d - 1].set(seed, presented(q));
+      stems[d - 1].add(presented(q));
       if (seed > QUALITY_SEEDS) continue;
       const at = `seed ${seed} d${d}`;
       n++;
@@ -366,15 +373,19 @@ export function templateGateFailures(t: Template<any>): Map<Gate, string> {
   if (trivial / n > 0.15) fail('degenerate.trivial', `answer is 0 or 1 in ${Math.round((trivial / n) * 100)}% of ${n} questions`);
 
   // 4. banks
-  const sizes = stems.map((m) => new Set(m.values()).size);
+  const sizes = stems.map((s) => s.size);
   if (sizes.some((s) => s < 100)) fail('bank.size', `distinct questions over ${BANK_SEEDS} seeds: d1 ${sizes[0]}, d2 ${sizes[1]}, d3 ${sizes[2]} (need 100)`);
+  // Same-seed comparisons always differ (the rng mixes the difficulty into the seed), so compare the
+  // banks themselves: two difficulties that share half the questions of the smaller one draw from the same bank.
   for (const [a, b] of [
     [0, 1],
     [1, 2],
   ]) {
-    let differ = 0;
-    for (let seed = 1; seed <= BANK_SEEDS; seed++) if (stems[a].get(seed) !== stems[b].get(seed)) differ++;
-    if (differ < 0.3 * BANK_SEEDS) fail('bank.difficulty', `d${a + 1} and d${b + 1} differ on only ${differ} of ${BANK_SEEDS} seeds`);
+    let shared = 0;
+    for (const h of stems[a]) if (stems[b].has(h)) shared++;
+    const overlap = shared / Math.min(sizes[a], sizes[b]);
+    if (overlap >= MAX_OVERLAP)
+      fail('bank.difficulty', `d${a + 1} and d${b + 1} share ${shared} questions, ${Math.round(overlap * 100)}% of the smaller bank (max ${MAX_OVERLAP * 100}%)`);
   }
 
   // 5. QC balance

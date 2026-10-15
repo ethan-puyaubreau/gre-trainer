@@ -1,6 +1,7 @@
 {
   "arith.consecutive.count-expression": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.consecutive.find-term": {
     "distractors.trapped": "baseline"
@@ -24,9 +25,11 @@
   "arith.decimals.percent-power-ten": {
     "artifacts.exp-1": "baseline",
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.decimals.repeating-qc": {
+    "bank.difficulty": "baseline",
     "qc.never-d": "baseline"
   },
   "arith.decimals.sci-notation": {
@@ -55,7 +58,8 @@
   "arith.exponents.powers-of-ten-percent": {
     "artifacts.exp-1": "baseline",
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.exponents.product-interval": {
     "distractors.trapped": "baseline"
@@ -69,7 +73,8 @@
   },
   "arith.factors.divisor-count-qc": {
     "artifacts.exp-1": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.factors.greatest-prime-factor": {
     "distractors.trapped": "baseline"
@@ -79,17 +84,22 @@
   },
   "arith.factors.square-multiplier": {
     "artifacts.exp-1": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.fractions.compare-mcs": {
     "distractors.trapped": "baseline"
+  },
+  "arith.lcm-gcd.common-multiple-qc": {
+    "bank.difficulty": "baseline"
   },
   "arith.lcm-gcd.multiples-select": {
     "artifacts.exp-1": "baseline"
   },
   "arith.lcm-gcd.rest-overlap": {
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.lcm-gcd.schedule": {
     "distractors.trapped": "baseline"
@@ -121,7 +131,8 @@
     "qc.never-d": "baseline"
   },
   "arith.percent.expression-mcs": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.percent.percent-of-qc": {
     "artifacts.coef-1": "baseline",
@@ -139,10 +150,12 @@
   },
   "arith.primes.odd-sum": {
     "artifacts.so-the": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.primes.parity-power-qc": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.primes.prime-bounds-qc": {
     "artifacts.plural-1": "baseline",
@@ -152,7 +165,8 @@
     "distractors.trapped": "baseline"
   },
   "arith.rates.compound-ne": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "arith.rates.equivalent-rates-mcm": {
     "artifacts.plural-1": "baseline"
@@ -194,6 +208,7 @@
     "distractors.cited": "baseline"
   },
   "arith.successive-percent.overall-ne": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   }
 }

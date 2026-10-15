@@ -11,10 +11,12 @@
   },
   "alg.coordinate.quadrants": {
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "alg.exponent-equations.equivalent-mcs": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "alg.expressions.expand-mcs": {
     "distractors.trapped": "baseline"
@@ -42,7 +44,8 @@
   },
   "alg.inequalities.order-mcs": {
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "alg.inequalities.range-ne": {
     "degenerate.trivial": "baseline"
@@ -65,7 +68,11 @@
     "distractors.trapped": "baseline"
   },
   "alg.mixtures-interest.interest-qc": {
-    "artifacts.exp-1": "baseline"
+    "artifacts.exp-1": "baseline",
+    "bank.difficulty": "baseline"
+  },
+  "alg.qc-algebra.sign-cases-qc": {
+    "bank.difficulty": "baseline"
   },
   "alg.quadratics.factor-mcs": {
     "artifacts.coef-1": "baseline",
@@ -113,7 +120,8 @@
   },
   "alg.word-problems.in-terms-of": {
     "distractors.trapped": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "alg.word-problems.setup-solve": {
     "artifacts.plural-1": "baseline"

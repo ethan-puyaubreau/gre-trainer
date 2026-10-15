@@ -11,7 +11,8 @@
   "data.counting.codes": {
     "distractors.trapped": "baseline",
     "distractors.cited": "baseline",
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "data.counting.committees": {
     "artifacts.plural-1": "baseline",
@@ -22,7 +23,8 @@
     "qc.never-d": "baseline"
   },
   "data.counting.pairs": {
-    "bank.size": "baseline"
+    "bank.size": "baseline",
+    "bank.difficulty": "baseline"
   },
   "data.distributions.normal": {
     "distractors.trapped": "baseline"
