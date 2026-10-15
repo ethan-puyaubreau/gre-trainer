@@ -1,6 +1,7 @@
 import { flaggedChoices, qcCompare, qcCompareNum, valuedChoices } from '../../engine/build';
 import { frac } from '../../engine/frac';
 import { num } from '../../engine/tex';
+import { term } from '../../engine/text';
 import type { QCQuestion, Template } from '../../engine/types';
 
 /** A radical expression term: coef * root_index(radicand). */
@@ -62,6 +63,16 @@ const radicalCompareQC: Template<DiffParams> = {
     const A = `${root(pw(a) * c)} ${op} ${root(pw(b) * c)}`;
     const B = root(m * c);
     const power = index === 2 ? 'square' : 'cube';
+    const val = (n: number) => (index === 2 ? Math.sqrt(n) : Math.cbrt(n));
+    const approxA = `${val(pw(a) * c).toFixed(2)} ${op} ${val(pw(b) * c).toFixed(2)} \\approx ${(op === '-' ? val(pw(a) * c) - val(pw(b) * c) : val(pw(a) * c) + val(pw(b) * c)).toFixed(2)}`;
+    const counter =
+      index === 2
+        ? op === '-'
+          ? '\\sqrt{25} - \\sqrt{9} = 2$, not $\\sqrt{16} = 4'
+          : '\\sqrt{9} + \\sqrt{16} = 7$, not $\\sqrt{25} = 5'
+        : op === '-'
+          ? '\\sqrt[3]{27} - \\sqrt[3]{8} = 1$, not $\\sqrt[3]{19} \\approx 2.7'
+          : '\\sqrt[3]{8} + \\sqrt[3]{27} = 5$, not $\\sqrt[3]{35} \\approx 3.3';
     return {
       params: { a, b, c, m, index, op },
       q: {
@@ -70,15 +81,19 @@ const radicalCompareQC: Template<DiffParams> = {
         quantityB: `$${B}$`,
         answer,
         traps,
-        explanation: `Take the perfect ${power}s out: $${root(pw(a) * c)} = ${radTex({ coef: a, radicand: c, index })}$ and $${root(pw(b) * c)} = ${radTex({
-          coef: b,
-          radicand: c,
-          index,
-        })}$, so Quantity A is $${radTex({ coef: k, radicand: c, index })}${k === 1 ? '' : ` = ${root(pw(k) * c)}`}$.
+        explanation: `Both radicals hide the same ${index === 2 ? 'square' : 'cube'} root, so pull out the perfect ${power}s and combine them like terms before comparing.
 
-Compare $${root(pw(k) * c)}$ with $${B}$: ${answer === 'C' ? 'they are equal' : answer === 'A' ? 'Quantity A is greater' : 'Quantity B is greater'}. (${answer})
+$${root(pw(a) * c)} = ${radTex({ coef: a, radicand: c, index })}$${
+          b === 1 ? '' : ` and $${root(pw(b) * c)} = ${radTex({ coef: b, radicand: c, index })}$`
+        }, just as $${term(a, 'x')} ${op} ${term(b, 'x')} = ${term(k, 'x')}$. So Quantity A is $${radTex({ coef: k, radicand: c, index })}${
+          k === 1 ? '' : ` = ${root(pw(k) * c)}`
+        }$. Compare it with $${B}$: ${answer === 'C' ? 'they are equal' : answer === 'A' ? 'Quantity A is greater' : 'Quantity B is greater'}. (${answer})
 
-Careful: $${A} \\ne ${root(Math.abs(slipInside) * c)}$. Radicals do not ${op === '-' ? 'subtract' : 'add'} under the root sign.`,
+Check: Quantity A $\\approx ${approxA}$ and Quantity B $\\approx ${val(m * c).toFixed(2)}$.
+
+${traps ? `Trap: combining under the root gives $${root(Math.abs(slipInside) * c)}$ and points to the wrong answer. ` : ''}Radicals do not ${
+          op === '-' ? 'subtract' : 'add'
+        } under the sign: $${counter}$.`,
       },
     };
   },
@@ -108,41 +123,65 @@ const simplifyRadicals: Template<SimplifyParams> = {
     let coefs: number[];
     let signs: (1 | -1)[];
     let k: number;
+    let cands: (Rad & { trap?: string })[];
+    let radicands: number[];
+    let insideSum: number;
+    let hasMinus: boolean;
+    const correct = (): Rad => ({ coef: k, radicand: r, index: 2 });
     do {
       coefs = Array.from({ length: nTerms }, () => rng.int(1, d === 3 ? 7 : 5));
       signs = coefs.map((_, i) => (i === 0 ? 1 : rng.chance(d === 1 ? 0.5 : 0.35) ? -1 : 1));
       k = coefs.reduce((s, c, i) => s + signs[i] * c, 0);
+      radicands = coefs.map((c) => c * c * r);
+      insideSum = radicands.reduce((s, x, i) => s + signs[i] * x, 0);
+      hasMinus = signs.includes(-1);
+      const absSum = coefs.reduce((s, c) => s + c, 0);
+      const squaresSum = coefs.reduce((s, c, i) => s + signs[i] * c * c, 0);
+      cands = (
+        [
+          { coef: 1, radicand: insideSum, index: 2, trap: hasMinus ? 'radical-subtract' : 'radical-add' },
+          { coef: 1, radicand: k * r, index: 2, trap: 'radical-coefficient' },
+          hasMinus
+            ? { coef: absSum, radicand: r, index: 2, trap: 'radical-sign-ignored' }
+            : { coef: k, radicand: nTerms * r, index: 2, trap: 'radical-add-radicands' },
+          { coef: squaresSum, radicand: r, index: 2, trap: 'radical-square-outside' },
+          { coef: k * r, radicand: 1, index: 2, trap: 'radical-dropped' },
+        ] as (Rad & { trap?: string })[]
+      ).filter((c) => c.radicand > 0 && c.coef > 0);
+      // Four wrong choices must be distinct values, all different from the key.
+      const values: number[] = [];
+      for (const c of cands) {
+        const v = radValue(c);
+        if (Math.abs(v - radValue(correct())) > 1e-9 && !values.some((u) => Math.abs(u - v) < 1e-9)) values.push(v);
+      }
+      if (values.length < 4) k = 0; // redraw
     } while (k <= 1 || new Set(coefs).size < nTerms || coefs.every((c) => c === 1));
-    const radicands = coefs.map((c) => c * c * r);
     const terms = radicands.map((radicand, i) => ({ sign: signs[i], radicand }));
-    const insideSum = radicands.reduce((s, x, i) => s + signs[i] * x, 0);
-    const absSum = coefs.reduce((s, c) => s + c, 0);
-
-    const correct: Rad = { coef: k, radicand: r, index: 2 };
-    const cands = ([
-      { coef: 1, radicand: insideSum, index: 2, trap: signs.includes(-1) ? 'radical-subtract' : 'radical-add' },
-      { coef: 1, radicand: k * r, index: 2, trap: 'radical-coefficient' },
-      { coef: absSum, radicand: r, index: 2 },
-      { coef: k - 1, radicand: r, index: 2 },
-      { coef: k + 1, radicand: r, index: 2 },
-      { coef: k - 1, radicand: 2 * r, index: 2 },
-      { coef: k, radicand: 2 * r, index: 2 },
-      { coef: k + 2, radicand: r, index: 2 },
-      { coef: k * k, radicand: r, index: 2 },
-      { coef: 1, radicand: r, index: 2 },
-    ] as (Rad & { trap?: string })[]).filter((c) => c.radicand > 0 && c.coef > 0);
-    const byText = new Map<string, Rad>([[`$${radTex(correct)}$`, correct], ...cands.map((c) => [`$${radTex(c)}$`, c] as [string, Rad])]);
-    const { choices, answer } = valuedChoices(
+    const correctRad = correct();
+    const byText = new Map<string, Rad>([[`$${radTex(correctRad)}$`, correctRad], ...cands.map((c) => [`$${radTex(c)}$`, c] as [string, Rad])]);
+    const picked = valuedChoices(
       rng,
-      { text: `$${radTex(correct)}$`, value: radValue(correct) },
+      { text: `$${radTex(correctRad)}$`, value: radValue(correctRad) },
       cands.map((c) => ({ text: `$${radTex(c)}$`, value: radValue(c), trap: c.trap })),
     );
+    // Mixed forms (radicals, a whole number): shuffled, so the key does not sit at the same rank every time.
+    const keyText = picked.choices[picked.answer].text;
+    const choices = rng.shuffle(picked.choices);
+    const answer = choices.findIndex((c) => c.text === keyText);
     const shown = choices.map((c) => {
       const { coef, radicand, index } = byText.get(c.text)!;
       return { coef, radicand, index };
     });
+    const shownTraps = new Set(choices.map((c) => c.trap));
     const expr = terms.map((t, i) => `${i === 0 ? '' : t.sign < 0 ? ' - ' : ' + '}\\sqrt{${num(t.radicand)}}`).join('');
-    const steps = coefs.map((c) => `\\sqrt{${num(c * c * r)}} = ${radTex({ coef: c, radicand: r, index: 2 })}`).join(',\\; ');
+    const steps = coefs
+      .filter((c) => c > 1)
+      .map((c) => `\\sqrt{${num(c * c * r)}} = ${radTex({ coef: c, radicand: r, index: 2 })}`)
+      .join(',\\; ');
+    const alreadySimple = coefs.includes(1) ? ` ($\\sqrt{${r}}$ is already simple)` : '';
+    const sumOfCoefs = coefs.map((c, i) => `${i === 0 ? '' : signs[i] < 0 ? ' - ' : ' + '}${c}`).join('');
+    const approx = terms.map((t, i) => `${i === 0 ? '' : t.sign < 0 ? ' - ' : ' + '}${Math.sqrt(t.radicand).toFixed(2)}`).join('');
+    const slip = shownTraps.has('radical-subtract') || shownTraps.has('radical-add') ? `Trap: adding or subtracting the radicands gives $\\sqrt{${num(insideSum)}}$. ` : '';
     return {
       params: { terms, choices: shown },
       q: {
@@ -150,13 +189,13 @@ const simplifyRadicals: Template<SimplifyParams> = {
         stem: `Which of the following is equal to $${expr}$?`,
         choices,
         answer,
-        explanation: `Simplify each radical: $${steps}$.
+        explanation: `Every radicand is a perfect square times ${r}, so simplify each radical first and then combine like terms.
 
-All the terms are multiples of $\\sqrt{${r}}$, so they combine like ordinary terms: $${coefs
-          .map((c, i) => `${i === 0 ? '' : signs[i] < 0 ? ' - ' : ' + '}${c}`)
-          .join('')} = ${k}$, giving $${radTex(correct)}$.
+$${steps}$${alreadySimple}. All the terms are multiples of $\\sqrt{${r}}$, so only the coefficients combine, as in $${sumOfCoefs} = ${k}$: the result is $${radTex(correctRad)}$.
 
-$${expr} \\ne \\sqrt{${num(insideSum)}}$: you cannot add or subtract under the radical.`,
+Check: $${approx} = ${Math.abs(terms.reduce((s, t) => s + t.sign * Math.sqrt(t.radicand), 0)).toFixed(2)}$ and $${radTex(correctRad)} \\approx ${radValue(correctRad).toFixed(2)}$.
+
+${slip}Radicals combine only through their coefficients: $\\sqrt{9} + \\sqrt{16} = 7$, not $\\sqrt{25} = 5$.`,
       },
     };
   },
@@ -195,11 +234,16 @@ const radicalValueNE: Template<ValueParams> = {
           format: 'ne',
           stem: `What is the value of $\\sqrt{${radicands[0]}} \\cdot \\sqrt{${radicands[1]}}$?`,
           answer: frac(value),
-          explanation: `$\\sqrt{${radicands[0]}} \\cdot \\sqrt{${radicands[1]}} = \\sqrt{${num(radicands[0] * radicands[1])}}$, and $${num(
-            radicands[0] * radicands[1],
-          )} = ${value}^2$, so the value is ${value}.
+          traps: [{ value: frac(p * q), trap: 'radical-product-dropped' }],
+          explanation: `Both radicands are multiples of ${r}, so simplify each radical before multiplying.
 
-Or simplify first: $${radTex({ coef: p, radicand: r, index: 2 })} \\cdot ${radTex({ coef: q, radicand: r, index: 2 })} = ${p * q} \\cdot ${r} = ${value}$.`,
+$\\sqrt{${radicands[0]}} = ${radTex({ coef: p, radicand: r, index: 2 })}$ and $\\sqrt{${radicands[1]}} = ${radTex({ coef: q, radicand: r, index: 2 })}$. Multiply the coefficients and the radicals separately: $${p * q} \\cdot \\sqrt{${r}} \\cdot \\sqrt{${r}} = ${p * q} \\cdot ${r} = ${value}$, because $\\sqrt{${r}} \\cdot \\sqrt{${r}} = ${r}$.
+
+Check: $\\sqrt{${radicands[0]}} \\cdot \\sqrt{${radicands[1]}} = \\sqrt{${num(radicands[0] * radicands[1])}} = ${value}$, since $${value}^2 = ${num(value * value)}$.
+
+Trap: ${p * q} comes from dropping the second radical, $\\sqrt{${r}} \\cdot \\sqrt{${r}}$, which is ${r}, not 1.
+
+A product of radicals is the root of the product: $\\sqrt{a} \\cdot \\sqrt{b} = \\sqrt{ab}$.`,
         },
       };
     }
@@ -211,26 +255,45 @@ Or simplify first: $${radTex({ coef: p, radicand: r, index: 2 })} \\cdot ${radTe
       coefs = rng.sample([1, 2, 3, 4, 5, 6], n);
       signs = coefs.map((_, i) => (i === 0 ? 1 : rng.chance(0.4) ? -1 : 1));
       k = coefs.reduce((s, c, i) => s + signs[i] * c, 0);
-    } while (k === 0);
+    } while (Math.abs(k) <= 1);
     const radicands = coefs.map((c) => c * c * r);
     const value = k * k * r;
     const naive = radicands.reduce((s, x) => s + x, 0);
+    const absSum = coefs.reduce((s, c) => s + c, 0);
+    const hasMinus = signs.includes(-1);
+    const signless = absSum * absSum * r;
+    const traps = [
+      ...(naive !== value ? [{ value: frac(naive), trap: 'square-of-sum' }] : []),
+      ...(hasMinus && signless !== naive ? [{ value: frac(signless), trap: 'radical-sign-ignored' }] : []),
+    ];
     const expr = radicands.map((x, i) => `${i === 0 ? '' : signs[i] < 0 ? ' - ' : ' + '}\\sqrt{${num(x)}}`).join('');
+    const sums = coefs.map((c, i) => `${i === 0 ? '' : signs[i] < 0 ? ' - ' : ' + '}${c}`).join('');
+    const steps = coefs
+      .filter((c) => c > 1)
+      .map((c) => `$\\sqrt{${num(c * c * r)}} = ${radTex({ coef: c, radicand: r, index: 2 })}$`)
+      .join(', ');
+    const approx = radicands.map((x, i) => `${i === 0 ? '' : signs[i] < 0 ? ' - ' : ' + '}${Math.sqrt(x).toFixed(2)}`).join('');
+    const trapSentence = traps.length
+      ? `Trap: ${[
+          ...(naive !== value ? [`squaring each term and adding gives $${num(naive)}$`] : []),
+          ...(hasMinus && signless !== naive ? [`adding every coefficient gives $${num(signless)}$`] : []),
+        ].join(', and ')}. `
+      : '';
+    const inner = `${k < 0 ? '-' : ''}${radTex({ coef: Math.abs(k), radicand: r, index: 2 })}`;
     return {
       params: { kind: 'square', radicands, signs },
       q: {
         format: 'ne',
         stem: `What is the value of $\\left(${expr}\\right)^2$?`,
         answer: frac(value),
-        traps: naive !== value ? [{ value: frac(naive), trap: 'square-of-sum' }] : [],
-        explanation: `Simplify inside first: ${coefs
-          .map((c) => `$\\sqrt{${num(c * c * r)}} = ${radTex({ coef: c, radicand: r, index: 2 })}$`)
-          .join(', ')}. The sum inside the parentheses is $${radTex({ coef: Math.abs(k), radicand: r, index: 2 })
-          .replace(/^/, k < 0 ? '-' : '')}$.
+        traps,
+        explanation: `Every radicand is a perfect square times ${r}, so simplify each radical before squaring.
 
-Squaring: $(${k}\\sqrt{${r}})^2 = ${k * k} \\cdot ${r} = ${value}$.
+${steps}${coefs.includes(1) ? ` ($\\sqrt{${r}}$ is already simple)` : ''}. Combine the like radicals: $${sums} = ${k}$, so the parentheses equal $${inner}$. Squaring gives $(${inner})^2 = ${k * k} \\cdot ${r} = ${value}$, because ${k < 0 ? 'a negative squared is positive and ' : ''}$\\sqrt{${r}}$ squared is ${r}.
 
-Adding the squares of each term (${num(naive)}) forgets the cross terms: $(a + b)^2 \\ne a^2 + b^2$.`,
+Check: $(${approx})^2 \\approx ${(radicands.reduce((s, x, i) => s + signs[i] * Math.sqrt(x), 0) ** 2).toFixed(1)}$.
+
+${trapSentence}The square of a sum has a middle term: $(\\sqrt{9} + \\sqrt{16})^2 = 49$, not $9 + 16 = 25$.`,
       },
     };
   },
@@ -310,7 +373,7 @@ const equalRadicalsMCM: Template<EqualParams> = {
       { t: 'sum', x: k * k, y: r, trap: 'radical-add' },
       { t: 'coef', c: m, n: (k / m) * r, trap: 'radical-coefficient' },
       { t: 'root', n: k * k + r, trap: 'radical-add' },
-      { t: 'coef', c: k * k, n: r },
+      { t: 'coef', c: k * k, n: r, trap: 'radical-square-outside' },
     ];
     const nTrue = rng.int(d === 1 ? 1 : 2, Math.min(3, trueForms.length));
     const picksTrue = rng.sample(trueForms, nTrue);

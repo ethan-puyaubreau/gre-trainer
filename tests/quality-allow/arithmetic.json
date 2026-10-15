@@ -192,16 +192,7 @@
     "bank.size": "baseline"
   },
   "arith.roots.combine-qc": {
-    "qc.never-d": "baseline"
-  },
-  "arith.roots.equal-forms": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.roots.simplify-sum": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.roots.value-ne": {
-    "artifacts.coef-1": "baseline"
+    "qc.never-d": "Both quantities are fixed numbers, so D (cannot be determined) is impossible."
   },
   "arith.successive-percent.final-value-mcs": {
     "distractors.trapped": "baseline",

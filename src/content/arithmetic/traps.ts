@@ -29,6 +29,26 @@ export const arithmeticTraps: Record<string, Trap> = {
     label: 'Moved the coefficient inside without squaring it',
     fix: '$k\\sqrt{b} = \\sqrt{k^2 b}$: the coefficient must be squared (or cubed for a cube root) when it moves under the radical.',
   },
+  'radical-add-radicands': {
+    label: '$2\\sqrt{3} + 3\\sqrt{3} = 5\\sqrt{6}$',
+    fix: 'Like radicals add through their coefficients only. The radical stays the same: $2\\sqrt{3} + 3\\sqrt{3} = 5\\sqrt{3}$, as $2x + 3x = 5x$.',
+  },
+  'radical-sign-ignored': {
+    label: 'Added the coefficients and ignored the minus signs',
+    fix: 'Keep each sign when you combine the coefficients: $5\\sqrt{6} - 4\\sqrt{6} = \\sqrt{6}$, not $9\\sqrt{6}$.',
+  },
+  'radical-square-outside': {
+    label: 'Pulled out the perfect square instead of its root',
+    fix: '$\\sqrt{c^2 r} = c\\sqrt{r}$: take the square root of the perfect square. $\\sqrt{18} = \\sqrt{9 \\cdot 2} = 3\\sqrt{2}$, not $9\\sqrt{2}$.',
+  },
+  'radical-dropped': {
+    label: 'Lost the radical sign after simplifying',
+    fix: 'The radical stays on the factor that is not a perfect square: $\\sqrt{12} = 2\\sqrt{3}$, not $2 \\cdot 3 = 6$.',
+  },
+  'radical-product-dropped': {
+    label: 'Forgot that $\\sqrt{r} \\cdot \\sqrt{r} = r$',
+    fix: 'Multiply the coefficients AND the radicals: $\\sqrt{5} \\cdot 3\\sqrt{5} = 3 \\cdot 5 = 15$, not $3$.',
+  },
   'square-of-sum': {
     label: '$(a + b)^2 = a^2 + b^2$',
     fix: '$(a + b)^2 = a^2 + 2ab + b^2$. The middle term $2ab$ is easy to forget.',
