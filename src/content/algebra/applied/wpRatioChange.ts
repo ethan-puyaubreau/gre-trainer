@@ -137,7 +137,7 @@ export const wpRatioChange: Template<RatioParams> = {
       const kept = res.kept[0];
       const explanation = `A ratio fixes shape, not size, so let one part be $t$: originally $${ct(r)}$ ${c.A} and $${ct(s)}$ ${c.B}. Adding and removing happen to the actual counts, giving $\\frac{${aTx}}{${bTx}} = \\frac{${r2}}{${s2}}$. Cross-multiplying, $${times(s2, aTx)} = ${times(r2, bTx)}$, so $${ct(Math.abs(s2 * r - r2 * s))} = ${num(Math.abs(r2 * dB - s2 * dA))}$ and $t = ${t}$. Originally: ${num(r * t)} ${c.A} and ${num(s * t)} ${c.B}; after: ${num(nA)} and ${num(nB)}.
 
-Check: $${nA} : ${nB}$ reduces to $${r2} : ${s2}$.
+Check: with $t = ${t}$ the counts after the change are $${dA ? `${num(r * t)} ${dA > 0 ? '+' : '-'} ${Math.abs(dA)} = ` : ''}${nA}$ and $${dB ? `${num(s * t)} ${dB > 0 ? '+' : '-'} ${Math.abs(dB)} = ` : ''}${nB}$, and $${nA} : ${nB}$ is ${nA * s2 === nB * r2 && (nA !== r2 || nB !== s2) ? `$${r2} : ${s2}$ in lowest terms` : `already $${r2} : ${s2}$`}.
 
 Trap: ${num(kept.value)} is ${cands.find((x) => x.trap === kept.trap && frac(x.value).eq(kept.value))!.why}, not the quantity asked. Rule: write the counts with the size $t$, apply the change to them, then match the new ratio.`;
       return { params: { r, s, r2, s2, dA, dB, ask, values }, q: { format: 'mcs', stem, choices, answer, explanation } };
