@@ -204,6 +204,10 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Added or subtracted product equations',
     fix: 'Sums and differences of $x^2y$ and $xy^2$ isolate nothing. Divide the equations for a ratio, multiply them for a power of $xy$.',
   },
+  'alg-factor-twice': {
+    label: 'Applied the factor twice',
+    fix: 'If the second equation is 3 times the first, each number is multiplied by 3 once: $3 \\cdot 4 = 12$, not $3 \\cdot 3 \\cdot 4 = 36$.',
+  },
   'alg-added-factor': {
     label: 'Added the factor instead of multiplying by it',
     fix: 'If the second equation is 3 times the first, each number is MULTIPLIED by 3, not increased by 3.',

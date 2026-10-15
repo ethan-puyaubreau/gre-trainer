@@ -448,6 +448,7 @@ Check: the second left side is then $${m}$ times the first, but $${num(c2)} \\ne
         wrongs.push({ value: frac(a1 * b2), trap: 'alg-operation-swapped', why: `multiplying ${a1} by ${num(b2)} where the ratio ${num(b2)}/${num(b1)} was needed` });
         wrongs.push({ value: frac(a1 + m), trap: 'alg-added-factor', why: 'adding the factor instead of multiplying by it' });
         wrongs.push({ value: new Frac(a1 * c2, c1), trap: 'alg-wrong-ratio-pair', why: 'matching the constants on the right instead of the $y$-coefficients' });
+        wrongs.push({ value: frac(m * m * a1), trap: 'alg-factor-twice', why: `multiplying by the factor $${m}$ twice` });
       } else {
         answer = frac(m * c1);
         e2 = [m * a1, m * b1, NaN];
@@ -466,6 +467,7 @@ Check: with $k = ${num(answer)}$ the second equation divided by $${m}$ gives bac
         wrongs.push({ value: frac(m * b1), trap: 'alg-wrong-ratio-pair', why: 'copying the new $y$-coefficient instead of scaling the constant' });
         wrongs.push({ value: frac(m), trap: 'alg-ratio-factor-only', why: 'giving the factor itself' });
         wrongs.push({ value: frac(c1 + m), trap: 'alg-added-factor', why: 'adding the factor to the constant instead of multiplying' });
+        wrongs.push({ value: frac(m * m * c1), trap: 'alg-factor-twice', why: `multiplying by the factor $${m}$ twice` });
       }
       const res = trapChoices(rng, answer, wrongs, (v) => `$${num(v)}$`);
       if (!res) continue;
