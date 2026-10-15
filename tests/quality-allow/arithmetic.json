@@ -52,20 +52,6 @@
   "arith.fractions.compare-mcs": {
     "distractors.trapped": "baseline"
   },
-  "arith.lcm-gcd.common-multiple-qc": {
-    "bank.difficulty": "baseline"
-  },
-  "arith.lcm-gcd.multiples-select": {
-    "artifacts.exp-1": "baseline"
-  },
-  "arith.lcm-gcd.rest-overlap": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.lcm-gcd.schedule": {
-    "distractors.trapped": "baseline"
-  },
   "arith.number-line.farthest": {
     "distractors.trapped": "baseline"
   },

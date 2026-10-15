@@ -85,9 +85,14 @@ const schedule: Template<ScheduleParams> = {
       }
       const partialArr = [...partial].filter((t) => (t - start) % 15 === 0);
       const step = 30;
-      const grid = range(1, 40)
-        .map((k) => start + k * step)
-        .filter((t) => t < end && (t - start) % L !== 0 && !partial.has(t));
+      void step;
+      // Wrong times that come from a real slip: multiples of the GCD (instead of the LCM) and the sum of the intervals.
+      const G = intervals.reduce((acc, x) => gcd(acc, x));
+      const sumT = intervals.reduce((acc, x) => acc + x, 0);
+      const slipTrap = new Map<number, string>();
+      for (let t = start + G; t < end; t += G) if ((t - start) % L !== 0 && (t - start) % 5 === 0 && !partial.has(t)) slipTrap.set(t, 'int-gcd-lcm-swapped');
+      for (const t of [start + sumT, start + 2 * sumT]) if (t < end && (t - start) % L !== 0 && !partial.has(t)) slipTrap.set(t, 'int-added-intervals');
+      const grid = [...slipTrap.keys()];
       const nChoices = diff === 1 ? 6 : 8;
       const nCorrect = Math.min(correct.length, rng.int(1, 3));
       const picksC = rng.sample(correct, nCorrect);
@@ -97,7 +102,11 @@ const schedule: Template<ScheduleParams> = {
       const times = [...picksC, ...picksP, ...picksG].sort((a, b) => a - b);
       const isCorrect = (t: number) => (t - start) % L === 0;
       const { choices, answer } = flaggedChoices(
-        times.map((t) => ({ text: fmtTime(t), correct: isCorrect(t), ...(partial.has(t) ? { trap: 'int-lcm-two-only' } : {}) })) as (Choice & { correct: boolean })[],
+        times.map((t) => ({
+          text: fmtTime(t),
+          correct: isCorrect(t),
+          ...(partial.has(t) ? { trap: 'int-lcm-two-only' } : slipTrap.has(t) ? { trap: slipTrap.get(t)! } : {}),
+        })) as (Choice & { correct: boolean })[],
       );
       const ctx = rng.pick(CONTEXTS);
       const iv = n === 2 ? `${intervals[0]} and ${intervals[1]}` : `${intervals[0]}, ${intervals[1]}, and ${intervals[2]}`;
@@ -239,7 +248,7 @@ Common multiples need not be multiples of $${a} \\cdot ${b} = ${a * b}$: ${L} al
       } else if (mode === 'lcm-inverse') {
         stem = `The least common multiple of the positive integer $x$ and ${a} is ${b}. Which of the following could be the value of $x$?`;
         const need = factorize(b).filter(([p, e]) => (factorize(a).find(([q]) => q === p)?.[1] ?? 0) < e);
-        explanation = `$${a} = ${factorTex(factorize(a))}$ and $${b} = ${factorTex(factorize(b))}$. So $x$ must divide ${b}, and $x$ must supply ${listAnd(need.map(([p, e]) => `$${p}^{${e}}$`))}, which ${a} lacks.
+        explanation = `$${a} = ${factorTex(factorize(a))}$ and $${b} = ${factorTex(factorize(b))}$. So $x$ must divide ${b}, and $x$ must supply ${listAnd(need.map(([p, e]) => `$${e === 1 ? p : `${p}^{${e}}`}$`))}, which ${a} lacks.
 
 ${values.map((v) => `- ${v}: lcm$(${v}, ${a}) = ${lcm(v, a)}$ ${lcm(v, a) === b ? '✓' : '✗'}`).join('\n')}
 
@@ -302,7 +311,12 @@ const commonMultipleQC: Template<CmParams> = {
       const G = gcd(a, b);
       let m = 0;
       let k = 0;
-      let info = `$x$ is a positive integer that is a multiple of both ${a} and ${b}.`;
+      // Each difficulty has its own wording, so the same numbers never give the same question twice.
+      let info = [
+        `$x$ is a positive integer that is a multiple of both ${a} and ${b}.`,
+        `$x$ is a positive integer divisible by both ${a} and ${b}.`,
+        `The positive integer $x$ is a common multiple of ${a} and ${b}.`,
+      ][diff - 1];
       let quantityA: string;
       let quantityB: string;
       let answer: QCChoice;
@@ -315,7 +329,7 @@ const commonMultipleQC: Template<CmParams> = {
         answer = qcCompare(L, k);
         const trapAns = qcCompare(a * b, k);
         traps = trapAns !== answer ? { [trapAns]: 'int-lcm-is-product' } : undefined;
-        quantityA = 'The least possible value of $x$';
+        quantityA = ['The least possible value of $x$', 'The smallest value that $x$ can have', 'The minimum possible value of $x$'][diff - 1];
         quantityB = `$${k}$`;
         explanation = `The least positive common multiple of ${a} and ${b} is their LCM. ${lcmWork([a, b])}.
 
@@ -332,7 +346,7 @@ The product $${a} \\cdot ${b} = ${a * b}$ is a common multiple, but not the leas
         traps = useProduct ? { C: 'int-lcm-is-product' } : { D: 'tested-one-value' };
         if (!zero && !useProduct) continue;
         if (zero && useProduct) continue;
-        quantityA = `The remainder when $x$ is divided by ${m}`;
+        quantityA = [`The remainder when $x$ is divided by ${m}`, `The remainder when $x$ is divided by ${m}`, `The remainder of $x$ divided by ${m}`][diff - 1];
         quantityB = '$0$';
         explanation = zero
           ? `Every common multiple of ${a} and ${b} is a multiple of their LCM. ${lcmWork([a, b])}. Since ${m} divides ${L}, every possible $x$ is a multiple of ${m}, so the remainder is always 0. (C)`
@@ -367,7 +381,11 @@ ${
           if (Number.isInteger(y) && x <= y && gcd(x, y) === g && lcm(x, y) === l) pairs.push([x, y]);
         }
         if (pairs.length < 2) continue;
-        info = `$x$ and $y$ are positive integers. Their greatest common divisor is ${g}, and their least common multiple is ${l}.`;
+        info = [
+          `$x$ and $y$ are positive integers. Their greatest common divisor is ${g}, and their least common multiple is ${l}.`,
+          `$x$ and $y$ are positive integers. Their greatest common divisor is ${g}, and their least common multiple is ${l}.`,
+          `The positive integers $x$ and $y$ have a greatest common divisor of ${g} and a least common multiple of ${l}.`,
+        ][diff - 1];
         m = g;
         k = l;
         if (kind === 'gcd-lcm-product') {
@@ -584,6 +602,8 @@ interface RestParams {
   r2: number;
   /** total length of the period, in hours, starting at noon of day 0 */
   T: number;
+  /** wording of the question (one family per difficulty) */
+  ctx: number;
 }
 
 const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -595,22 +615,33 @@ const spanText = (st: number, en: number) => {
   return `${hourText(st)} to ${sameDay ? clockOf(en) : hourText(en)}`;
 };
 
+/** Three wordings of the same situation: each difficulty uses its own. */
+const REST_CONTEXTS = [
+  (a1: number, r1: number, a2: number, r2: number, end: string) =>
+    `Machine X runs for ${a1} hours, then rests for ${r1} hours, and repeats this cycle without stopping. Machine Y runs for ${a2} hours, then rests for ${r2} hours, and repeats this cycle without stopping. Both machines start running at noon on a Monday, and both are shut down at noon on the following ${end}. On which of the following days is there a time when both machines are resting?`,
+  (a1: number, r1: number, a2: number, r2: number, end: string) =>
+    `Pump X works for ${a1} hours, then stays off for ${r1} hours, and keeps repeating this pattern. Pump Y works for ${a2} hours, then stays off for ${r2} hours, and keeps repeating this pattern. Both pumps are switched on at noon on a Monday and are switched off for good at noon on the following ${end}. On which of the following days are both pumps off at the same time at some point?`,
+  (a1: number, r1: number, a2: number, r2: number, end: string) =>
+    `Lamp X stays on for ${a1} hours and then off for ${r1} hours, over and over. Lamp Y stays on for ${a2} hours and then off for ${r2} hours, over and over. Both lamps are turned on at noon on a Monday, and the experiment ends at noon on the following ${end}. On which of the following days are both lamps off together at some time?`,
+];
+
 const restOverlap: Template<RestParams> = {
   id: 'arith.lcm-gcd.rest-overlap',
   skill: 'arith.lcm-gcd',
   format: 'mcm',
   style: 'two machines on work/rest cycles: on which days do they rest at the same time',
   generate(rng, diff) {
+    const ctx = diff - 1;
     for (;;) {
-      const c1 = rng.pick([6, 8, 10, 12, 16]);
+      const c1 = rng.pick([6, 8, 9, 10, 12, 14, 15, 16, 18]);
       const k = rng.pick(diff === 1 ? [2] : [2, 3]);
       const c2 = c1 * k;
       if (c2 > 48) continue;
-      const r1 = rng.int(2, Math.max(2, Math.floor(c1 / 3)));
-      const r2 = rng.int(2, Math.max(2, Math.floor(c2 / 4)));
+      const r1 = rng.int(2, Math.max(2, Math.floor(c1 / 2.5)));
+      const r2 = rng.int(2, Math.max(2, Math.floor(c2 / 3)));
       const a1 = c1 - r1;
       const a2 = c2 - r2;
-      const days = diff === 3 ? 5 : 4;
+      const days = diff === 1 ? rng.pick([3, 4]) : diff === 2 ? rng.pick([4, 5]) : rng.pick([5, 6]);
       const T = days * 24;
       // hour-by-hour: which calendar days contain an hour when both rest
       const both: number[] = [];
@@ -618,8 +649,16 @@ const restOverlap: Template<RestParams> = {
       const dayIdx = [...new Set(both.map((t) => Math.floor((12 + t) / 24)))];
       const nDays = days + 1; // Monday .. the day the period ends at noon
       if (dayIdx.length < 1 || dayIdx.length > nDays - 2) continue;
-      const items = range(0, nDays - 1).map((d) => ({ text: WEEK[d], correct: dayIdx.includes(d) }));
-      const { choices, answer } = flaggedChoices(items);
+      // A wrong day is tempting when a single machine rests at some time that day.
+      const oneRests = (d: number) => range(0, T - 1).some((t) => Math.floor((12 + t) / 24) === d && (t % c1 >= a1 || t % c2 >= a2));
+      // Every wrong day must be a real temptation: a day when one of the machines rests alone.
+      if (range(0, nDays - 1).some((d) => !dayIdx.includes(d) && !oneRests(d))) continue;
+      const items = range(0, nDays - 1).map((d) => ({
+        text: WEEK[d],
+        correct: dayIdx.includes(d),
+        ...(!dayIdx.includes(d) && oneRests(d) ? { trap: 'int-one-condition-only' } : {}),
+      }));
+      const { choices, answer } = flaggedChoices(items as (Choice & { correct: boolean })[]);
       // explanation: rest windows within one long cycle, then every overlap in the period
       const overlaps: [number, number][] = [];
       for (const t of both) {
@@ -629,22 +668,20 @@ const restOverlap: Template<RestParams> = {
       }
       const inCycle = overlaps.filter(([st]) => st < c2).map(([st, en]) => `hours ${st} to ${en}`);
       const endDay = WEEK[days];
+      const wrongDay = items.find((it) => !it.correct && 'trap' in it);
       return {
-        params: { a1, r1, a2, r2, T },
+        params: { a1, r1, a2, r2, T, ctx },
         q: {
           format: 'mcm',
-          stem: `Machine X runs for ${a1} hours, then rests for ${r1} hours, and repeats this cycle without stopping. Machine Y runs for ${a2} hours, then rests for ${r2} hours, and repeats this cycle without stopping. Both machines start running at noon on a Monday, and both are shut down at noon on the following ${endDay}. On which of the following days is there a time when both machines are resting?`,
+          stem: REST_CONTEXTS[ctx](a1, r1, a2, r2, endDay),
           instruction: 'Indicate all such days.',
           choices,
           answer,
-          explanation: `Count hours from noon on Monday. Machine X's cycle is ${c1} hours and machine Y's is ${c2} hours, so the pattern of the two machines repeats every lcm$(${c1}, ${c2}) = ${c2}$ hours.
+          explanation: `Two repeating cycles meet again at the LCM of their lengths: lcm$(${c1}, ${c2}) = ${c2}$ hours. Count hours from noon on Monday.
 
-In each ${c1}-hour cycle, X rests during the last ${r1} hours; in each ${c2}-hour cycle, Y rests during hours ${a2} to ${c2}. In the first ${c2} hours, both rest during ${listAnd(inCycle)}.
+X rests in the last ${r1} hours of every ${c1}-hour cycle, and Y in the last ${r2} hours of every ${c2}-hour cycle. In the first ${c2} hours both rest during ${listAnd(inCycle)}. This repeats every ${c2} hours: ${listAnd(overlaps.slice(0, 3).map(([st, en]) => spanText(st, en)))}${overlaps.length > 3 ? ', and so on' : ''}.
 
-Repeating every ${c2} hours, the times when both rest before the shutdown are:
-${overlaps.map(([st, en]) => `- ${spanText(st, en)}`).join('\n')}
-
-So the days are ${listAnd(dayIdx.map((d) => WEEK[d]))}. Checking only the first cycle, or only the times when one of the machines rests, misses some days.`,
+So the days are ${listAnd(dayIdx.map((d) => WEEK[d]))}.${wrongDay ? ` Trap: on ${wrongDay.text} only one of them rests at a time, which is not enough.` : ''}`,
         },
       };
     }

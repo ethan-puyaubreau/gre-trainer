@@ -127,6 +127,10 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Used the product instead of the LCM',
     fix: 'The least common multiple of $a$ and $b$ is $ab$ only when they share no prime factor. For 12 and 18 it is 36, not 216.',
   },
+  'int-added-intervals': {
+    label: 'Added the intervals instead of finding the LCM',
+    fix: 'Events with intervals 12 and 18 minutes do not coincide after 12 + 18 = 30 minutes. They coincide at common multiples: the first is lcm$(12, 18) = 36$.',
+  },
   'int-lcm-two-only': {
     label: 'Used the LCM of only some of the numbers',
     fix: 'Everything lines up only at multiples of the LCM of ALL the intervals. A common multiple of two of them is not enough.',
