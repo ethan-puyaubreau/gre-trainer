@@ -40,6 +40,34 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Used $360^\\circ$ for the angles of a triangle',
     fix: 'The three angles of a triangle add up to $180^\\circ$ ($360^\\circ$ is the sum for a quadrilateral).',
   },
+  'geo-tri-drop-constant': {
+    label: 'Left the constants out when adding the angle expressions',
+    fix: 'Each angle is the whole expression, constant included. Add the $x$ terms and the plain numbers separately, then solve.',
+  },
+  'geo-tri-const-sign': {
+    label: 'Added a constant to the $180^\\circ$ instead of subtracting it',
+    fix: 'From $Cx + K = 180$, subtract $K$ from both sides: $Cx = 180 - K$.',
+  },
+  'geo-tri-wrong-angle': {
+    label: 'Gave a different angle of the triangle than the one asked',
+    fix: 'Find all three angles first, then read off the one the question asks for (largest, smallest, at a given vertex).',
+  },
+  'geo-tri-diff-pair': {
+    label: 'Subtracted the wrong pair of angles',
+    fix: 'The difference asked for is between the LARGEST and the SMALLEST angle. List the three angles, then pick those two.',
+  },
+  'geo-tri-iso-half': {
+    label: 'Halved the given angle instead of sharing what is left',
+    fix: 'The equal angles share $180^\\circ$ minus the other angle. Half of the given angle has no role in an isosceles triangle.',
+  },
+  'geo-tri-ext-add': {
+    label: 'Added the known remote angle to the exterior angle',
+    fix: 'The exterior angle EQUALS the sum of the two remote interior angles, so the unknown one is the exterior angle MINUS the known one.',
+  },
+  'geo-tri-ext-supp': {
+    label: 'Used the interior angle next to the exterior angle',
+    fix: 'The angle next to the exterior angle is a different angle of the triangle. The exterior angle equals the two REMOTE angles, not the one beside it.',
+  },
   'geo-tri-ext-adjacent': {
     label: 'Treated the exterior angle as an angle of the triangle',
     fix: 'An exterior angle is outside the triangle. It equals the sum of the two remote interior angles; it does not join them to make $180^\\circ$.',
@@ -181,6 +209,22 @@ export const shapesTraps: Record<string, Trap> = {
   'geo-rt-used-area': {
     label: 'Used the area instead of the perimeter',
     fix: 'Material along the sides is a length: use the perimeter.',
+  },
+  'geo-rt-hyp-only': {
+    label: 'Used only the hypotenuse as the length of strip per triangle',
+    fix: 'The strip goes along ALL three sides, so each triangle uses its perimeter: leg + leg + hypotenuse.',
+  },
+  'geo-rt-rectangle-perimeter': {
+    label: 'Used the perimeter formula of a rectangle for the triangle',
+    fix: 'A triangle has three sides, not four. Its perimeter is the two legs plus the hypotenuse, not $2(\\ell + w)$.',
+  },
+  'geo-rt-gave-area': {
+    label: 'Gave the area instead of the hypotenuse',
+    fix: 'The area is only a clue that fixes the scale $k$. The question asks for the hypotenuse, which comes from the Pythagorean theorem.',
+  },
+  'geo-rt-stopped-early': {
+    label: 'Stopped after the first step',
+    fix: 'The first triangle only gives the shared side. Use it as a leg of the second triangle and apply the Pythagorean theorem again.',
   },
   'geo-rt-ratio-no-k': {
     label: 'Used the ratio numbers as the actual lengths',

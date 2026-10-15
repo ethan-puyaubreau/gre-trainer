@@ -4,6 +4,7 @@ import { decimal, num } from '../../../engine/tex';
 import type { QCChoice, Template } from '../../../engine/types';
 import { FigBuilder, add, bisect, dir, dist, mul, shoelace, sub, unit, type Pt } from './fig';
 import { checkMcs, intChoices, qcTraps, QC_SAY, surd, surdChoices, surdDiv, surdMul, surdTex, surdVal, type Surd } from './util';
+import { Redraw, retryAll } from '../redraw';
 
 const SKILL = 'geo.right-triangles';
 
@@ -48,6 +49,13 @@ function isRoundedSqrt(r: Frac, N: number, places: number): boolean {
   return lo.mul(lo).lt(N) && hi.mul(hi).gt(N);
 }
 
+const NAME_SETS: [string, string, string][] = [
+  ['A', 'B', 'C'],
+  ['P', 'Q', 'R'],
+  ['X', 'Y', 'Z'],
+  ['D', 'E', 'F'],
+];
+
 const pythagorean: Template<PythParams> = {
   id: 'geo.right-triangles.pythagorean-ne',
   skill: SKILL,
@@ -56,28 +64,33 @@ const pythagorean: Template<PythParams> = {
   generate(rng, d) {
     const kind: 'hyp' | 'leg' = d === 1 ? rng.pick(['hyp', 'leg'] as const) : rng.pick(['hyp', 'leg', 'leg'] as const);
     const rounded = d === 1 ? false : d === 2 ? rng.chance(0.5) : rng.chance(0.7);
-    const places: 1 | 2 = rng.chance(0.6) ? 2 : 1;
-    const context = d >= 2 && kind === 'leg' && rng.chance(0.4);
+    // a story (path across a field, ladder, guy wire) instead of a bare triangle; its lengths are measured to a tenth at most
+    const context = d >= 2 && rng.chance(d === 2 ? 0.4 : 0.6);
+    const places: 1 | 2 = !context && rng.chance(0.6) ? 2 : 1;
+    const nm = rng.pick(NAME_SETS);
     let a: number;
     let b: number;
     let c: number;
     let N: number;
     if (!rounded) {
-      const t = rng.pick(d === 1 ? TRIPLES.slice(0, 2) : TRIPLES);
-      let k = rng.int(1, d === 1 ? 2 : 3);
-      if (t[2] * k > 75) k = 1;
+      // easy: small triples scaled by 1 or 2; later levels: any triple scaled by 3 or 4, so the banks never share a question
+      const t = rng.pick(d === 1 ? TRIPLES.slice(0, 3) : context ? TRIPLES.slice(0, 4) : TRIPLES);
+      let k = d === 1 || context ? rng.int(1, 2) : rng.int(3, 4);
+      if (context && t[2] * k > 40) k = 1;
+      if (t[2] * k > 100) k = 3;
       [a, b, c] = rng.chance(0.5) ? [t[0] * k, t[1] * k, t[2] * k] : [t[1] * k, t[0] * k, t[2] * k];
       N = kind === 'hyp' ? c * c : b * b;
     } else {
+      const hi = context ? 30 : 60;
       for (;;) {
-        a = rng.int(4, 60);
-        b = rng.int(4, 60);
+        a = rng.int(context ? 5 : 4, hi);
+        b = rng.int(context ? 5 : 4, hi);
         if (a === b) continue;
         if (kind === 'hyp') {
           N = a * a + b * b;
           c = Math.sqrt(N);
         } else {
-          c = rng.int(Math.max(a, 8) + 2, Math.max(a, 8) + 40);
+          c = rng.int(Math.max(a, 8) + 2, Math.max(a, 8) + (context ? 20 : 40));
           N = c * c - a * a;
           b = Math.sqrt(N);
         }
@@ -93,60 +106,83 @@ const pythagorean: Template<PythParams> = {
         ? [
             { v: a + b, trap: 'geo-rt-add-legs' },
             { v: Math.sqrt(a) + Math.sqrt(b), trap: 'geo-rt-root-split' },
+            { v: Math.abs(a - b), trap: 'geo-rt-add-legs' },
           ]
         : [
             { v: c - a, trap: 'geo-rt-add-legs' },
             { v: Math.sqrt(c * c + a * a), trap: 'geo-rt-leg-as-hyp' },
+            { v: Math.sqrt(c) - Math.sqrt(a), trap: 'geo-rt-root-split' },
           ];
     const traps = trapVals.flatMap((t) => {
       const f = rnd(t.v);
-      return f && !f.eq(answer) ? [{ value: f, trap: t.trap }] : [];
+      if (f?.eq(answer)) throw new Redraw('a trap equals the answer');
+      return f ? [{ value: f, trap: t.trap }] : [];
     });
     const unknownLen = kind === 'hyp' ? exact : b;
-    const nm: [string, string, string] = ['A', 'B', 'C'];
+    const [nA, nB, nC] = nm;
     const mirror = rng.chance(0.4);
     const roundTxt = rounded ? ` Give your answer to the nearest ${places === 2 ? '0.01' : '0.1'}.` : '';
     const showA = `$${num(a)}$`;
+    const unit = rng.pick(['feet', 'meters']);
     let stem: string;
     let figure;
     let suffix: string | undefined;
-    if (context) {
-      // ladder against a wall: the ladder is the hypotenuse c, the foot is a from the wall, height b
-      const s = 4 / Math.max(a, unknownLen);
-      const fb = new FigBuilder();
-      const W0 = fb.helper([0, 0]);
-      const Wtop = fb.helper([0, unknownLen * s * 1.15]);
-      const G1 = fb.helper([-0.6, 0]);
-      const G2 = fb.helper([a * s + 0.8, 0]);
-      fb.pt('P', [0, unknownLen * s], [-1, 0.2]).pt('Q', [a * s, 0], [0.3, -1]).pt('R', [0, 0], [-1, -1]);
-      fb.seg(W0, Wtop).seg(G1, G2).seg('P', 'Q').right('P', 'R', 'Q');
-      fb.side('P', 'Q', 'R', `$${num(c)}$`).side('R', 'Q', 'P', showA);
-      figure = fb.build();
-      stem = `A ladder $${num(c)}$ feet long leans against a vertical wall, as shown above. The foot of the ladder, $Q$, is $${num(a)}$ feet from the base of the wall, $R$, on level ground. How many feet above the ground is the top of the ladder, $P$?${roundTxt}`;
-      suffix = 'feet';
+    let story = '';
+    if (context && kind === 'hyp') {
+      story = 'field';
+      stem = rng.pick([
+        `A rectangular field measures $${num(a)}$ ${unit} by $${num(b)}$ ${unit}. A straight path runs from one corner of the field to the opposite corner. How long is the path, in ${unit}?${roundTxt}`,
+        `The screen of a rectangular display is $${num(Math.max(a, b))}$ inches wide and $${num(Math.min(a, b))}$ inches tall. What is the length, in inches, of its diagonal?${roundTxt}`,
+      ]);
+      suffix = stem.includes('inches') ? 'inches' : unit;
+    } else if (context) {
+      // the unknown leg is the height
+      const useLadder = rng.chance(0.6);
+      if (useLadder) {
+        // ladder against a wall: the ladder is the hypotenuse c, the foot is a from the wall, height b
+        story = 'ladder';
+        const s = 4 / Math.max(a, unknownLen);
+        const fb = new FigBuilder();
+        const W0 = fb.helper([0, 0]);
+        const Wtop = fb.helper([0, unknownLen * s * 1.15]);
+        const G1 = fb.helper([-0.6, 0]);
+        const G2 = fb.helper([a * s + 0.8, 0]);
+        fb.pt('P', [0, unknownLen * s], [-1, 0.2]).pt('Q', [a * s, 0], [0.3, -1]).pt('R', [0, 0], [-1, -1]);
+        fb.seg(W0, Wtop).seg(G1, G2).seg('P', 'Q').right('P', 'R', 'Q');
+        fb.side('P', 'Q', 'R', `$${num(c)}$`).side('R', 'Q', 'P', showA);
+        figure = fb.build();
+        stem = `A ladder $${num(c)}$ feet long leans against a vertical wall, as shown above. The foot of the ladder, $Q$, is $${num(a)}$ feet from the base of the wall, $R$, on level ground. How many feet above the ground is the top of the ladder, $P$?${roundTxt}`;
+        suffix = 'feet';
+      } else {
+        story = 'wire';
+        stem = `A guy wire $${num(c)}$ ${unit} long runs from the top of a vertical pole to a point on level ground $${num(a)}$ ${unit} from the base of the pole. How tall is the pole, in ${unit}?${roundTxt}`;
+        suffix = unit;
+      }
     } else if (kind === 'hyp') {
       figure = rightTriFig(nm, a, b, { a: showA, b: `$${num(b)}$` }, mirror);
-      stem = `In right triangle $ABC$ above, what is the length of side $AB$?${roundTxt}`;
+      stem = `In right triangle $${nA}${nB}${nC}$ above, what is the length of side $${nA}${nB}$?${roundTxt}`;
     } else {
       figure = rightTriFig(nm, a, unknownLen, { a: showA, c: `$${num(c)}$` }, mirror);
-      stem = `In right triangle $ABC$ above, what is the length of side $BC$?${roundTxt}`;
+      stem = `In right triangle $${nA}${nB}${nC}$ above, what is the length of side $${nB}${nC}$?${roundTxt}`;
     }
     const val = rounded ? dec(answer) : num(answer.n);
+    const hypName = story === 'ladder' ? 'ladder' : story === 'wire' ? 'wire' : story === 'field' ? 'path' : `side $${nA}${nB}$`;
+    const unknownName = context ? 'h' : kind === 'hyp' ? `${nA}${nB}` : `${nB}${nC}`;
     const explanation =
       kind === 'hyp'
-        ? `The side opposite the right angle is the hypotenuse: $AB^2 = ${num(a)}^2 + ${num(b)}^2 = ${num(a * a)} + ${num(b * b)} = ${num(N)}$.
+        ? `${context ? 'The diagonal is the side opposite the right angle of a right triangle whose legs are the two sides.' : 'The side opposite the right angle is the hypotenuse.'} Square the legs and add: $${unknownName}^2 = ${num(a)}^2 + ${num(b)}^2 = ${num(a * a)} + ${num(b * b)} = ${num(N)}$.
 
-$AB = \\sqrt{${num(N)}}${rounded ? ` \\approx ${dec(answer)}` : ` = ${val}`}$.${rounded ? ` (On the calculator, add the squares first and take the square root of the total.)` : ''}
+$${unknownName} = \\sqrt{${num(N)}}${rounded ? ` \\approx ${dec(answer)}` : ` = ${val}`}$.${rounded ? ` (On the calculator, add the squares first and take the square root of the total.)` : ''}
 
-Adding the legs ($${num(a)} + ${num(b)} = ${num(a + b)}$) is wrong: the hypotenuse is always shorter than the sum of the legs.`
-        : `The ${context ? 'ladder' : 'side of length ' + num(c)} is the hypotenuse, opposite the right angle. So the unknown leg satisfies $${context ? 'h' : 'BC'}^2 + ${num(a)}^2 = ${num(c)}^2$:
+Trap: adding the legs ($${num(a)} + ${num(b)} = ${num(a + b)}$) is wrong, because the hypotenuse is always shorter than the sum of the legs.`
+        : `The ${story ? hypName : 'side of length ' + num(c)} is the hypotenuse, opposite the right angle. So the unknown leg satisfies $${unknownName}^2 + ${num(a)}^2 = ${num(c)}^2$:
 
-$${context ? 'h' : 'BC'}^2 = ${num(c * c)} - ${num(a * a)} = ${num(N)}$, so $${context ? 'h' : 'BC'} = \\sqrt{${num(N)}}${rounded ? ` \\approx ${dec(answer)}` : ` = ${val}`}$.
+$${unknownName}^2 = ${num(c * c)} - ${num(a * a)} = ${num(N)}$, so $${unknownName} = \\sqrt{${num(N)}}${rounded ? ` \\approx ${dec(answer)}` : ` = ${val}`}$.
 
-Subtract the squares, do not add them: $\\sqrt{${num(c)}^2 + ${num(a)}^2}$ would be longer than the hypotenuse itself.`;
+Trap: subtract the squares, do not add them. $\\sqrt{${num(c)}^2 + ${num(a)}^2} \\approx ${dec(rnd(Math.sqrt(c * c + a * a)) ?? Frac.of(Math.round(Math.sqrt(c * c + a * a))))}$ would be longer than the hypotenuse itself.`;
     return {
       params: kind === 'hyp' ? { kind, legs: [a, b], round: rounded ? places : 0 } : { kind, hyp: c, leg: a, round: rounded ? places : 0 },
-      q: { format: 'ne', stem, figure, answer, traps, explanation, ...(suffix ? { suffix } : {}) },
+      q: { format: 'ne', stem, ...(figure ? { figure } : {}), answer, traps, explanation, ...(suffix ? { suffix } : {}) },
     };
   },
   check(q, p) {
@@ -414,7 +450,7 @@ The altitude is $\\frac{s}{2}\\sqrt{3}$, not $s\\sqrt{3}$: the short leg $QS$ is
 
 /* ================================================================== 3. Comparisons: isosceles right triangle vs square, rectangle diagonals (QC) */
 
-type CmpKind = 'iso-square' | 'rect-sides' | 'rect-diag-side' | 'rect-perimeter' | 'square-diag';
+type CmpKind = 'iso-square' | 'rect-sides' | 'rect-diag-side' | 'rect-perimeter' | 'square-diag' | 'rect-one-side' | 'legs-sum';
 type IsoQ = 'leg' | 'hyp';
 type SqQ = 'side' | 'diag';
 interface CmpParams {
@@ -439,10 +475,10 @@ const compareQC: Template<CmpParams> = {
   generate(rng, d) {
     const kind: CmpKind = rng.pick(
       d === 1
-        ? (['rect-sides', 'square-diag', 'iso-square'] as const)
+        ? (['rect-sides', 'square-diag', 'iso-square', 'rect-one-side'] as const)
         : d === 2
-          ? (['iso-square', 'rect-sides', 'rect-diag-side', 'square-diag'] as const)
-          : (['iso-square', 'rect-diag-side', 'rect-perimeter', 'rect-sides'] as const),
+          ? (['iso-square', 'rect-sides', 'rect-diag-side', 'square-diag', 'legs-sum', 'rect-one-side'] as const)
+          : (['iso-square', 'rect-diag-side', 'rect-perimeter', 'rect-sides', 'legs-sum', 'legs-sum'] as const),
     );
     const near = (x: number) => (Math.abs(x - Math.round(x)) < 1e-9 ? Math.round(x) : null);
     if (kind === 'iso-square') {
@@ -507,15 +543,15 @@ Squaring the diagonal gives $${dd * dd}$, twice the area.`,
         },
       };
     }
-    const fb = (l: number, w: number, lab: { AB?: string; BC?: string; AC?: string }) => {
+    const fb = (l: number, w: number, lab: { AB?: string; BC?: string; AC?: string }, notToScale = false) => {
       const s = 4.4 / Math.max(l, w);
-      const L = Math.max(1.6, l * s);
-      const W = Math.max(1.4, w * s);
+      const L = l * s;
+      const W = w * s;
       const f = new FigBuilder().pt('A', [0, W]).pt('B', [L, W]).pt('C', [L, 0]).pt('D', [0, 0]).poly('A', 'B', 'C', 'D').seg('A', 'C').right('B', 'C', 'D');
       if (lab.AB) f.side('A', 'B', 'D', lab.AB);
       if (lab.BC) f.side('B', 'C', 'A', lab.BC);
       if (lab.AC) f.text([L * 0.42, W * 0.5 + 0.35], lab.AC);
-      return f.build();
+      return f.build(notToScale);
     };
     if (kind === 'rect-sides') {
       let l: number;
@@ -576,6 +612,61 @@ Compared with $${N}$: ${QC_SAY[answer]}. (${answer})${ask === 'area' ? `\n\nThe 
         },
       };
     }
+    if (kind === 'rect-one-side') {
+      // AC is longer than AB, but nothing bounds it from above
+      const l = rng.int(4, 15);
+      const N = rng.chance(0.4) ? l - rng.int(0, 2) : l + rng.int(1, 6);
+      const answer: QCChoice = N <= l ? 'A' : 'D';
+      const square = Math.SQRT2 * l > N ? 'A' : 'B';
+      return {
+        params: { kind, l, N },
+        q: {
+          format: 'qc',
+          info: `$ABCD$ is a rectangle with $AB = ${l}$.`,
+          figure: fb(l, Math.max(2, Math.round(l * 0.6)), { AB: `$${l}$` }, true),
+          quantityA: '$AC$',
+          quantityB: `$${N}$`,
+          answer,
+          traps: qcTraps(answer, answer === 'D' ? { [square]: 'geo-rt-assumed-dims' } : { D: 'geo-rt-range-missed' }),
+          explanation:
+            answer === 'A'
+              ? `Diagonal $AC$ is the hypotenuse of right triangle $ABC$, so $AC^2 = ${l}^2 + BC^2$ and $AC$ is longer than the leg $AB = ${l}$, whatever $BC$ is. Since $${N} \\le ${l}$, Quantity A is greater. (A)\n\nThe unknown side does not matter here: the hypotenuse beats each leg.`
+              : `$AC^2 = ${l}^2 + BC^2$, and $BC$ can be any positive length. A very thin rectangle ($BC = 1$) gives $AC = \\sqrt{${l * l + 1}}$, which is less than $${N}$ because $${N}^2 = ${N * N} > ${l * l + 1}$. A very long one ($BC = ${2 * N}$) gives $AC > ${2 * N} > ${N}$. Both can happen. (D)\n\nIf $BC$ were equal to $AB$, then $AC = ${l}\\sqrt{2} \\approx ${(l * Math.SQRT2).toFixed(2)}$ would settle the comparison for that rectangle only.`,
+        },
+      };
+    }
+    if (kind === 'legs-sum') {
+      // right triangle with hypotenuse c: c < leg + leg <= c * sqrt(2)
+      const c = rng.int(4, 15);
+      const hi = c * Math.SQRT2;
+      const pick = rng.pick(['A', 'D', 'D', 'B'] as const);
+      const N = pick === 'A' ? c - rng.int(0, 2) : pick === 'B' ? Math.ceil(hi) + rng.int(0, 2) : rng.int(c + 1, Math.floor(hi));
+      const answer: QCChoice = N <= c ? 'A' : N > hi ? 'B' : 'D';
+      const equalHyp: QCChoice = c > N ? 'A' : c < N ? 'B' : 'C';
+      const iso: QCChoice = hi > N ? 'A' : 'B';
+      const nm = rng.pick(NAME_SETS);
+      const f = new FigBuilder().pt(nm[0], [0, 3]).pt(nm[1], [4.6, 0]).pt(nm[2], [0, 0]).poly(nm[0], nm[1], nm[2]).right(nm[0], nm[2], nm[1]);
+      f.side(nm[0], nm[1], nm[2], `$${c}$`);
+      return {
+        params: { kind, d: c, N },
+        q: {
+          format: 'qc',
+          info: `In right triangle $${nm[0]}${nm[1]}${nm[2]}$, the hypotenuse $${nm[0]}${nm[1]}$ has length $${c}$.`,
+          figure: f.build(true),
+          quantityA: `$${nm[0]}${nm[2]} + ${nm[1]}${nm[2]}$`,
+          quantityB: `$${N}$`,
+          answer,
+          traps: qcTraps(answer, answer === 'D' ? { [equalHyp]: 'geo-rt-root-split', [iso]: 'geo-rt-assumed-dims' } : { D: 'geo-rt-range-missed' }),
+          explanation: `Call the legs $x$ and $y$, so $x^2 + y^2 = ${c * c}$. The sum of two sides of a triangle exceeds the third, so $x + y > ${c}$. Also $(x + y)^2 = ${c * c} + 2xy \\le ${2 * c * c}$, because $2xy \\le x^2 + y^2$, so $x + y \\le ${c}\\sqrt{2} \\approx ${hi.toFixed(2)}$.\n\nSo $${c} < x + y \\le ${hi.toFixed(2)}$. ${
+            answer === 'A'
+              ? `Every possible sum is greater than $${N}$. (A)`
+              : answer === 'B'
+                ? `Every possible sum is less than $${N}$. (B)`
+                : `$${N}$ lies inside that range: legs $${c}\\sqrt{2}/2$ and $${c}\\sqrt{2}/2$ give the largest sum, which is greater than $${N}$, while a very flat triangle gives a sum just over $${c}$, which is less than $${N}$. (D)`
+          }\n\n$\\sqrt{x^2 + y^2}$ is not $x + y$: for legs $3$ and $4$ the hypotenuse is $5$, not $7$.`,
+        },
+      };
+    }
     // rect-perimeter: only the perimeter is known
     const half = rng.int(5, 14);
     const lo = half / Math.SQRT2;
@@ -588,7 +679,7 @@ Compared with $${N}$: ${QC_SAY[answer]}. (${answer})${ask === 'area' ? `\n\nThe 
       q: {
         format: 'qc',
         info: `The perimeter of rectangle $ABCD$ is $${2 * half}$.`,
-        figure: fb(sideL, half - sideL, {}),
+        figure: fb(sideL, half - sideL, {}, true),
         quantityA: '$AC$',
         quantityB: `$${N}$`,
         answer,
@@ -627,6 +718,16 @@ So $${(half / Math.SQRT2).toFixed(2)} \\le AC < ${half}$. ${
         samples.push([p.ask === 'other' ? w : p.l! * w, p.N!]);
         break;
       }
+      case 'rect-one-side':
+        for (const k of [0.01, 0.5, 1, 3, 100]) samples.push([rectDiag(p.l!, p.l! * k), p.N!]);
+        samples.push([rectDiag(p.l!, 3 * p.N!), p.N!]);
+        break;
+      case 'legs-sum':
+        for (let i = 1; i < 90; i++) {
+          const th = (i * Math.PI) / 180;
+          samples.push([p.d! * Math.cos(th) + p.d! * Math.sin(th), p.N!]);
+        }
+        break;
       case 'rect-perimeter':
         for (let i = 1; i < 400; i++) {
           const l = (p.s! * i) / 400;
@@ -685,8 +786,10 @@ const twoStep: Template<TwoParams> = {
         [
           { value: Math.floor(L / (a + b)), trap: 'geo-rt-forgot-hyp' },
           { value: Math.floor(L / ((a * b) / 2)), trap: 'geo-rt-used-area' },
+          { value: Math.floor(L / c), trap: 'geo-rt-hyp-only' },
+          { value: Math.floor(L / (2 * (a + b))), trap: 'geo-rt-rectangle-perimeter' },
         ],
-        [Math.floor(L / (a + b + c + 1)), Math.floor(L / (2 * (a + b))), n + 2, n - 2, n + 4, n - 4],
+        [n + 2, n - 2],
       );
       const fb = new FigBuilder();
       const s = 4 / Math.max(a, b);
@@ -728,6 +831,8 @@ Leaving out the hypotenuse ($${a} + ${b} = ${a + b}$ per triangle) or dividing b
       const traps = [
         { v: surd(1, sq), trap: 'geo-rt-ratio-no-k' },
         { v: surd((a + b) * k, 1), trap: 'geo-rt-add-legs' },
+        { v: surd(new Frac(k, 2), 2 * sq), trap: 'geo-tri-no-half' },
+        { v: surd(K, 1), trap: 'geo-rt-gave-area' },
       ];
       const { choices, answer, values } = surdChoices(rng, correct, traps, [surd(2 * k, sq), surd(a * b * k, 1), surd(k * k, sq)]);
       return {
@@ -761,6 +866,8 @@ $${surdTex(surd(1, sq))}$ is the hypotenuse for legs of exactly $${a}$ and $${b}
         { v: surd(1, AB * AB + p * p + DC * DC), trap: 'geo-rt-leg-as-hyp' },
         { v: surd(h + DC, 1), trap: 'geo-rt-add-legs' },
         { v: surd(1, AB * AB + DC * DC), trap: 'geo-rt-wrong-triangle' },
+        { v: surd(h, 1), trap: 'geo-rt-stopped-early' },
+        { v: surd(1, p * p + DC * DC), trap: 'geo-rt-wrong-triangle' },
       ];
       const { choices, answer, values } = surdChoices(rng, correct, traps, [N - 7, N + 9, N - 3, N + 5, N - 12, N + 16].filter((x) => x > 1).map((x) => surd(1, x)));
       const s = 4.6 / (p + DC);
@@ -793,15 +900,17 @@ $AB$ is the hypotenuse of the first triangle, so subtract its square; $AC$ is th
       { v: surd(x + y + zz, 1), trap: 'geo-rt-add-legs' },
       { v: surd(1, Math.abs(zz * zz - x * x - y * y)), trap: 'geo-rt-leg-as-hyp' },
       { v: surd(1, x * x + zz * zz), trap: 'geo-rt-wrong-triangle' },
+      { v: surd(1, x * x + y * y), trap: 'geo-rt-stopped-early' },
+      { v: surd(1, y * y + zz * zz), trap: 'geo-rt-wrong-triangle' },
     ];
     const { choices, answer, values } = surdChoices(rng, correct, traps, [surd(w + 1, 1), surd(1, N + 4), surd(w - 1, 1), surd(1, N - 5), surd(1, N + 12), surd(1, N - 10)]);
-    const s = 0.55;
+    // drawn to scale: AB = x, BC = y, CD = zz, with CD perpendicular to AC and pointing away from B
     const B: Pt = [0, 0];
-    const A: Pt = [0, x * s * 1.2 + 0.6];
-    const C: Pt = [y * s * 1.2 + 0.6, 0];
+    const A: Pt = [0, x];
+    const C: Pt = [y, 0];
     const u = unit(sub(C, A));
     const perp: Pt = [u[1], -u[0]];
-    const Dp = add(C, mul(perp[1] > 0 || perp[0] > 0 ? perp : mul(perp, -1), Math.min(4.2, zz * s * 0.7 + 1)));
+    const Dp = add(C, mul(perp[1] > 0 || perp[0] > 0 ? perp : mul(perp, -1), zz));
     const fb = new FigBuilder().pt('A', A).pt('B', B).pt('C', C).pt('D', Dp).poly('A', 'B', 'C').poly('A', 'C', 'D');
     fb.right('A', 'B', 'C').right('A', 'C', 'D');
     fb.side('A', 'B', 'C', `$${x}$`).side('B', 'C', 'A', `$${y}$`).side('C', 'D', 'A', `$${zz}$`);
@@ -846,4 +955,4 @@ Adding the lengths $${x} + ${y} + ${zz}$ instead of their squares gives the wron
   },
 };
 
-export const rightTemplates = [pythagorean, special, compareQC, twoStep];
+export const rightTemplates = retryAll([pythagorean, special, compareQC, twoStep]);

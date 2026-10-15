@@ -25,6 +25,7 @@ import {
 } from './fig';
 import { mulberry } from './lines';
 import { angleLabel, checkMcm, checkMcs, evalTex, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
+import { retryAll } from '../redraw';
 
 const SKILL = 'geo.triangles';
 /** Exact value for display: integers with commas, other terminating fractions as decimals. */
@@ -134,13 +135,34 @@ const angleSum: Template<SumParams> = {
       const C = exprs.reduce((s, e) => s + e.c, 0);
       const K = exprs.reduce((s, e) => s + e.k, 0);
       const xw = (360 - K) / C;
+      const xSign = (180 + K) / C; // constants moved across with the wrong sign
+      const xDrop = 180 / C; // constants ignored
       const traps: { value: number; trap: string }[] = [];
       const eMax = exprs[vals.indexOf(mx)];
-      if (ask === 'x') traps.push({ value: xw, trap: 'geo-tri-sum-360' });
-      if (ask === 'largest') {
-        traps.push({ value: ev(eMax, xw), trap: 'geo-tri-sum-360' }, { value: x0, trap: 'geo-ang-wrong-unknown' });
-      }
-      if (ask === 'diff') traps.push({ value: mx, trap: 'geo-ang-wrong-unknown' }, { value: x0, trap: 'geo-ang-wrong-unknown' });
+      const sorted = [...vals].sort((a, b) => a - b);
+      const mid = sorted[1];
+      if (ask === 'x')
+        traps.push(
+          { value: xw, trap: 'geo-tri-sum-360' },
+          { value: xSign, trap: 'geo-tri-const-sign' },
+          { value: xDrop, trap: 'geo-tri-drop-constant' },
+          ...vals.map((t) => ({ value: t, trap: 'geo-ang-wrong-unknown' })),
+        );
+      if (ask === 'largest')
+        traps.push(
+          { value: ev(eMax, xw), trap: 'geo-tri-sum-360' },
+          { value: ev(eMax, xSign), trap: 'geo-tri-const-sign' },
+          { value: x0, trap: 'geo-ang-wrong-unknown' },
+          ...vals.filter((t) => t !== mx).map((t) => ({ value: t, trap: 'geo-tri-wrong-angle' })),
+        );
+      if (ask === 'diff')
+        traps.push(
+          { value: mx, trap: 'geo-ang-wrong-unknown' },
+          { value: x0, trap: 'geo-ang-wrong-unknown' },
+          { value: mx - mid, trap: 'geo-tri-diff-pair' },
+          { value: mid - mn, trap: 'geo-tri-diff-pair' },
+          { value: mx + mn, trap: 'geo-tri-diff-pair' },
+        );
       const fillers = ask === 'x' ? [x0 + 5, x0 - 5, x0 + 10, 2 * x0] : [correct + 10, correct - 10, correct + 20, correct - 5, 180 - correct];
       const { choices, answer, values } = intChoices(rng, correct, traps, fillers);
       const pts = triPts(vals[0], vals[1], vals[2]);
@@ -205,12 +227,13 @@ Using $360^\\circ$ (the angle sum of a quadrilateral) instead of $180^\\circ$ is
       const correct = ask === 'x' ? x0 : p;
       // trap: treating the exterior angle as one of the triangle's angles
       const xw = d === 2 ? 180 - e - q : (180 - ext.k - top.k - q) / (ext.c + top.c);
+      // trap: adding the known remote angle to the exterior angle instead of subtracting it
+      const xAdd = d === 2 ? e + q : (ext.k + q - top.k) / (top.c - ext.c);
       const traps: { value: number; trap: string }[] = [];
-      if (ask === 'x') traps.push({ value: xw, trap: 'geo-tri-ext-adjacent' });
-      else {
-        traps.push({ value: ev(top, xw), trap: 'geo-tri-ext-adjacent' }, { value: x0, trap: 'geo-ang-wrong-unknown' });
-      }
-      traps.push({ value: 180 - e, trap: 'geo-ang-wrong-unknown' });
+      if (ask === 'x') traps.push({ value: xw, trap: 'geo-tri-ext-adjacent' }, { value: xAdd, trap: 'geo-tri-ext-add' });
+      else traps.push({ value: ev(top, xw), trap: 'geo-tri-ext-adjacent' }, { value: x0, trap: 'geo-ang-wrong-unknown' }, { value: ev(top, xAdd), trap: 'geo-tri-ext-add' });
+      traps.push({ value: 180 - e, trap: 'geo-tri-ext-supp' }, { value: q, trap: 'geo-ang-wrong-unknown' }, { value: e, trap: 'geo-ang-wrong-unknown' });
+      if (ask === 'x' && d !== 2) traps.push({ value: p, trap: 'geo-ang-wrong-unknown' });
       const { choices, answer, values } = intChoices(rng, correct, traps, [correct + 10, correct - 10, correct + 5, e]);
       const pts = triPts(p, q, 180 - p - q);
       const fb = new FigBuilder().pt(nT, pts.T).pt(nL, pts.L).pt(nR, pts.R, [-0.5, -1]).poly(nT, nL, nR);
@@ -250,14 +273,26 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
         given = 'T';
         ask = rng.pick(['L', 'R'] as const);
         correct = (180 - value) / 2;
-        traps.push({ value, trap: 'geo-tri-iso-pair' }, { value: 180 - value, trap: 'geo-tri-iso-split' });
+        traps.push(
+          { value, trap: 'geo-tri-iso-pair' },
+          { value: 180 - value, trap: 'geo-tri-iso-split' },
+          { value: value / 2, trap: 'geo-tri-iso-half' },
+          { value: (360 - value) / 2, trap: 'geo-tri-sum-360' },
+          { value: 90 - value, trap: 'geo-tri-iso-half' },
+        );
         ang = { T: value, L: correct, R: correct };
       } else {
         value = rng.int(5, 16) * 5;
         given = rng.pick(['L', 'R'] as const);
         ask = 'T';
         correct = 180 - 2 * value;
-        traps.push({ value, trap: 'geo-tri-iso-pair' }, { value: 180 - value, trap: 'geo-tri-iso-split' });
+        traps.push(
+          { value, trap: 'geo-tri-iso-pair' },
+          { value: 180 - value, trap: 'geo-tri-iso-split' },
+          { value: (180 - value) / 2, trap: 'geo-tri-iso-pair' },
+          { value: 360 - 2 * value, trap: 'geo-tri-sum-360' },
+          { value: 90 - value, trap: 'geo-tri-iso-half' },
+        );
         ang = { T: correct, L: value, R: value };
       }
     } else {
@@ -267,8 +302,22 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
       const base = (180 - value) / 2;
       ang = { T: base, L: value, R: base };
       correct = ask === 'ext' ? 180 - base : base;
-      if (ask === 'ext') traps.push({ value: 180 - value, trap: 'geo-tri-iso-pair' }, { value: base, trap: 'geo-tri-ext-interior' });
-      else traps.push({ value, trap: 'geo-tri-iso-pair' }, { value: 180 - 2 * value, trap: 'geo-tri-iso-pair' });
+      if (ask === 'ext')
+        traps.push(
+          { value: 180 - value, trap: 'geo-tri-iso-pair' },
+          { value: base, trap: 'geo-tri-ext-interior' },
+          { value: 180 - 2 * value, trap: 'geo-tri-iso-pair' },
+          { value: 180 - value / 2, trap: 'geo-tri-iso-half' },
+          { value: value, trap: 'geo-tri-iso-pair' },
+        );
+      else
+        traps.push(
+          { value, trap: 'geo-tri-iso-pair' },
+          { value: 180 - 2 * value, trap: 'geo-tri-iso-pair' },
+          { value: 180 - value, trap: 'geo-tri-iso-split' },
+          { value: value / 2, trap: 'geo-tri-iso-half' },
+          { value: (360 - value) / 2, trap: 'geo-tri-sum-360' },
+        );
     }
     // keep the example non-equilateral
     if (ang.T === 60 && ang.L === 60) return angleSum.generate(rng, d);
@@ -1050,4 +1099,4 @@ ${uniq.map((it) => `- $(${num(it.p[0])}, ${num(it.p[1])})$: ${it.ok ? 'height ' 
 
 const paren = (x: number) => (x < 0 ? `(${x})` : `${x}`);
 
-export const triangleTemplates = [angleSum, thirdSide, sideAngleQC, isoIneqQC, triangleArea, thirdVertex];
+export const triangleTemplates = retryAll([angleSum, thirdSide, sideAngleQC, isoIneqQC, triangleArea, thirdVertex]);
