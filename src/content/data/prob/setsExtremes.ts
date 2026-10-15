@@ -59,7 +59,7 @@ const CTX2 = [
   { pop: (n: number) => `In a survey of ${n} residents of a town`, unit: 'residents', A: 'own a bicycle', B: 'own a car', both: 'own both a bicycle and a car', neither: 'own neither' },
   { pop: (n: number) => `Of the ${n} people who attended a festival`, unit: 'people', A: 'bought a ticket for the concert', B: 'bought a ticket for the film', both: 'bought tickets for both', neither: 'bought a ticket for neither' },
   { pop: (n: number) => `Among the ${n} students in a school club`, unit: 'students', A: 'play chess', B: 'play checkers', both: 'play both games', neither: 'play neither game' },
-  { pop: (n: number) => `A company has ${n} employees`, unit: 'employees', A: 'have a laptop', B: 'have a company phone', both: 'have both a laptop and a company phone', neither: 'have neither' },
+  { pop: (n: number) => `Of the ${n} employees of a company`, unit: 'employees', A: 'have a laptop', B: 'have a company phone', both: 'have both a laptop and a company phone', neither: 'have neither' },
 ];
 
 const CTX3 = [
