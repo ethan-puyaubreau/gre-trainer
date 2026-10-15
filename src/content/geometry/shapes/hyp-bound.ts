@@ -71,7 +71,7 @@ const hypBound: Template<P> = {
       const list = pairs.map(([a, b]) => `$${a}$ and $${b}$ (sum $${a + b}$)`).join(', ');
       body = `Recognize: the legs are whole numbers with $x^2 + y^2 = ${h * h}$, so list every pair that works.
 
-The pairs are ${list}. ${answer === 'D' ? `The sums ${sums.join(' and ')} are not all on the same side of $${N}$, so $x + y$ is not fixed.` : `Every sum ${answer === 'A' ? 'exceeds' : answer === 'B' ? 'is below' : 'equals'} $${N}$.`}
+The pairs are ${list}. ${answer === 'D' ? `The sums ${sums.join(', ')} are not all on the same side of $${N}$, so $x + y$ is not fixed.` : `Every sum ${answer === 'A' ? 'exceeds' : answer === 'B' ? 'is below' : 'equals'} $${N}$.`}
 
 Check: ${pairs.map(([a, b]) => `$${a}^2 + ${b}^2 = ${a * a + b * b}$`).join(', ')}.
 
