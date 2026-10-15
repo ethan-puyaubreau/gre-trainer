@@ -168,6 +168,14 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Miscounted the person in the middle',
     fix: 'People in line = (people ahead) + 1 + (people behind). Someone who is $k$th from the front and $m$th from the back is counted in both positions, so the line has $k + m - 1$ people.',
   },
+  'int-other-end': {
+    label: 'Gave the other end of the run',
+    fix: 'Read whether the question asks for the least or the greatest term, and check your answer against the run you built.',
+  },
+  'int-sum-scale': {
+    label: 'Assumed doubling the last term quadruples the sum',
+    fix: 'Doubling $n$ does not quadruple the sum exactly: $S(2m) = 2S(m) + m^2$, and $4S(m)$ is $m$ too large. Test with $m = 3$: $S(3) = 6$ and $S(6) = 21$, not 24.',
+  },
   'int-gave-middle-term': {
     label: 'Gave the average instead of the requested term',
     fix: 'Sum $\\div$ number of terms is the average, which is the middle term. Then step out to the least or greatest term.',

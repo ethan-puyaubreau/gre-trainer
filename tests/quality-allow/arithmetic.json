@@ -1,17 +1,4 @@
 {
-  "arith.consecutive.count-expression": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.consecutive.find-term": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.consecutive.possible-sums": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.consecutive.sum-function": {
-    "distractors.trapped": "baseline"
-  },
   "arith.cycles.decimal-digit": {
     "qc.never-d": "Both quantities are fixed numbers (a digit and a given digit), so D is impossible."
   },

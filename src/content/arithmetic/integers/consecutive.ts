@@ -3,7 +3,7 @@ import { frac } from '../../../engine/frac';
 import { lcm, range } from '../../../engine/math';
 import { num, ordinal, plain } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { QC_WORDS, expectMcm, expectMcsBy, expectNe, expectQc, spreadChoices } from './util';
+import { QC_WORDS, listAnd, expectMcm, expectMcsBy, expectNe, expectQc, spreadChoices } from './util';
 
 /** Sum of the integers from a to b by looping (checks only). */
 function loopSum(a: number, b: number, step = 1): number {
@@ -37,21 +37,17 @@ const sumFunction: Template<SumFnParams> = {
     let explanation: string;
     const def = 'For each integer $n > 1$, let $S(n)$ denote the sum of the integers from 1 to $n$, inclusive.';
     if (mode === 'double') {
-      m = rng.pick(diff === 1 ? [20, 30, 40, 50] : [30, 40, 60, 80, 150, 200]);
+      m = rng.pick(diff === 1 ? [10, 12, 14, 15, 16, 18, 20, 24, 25, 30, 35, 36, 40, 45, 48, 50, 60, 64, 70, 75] : [32, 42, 55, 65, 80, 90, 96, 100, 120, 125, 150, 200, 250]);
       n = 2 * m;
       answer = T(n);
       cands = [
         { v: 2 * T(m), trap: 'int-doubled-sum' },
         { v: T(m) + m * m, trap: 'int-sum-split' },
-        { v: 4 * T(m) },
-        { v: 3 * T(m) },
-        { v: answer - m },
-        { v: answer + 2 * m },
-        { v: answer + 3 * m },
-        { v: 2 * answer },
-        { v: answer + m * m },
+        { v: 4 * T(m), trap: 'int-sum-scale' },
+        { v: answer - n, trap: 'cycle-count-terms' },
+        { v: answer + n + 1, trap: 'cycle-count-terms' },
       ];
-      stem = `${def} For example, $S(${m}) = ${num(T(m))}$. What is the value of $S(${n})$?`;
+      stem = [`${def} For example, $S(${m}) = ${num(T(m))}$. What is the value of $S(${n})$?`, `${def} If $S(${m}) = ${num(T(m))}$, what is the value of $S(${n})$?`][rng.int(0, 1)];
       explanation = `Use the formula: $S(${n}) = \\frac{${n} \\cdot ${n + 1}}{2} = ${num(answer)}$.
 
 Or use the given value: each of the integers $${m + 1}, ${m + 2}, \\ldots, ${n}$ is ${m} more than one of $1, 2, \\ldots, ${m}$, so their sum is $S(${m}) + ${m} \\cdot ${m}$. Then $S(${n}) = 2S(${m}) + ${m}^2 = ${num(2 * T(m))} + ${num(m * m)} = ${num(answer)}$.
@@ -66,13 +62,12 @@ Doubling $S(${m})$ gives only $${num(2 * T(m))}$: it misses the extra ${m} added
       answer = T(n) - T(m);
       cands = [
         { v: T(n - m), trap: 'int-sum-difference-shift' },
-        { v: answer + m, trap: 'cycle-count-terms' },
+        { v: answer + m, trap: 'counted-endpoint' },
         { v: answer - n, trap: 'cycle-count-terms' },
-        { v: answer + n },
-        { v: answer - m },
-        { v: answer + 2 * m },
+        { v: answer - (m + 1), trap: 'cycle-count-terms' },
+        { v: ((n - m) * (n + m)) / 2, trap: 'int-sum-difference-shift' },
       ];
-      stem = `${def} What is the value of $S(${n}) - S(${m})$?`;
+      stem = [`${def} What is the value of $S(${n}) - S(${m})$?`, `${def} What is $S(${n}) - S(${m})$?`][rng.int(0, 1)];
       const count = n - m;
       explanation = `$S(${n}) - S(${m})$ is the sum $${m + 1} + ${m + 2} + \\cdots + ${n}$: ${count} integers whose average is $\\frac{${m + 1} + ${n}}{2} = ${frac(m + 1 + n, 2).toDecimalString()}$. So the sum is $${count} \\times ${frac(m + 1 + n, 2).toDecimalString()} = ${num(answer)}$.
 
@@ -80,7 +75,7 @@ Check with the formula: $\\frac{${n} \\cdot ${n + 1}}{2} - \\frac{${m} \\cdot ${
 
 It is not $S(${count}) = ${num(T(count))}$: the terms run from ${m + 1} to ${n}, not from 1 to ${count}.`;
     }
-    const { choices, answer: idx } = spreadChoices(rng, answer, cands, (v) => `$${num(v)}$`);
+    const { choices, answer: idx } = spreadChoices(rng, answer, cands, (v) => `$${num(v)}$`, 5, 'shuffled');
     return {
       params: { mode, m, n, values: choices.map((c) => Number(c.text.replace(/[${},]/g, ''))) },
       q: { format: 'mcs', stem, choices, answer: idx, explanation },
@@ -226,8 +221,8 @@ interface ExprParams {
   forms: { top: number; den: number; add: number }[];
 }
 
-const formTex = ({ top, den, add }: { top: number; den: number; add: number }) => {
-  const numer = top === 0 ? 'k - j' : `k - j ${top > 0 ? '+' : '-'} ${Math.abs(top)}`;
+const formTex = ({ top, den, add }: { top: number; den: number; add: number }, [j, k] = ['j', 'k']) => {
+  const numer = top === 0 ? `${k} - ${j}` : `${k} - ${j} ${top > 0 ? '+' : '-'} ${Math.abs(top)}`;
   const main = den === 1 ? numer : `\\dfrac{${numer}}{${den}}`;
   return add === 0 ? main : `${main} ${add > 0 ? '+' : '-'} ${Math.abs(add)}`;
 };
@@ -250,39 +245,58 @@ const countExpression: Template<ExprParams> = {
     const correct: Form = { top: 0, den: step, add: correctAdd, ok: true };
     const cand: Form[] = [-1, 0, 1].filter((x) => x !== correctAdd).map((add) => ({ top: 0, den: step, add, trap: add > correctAdd ? 'counted-endpoint' : 'cycle-count-terms' }));
     const alt = step === 1 ? 2 : 1;
-    cand.push({ top: 0, den: alt, add: correctAdd, ...(step > 1 ? { trap: 'int-step-size' } : {}) }, { top: 0, den: alt, add: correctAdd + 1 }, { top: -1, den: Math.max(step, 2), add: 0 }, { top: 0, den: alt, add: correctAdd - 1 });
+    cand.push(
+      { top: 0, den: alt, add: correctAdd, trap: 'int-step-size' },
+      { top: 0, den: alt, add: correctAdd + 1, trap: 'int-step-size' },
+      { top: -1, den: Math.max(step, 2), add: 0, trap: 'int-multiples-count' },
+      { top: 0, den: alt, add: correctAdd - 1, trap: 'int-step-size' },
+    );
+    if (step > 2) cand.push({ top: 0, den: 2, add: correctAdd, trap: 'int-step-size' });
+    const vars = rng.pick([
+      ['j', 'k'],
+      ['m', 'n'],
+      ['a', 'b'],
+      ['s', 't'],
+    ]);
+    const [vj, vk] = vars;
+    // every form is expressed with the same letters as the stem, so nothing in the choices gives the pair away
     const evalAt = (f: Form, D: number) => (D + f.top) / f.den + f.add;
     const sample = [step * 4, step * 7, step * 10, step * 13];
     const same = (f: Form, g: Form) => sample.every((D) => evalAt(f, D) === evalAt(g, D));
     const clean: Form[] = [correct];
-    for (const f of cand) if (clean.length < 5 && !clean.some((g) => same(f, g) || formTex(f) === formTex(g))) clean.push(f);
+    for (const f of rng.shuffle(cand)) if (clean.length < 5 && !clean.some((g) => same(f, g) || formTex(f) === formTex(g))) clean.push(f);
     if (clean.length !== 5) throw new Error('count-expression: choice set');
     // expression choices: random order (they have no natural numeric order)
     const shuffled = rng.shuffle(clean);
     clean.splice(0, clean.length, ...shuffled);
-    const choices: Choice[] = clean.map((f) => ({ text: `$${formTex(f)}$`, ...(f.trap ? { trap: f.trap } : {}) }));
+    const choices: Choice[] = clean.map((f) => ({ text: `$${formTex(f, [vj, vk])}$`, ...(f.trap ? { trap: f.trap } : {}) }));
     const answer = clean.findIndex((f) => f.ok);
     const kind = parity === 'any' ? 'integers' : parity === 'mult3' ? 'multiples of 3' : `${parity} integers`;
-    const given = parity === 'any' ? 'integers' : parity === 'mult3' ? 'multiples of 3' : `${parity} integers`;
-    const loText = lo === 'gt' ? 'greater than $j$' : 'greater than or equal to $j$';
-    const hiText = hi === 'lt' ? 'less than $k$' : 'less than or equal to $k$';
+    const loText = lo === 'gt' ? `greater than $${vj}$` : `greater than or equal to $${vj}$`;
+    const hiText = hi === 'lt' ? `less than $${vk}$` : `less than or equal to $${vk}$`;
     const ex = { j: step * 3 + (parity === 'odd' ? 1 : 0), k: step * 8 + (parity === 'odd' ? 1 : 0) };
     const listed = range(ex.j, ex.k).filter((x) => (x - ex.j) % step === 0 && (lo === 'ge' || x > ex.j) && (hi === 'le' || x < ex.k));
+    const key = formTex(clean[answer], [vj, vk]);
+    const keyAtEx = formTex(clean[answer], [String(ex.j), String(ex.k)]);
+    const traps = new Set(clean.map((f) => f.trap));
+    const slips: string[] = [];
+    if (traps.has('int-step-size')) slips.push(`dividing by ${alt} instead of the step ${step} counts the wrong spacing`);
+    if (traps.has('counted-endpoint') || traps.has('cycle-count-terms')) slips.push('adding or subtracting the wrong number of ends miscounts by one or two');
+    if (traps.has('int-multiples-count')) slips.push('subtracting 1 from the span before dividing is the fence-post slip');
     return {
       params: { step, parity, lo, hi, forms: clean.map(({ top, den, add }) => ({ top, den, add })) },
       q: {
         format: 'mcs',
-        stem: `If $j$ and $k$ are ${given} and $j < k$, which of the following represents the number of ${kind} that are ${loText} and ${hiText}?`,
+        stem: `If $${vj}$ and $${vk}$ are ${kind === 'integers' ? 'integers' : kind} and $${vj} < ${vk}$, which of the following represents the number of ${kind} that are ${loText} and ${hiText}?`,
         choices,
         answer,
-        explanation: `From $j$ to $k$ the ${kind} go up in steps of ${step}, so counting both $j$ and $k$ there are $\\frac{k - j}{${step}} + 1$ of them${step === 1 ? '' : ''}. ${
-          inclusive === 2 ? 'Both ends are included here' : inclusive === 1 ? 'Exactly one end is included here, so subtract 1' : 'Both ends are excluded here, so subtract 2'
-        }: the count is $${formTex(clean[answer])}$.
+        explanation: `Evenly spaced numbers: the count is (last - first) divided by the step, plus 1.
 
-Check with numbers: $j = ${ex.j}$ and $k = ${ex.k}$ give ${listed.join(', ')}, which is ${listed.length} ${kind}, and $${formTex(clean[answer]).replace(/k - j/g, `${ex.k} - ${ex.j}`)} = ${listed.length}$.`.replace(
-          '\\frac{k - j}{1} + 1',
-          'k - j + 1',
-        ),
+From $${vj}$ to $${vk}$ the ${kind} go up in steps of ${step}, so counting both ends there are ${step === 1 ? `$${vk} - ${vj} + 1$` : `$\\frac{${vk} - ${vj}}{${step}} + 1$`} of them. ${
+          inclusive === 2 ? 'Both ends are included here' : inclusive === 1 ? 'Exactly one end is included here, so subtract 1' : 'Both ends are excluded here, so subtract 2'
+        }: the count is $${key}$.
+
+Check with numbers: $${vj} = ${ex.j}$ and $${vk} = ${ex.k}$ give ${listed.join(', ')}, which is ${listed.length} ${kind}, and $${keyAtEx} = ${listed.length}$.${slips.length ? ` Trap: ${slips.slice(0, 2).join('; ')}.` : ''}`,
       },
     };
   },
@@ -334,19 +348,19 @@ const findTerm: Template<TermParams> = {
     const answer = ask === 'greatest' ? last : x;
     const avg = frac(S, k);
     const cands: { v: number; trap?: string }[] = [];
+    // the average (the middle term, or the two middle terms when k is even)
     if (avg.isInt()) cands.push({ v: avg.n, trap: 'int-gave-middle-term' });
+    else cands.push({ v: Math.floor(avg.toNumber()), trap: 'int-gave-middle-term' }, { v: Math.ceil(avg.toNumber()), trap: 'int-gave-middle-term' });
+    // the other end of the run
+    cands.push({ v: ask === 'greatest' ? x : last, trap: 'int-other-end' });
+    // one term too many (counting k + 1 terms) or one too few
+    cands.push({ v: ask === 'greatest' ? last + step : x - step, trap: 'cycle-count-terms' }, { v: ask === 'greatest' ? last - step : x + step, trap: 'cycle-count-terms' });
     if (step === 2) {
       const half = (k - 1) / 2;
       const wrongStep = ask === 'greatest' ? avg.toNumber() + half : avg.toNumber() - half;
       if (Number.isInteger(wrongStep)) cands.push({ v: wrongStep, trap: 'int-step-size' });
     }
-    cands.push(
-      { v: ask === 'greatest' ? x : last },
-      ...[1, 2, 3, 4].flatMap((t) => [{ v: answer + t * step }, { v: answer - t * step }]),
-      { v: answer + 1 },
-      { v: answer - 1 },
-    );
-    const { choices, answer: idx } = spreadChoices(rng, answer, cands);
+    const { choices, answer: idx } = spreadChoices(rng, answer, rng.shuffle(cands), undefined, 5, 'shuffled');
     const kindText = parity === 'any' ? 'consecutive integers' : `consecutive ${parity} integers`;
     const terms = range(0, k - 1).map((i) => x + step * i);
     const middle =
@@ -417,18 +431,28 @@ const possibleSums: Template<PossParams> = {
     const k = diff === 1 ? rng.pick([3, 5]) : diff === 2 ? rng.pick([4, 6]) : parity === 'even' ? rng.pick([3, 4]) : rng.pick([3, 4]);
     const nChoices = diff === 1 ? 5 : 6;
     for (;;) {
-      const { good, nearMiss, other } = possibleSumsChoices(k, step, parity, nChoices);
+      const { good, other } = possibleSumsChoices(k, step, parity, nChoices);
+      const pool = range(20, 160);
+      // Wrong values that come from a real slip: a multiple of k, or a sum of k - 1 or k + 1 terms.
+      const slipOf = (v: number): string | undefined =>
+        canBeSum(v, k, step, parity)
+          ? undefined
+          : v % k === 0
+            ? 'int-sum-multiple-of-count'
+            : canBeSum(v, k - 1, step, parity) || canBeSum(v, k + 1, step, parity)
+              ? 'cycle-count-terms'
+              : undefined;
+      const named = pool.filter((v) => slipOf(v));
       const nGood = rng.int(1, 3);
-      const nNear = nearMiss.length ? Math.min(nearMiss.length, rng.int(1, 2)) : 0;
       const g = rng.sample(good, nGood);
-      const nm = rng.sample(nearMiss, nNear);
-      const o = rng.sample(other, nChoices - nGood - nNear);
+      const nm = rng.sample(named, Math.min(named.length, nChoices - nGood));
+      const o = rng.sample(other, nChoices - nGood - nm.length);
       const values = [...g, ...nm, ...o].sort((a, b) => a - b);
       if (new Set(values).size !== nChoices) continue;
       const items = values.map((v) => ({
         text: `$${v}$`,
         correct: g.includes(v),
-        ...(nm.includes(v) ? { trap: 'int-sum-multiple-of-count' } : {}),
+        ...(nm.includes(v) ? { trap: slipOf(v)! } : {}),
       }));
       const { choices, answer } = flaggedChoices(items as (Choice & { correct: boolean })[]);
       const kindText = parity === 'any' ? 'consecutive integers' : `consecutive ${parity} integers`;
@@ -447,19 +471,25 @@ const possibleSums: Template<PossParams> = {
             return `${k * x + offset}`;
           })
           .join(', ')}, and so on, going up by ${2 * k}.`;
-      const whyNot = (v: number) => {
-        if (parity === 'any') return k % 2 === 1 ? `not a multiple of ${k}` : `leaves remainder ${v % k}, not ${offset % k}, when divided by ${k}`;
-        const rest = v - offset;
-        if (rest % k !== 0) return `$${v} - ${offset} = ${rest}$ is not a multiple of ${k}`;
-        return `the least term would be ${rest / k}, which is not ${parity}`;
-      };
-      const lines = values.map((v) => {
-        if (!canBeSum(v, k, step, parity)) return `- ${v}: ${whyNot(v)} ✗`;
-        const x = (v - offset) / k;
-        return `- $${v} = ${range(0, k - 1)
-          .map((i) => x + step * i)
-          .join(' + ')}$ ✓`;
-      });
+      const okLines = values
+        .filter((v) => canBeSum(v, k, step, parity))
+        .map((v) => {
+          const x = (v - offset) / k;
+          return `$${v} = ${range(0, k - 1)
+            .map((i) => x + step * i)
+            .join(' + ')}$`;
+        });
+      const failing = values.filter((v) => !canBeSum(v, k, step, parity));
+      const lines = [`Works: ${listAnd(okLines)}.`, `Fail the test: ${listAnd(failing.map(String))}.`];
+      const countSlip = nm.find((v) => slipOf(v) === 'cycle-count-terms');
+      const multSlip = nm.find((v) => slipOf(v) === 'int-sum-multiple-of-count');
+      const trapBits = [
+        ...(multSlip !== undefined ? [`${multSlip} is a multiple of ${k}, but a multiple of ${k} is not automatically a possible sum${k % 2 === 0 ? ' (that works only when the number of terms is odd)' : ''}`] : []),
+        ...(countSlip !== undefined
+          ? [`${countSlip} is the sum of ${canBeSum(countSlip, k + 1, step, parity) ? k + 1 : k - 1} ${kindText}, not of ${k}`]
+          : []),
+      ];
+      const trapLine = trapBits.length ? `\n\nTrap: ${trapBits.join('; ')}.` : '';
       return {
         params: { k, step, parity, values },
         q: {
@@ -470,7 +500,7 @@ const possibleSums: Template<PossParams> = {
           answer,
           explanation: `${rule}
 
-${lines.join('\n')}${nm.length ? `\n\nA multiple of ${k} is not automatically a possible sum${k % 2 === 0 ? `: that works only when the number of terms is odd` : ''}.` : ''}`,
+${lines.join(' ')}${trapLine}`,
         },
       };
     }
