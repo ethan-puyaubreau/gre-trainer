@@ -20,3 +20,6 @@ export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenT
 import { crossTermTemplate, crossTermTraps } from './crossTerm';
 coreTemplates.push(crossTermTemplate);
 Object.assign(coreTraps, crossTermTraps);
+import { simplifyFractionTemplate, simplifyFractionTraps } from './simplifyFraction';
+coreTemplates.push(simplifyFractionTemplate);
+Object.assign(coreTraps, simplifyFractionTraps);
