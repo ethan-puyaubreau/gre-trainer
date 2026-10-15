@@ -7,7 +7,7 @@ import { frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { num } from '../../../engine/tex';
 import type { BarChartFigure, Difficulty, PieChartFigure, QuestionBody, Template } from '../../../engine/types';
-import { mcmCheck, mcsCheck, nearestIndex, spacedChoices } from './util';
+import { mcmCheck, mcsCheck, nearestIndex, trapChoicesOrPad } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.region-pie-bar';
@@ -117,25 +117,36 @@ const otherPercent: Template<OtherParams> = {
     const rest = D.T - shown;
     const exact = (rest / D.T) * 100;
     const r = Math.round(exact);
-    const { choices, answer, values } = spacedChoices(
-      rng,
-      r,
-      [
-        { v: Math.round((shown / D.T) * 100), trap: 'prob-wrong-event' },
-        { v: Math.round((rest / D.W) * 100), trap: 'prob-di-wrong-total' },
-        { v: rest, trap: 'prob-count-as-percent' },
-      ],
-      { step: 5, minGap: 3, min: 1, max: 99, format: (v) => `${v}%` },
-    );
+    const mk = (x: number, trap: string, why: (s: string) => string) => ({ value: Math.round(x), trap, why });
+    const traps = rng.shuffle([
+      mk((shown / D.T) * 100, 'prob-wrong-event', (s) => `${s}% is the part covered by the four countries shown, the opposite of what is asked`),
+      mk((rest / D.W) * 100, 'prob-di-wrong-total', (s) => `dividing by the worldwide total gives ${s}%, but the question is about ${D.focus}`),
+      mk(rest, 'prob-count-as-percent', (s) => `${s} is the number of millions left over, not a percent`),
+      mk((rest / shown) * 100, 'prob-percent-wrong-base', (s) => `dividing by the four countries shown gives ${s}%, but the base is the ${D.focus} total`),
+      mk(D.pcts[0], 'prob-di-wrong-total', (s) => `${s}% is the share of ${D.focus} in the circle graph, not the share of the countries not shown`),
+      mk(100 - D.pcts[0], 'prob-di-wrong-total', (s) => `${s}% is the share of the other regions in the circle graph`),
+      mk((Math.max(...D.values) / D.T) * 100, 'prob-di-lumped-category', (s) => `${s}% is the share of the largest country shown, not of the countries not shown`),
+      mk((rest / D.W) * 100 * (D.pcts[0] / 100) * 4, 'prob-di-wrong-total', (s) => `taking the share of the countries not shown inside the ${D.pcts[0]}% of the circle graph gives ${s}%`),
+      mk((rest / (D.W - D.T)) * 100, 'prob-di-wrong-total', (s) => `dividing by everyone outside ${D.focus} gives ${s}%, but the base is the ${D.focus} total`),
+      mk((Math.min(...D.values) / D.T) * 100, 'prob-di-lumped-category', (s) => `${s}% is the share of the smallest country shown, not of the countries not shown`),
+      mk((rest / D.T) * 50, 'prob-half-count', (s) => `halving the share gives ${s}%`),
+    ]).filter((t) => t.value >= 1 && t.value <= 99);
+    const built = trapChoicesOrPad(rng, r, traps, { step: 5, minGap: 3, min: 1, max: 99, pad: true, ends: true, format: (v) => `${v}%` });
+    if (!built) throw new Error('region-other-percent: no choices');
+    const cite = rng.pick(built.used.length ? built.used : traps);
     return {
-      params: { values },
+      params: { values: built.values },
       q: {
         format: 'mcs',
         figure: D.figure,
         stem: `Approximately what percent of the ${D.who} in ${D.focus} were in countries other than the four shown in the bar graph?`,
-        choices,
-        answer,
+        choices: built.choices,
+        answer: built.answer,
         explanation: `The four countries shown account for $${D.values.join(' + ')} = ${shown}$ million of the ${D.T} million ${D.who} in ${D.focus}. The rest: $${D.T} - ${shown} = ${rest}$ million, which is $\\frac{${rest}}{${D.T}} \\approx ${num(Math.round(exact * 10) / 10)}$%, about ${r}%.
+
+Check: ${r}% of ${D.T} million is about ${num(Math.round((r * D.T) / 10) / 10)} million, near the ${rest} million left.
+
+Trap: ${cite.why(String(cite.value))}.
 
 The base is the ${D.focus} total (${D.T} million), not the worldwide total.`,
       },
@@ -165,34 +176,73 @@ const barRange: Template<RangeParams> = {
   style: 'range of the values in a bar graph, or the difference of two bars',
   generate(rng, d) {
     const D = makeRegionData(rng, d);
-    const ask: RangeParams['ask'] = d === 1 ? 'range' : rng.pick(['range', 'difference'] as const);
     const v = D.values;
-    const maxV = Math.max(...v);
-    const minV = Math.min(...v);
-    let a = v.indexOf(maxV);
-    let b = v.indexOf(minV);
-    let correct: number;
-    const traps: { v: number; trap: string }[] = [];
-    let stem: string;
-    let explanation: string;
-    if (ask === 'range') {
-      correct = maxV - minV;
-      stem = `What is the range of the numbers of ${D.who} in the four countries shown in the bar graph?`;
-      traps.push({ v: maxV, trap: 'prob-di-range' }, { v: maxV - v.slice().sort((x, y) => y - x)[1], trap: 'prob-di-range' });
-      explanation = `Range = greatest $-$ least: ${D.countries[a]} has the most (${mil(maxV)}) and ${D.countries[b]} the fewest (${mil(minV)}), so the range is $${maxV} - ${minV} = ${correct}$ million.`;
-    } else {
-      [a, b] = rng.sample([0, 1, 2, 3], 2);
-      if (v[a] < v[b]) [a, b] = [b, a];
-      correct = v[a] - v[b];
-      stem = `In 2023, how many more ${D.who} were there in ${D.countries[a]} than in ${D.countries[b]}?`;
-      traps.push({ v: v[a] + v[b], trap: 'prob-wrong-event' }, { v: v[a], trap: 'prob-di-wrong-column' });
-      explanation = `Read the two bars: ${D.countries[a]}, ${mil(v[a])}; ${D.countries[b]}, ${mil(v[b])}. Difference: $${v[a]} - ${v[b]} = ${correct}$ million.`;
+    const sortedDesc = v.slice().sort((x, y) => y - x);
+    const maxV = sortedDesc[0];
+    const minV = sortedDesc[3];
+    const shown = v.reduce((s, x) => s + x, 0);
+    for (let tries = 0; ; tries++) {
+      const ask: RangeParams['ask'] = d === 1 ? 'range' : rng.pick(['range', 'difference'] as const);
+      let a = v.indexOf(maxV);
+      let b = v.indexOf(minV);
+      let correct: number;
+      let stem: string;
+      let explanation: string;
+      let check: string;
+      const traps: { value: number; trap: string; why: (s: string) => string }[] = [];
+      const T = (value: number, trap: string, why: (s: string) => string) => traps.push({ value, trap, why });
+      if (ask === 'range') {
+        correct = maxV - minV;
+        stem = `What is the range of the numbers of ${D.who} in the four countries shown in the bar graph?`;
+        T(maxV, 'prob-di-range', (s) => `${s} million is the greatest value, not the range`);
+        T(maxV - sortedDesc[1], 'prob-di-range', (s) => `subtracting the second greatest instead of the least gives ${s} million`);
+        T(maxV - sortedDesc[2], 'prob-di-range', (s) => `subtracting the third greatest instead of the least gives ${s} million`);
+        T(maxV + minV, 'prob-di-range', (s) => `adding the greatest and the least gives ${s} million instead of subtracting`);
+        T(shown, 'prob-wrong-event', (s) => `${s} million is the total of the four countries, not their range`);
+        T(D.T, 'prob-di-wrong-column', (s) => `${s} million is the total of ${D.focus} given in the title, not a range`);
+        T(minV, 'prob-di-range', (s) => `${s} million is the least value, not the range`);
+        T(sortedDesc[1] - sortedDesc[2], 'prob-di-range', (s) => `subtracting two values in the middle gives ${s} million`);
+        T(sortedDesc[2] - minV, 'prob-di-range', (s) => `subtracting the least from the third greatest gives ${s} million`);
+        T(sortedDesc[1] - minV, 'prob-di-range', (s) => `using the second greatest instead of the greatest gives ${s} million`);
+        explanation = `Range = greatest $-$ least: ${D.countries[a]} has the most (${mil(maxV)}) and ${D.countries[b]} the fewest (${mil(minV)}), so the range is $${maxV} - ${minV} = ${correct}$ million.`;
+        check = `the range cannot exceed the greatest value, ${maxV}, and $${maxV} - ${minV} = ${correct}$ does not.`;
+      } else {
+        [a, b] = rng.sample([0, 1, 2, 3], 2);
+        if (v[a] < v[b]) [a, b] = [b, a];
+        correct = v[a] - v[b];
+        stem = `In 2023, how many more ${D.who} were there in ${D.countries[a]} than in ${D.countries[b]}?`;
+        T(v[a] + v[b], 'prob-wrong-event', (s) => `adding the two bars gives ${s} million instead of subtracting`);
+        T(v[a], 'prob-di-wrong-column', (s) => `${s} million is the ${D.countries[a]} bar alone`);
+        T(v[b], 'prob-di-wrong-column', (s) => `${s} million is the ${D.countries[b]} bar alone`);
+        for (const x of [0, 1, 2, 3]) {
+          if (x === a || x === b) continue;
+          T(Math.abs(v[a] - v[x]), 'prob-di-wrong-column', (s) => `reading ${D.countries[x]} instead of ${D.countries[b]} gives ${s} million`);
+          T(Math.abs(v[x] - v[b]), 'prob-di-wrong-column', (s) => `reading ${D.countries[x]} instead of ${D.countries[a]} gives ${s} million`);
+        }
+        explanation = `Read the two bars: ${D.countries[a]}, ${mil(v[a])}; ${D.countries[b]}, ${mil(v[b])}. Difference: $${v[a]} - ${v[b]} = ${correct}$ million.`;
+        check = `$${v[b]} + ${correct} = ${v[a]}$.`;
+      }
+      const built = trapChoicesOrPad(rng, correct, traps.filter((t) => t.value >= 1), { step: 2, minGap: 1, min: 1, pad: tries >= 40, format: mil });
+      if (!built) continue;
+      const cite = rng.pick(built.used.length ? built.used : traps);
+      return {
+        params: { ask, a, b },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `${explanation}
+
+Check: ${check}
+
+Trap: ${cite.why(String(cite.value))}.
+
+${ask === 'range' ? 'The range is the difference between the greatest and the least value.' : '"How many more" is a difference, not a sum.'}`,
+        },
+      };
     }
-    const { choices, answer } = spacedChoices(rng, correct, traps, { step: 2, minGap: 1, min: 1, format: mil });
-    return {
-      params: { ask, a, b },
-      q: { format: 'mcs', figure: D.figure, stem, choices, answer, explanation },
-    };
   },
   check(q, { ask, a, b }) {
     const { values } = readRegion(q);
@@ -226,39 +276,53 @@ const howManyTimes: Template<TimesParams> = {
         const st = stepOf(ratio);
         if (ratio >= 1.7 && Math.abs(ratio / st - Math.round(ratio / st)) < 0.3) pairs.push({ c, r, ratio });
       }
-    const pick = pairs.length ? rng.pick(pairs) : (() => {
+    const fallback = (() => {
       const c = D.values.indexOf(Math.min(...D.values));
       return { c, r: 1, ratio: (D.W * D.pcts[1]) / 100 / D.values[c] };
     })();
-    const { c, r, ratio } = pick;
-    const st = stepOf(ratio);
-    const R = Math.max(st, Math.round(ratio / st) * st);
-    const regionCount = (D.W * D.pcts[r]) / 100;
-    const g = (v: number) => Math.round(v / st) * st;
-    const { choices, answer, values } = spacedChoices(
-      rng,
-      R,
-      [
-        { v: g(D.pcts[r] / D.values[c]), trap: 'prob-percent-not-count' },
-        { v: g((D.T * D.pcts[r]) / 100 / D.values[c]), trap: 'prob-di-wrong-total' },
-      ],
-      { step: st, min: st > 1 ? st : 1, format: (v) => `${v}` },
-    );
-    return {
-      params: { c, r, values },
-      q: {
-        format: 'mcs',
-        figure: D.figure,
-        stem: `In 2023, the number of ${D.who} of ${D.org} in ${D.regions[r]} was approximately how many times the number of ${D.who} in ${D.countries[c]}?`,
-        choices,
-        answer,
-        explanation: `First find the worldwide total: ${D.focus} had ${D.T} million ${D.who}, which is ${D.pcts[0]}% of the total, so the total was $\\frac{${D.T}}{${frac(D.pcts[0], 100).toNumber()}} = ${D.W}$ million. ${D.regions[r]} had ${D.pcts[r]}% of that: $${frac(D.pcts[r], 100).toNumber()} \\times ${D.W} = ${num(regionCount)}$ million.
+    for (let tries = 0; ; tries++) {
+      const { c, r, ratio } = pairs.length ? rng.pick(pairs) : fallback;
+      const st = stepOf(ratio);
+      const R = Math.max(st, Math.round(ratio / st) * st);
+      const regionCount = (D.W * D.pcts[r]) / 100;
+      const g = (v: number) => Math.round(v / st) * st;
+      const mk = (x: number, trap: string, why: (s: string) => string) => ({ value: g(x), trap, why });
+      const traps = rng.shuffle([
+        mk(D.pcts[r] / D.values[c], 'prob-percent-not-count', (s) => `dividing the percent ${D.pcts[r]} by ${D.values[c]} gives ${s}, but ${D.pcts[r]} is a percent, not a number of ${D.who}`),
+        mk((D.T * D.pcts[r]) / 100 / D.values[c], 'prob-di-wrong-total', (s) => `taking ${D.pcts[r]}% of the ${D.focus} total gives ${s}, but the percent is of the worldwide total`),
+        ...[0, 1, 2, 3]
+          .filter((k) => k !== c)
+          .map((k) => mk(regionCount / D.values[k], 'prob-di-wrong-column', (s) => `comparing with ${D.countries[k]} instead of ${D.countries[c]} gives ${s}`)),
+        ...[1, 2, 3]
+          .filter((k) => k !== r)
+          .map((k) => mk(((D.W * D.pcts[k]) / 100) / D.values[c], 'prob-di-wrong-column', (s) => `using ${D.regions[k]} instead of ${D.regions[r]} gives ${s}`)),
+        mk((D.W * D.pcts[0]) / 100 / D.values[c], 'prob-di-wrong-column', (s) => `using ${D.focus} itself gives ${s}`),
+        mk(D.W / D.values[c], 'prob-di-wrong-column', (s) => `dividing the worldwide total by ${D.countries[c]} gives ${s}`),
+        mk(D.values[c] / regionCount, 'prob-di-inverted', (s) => `dividing the country by the region gives ${s}, the reverse ratio`),
+      ]).filter((t) => t.value >= (st > 1 ? st : 1));
+      const built = trapChoicesOrPad(rng, R, traps, { step: st, minGap: st, min: st > 1 ? st : 1, pad: tries >= 60, ends: true, format: (v) => `${v}` });
+      if (!built) continue;
+      const cite = rng.pick(built.used.length ? built.used : traps);
+      return {
+        params: { c, r, values: built.values },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem: `In 2023, the number of ${D.who} of ${D.org} in ${D.regions[r]} was approximately how many times the number of ${D.who} in ${D.countries[c]}?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `First find the worldwide total: ${D.focus} had ${D.T} million ${D.who}, which is ${D.pcts[0]}% of the total, so the total was $\\frac{${D.T}}{${frac(D.pcts[0], 100).toNumber()}} = ${D.W}$ million. ${D.regions[r]} had ${D.pcts[r]}% of that: $${frac(D.pcts[r], 100).toNumber()} \\times ${D.W} = ${num(regionCount)}$ million.
 
 ${D.countries[c]} had ${D.values[c]} million, so the ratio is $\\frac{${num(regionCount)}}{${D.values[c]}} ${Number.isInteger(ratio) ? '=' : '\\approx'} ${num(Math.round(ratio * 100) / 100)}$${ratio === R ? '' : `, closest to ${R}`}.
 
-Applying ${D.pcts[r]}% to the ${D.focus} total (${D.T} million) instead of the worldwide total is the trap.`,
-      },
-    };
+Check: $${R} \\times ${D.values[c]} = ${num(R * D.values[c])}$ million, near the ${num(regionCount)} million of ${D.regions[r]}.
+
+Trap: ${cite.why(String(cite.value))}.
+
+A percent in a circle graph is a percent of the whole circle: derive the whole first.`,
+        },
+      };
+    }
   },
   check(q, { c, r, values }) {
     const { pcts, values: bars, T } = readRegion(q);
@@ -328,6 +392,7 @@ const regionMust: Template<RegMustParams> = {
       s: { kind: 'pair-share', a, b, num: fn, den: fd },
       text: `${D.countries[a]} and ${D.countries[b]} together accounted for more than ${fname} of the ${D.who} in ${D.focus}.`,
       truth: share > fn / fd,
+      ...(share > fn / fd ? {} : { trap: 'prob-di-fraction-of-total' }),
       why: `$${D.values[a]} + ${D.values[b]} = ${D.values[a] + D.values[b]}$ million, and ${fname} of ${D.T} million is $${num(Math.round((D.T * fn * 100) / fd) / 100)}$ million, so the statement is ${share > fn / fd ? 'true' : 'false'}.`,
     });
     // Worldwide total.
@@ -337,6 +402,7 @@ const regionMust: Template<RegMustParams> = {
       s: { kind: 'world-over', x },
       text: `${D.org} had more than ${x} million ${D.who} worldwide in 2023.`,
       truth: D.W > x,
+      ...(D.W > x ? {} : { trap: 'prob-di-wrong-total' }),
       why: `${D.focus}'s ${D.T} million is ${D.pcts[0]}% of the total, so the total is $${D.T} \\div ${frac(D.pcts[0], 100).toNumber()} = ${D.W}$ million, which is ${D.W > x ? 'more' : 'less'} than ${x} million.`,
     });
     const n = d === 3 ? 4 : 3;

@@ -221,7 +221,8 @@ export function commas(x: number, maxDec = 2): string {
  * value is not a distractor and is left out; a `must` mistake (one the explanation cites) that gives
  * the right value, or too few different mistakes, make this return null so the generator draws again.
  * Mistakes are used in the order given, `must` ones first on their side of the right value.
- * With `uniformRank` the right value takes any rank the mistakes allow with equal chance (for counts, where few ranks are possible).
+ * `rankMode` true: the right value takes any rank the mistakes allow with equal chance (for counts, where few ranks are
+ * possible); 'ends': the extreme ranks are favoured (for questions whose mistakes sit mostly on one side).
  * `minGap` keeps every value at least that far from the right one and from the others kept before
  * it (for "closest to" questions). `used` lists the mistakes that became choices, so an explanation
  * can cite one of them; `values` is the value of each choice, in choice order.
@@ -233,7 +234,7 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
   format: (v: Frac) => string,
   count = 5,
   minGap = 0,
-  uniformRank = false,
+  rankMode: boolean | 'ends' = false,
 ): { choices: Choice[]; answer: number; used: T[]; values: Frac[] } | null {
   const right = Frac.of(correct);
   const far = (a: Frac, b: Frac) => minGap <= 0 || Math.abs(a.sub(b).toNumber()) >= minGap - 1e-9;
@@ -259,7 +260,12 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
   const lo = Math.max(mustBelow, count - 1 - above.length);
   const hi = Math.min(below.length, count - 1 - mustAbove);
   if (lo > hi) return null;
-  const r = uniformRank ? lo + rng.int(0, hi - lo) : Math.min(Math.max(rng.int(0, count - 1), lo), hi);
+  let r: number;
+  if (rankMode === 'ends') {
+    // the least and the greatest allowed ranks each get 30% of the draws, the others share the rest
+    const t = rng.next();
+    r = t < 0.3 ? lo : t < 0.6 ? hi : lo + rng.int(0, hi - lo);
+  } else r = rankMode ? lo + rng.int(0, hi - lo) : Math.min(Math.max(rng.int(0, count - 1), lo), hi);
   const take = (list: typeof seen, k: number) => [...list.filter((x) => x.must), ...list.filter((x) => !x.must)].slice(0, k);
   const all = [
     ...take(below, r).map((x) => ({ v: x.v, item: x.item, ok: false })),
@@ -283,9 +289,9 @@ export function trapChoicesOrPad<T extends { value: number; trap: string }>(
   rng: Rng,
   correct: number,
   traps: T[],
-  opts: { step: number; minGap: number; min?: number; max?: number; pad: boolean; format: (v: number) => string },
+  opts: { step: number; minGap: number; min?: number; max?: number; pad: boolean; ends?: boolean; format: (v: number) => string },
 ): { choices: Choice[]; answer: number; used: T[]; values: number[] } | null {
-  const named = trapOnlyChoices(rng, correct, traps, (v) => opts.format(v.toNumber()), 5, opts.minGap);
+  const named = trapOnlyChoices(rng, correct, traps, (v) => opts.format(v.toNumber()), 5, opts.minGap, opts.ends ? 'ends' : false);
   if (named) return { choices: named.choices, answer: named.answer, used: named.used, values: named.values.map((v) => v.toNumber()) };
   if (!opts.pad) return null;
   const sc = spacedChoices(rng, correct, traps.map((t) => ({ v: t.value, trap: t.trap })), opts);

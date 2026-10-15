@@ -349,6 +349,10 @@ export const probTraps: Record<string, Trap> = {
     label: 'Misread a bar by one gridline',
     fix: 'Read each bar against the axis and take the value at the top of the bar before computing.',
   },
+  'prob-di-fraction-of-total': {
+    label: 'Compared the countries with the wrong share of the total',
+    fix: 'Take the stated fraction of the region total given in the title of the bar graph, then compare it with the sum of the bars.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

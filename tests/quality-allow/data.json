@@ -2,18 +2,6 @@
   "data.interpretation.pie-remove": {
     "distractors.trapped": "baseline"
   },
-  "data.interpretation.region-must": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.region-other-percent": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.region-range": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.region-times": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.season-fraction": {
     "artifacts.frac-1": "baseline",
     "distractors.trapped": "baseline"
