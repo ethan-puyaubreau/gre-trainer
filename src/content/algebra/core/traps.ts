@@ -21,6 +21,18 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: '$(a + b)^2 = a^2 + ab + b^2$',
     fix: 'The middle term is $2ab$: $(a + b)^2 = a^2 + 2ab + b^2$ and $(a - b)^2 = a^2 - 2ab + b^2$.',
   },
+  'alg-square-middle-sign': {
+    label: 'Gave the middle term of a square the wrong sign',
+    fix: '$(a - b)^2 = a^2 - 2ab + b^2$ and $(a + b)^2 = a^2 + 2ab + b^2$: the middle term has the sign of the sum or difference inside.',
+  },
+  'alg-conjugate-as-square': {
+    label: 'Expanded $(a + b)(a - b)$ like a square',
+    fix: 'The two factors differ in sign, so the middle terms cancel: $(a + b)(a - b) = a^2 - b^2$.',
+  },
+  'alg-foil-cross-terms': {
+    label: 'Multiplied only the first terms and the last terms',
+    fix: 'Every term of the first factor multiplies every term of the second: first, outer, inner, last.',
+  },
   'alg-distribute-minus': {
     label: 'Changed the sign of only the first term after a minus',
     fix: 'A minus sign in front of parentheses changes the sign of EVERY term inside: $-(x^2 - 6x + 9) = -x^2 + 6x - 9$.',

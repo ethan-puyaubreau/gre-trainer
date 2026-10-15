@@ -303,94 +303,100 @@ const expandMCS: Template<ExpandParams> = {
   format: 'mcs',
   style: 'expand and simplify squares and products',
   generate(rng, d) {
-    const twoVar = d === 3 ? rng.chance(0.6) : d === 2 ? rng.chance(0.25) : false;
-    let terms: ProdTerm[];
-    let R: Quad;
-    do {
-      const p1 = d === 1 ? 1 : rng.pick([1, 1, 2, 3]);
-      const q1 = rng.int(1, 6) * rng.sign();
-      const t1: ProdTerm = { c: d === 3 && rng.chance(0.3) ? 2 : 1, l1: [p1, q1], l2: [p1, q1] };
-      const kind = rng.pick(['square', 'conj', 'general'] as const);
-      const p2 = d === 1 ? 1 : rng.pick([1, 1, 2, 3]);
-      const q2 = rng.int(1, 6) * rng.sign();
-      const l2: Lin = [p2, q2];
-      const l3: Lin = kind === 'square' ? [p2, q2] : kind === 'conj' ? [p2, -q2] : [d === 1 ? 1 : rng.pick([1, 2]), rng.int(1, 6) * rng.sign()];
-      const t2: ProdTerm = { c: rng.chance(0.75) ? -1 : 1, l1: l2, l2: l3 };
-      terms = [t1, t2];
-      R = addQ(scaleQ(prodQuad(t1), t1.c), scaleQ(prodQuad(t2), t2.c));
-    } while (R.filter((x) => x !== 0).length < 2 || terms[1].l1.join() === terms[0].l1.join());
+    for (;;) {
+      const twoVar = d === 3 ? rng.chance(0.6) : d === 2 ? rng.chance(0.25) : false;
+      let terms: ProdTerm[];
+      let R: Quad;
+      do {
+        const p1 = d === 1 ? 1 : rng.pick([1, 1, 2, 3]);
+        const q1 = rng.int(1, 6) * rng.sign();
+        const t1: ProdTerm = { c: d === 3 && rng.chance(0.3) ? 2 : 1, l1: [p1, q1], l2: [p1, q1] };
+        const kind = rng.pick(['square', 'conj', 'general'] as const);
+        const p2 = d === 1 ? 1 : rng.pick([1, 1, 2, 3]);
+        const q2 = rng.int(1, 6) * rng.sign();
+        const l2: Lin = [p2, q2];
+        const l3: Lin = kind === 'square' ? [p2, q2] : kind === 'conj' ? [p2, -q2] : [d === 1 ? 1 : rng.pick([1, 2]), rng.int(1, 6) * rng.sign()];
+        const t2: ProdTerm = { c: rng.chance(0.75) ? -1 : 1, l1: l2, l2: l3 };
+        terms = [t1, t2];
+        R = addQ(scaleQ(prodQuad(t1), t1.c), scaleQ(prodQuad(t2), t2.c));
+      } while (R.filter((x) => x !== 0).length < 2 || terms[1].l1.join() === terms[0].l1.join());
 
-    // Mistaken expansions.
-    const sqNoMiddle = (t: ProdTerm): Quad => {
-      const same = t.l1.join() === t.l2.join();
-      return same ? [t.l1[0] ** 2, 0, t.l1[1] ** 2] : prodQuad(t);
-    };
-    const sqHalfMiddle = (t: ProdTerm): Quad => {
-      const same = t.l1.join() === t.l2.join();
-      return same ? [t.l1[0] ** 2, t.l1[0] * t.l1[1], t.l1[1] ** 2] : prodQuad(t);
-    };
-    const minusFirstOnly = (t: ProdTerm): Quad => {
-      const p = prodQuad(t);
-      return t.c < 0 ? [-Math.abs(t.c) * p[0], Math.abs(t.c) * p[1], Math.abs(t.c) * p[2]] : scaleQ(p, t.c);
-    };
-    const wrongs: { v: Quad; trap?: string }[] = [];
-    const combine = (f: (t: ProdTerm) => Quad, scaled = true) =>
-      terms.map((t) => (scaled ? scaleQ(f(t), t.c) : f(t))).reduce(addQ);
-    wrongs.push({ v: combine(sqNoMiddle), trap: 'square-of-sum' });
-    if (terms[1].c < 0) wrongs.push({ v: addQ(scaleQ(prodQuad(terms[0]), terms[0].c), minusFirstOnly(terms[1])), trap: 'alg-distribute-minus' });
-    wrongs.push({ v: combine(sqHalfMiddle), trap: 'alg-middle-term-half' });
-    const fillers: Quad[] = [
-      [R[0], -R[1], R[2]],
-      [R[0], R[1], -R[2]],
-      [R[0], 2 * R[1], R[2]],
-      [R[0] + 1, R[1], R[2]],
-      [R[0], R[1], R[2] + (R[2] > 0 ? -2 : 2)],
-      [R[0], R[1] + 4, R[2]],
-      [R[0], R[1] - 4, R[2]],
-      [R[0], R[1], 2 * R[2]],
-      [R[0] - 1, R[1], R[2]],
-    ];
-    const seen = new Set([qKey(R)]);
-    const chosen: { v: Quad; trap?: string }[] = [];
-    for (const w of [...wrongs, ...rng.shuffle(fillers).map((v) => ({ v }))]) {
-      if (chosen.length === 4) break;
-      if (seen.has(qKey(w.v)) || w.v.every((x) => x === 0)) continue;
-      seen.add(qKey(w.v));
-      chosen.push(w);
+      // Mistaken expansions, each one a named slip in ONE step; the other terms are expanded correctly.
+      const exact = terms.map((t) => scaleQ(prodQuad(t), t.c));
+      const swapIn = (i: number, mistaken: Quad): Quad => exact.map((e, j) => (j === i ? scaleQ(mistaken, terms[j].c) : e)).reduce(addQ);
+      const wrongs: { v: Quad; trap: string; why: string }[] = [];
+      terms.forEach((t, i) => {
+        const [a1, b1] = t.l1;
+        const [a2, b2] = t.l2;
+        const L = `(${linTex(t.l1, twoVar)})`;
+        if (t.l1.join() === t.l2.join()) {
+          wrongs.push({ v: swapIn(i, [a1 * a1, 0, b1 * b1]), trap: 'square-of-sum', why: `dropping the middle term of $${L}^2$` });
+          wrongs.push({ v: swapIn(i, [a1 * a1, a1 * b1, b1 * b1]), trap: 'alg-middle-term-half', why: `using $ab$ instead of $2ab$ for the middle term of $${L}^2$` });
+          wrongs.push({ v: swapIn(i, [a1 * a1, -2 * a1 * b1, b1 * b1]), trap: 'alg-square-middle-sign', why: `giving the middle term of $${L}^2$ the wrong sign` });
+        } else if (a1 === a2 && b1 === -b2) {
+          wrongs.push({ v: swapIn(i, prodQuad({ c: 1, l1: t.l1, l2: t.l1 })), trap: 'alg-conjugate-as-square', why: `expanding $${L}(${linTex(t.l2, twoVar)})$ as if it were the square $${L}^2$` });
+        } else {
+          wrongs.push({ v: swapIn(i, [a1 * a2, 0, b1 * b2]), trap: 'alg-foil-cross-terms', why: `multiplying only the first terms and the last terms of $${L}(${linTex(t.l2, twoVar)})$` });
+        }
+        if (t.c === 2) wrongs.push({ v: exact.map((e, j) => (j === i ? prodQuad(t) : e)).reduce(addQ), trap: 'alg-dropped-factor', why: `dropping the factor 2 in front of the first square` });
+      });
+      if (terms[1].c < 0) {
+        const p = prodQuad(terms[1]);
+        wrongs.push({ v: addQ(exact[0], [-p[0], p[1], p[2]]), trap: 'alg-distribute-minus', why: `changing the sign of only the first term after the minus` });
+        wrongs.push({ v: addQ(exact[0], p), trap: 'alg-distribute-minus', why: `ignoring the minus sign in front of the second product` });
+      }
+      const seen = new Set([qKey(R)]);
+      const chosen: typeof wrongs = [];
+      for (const w of rng.shuffle(wrongs)) {
+        if (chosen.length === 4) break;
+        if (seen.has(qKey(w.v)) || w.v.every((x) => x === 0)) continue;
+        seen.add(qKey(w.v));
+        chosen.push(w);
+      }
+      if (chosen.length < 4) continue;
+      const { choices, answer } = textChoices(
+        rng,
+        `$${quadTex(R, twoVar)}$`,
+        chosen.map((w) => ({ text: `$${quadTex(w.v, twoVar)}$`, trap: w.trap })),
+      );
+      const options: Quad[] = choices.map((c) => {
+        if (c.text === `$${quadTex(R, twoVar)}$`) return R;
+        return chosen.find((w) => `$${quadTex(w.v, twoVar)}$` === c.text)!.v;
+      });
+      const expr = terms.map((t, i) => termTex(t, twoVar, i === 0)).join('');
+      const steps = terms
+        .map((t) => {
+          const same = t.l1.join() === t.l2.join();
+          const lhs = same ? `(${linTex(t.l1, twoVar)})^2` : `(${linTex(t.l1, twoVar)})(${linTex(t.l2, twoVar)})`;
+          return `$${lhs} = ${quadTex(prodQuad(t), twoVar)}$`;
+        })
+        .join(' and ');
+      const neg2 = terms[1].c < 0;
+      // A test point where the cited wrong form and the right one differ.
+      const at = (q: Quad, x: number, y: number) => q[0] * x * x + q[1] * x * y + q[2] * y * y;
+      const w0 = chosen[0];
+      const pt = (twoVar ? [[1, 1], [2, 1], [1, 2], [3, 1], [2, 3]] : [[1, 1], [2, 1], [3, 1], [-1, 1], [4, 1]]).find(([x, y]) => at(w0.v, x, y) !== at(R, x, y))!;
+      const where = twoVar ? `$x = ${pt[0]}$ and $y = ${pt[1]}$` : `$x = ${pt[0]}$`;
+      const original = terms.reduce((s, t) => s + t.c * (t.l1[0] * pt[0] + t.l1[1] * pt[1]) * (t.l2[0] * pt[0] + t.l2[1] * pt[1]), 0);
+      return {
+        params: { twoVar, terms, options },
+        q: {
+          format: 'mcs',
+          stem: `Which of the following is equivalent to $${expr}$ for all ${twoVar ? 'numbers $x$ and $y$' : 'values of $x$'}?`,
+          choices,
+          answer,
+          explanation: `Squares and products need every term: expand each one, then combine like terms.
+
+Expand: ${steps}. ${neg2 ? 'The minus sign in front of the second product changes the sign of every one of its terms, so subtract the whole result' : 'Add the results'}: $${quadTex(R, twoVar)}$.
+
+Check at ${where}: the original expression and $${quadTex(R, twoVar)}$ both give $${num(original)}$.
+
+Trap: $${quadTex(w0.v, twoVar)}$ comes from ${w0.why}. At ${where} it gives $${num(at(w0.v, pt[0], pt[1]))}$, not $${num(original)}$.
+
+Rule: write out every term of a product, and let a minus sign act on all of them.`,
+        },
+      };
     }
-    const { choices, answer } = textChoices(
-      rng,
-      `$${quadTex(R, twoVar)}$`,
-      chosen.map((w) => ({ text: `$${quadTex(w.v, twoVar)}$`, ...(w.trap ? { trap: w.trap } : {}) })),
-    );
-    const options: Quad[] = choices.map((c) => {
-      if (c.text === `$${quadTex(R, twoVar)}$`) return R;
-      return chosen.find((w) => `$${quadTex(w.v, twoVar)}$` === c.text)!.v;
-    });
-    const expr = terms.map((t, i) => termTex(t, twoVar, i === 0)).join('');
-    const steps = terms
-      .map((t) => {
-        const same = t.l1.join() === t.l2.join();
-        const lhs = same ? `(${linTex(t.l1, twoVar)})^2` : `(${linTex(t.l1, twoVar)})(${linTex(t.l2, twoVar)})`;
-        return `$${lhs} = ${quadTex(prodQuad(t), twoVar)}$`;
-      })
-      .join(' and ');
-    const sq = terms.find((t) => t.l1.join() === t.l2.join())!;
-    const neg2 = terms[1].c < 0;
-    return {
-      params: { twoVar, terms, options },
-      q: {
-        format: 'mcs',
-        stem: `Which of the following is equivalent to $${expr}$ for all ${twoVar ? 'numbers $x$ and $y$' : 'values of $x$'}?`,
-        choices,
-        answer,
-        explanation: `Expand each product: ${steps}.
-
-${neg2 ? `Subtract the second result, changing the sign of every one of its terms` : 'Combine like terms'}: the result is $${quadTex(R, twoVar)}$.
-
-Watch the middle term of a square: $(${linTex(sq.l1, twoVar)})^2$ has the middle term $2(${lin([[sq.l1[0], 'x']])})(${lin([[sq.l1[1], twoVar ? 'y' : '']])}) = ${lin([[2 * sq.l1[0] * sq.l1[1], twoVar ? 'xy' : 'x']])}$, which is easy to drop.`,
-      },
-    };
   },
   check(q, { twoVar, terms, options }, rng) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -409,7 +415,9 @@ interface PowParams {
   kind: 'value' | 'k' | 'ratio' | 'square';
   b: number;
   v: number;
+  /** Larger exponent offset (b^{w+m}). */
   m: number;
+  /** Smaller exponent offset (b^{w+n}); for 'ratio' the offset of the denominator. */
   n: number;
   sign: 1 | -1;
 }
@@ -420,6 +428,9 @@ const isPowerOf = (v: number, b: number) => {
   return false;
 };
 
+/** b^{w+n} in TeX without a visible "+ 0" or exponent 1 on the offset. */
+const bPow = (b: number, w: string, n: number) => (n === 0 ? `${b}^{${w}}` : `${b}^{${w} + ${n}}`);
+
 const powerFactorNE: Template<PowParams> = {
   id: 'alg.expressions.power-factor-ne',
   skill: 'alg.expressions',
@@ -427,7 +438,8 @@ const powerFactorNE: Template<PowParams> = {
   style: 'factor out a common power to evaluate',
   generate(rng, d) {
     const kind = rng.pick(d === 1 ? (['value', 'k'] as const) : d === 2 ? (['value', 'k', 'square'] as const) : (['value', 'ratio', 'square'] as const));
-    const b = rng.pick(kind === 'square' ? [2, 3] : d === 1 ? [2, 3] : [2, 3, 5]);
+    const b = rng.pick(kind === 'square' || kind === 'ratio' ? [2, 3] : d === 1 ? [2, 3] : [2, 3, 5]);
+    const w = rng.pick(['x', 't', 'y']);
     let answer: number;
     let stem: string;
     let explanation: string;
@@ -436,52 +448,88 @@ const powerFactorNE: Template<PowParams> = {
     let m = 0;
     let n = 0;
     let sign: 1 | -1 = -1;
+    const op = () => (sign < 0 ? '-' : '+');
     if (kind === 'value') {
-      do v = rng.int(3, d === 1 ? 12 : 20);
+      do v = rng.int(3, d === 1 ? 12 : 24);
       while (isPowerOf(v, b));
       m = rng.int(1, b === 5 ? 2 : 3);
       n = d === 3 ? rng.int(0, m - 1) : 0;
       sign = d === 1 ? -1 : rng.pick([1, -1]);
-      answer = v * (b ** m + sign * b ** n);
-      const e2 = n === 0 ? `${b}^{x}` : `${b}^{x + ${n}}`;
-      stem = `If $${b}^{x} = ${v}$, what is the value of $${b}^{x + ${m}} ${sign < 0 ? '-' : '+'} ${e2}$?`;
-      const inside = `${powT(b, m)} ${sign < 0 ? '-' : '+'} ${n === 0 ? '1' : powT(b, n)}`;
-      explanation = `Factor out $${b}^{x}$: $${b}^{x + ${m}} ${sign < 0 ? '-' : '+'} ${e2} = ${b}^{x}(${inside}) = ${v}(${b ** m + sign * b ** n})$.
+      const inner = b ** m + sign * b ** n;
+      answer = v * inner;
+      stem = rng.pick([
+        `If $${b}^{${w}} = ${v}$, what is the value of $${bPow(b, w, m)} ${op()} ${bPow(b, w, n)}$?`,
+        `If $${b}^{${w}} = ${v}$, then $${bPow(b, w, m)} ${op()} ${bPow(b, w, n)}$ equals what number?`,
+      ]);
+      const inside = `${powT(b, m)} ${op()} ${n === 0 ? '1' : powT(b, n)}`;
+      const at = (e: number, f: number, s2: number) => num(b ** e + s2 * b ** f);
+      explanation = `Both terms contain $${b}^{${w}}$, whose value is given, so factor it out instead of solving for $${w}$. Because $${bPow(b, w, m)} = ${b}^{${w}} \\cdot ${powT(b, m)}$:
 
-So the value is $${num(answer)}$. You never need $x$ itself (it is not an integer).`;
-      if (sign < 0 && n === 0) {
-        explanation += ` Note that $${b}^{x + ${m}} - ${b}^{x} \\ne ${powT(b, m)}$: exponents subtract only when powers are divided.`;
-        traps = [{ value: frac(b ** m), trap: 'alg-power-difference' }];
-      }
+$${bPow(b, w, m)} ${op()} ${bPow(b, w, n)} = ${b}^{${w}}(${inside}) = ${v} \\cdot ${num(inner)} = ${num(answer)}$.
+
+Check: for $${w} = 1$ the expression is $${at(1 + m, 1 + n, sign)}$, which is $${b} \\cdot ${num(inner)}$.`;
+      const cited: { value: Frac; trap: string; text: string }[] = [];
+      if (sign < 0 && n === 0)
+        cited.push({ value: frac(b ** m), trap: 'alg-power-difference', text: `Trap: $${bPow(b, w, m)} - ${b}^{${w}} = ${powT(b, m)}$ treats a difference like a quotient. For $${w} = 2$ the left side is $${at(2 + m, 2, -1)}$, not $${num(b ** m)}$.` });
+      if (sign > 0 && n === 0)
+        cited.push({ value: frac(b ** m + 2 * v), trap: 'alg-exponent-add-as-sum', text: `Trap: $${b}^{${w} + ${m}} = ${powT(b, m)} + ${b}^{${w}}$ turns a sum in the exponent into a sum of powers; it is a product. For $${w} = 2$ the left side is $${at(2 + m, 2, 1)}$, not $${num(b ** m + 2 * b ** 2)}$.` });
+      if (n === 0)
+        cited.push({ value: frac(v * b ** m), trap: 'alg-factor-dropped-one', text: `Trap: $${v} \\cdot ${num(b ** m)}$ forgets the second term: factoring $${b}^{${w}}$ out of $${b}^{${w}}$ leaves $1$, not nothing. For $${w} = 1$ the expression is $${at(1 + m, 1, sign)}$, not $${num(b ** (1 + m))}$.` });
+      traps = cited.map((c) => ({ value: c.value, trap: c.trap }));
+      if (cited.length) explanation += `\n\n${cited[0].text}`;
+      explanation += `\n\nRule: $${b}^{${w} + m} = ${b}^{${w}} \\cdot ${b}^{m}$, so a sum or difference of powers factors.`;
     } else if (kind === 'k') {
       m = rng.int(1, 3);
+      n = d === 1 ? 0 : rng.int(0, m - 1);
       sign = rng.pick([1, -1]);
-      answer = b ** m + sign;
-      stem = `If $${b}^{n + ${m}} ${sign < 0 ? '-' : '+'} ${b}^{n} = k \\cdot ${b}^{n}$ for every integer $n$, what is the value of $k$?`;
-      explanation = `Factor $${b}^{n}$ out of both terms: $${b}^{n + ${m}} ${sign < 0 ? '-' : '+'} ${b}^{n} = ${b}^{n} \\cdot ${b}^{${m}} ${sign < 0 ? '-' : '+'} ${b}^{n} \\cdot 1 = ${b}^{n}(${b ** m} ${sign < 0 ? '-' : '+'} 1)$.
+      answer = b ** m + sign * b ** n;
+      stem = `If $${bPow(b, w, m)} ${op()} ${bPow(b, w, n)} = k \\cdot ${b}^{${w}}$ for every integer $${w}$, what is the value of $k$?`;
+      const left1 = num(b ** (1 + m) + sign * b ** (1 + n));
+      explanation = `Factor $${b}^{${w}}$ out of both terms, using $${bPow(b, w, m)} = ${b}^{${w}} \\cdot ${powT(b, m)}$: $${bPow(b, w, m)} ${op()} ${bPow(b, w, n)} = ${b}^{${w}}(${powT(b, m)} ${op()} ${n === 0 ? '1' : powT(b, n)}) = ${num(answer)} \\cdot ${b}^{${w}}$, so $k = ${num(answer)}$.
 
-So $k = ${answer}$.`;
+Check: for $${w} = 1$ the left side is $${left1}$ and $${num(answer)} \\cdot ${b} = ${num(answer * b)}$.
+
+Trap: $k = ${num(b ** m)}$ forgets the second term. For $${w} = 1$ that would give $${num(b ** m * b)}$, not $${left1}$.
+
+Rule: when you factor a power out, every term keeps a factor, even if it is just $1$.`;
       traps = [{ value: frac(b ** m), trap: 'alg-factor-dropped-one' }];
     } else if (kind === 'ratio') {
-      m = rng.int(2, 3);
-      sign = -1;
-      // (b^{n+m} - b^n) / (b^{n+1} - b^n) = (b^m - 1)/(b - 1)
-      answer = (b ** m - 1) / (b - 1);
-      stem = `For every integer $n$, what is the value of $\\dfrac{${b}^{n + ${m}} - ${b}^{n}}{${b}^{n + 1} - ${b}^{n}}$?`;
-      explanation = `Factor $${b}^{n}$ out of the numerator and the denominator: $\\dfrac{${b}^{n}(${b}^{${m}} - 1)}{${b}^{n}(${b} - 1)} = \\dfrac{${b ** m - 1}}{${b - 1}} = ${answer}$.
+      // (b^{w+m} + s b^w) / (b^{w+j} + s b^w) = (b^m + s)/(b^j + s)
+      sign = rng.pick([1, -1]);
+      const combos = sign < 0 ? [[2, 1], [3, 1], [4, 1], [4, 2], [6, 2], [6, 3]] : [[3, 1], [5, 1], [6, 2]];
+      [m, n] = rng.pick(combos.filter(([mm]) => b ** mm < 800));
+      const top = b ** m + sign;
+      const bottom = b ** n + sign;
+      answer = top / bottom;
+      stem = `For every integer $${w}$, what is the value of $\\dfrac{${bPow(b, w, m)} ${op()} ${b}^{${w}}}{${bPow(b, w, n)} ${op()} ${b}^{${w}}}$?`;
+      explanation = `Both the top and the bottom contain $${b}^{${w}}$: factor it out, then cancel it (it is never 0).
 
-Do not subtract exponents across a difference: $${b}^{n + ${m}} - ${b}^{n}$ is not $${b}^{${m}}$.`;
-      traps = [{ value: frac(b ** (m - 1)), trap: 'alg-power-difference' }];
+$\\dfrac{${b}^{${w}}(${powT(b, m)} ${op()} 1)}{${b}^{${w}}(${powT(b, n)} ${op()} 1)} = ${bottom === 1 ? num(top) : `\\dfrac{${num(top)}}{${num(bottom)}} = ${num(answer)}`}$.
+
+Check: for $${w} = 1$ the fraction is $\\dfrac{${num(b ** (1 + m) + sign * b)}}{${num(b ** (1 + n) + sign * b)}} = ${num(answer)}$.
+
+Trap: cancelling like a quotient of powers gives $${m - n === 1 ? num(b) : `${b}^{${m - n}} = ${num(b ** (m - n))}`}$. But the top and bottom are ${sign < 0 ? 'differences' : 'sums'}, not single powers: the check above gives $${num(answer)}$.
+
+Rule: factor the common power out of the top and the bottom before you cancel.`;
+      traps = [{ value: frac(b ** (m - n)), trap: 'alg-power-difference' }];
     } else {
       do v = rng.int(3, 15);
       while (isPowerOf(v, b));
-      m = 1;
-      answer = v * v + b * v;
-      stem = `If $${b}^{x} = ${v}$, what is the value of $${b * b}^{x} + ${b}^{x + 1}$?`;
-      explanation = `Rewrite both terms with $${b}^{x}$: $${b * b}^{x} = (${b}^{2})^{x} = (${b}^{x})^{2} = ${v}^2 = ${v * v}$, and $${b}^{x + 1} = ${b} \\cdot ${b}^{x} = ${b * v}$.
+      n = rng.int(1, 2);
+      sign = d === 2 ? 1 : rng.pick([1, -1]);
+      m = 2;
+      answer = v * v + sign * b ** n * v;
+      stem = `If $${b}^{${w}} = ${v}$, what is the value of $${b * b}^{${w}} ${op()} ${bPow(b, w, n)}$?`;
+      explanation = `Rewrite both terms with $${b}^{${w}}$, whose value is given: $${b * b}^{${w}} = (${b}^{2})^{${w}} = (${b}^{${w}})^{2} = ${v}^2 = ${v * v}$, and $${bPow(b, w, n)} = ${b}^{${w}} \\cdot ${powT(b, n)} = ${num(b ** n * v)}$.
 
-The value is $${v * v} + ${b * v} = ${answer}$. Note that $${b * b}^{x}$ is $(${b}^{x})^2$, not $${b} \\cdot ${b}^{x}$.`;
-      traps = [{ value: frac(2 * b * v), trap: 'alg-power-base-mult' }];
+So the value is $${v * v} ${op()} ${num(b ** n * v)} = ${num(answer)}$.
+
+Check: for $${w} = 1$ the expression is $${b * b} ${op()} ${b ** (1 + n)} = ${num(b * b + sign * b ** (1 + n))}$, and the method gives $${b}^2 ${op()} ${b ** n} \\cdot ${b} = ${num(b * b + sign * b ** (1 + n))}$.
+
+Trap: $${b * b}^{${w}} = ${b} \\cdot ${b}^{${w}}$ is tempting because $${b * b} = ${b} \\cdot ${b}$; it gives $${num(b * v + sign * b ** n * v)}$. But for $${w} = 2$: $${b * b}^{2} = ${(b * b) ** 2}$, while $${b} \\cdot ${b}^{2} = ${b ** 3}$.
+
+Rule: write every base as a power of the same number, then use $(a^m)^n = a^{mn}$.`;
+      traps = [{ value: frac(b * v + sign * b ** n * v), trap: 'alg-power-base-mult' }];
     }
     traps = traps.filter((t) => !t.value.eq(answer));
     return {
@@ -494,18 +542,18 @@ The value is $${v * v} + ${b * v} = ${answer}$. Note that $${b * b}^{x}$ is $(${
     let expected: number;
     if (kind === 'value' || kind === 'square') {
       const x = Math.log(v) / Math.log(b);
-      expected = kind === 'value' ? Math.pow(b, x + m) + sign * Math.pow(b, x + n) : Math.pow(b * b, x) + Math.pow(b, x + 1);
+      expected = kind === 'value' ? Math.pow(b, x + m) + sign * Math.pow(b, x + n) : Math.pow(b * b, x) + sign * Math.pow(b, x + n);
     } else {
       const N0 = 4n;
       const B = BigInt(b);
       const bn = B ** N0;
       if (kind === 'k') {
-        const top = B ** (N0 + BigInt(m)) + BigInt(sign) * bn;
+        const top = B ** (N0 + BigInt(m)) + BigInt(sign) * B ** (N0 + BigInt(n));
         if (top % bn !== 0n) return 'k not an integer';
         expected = Number(top / bn);
       } else {
-        const top = B ** (N0 + BigInt(m)) - bn;
-        const bottom = B ** (N0 + 1n) - bn;
+        const top = B ** (N0 + BigInt(m)) + BigInt(sign) * bn;
+        const bottom = B ** (N0 + BigInt(n)) + BigInt(sign) * bn;
         if (top % bottom !== 0n) return 'ratio not an integer';
         expected = Number(top / bottom);
       }
@@ -598,7 +646,9 @@ const equivalentMCM: Template<EquivParams> = {
       ? `Factor the numerator: $${texEx(expanded)} = ${factored}$. For $x \\ne ${num(u)}$ the factor $${texEx(xu)}$ cancels${
           excluded !== null && (target as { b: Ex }).b && texEx((target as { b: Ex }).b) !== texEx(xu) ? `, but $${texEx(rev(u))} = -(${texEx(xu)})$, so the expression equals $${texEx(mul(N(-k), xv))}$` : `, so the expression equals $${texEx(mul(N(k), xv))}$`
         }.`
-      : `Factor: $${texEx(expanded)} = ${factored}$${k !== 1 ? ` (take out $${k}$, then find two numbers with product $${num(u * v)}$ and sum $${num(u + v)}$)` : ` (two numbers with product $${num(u * v)}$ and sum $${num(u + v)}$)`}.`;
+      : `Factor: $${texEx(expanded)} = ${factored}$. ${k !== 1 ? `Take out $${k}$, then look` : 'Look'} for two numbers with product $${num(u * v)}$ and sum $${num(-(u + v))}$: they are $${num(-u)}$ and $${num(-v)}$, the constants in the two factors.`;
+    const probeX = excluded === 0 ? 1 : 0;
+    const probeV = Math.round(evalEx(target, { x: probeX }));
     return {
       params: { target, options: picked.map((c) => c.e), excluded },
       q: {
@@ -610,7 +660,7 @@ const equivalentMCM: Template<EquivParams> = {
         explanation: `${intro} Then compare each choice with that form:
 ${lines}
 
-A quick test: plug in a value such as $x = ${excluded === 0 ? 1 : 0}$ and compare.`,
+Check at $x = ${probeX}$: the original equals $${num(probeV)}$, so an equivalent choice must give $${num(probeV)}$ there too; a choice that gives another value is out.`,
       },
     };
   },
