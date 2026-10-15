@@ -8,7 +8,7 @@
 //   2 formats including numeric entry or select-all when the skill has one, a credit at difficulty 3,
 //   and 18 h since the first credit. It stays "to confirm" until the first successful review.
 // - A miss removes the credit of the missed style, lowers the difficulty and brings the skill back;
-//   two misses within the last 6 answers wipe every credit and drop one level.
+//   two misses within the last 6 answers wipe every credit, drop one level and start a new window.
 // - Mastered skills come back for spaced review; a miss on review drops them to Proficient.
 
 import type { Difficulty, Format, Template } from '../engine/types';
@@ -155,6 +155,8 @@ export function applyAttempt(prev: SkillState, a: AttemptInput, req: SkillRequir
     if (wipe) {
       s.styles = {};
       s.styleFormats = {};
+      // The window starts over, so the same two misses cannot wipe the credits again on the next miss.
+      s.recent = [];
     } else {
       delete s.styles[a.templateId];
       delete s.styleFormats[a.templateId];

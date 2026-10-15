@@ -166,11 +166,25 @@ describe('mastery model', () => {
     expect(s.styles).toEqual({});
     expect(s.formats).toEqual([]);
     expect(s.level).toBe(2);
+    expect(s.recent).toEqual([]); // the window starts over
     // A miss 6 answers back has left the window: only the missed credit goes.
     const s2 = applyAttempt({ ...st, recent: [false, true, true, true, true, true] }, miss('t1'), REQ).state;
     expect(s2.styles).toEqual({ t2: 2, t4: 2 });
     expect(s2.recent).toEqual([true, true, true, true, true, false]);
     expect(applyAttempt({ ...newSkillState(), level: 2, recent: [false] }, miss('t1'), REQ).state.level).toBe(1);
+  });
+
+  it('costs one window at most one level drop: three misses in a row take Mastered to Familiar, not Attempted', () => {
+    const mastered: SkillState = { ...proficient({ t1: 3, t2: 2, t3: 2 }), level: 4, recent: [true, true, true, true, true, true] };
+    const levels: number[] = [];
+    let s = mastered;
+    for (const id of ['t1', 't2', 't3', 't4']) {
+      s = applyAttempt(s, miss(id), REQ).state;
+      levels.push(s.level);
+    }
+    // 1st miss: Mastered -> Proficient. 2nd: two misses in the window, credits wiped, -1 level and a fresh window.
+    // 3rd: one miss in the new window, no further drop. 4th: the new window now holds two misses.
+    expect(levels).toEqual([3, 2, 2, 1]);
   });
 
   it('keeps the last 6 results', () => {
