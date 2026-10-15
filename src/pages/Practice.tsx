@@ -276,11 +276,6 @@ export function Practice({ route }: { route: string[] }) {
             </button>
           </div>
         )}
-        {showHint && (
-          <div className="strategy-box">
-            <Rich text={skill.strategy} />
-          </div>
-        )}
 
         {result && (
           <Feedback
@@ -293,6 +288,11 @@ export function Practice({ route }: { route: string[] }) {
             onNext={next}
             nextStepText={nextStep(result.outcome.state)}
           />
+        )}
+        {showHint && (
+          <div className="strategy-box">
+            <Rich text={skill.strategy} />
+          </div>
         )}
       </div>
 
