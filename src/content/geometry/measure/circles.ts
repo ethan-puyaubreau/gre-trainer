@@ -1,11 +1,13 @@
-import { qcCompare, qcFromSamples, QC_TEXT, valuedChoices } from '../../../engine/build';
+import { qcCompare, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, dist, pathLength, shoelace, unitCircle } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
-import { retryAll } from '../redraw';
+import { Redraw, retryAll } from '../redraw';
+import { trapNotes } from '../notes';
+import { positioned } from '../shapes/util';
 
 const deg = (v: number | string) => `${v}^\\circ`;
 const relText = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -49,6 +51,15 @@ interface RatioParams {
   ratios: [number, number][];
 }
 
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const RATIO_NOTES: Record<string, (vs: string) => string> = {
+  'geom-circle-ratio-inverted': (vs) => `reversing the order, ${vs}, answers "B to A" instead of "A to B"`,
+  'geom-circle-ratio-linear': (vs) => `the ratio of the lengths, ${vs}, forgets that areas use the square`,
+  'geom-circle-ratio-squared': (vs) => `squaring the ratio for a length, ${vs}, gives the ratio of the areas`,
+  'geom-circle-ratio-cubed': (vs) => `cubing the ratio, ${vs}, is for volumes`,
+  'geom-circle-radius-diameter': (vs) => `mixing up radius and diameter, ${vs}, doubles one side of the ratio`,
+};
+
 const ratio: Template<RatioParams> = {
   id: 'geo.circles.ratio',
   skill: 'geo.circles',
@@ -85,9 +96,9 @@ const ratio: Template<RatioParams> = {
       b = p;
       correct = areas ? [q * q, p * p] : [q, p];
       if (areas) {
-        wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-inverted' }, { r: [q, p], trap: 'geom-circle-ratio-linear' }, { r: [p, q] }, { r: [q ** 3, p ** 3] });
+        wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-inverted' }, { r: [q, p], trap: 'geom-circle-ratio-linear' }, { r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q ** 3, p ** 3], trap: 'geom-circle-ratio-cubed' });
       } else {
-        wrong.push({ r: [p, q], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-squared' }, { r: [p * p, q * q] }, { r: [2 * q, p] });
+        wrong.push({ r: [p, q], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-squared' }, { r: [p * p, q * q], trap: 'geom-circle-ratio-squared' }, { r: [2 * q, p], trap: 'geom-circle-radius-diameter' });
       }
       const rB = frac(p, q).toTex();
       stem = `Circle $A$ has radius $r$, and circle $B$ has radius $${rB}r$. What is the ratio of the ${areas ? 'area' : 'circumference'} of $A$ to that of $B$?`;
@@ -95,44 +106,38 @@ const ratio: Template<RatioParams> = {
         ? `Area is $\\pi r^2$, so the ratio is $\\dfrac{\\pi r^2}{\\pi \\left(${rB}r\\right)^2} = \\dfrac{1}{${frac(p * p, q * q).toTex()}} = ${frac(q * q, p * p).toTex({ dfrac: true })}$, that is, ${q * q} to ${p * p}.
 
 The radii are in the ratio ${q} to ${p}, and areas use the SQUARE of that ratio. Keep the order: circle $A$ first.`
-        : `Circumference is $2\\pi r$, a length, so it scales like the radius: $\\dfrac{2\\pi r}{2\\pi \\cdot ${rB}r} = ${frac(q, p).toTex({ dfrac: true })}$, that is, ${q} to ${p}.
-
-Squaring the ratio is only for areas. Keep the order: circle $A$ first.`;
+        : `Circumference is $2\\pi r$, a length, so it scales like the radius: $\\dfrac{2\\pi r}{2\\pi \\cdot ${rB}r} = ${frac(q, p).toTex({ dfrac: true })}$, that is, ${q} to ${p}. Keep the order: circle $A$ first.`;
     } else if (mode === 'area-circ') {
       // areas (p^2) pi and (q^2) pi -> circumferences p : q
       a = p * p;
       b = q * q;
       correct = [p, q];
-      wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-squared' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p] }, { r: [2 * p, q] });
+      wrong.push({ r: [p * p, q * q], trap: 'geom-circle-ratio-squared' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [2 * p, q], trap: 'geom-circle-radius-diameter' });
       stem = `Circle $W$ has area $${piTex(new Frac(p * p))}$, and circle $Z$ has area $${piTex(new Frac(q * q))}$. What is the ratio of the circumference of $W$ to that of $Z$?`;
       explanation = `From $\\pi r^2 = ${piTex(new Frac(p * p))}$ the radius of $W$ is ${p}; from $\\pi r^2 = ${piTex(new Frac(q * q))}$ the radius of $Z$ is ${q}.
 
-Circumferences are $2\\pi \\cdot ${p}$ and $2\\pi \\cdot ${q}$, in the ratio ${p} to ${q}.
-
-${p * p} to ${q * q} is the ratio of the AREAS; lengths are in the ratio of the square roots.`;
+Circumferences are $2\\pi \\cdot ${p}$ and $2\\pi \\cdot ${q}$, in the ratio ${p} to ${q}. Lengths are in the ratio of the square roots of the areas.`;
     } else if (mode === 'circ-area') {
       a = 2 * p;
       b = 2 * q;
       correct = [p * p, q * q];
-      wrong.push({ r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [q, p] }, { r: [2 * p * p, q * q] });
+      wrong.push({ r: [p, q], trap: 'geom-circle-ratio-linear' }, { r: [q * q, p * p], trap: 'geom-circle-ratio-inverted' }, { r: [q, p], trap: 'geom-circle-ratio-inverted' }, { r: [2 * p * p, q * q], trap: 'geom-circle-radius-diameter' });
       stem = `The circumference of circle $W$ is $${piTex(new Frac(2 * p))}$, and the circumference of circle $Z$ is $${piTex(new Frac(2 * q))}$. What is the ratio of the area of $W$ to that of $Z$?`;
       explanation = `From $2\\pi r = ${piTex(new Frac(2 * p))}$ the radius of $W$ is ${p}; from $2\\pi r = ${piTex(new Frac(2 * q))}$ the radius of $Z$ is ${q}.
 
-The areas are $${piTex(new Frac(p * p))}$ and $${piTex(new Frac(q * q))}$, in the ratio ${p * p} to ${q * q}.
-
-The circumferences are in the ratio ${p} to ${q}; areas use the square of that ratio.`;
+The areas are $${piTex(new Frac(p * p))}$ and $${piTex(new Frac(q * q))}$, in the ratio ${p * p} to ${q * q}. Areas use the square of the ratio of the lengths.`;
     } else {
       // diameter of A = p * radius of B  ->  r_A = (p/2) r_B, areas p^2 : 4
       p = rng.pick([1, 3, 5, 3, 5, 7]);
       a = p;
       correct = red([p * p, 4]);
-      wrong.push({ r: [p * p, 1], trap: 'geom-circle-radius-diameter' }, { r: red([p, 2]), trap: 'geom-circle-ratio-linear' }, { r: red([4, p * p]), trap: 'geom-circle-ratio-inverted' }, { r: [p, 1] }, { r: [1, p * p] });
+      wrong.push({ r: [p * p, 1], trap: 'geom-circle-radius-diameter' }, { r: red([p, 2]), trap: 'geom-circle-ratio-linear' }, { r: red([4, p * p]), trap: 'geom-circle-ratio-inverted' }, { r: [p, 1], trap: 'geom-circle-ratio-linear' }, { r: [1, p * p], trap: 'geom-circle-ratio-inverted' });
       stem = `The diameter of circle $A$ is ${p === 1 ? 'equal to' : `${p} times`} the radius of circle $B$. What is the ratio of the area of $A$ to that of $B$?`;
       explanation = `Let the radius of $B$ be $r$. The diameter of $A$ is $${p === 1 ? '' : p}r$, so its radius is $${frac(p, 2).toTex()}r$.
 
 Ratio of areas: $\\dfrac{\\pi \\left(${frac(p, 2).toTex()}r\\right)^2}{\\pi r^2} = ${frac(p * p, 4).toTex({ dfrac: true })}$, that is, ${correct[0]} to ${correct[1]}.
 
-Using ${p === 1 ? '' : p}$r$ as the radius of $A$ gives ${p * p} to 1: the diameter is twice the radius.`;
+The diameter is twice the radius, so $${p === 1 ? '' : p}r$ is the diameter of $A$, not its radius.`;
     }
     correct = red(correct);
     const txt = (r: [number, number]) => `${plain(r[0])} to ${plain(r[1])}`;
@@ -142,19 +147,20 @@ Using ${p === 1 ? '' : p}$r$ as the radius of $A$ gives ${p * p} to 1: the diame
       [x0, 2 * y0],
       [3 * x0, y0],
       [x0, 3 * y0],
-      [4 * x0, y0],
-      [x0, 4 * y0],
     ];
-    const candidates = [...wrong.map((w) => ({ r: red(w.r), trap: w.trap })), ...rng.shuffle(generic).map((r) => ({ r: red(r), trap: undefined as string | undefined }))];
-    const { choices, answer } = valuedChoices(
+    const items = positioned<[number, number]>(
       rng,
-      { text: txt(correct), value: x0 / y0 },
-      candidates.map((c) => ({ text: txt(c.r), value: c.r[0] / c.r[1], ...(c.trap ? { trap: c.trap } : {}) })),
+      correct,
+      wrong.map((w) => ({ v: red(w.r), trap: w.trap })),
+      rng.shuffle(generic).map(red),
+      (r) => r[0] / r[1],
     );
-    const byText = new Map<string, [number, number]>([[txt(correct), correct], ...candidates.map((c) => [txt(c.r), c.r] as [string, [number, number]])]);
+    const choices = items.map((it) => ({ text: txt(it.v), ...(it.trap ? { trap: it.trap } : {}) }));
+    const answer = items.findIndex((it) => it.ok);
+    const notes = trapNotes(choices, RATIO_NOTES);
     return {
-      params: { mode, a, b, ratios: choices.map((c) => byText.get(c.text)!) },
-      q: { format: 'mcs', stem, choices, answer, explanation },
+      params: { mode, a, b, ratios: items.map((it) => it.v) },
+      q: { format: 'mcs', stem, choices, answer, explanation: notes ? `${explanation}\n\n${notes}` : explanation },
     };
   },
   check(q, p) {
@@ -256,7 +262,8 @@ const arcSector: Template<ArcParams> = {
       answer = new Frac(theta);
       // the other formula: sector value read as an arc, or arc read as a sector
       const other = askLen ? k.mul(360).div(r * r) : k.mul(360).div(2 * r);
-      if (!other.eq(answer) && other.lt(360)) traps.push({ value: other, trap: 'geom-circle-arc-sector-mixed' });
+      if (other.eq(answer)) throw new Redraw('a trap equals the answer');
+      if (other.lt(360)) traps.push({ value: other, trap: 'geom-circle-arc-sector-mixed' });
       stem = `In the figure above, $O$ is the center of the circle. If ${what} is $${piTex(k)}$, what is the value of $x$?`;
       explanation = `The whole circle has ${askLen ? 'circumference' : 'area'} $${full}$. The ${askLen ? 'arc' : 'sector'} is the fraction $\\frac{x}{360}$ of it:
 
@@ -295,7 +302,10 @@ ${
         stem,
         figure: fig.build(false),
         answer,
-        traps: traps.filter((t) => !t.value.eq(answer)),
+        traps: ((): typeof traps => {
+          if (traps.some((t) => t.value.eq(answer))) throw new Redraw('a trap equals the answer');
+          return traps;
+        })(),
         explanation,
       },
     };
@@ -348,7 +358,7 @@ const compareQC: Template<CircleQCParams> = {
     const fig = new Fig();
     if (mode === 'obtuse-chord') {
       const m = rng.int(2, 9);
-      const variant = rng.pick(['obtuse', 'obtuse', 'obtuse', 'right', 'radius'] as const);
+      const variant = rng.pick(['obtuse', 'obtuse', 'right', 'radius', 'radius'] as const);
       const O: P2 = [0, 0];
       // right: RT is a diameter and S is on the upper arc; obtuse: S is on the short arc RT below.
       const R = onCircle(O, m, variant === 'right' ? 180 : rng.int(195, 215));
@@ -640,6 +650,12 @@ const TAN_TRIPLES: [number, number, number][] = [
   [12, 9, 15],
 ];
 
+/** A trap that equals the answer would be a wrong choice that is right: draw again. */
+function noClash<T extends { value: Frac }>(traps: T[], answer: Frac): T[] {
+  if (traps.some((t) => t.value.eq(answer))) throw new Redraw('a trap equals the answer');
+  return traps;
+}
+
 const lengths: Template<LengthParams> = {
   id: 'geo.circles.lengths',
   skill: 'geo.circles',
@@ -679,10 +695,17 @@ const lengths: Template<LengthParams> = {
         params: { ...base, r: D / 2, dist: distance, unitFactor: factor },
         q: {
           format: 'ne',
-          stem: `A wheel with a diameter of ${D} ${small} rolls in a straight line without slipping. How many complete revolutions does the wheel make while it travels ${plain(distance)} ${big}? (1 ${inches ? 'foot = 12 inches' : 'meter = 100 centimeters'})`,
+          stem: rng.pick([
+            `A wheel with a diameter of ${D} ${small} rolls in a straight line without slipping. How many complete revolutions does the wheel make while it travels ${plain(distance)} ${big}? (1 ${inches ? 'foot = 12 inches' : 'meter = 100 centimeters'})`,
+            `The wheel of a ${inches ? 'cart' : 'trolley'} is ${D} ${small} across. If it rolls ${plain(distance)} ${big} along a straight, level path without slipping, how many complete turns does it make? (1 ${inches ? 'foot = 12 inches' : 'meter = 100 centimeters'})`,
+            `A ${inches ? 'bicycle' : 'roller'} wheel has a diameter of ${D} ${small}. How many complete revolutions does it make over a straight run of ${plain(distance)} ${big}, with no slipping? (1 ${inches ? 'foot = 12 inches' : 'meter = 100 centimeters'})`,
+          ]),
           suffix: 'complete revolutions',
           answer: new Frac(ans),
-          traps: traps.filter((t) => !t.value.eq(ans)),
+          traps: ((): typeof traps => {
+            if (traps.some((t) => t.value.eq(ans))) throw new Redraw('a trap equals the answer');
+            return traps;
+          })(),
           explanation: `Each revolution moves the wheel one circumference: $\\pi d = ${D}\\pi \\approx ${(D * Math.PI).toFixed(2)}$ ${small}.
 
 The distance is $${num(distance)} \\times ${factor} = ${num(distance * factor)}$ ${small}, so the number of revolutions is $\\frac{${num(distance * factor)}}{${D}\\pi} \\approx ${N.toFixed(2)}$.
@@ -706,7 +729,11 @@ The wheel completes ${ans} revolutions (the last one is not finished). Use the d
         fig.seg('O', 'A', `$${r}$`).seg('A', 'P').seg('O', 'P', `$${dd}$`);
         answer = new Frac(t);
         traps.push({ value: new Frac(dd - r), trap: 'geom-circle-no-right-triangle' });
-        stem = `In the figure above, $O$ is the center of the circle and $PA$ is tangent to the circle at $A$. What is the length of $PA$?`;
+        stem = rng.pick([
+          `In the figure above, $O$ is the center of the circle and $PA$ is tangent to the circle at $A$. What is the length of $PA$?`,
+          `In the figure above, the line through $P$ and $A$ is tangent at $A$ to the circle with center $O$. What is the length of $PA$?`,
+          `$O$ is the center of the circle in the figure above, and $PA$ touches the circle at $A$ without crossing it. What is the length of $PA$?`,
+        ]);
         explanation = `A tangent is perpendicular to the radius at the point of tangency, so triangle $OAP$ has a right angle at $A$ with hypotenuse $OP = ${dd}$:
 
 $$PA = \\sqrt{${dd}^2 - ${r}^2} = \\sqrt{${dd * dd - r * r}} = ${t}$$
@@ -716,7 +743,11 @@ Subtracting the lengths ($${dd} - ${r}$) ignores the right triangle.`;
         fig.seg('O', 'A', `$${r}$`).seg('A', 'P', `$${t}$`).seg('O', 'P');
         answer = new Frac(dd);
         traps.push({ value: new Frac(r + t), trap: 'geom-circle-no-right-triangle' });
-        stem = `In the figure above, $O$ is the center of the circle and $PA$ is tangent to the circle at $A$. What is the length of $OP$?`;
+        stem = rng.pick([
+          `In the figure above, $O$ is the center of the circle and $PA$ is tangent to the circle at $A$. What is the length of $OP$?`,
+          `In the figure above, the line through $P$ and $A$ is tangent at $A$ to the circle with center $O$. What is the length of $OP$?`,
+          `$O$ is the center of the circle in the figure above, and $PA$ touches the circle at $A$ without crossing it. What is the length of $OP$?`,
+        ]);
         explanation = `The radius $OA$ is perpendicular to the tangent $PA$, so $OP$ is the hypotenuse of right triangle $OAP$:
 
 $$OP = \\sqrt{${r}^2 + ${t}^2} = \\sqrt{${r * r + t * t}} = ${dd}$$
@@ -738,7 +769,7 @@ ${dd} is the distance from $P$ to the center, not to the circle.`;
       }
       return {
         params: { ...base, r, a: t, b: dd },
-        q: { format: 'ne', stem, figure: fig.build(false), answer, traps: traps.filter((x) => !x.value.eq(answer)), explanation },
+        q: { format: 'ne', stem, figure: fig.build(false), answer, traps: noClash(traps, answer), explanation },
       };
     }
     // chords
@@ -790,7 +821,7 @@ The leg is half the chord (${half}), not the whole chord.`;
     }
     return {
       params: { ...base, r, a: h, b: half },
-      q: { format: 'ne', stem, figure: fig.build(false), answer, traps: traps.filter((x) => !x.value.eq(answer)), explanation },
+      q: { format: 'ne', stem, figure: fig.build(false), answer, traps: noClash(traps, answer), explanation },
     };
   },
   check(q, p) {

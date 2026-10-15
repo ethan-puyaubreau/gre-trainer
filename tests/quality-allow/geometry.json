@@ -1,13 +1,4 @@
 {
-  "geo.circles.compare-qc": {
-    "qc.d-share": "baseline"
-  },
-  "geo.circles.lengths": {
-    "bank.size": "baseline"
-  },
-  "geo.circles.ratio": {
-    "distractors.trapped": "baseline"
-  },
   "geo.composite.combined": {
     "artifacts.plural-1": "baseline"
   },

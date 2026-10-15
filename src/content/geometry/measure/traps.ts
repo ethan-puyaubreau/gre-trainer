@@ -119,6 +119,10 @@ export const measureTraps: Record<string, Trap> = {
     label: 'Used the ratio of the radii for the areas',
     fix: 'Areas grow with the SQUARE of the radius: radii in the ratio $p : q$ give areas in the ratio $p^2 : q^2$.',
   },
+  'geom-circle-ratio-cubed': {
+    label: 'Cubed the ratio for an area',
+    fix: 'Cubing is for volumes. Areas of circles go with the square of the radii.',
+  },
   'geom-circle-ratio-squared': {
     label: 'Squared the ratio for a length',
     fix: 'Circumferences, radii and diameters are lengths: they are in the same ratio as the radii. Only areas use the squared ratio.',
