@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeSegment } from '../src/router';
 import { dropWeakFlags } from '../src/store/migrate';
 import type { Remediation } from '../src/mastery/scheduler';
-import { initialData, isProgressData, MAX_ATTEMPT_MS, useProgress } from '../src/store/progress';
+import { exportProgress, initialData, isProgressData, MAX_ATTEMPT_MS, useProgress } from '../src/store/progress';
 
 describe('router', () => {
   it('keeps a malformed escape instead of throwing', () => {
@@ -100,5 +100,35 @@ describe('repair queue', () => {
     useProgress.setState({ ...initialData(), seq: 1, remediation: [old] });
     answer(true, old);
     expect(queue()).toMatchObject([{ skillId: 'arith.s', stage: 2 }]);
+  });
+});
+
+describe('lessons seen', () => {
+  it('records a skill once, exports it and takes it back on import', () => {
+    useProgress.setState(initialData());
+    useProgress.getState().markLessonSeen('arith.fractions');
+    useProgress.getState().markLessonSeen('arith.fractions');
+    expect(useProgress.getState().lessonsSeen).toEqual(['arith.fractions']);
+    const exported = JSON.parse(exportProgress());
+    expect(exported.lessonsSeen).toEqual(['arith.fractions']);
+    useProgress.getState().reset();
+    expect(useProgress.getState().lessonsSeen).toEqual([]);
+    useProgress.getState().importData(exported);
+    expect(useProgress.getState().lessonsSeen).toEqual(['arith.fractions']);
+  });
+
+  it('accepts an export without the field, and rejects one that is not a list of ids', () => {
+    const { lessonsSeen, ...old } = initialData();
+    expect(lessonsSeen).toEqual([]);
+    expect(isProgressData(old)).toBe(true);
+    useProgress.getState().importData(old);
+    expect(useProgress.getState().lessonsSeen).toEqual([]);
+    expect(isProgressData({ ...old, lessonsSeen: 'arith.fractions' })).toBe(false);
+    expect(isProgressData({ ...old, lessonsSeen: [1] })).toBe(false);
+  });
+
+  it('keeps the lessons setting through an import', () => {
+    useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, lessons: false } });
+    expect(useProgress.getState().settings.lessons).toBe(false);
   });
 });

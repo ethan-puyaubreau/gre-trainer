@@ -1,12 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Calculator } from '../components/Calculator';
+import { LessonView } from '../components/LessonView';
 import { LevelChange } from '../components/LevelChange';
 import { QuestionView } from '../components/QuestionView';
 import { Rich, RichInline } from '../components/Rich';
 import { SessionRecap } from '../components/SessionRecap';
 import { formatClock, PaceBar, useStopwatch } from '../components/Timer';
 import { AREA_NAMES, SKILLS, skillById, templateById, templatesBySkill, TRAPS } from '../content';
-import { LESSONS } from '../content/lessons';
+import { LESSONS, lessonDue } from '../content/lessons';
 import { generateQuestion, poolSeed } from '../engine/generate';
 import { grade, isAnswered, type GradeResult, type Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
@@ -83,7 +84,12 @@ export function Practice({ route }: { route: string[] }) {
   const recent = useRef<string[]>([]);
   const lastSkill = useRef<string | undefined>(undefined);
 
-  const elapsed = useStopwatch(!!current && !result && !recap, current?.question.id);
+  // A skill met for the first time shows its lesson before the question (the question is already easy: difficulty 1).
+  const lessonSkill = current?.question.skillId;
+  const gated =
+    !!lessonSkill && lessonDue(lessonSkill, { enabled: store.settings.lessons, level: store.skills[lessonSkill]?.level ?? 0, seen: store.lessonsSeen });
+
+  const elapsed = useStopwatch(!!current && !result && !recap && !gated, current?.question.id);
 
   const next = useCallback(() => {
     const s = useProgress.getState();
@@ -159,7 +165,7 @@ export function Practice({ route }: { route: string[] }) {
   // Keyboard: letters / digits pick a choice, Enter submits or goes to the next question.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!current || recap) return;
+      if (!current || recap || gated) return;
       const target = e.target as HTMLElement;
       const typing = target.tagName === 'INPUT' || target.closest('.calc');
       if (e.key === 'Enter') {
@@ -186,7 +192,7 @@ export function Practice({ route }: { route: string[] }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, recap, result, response, next, submit]);
+  }, [current, recap, gated, result, response, next, submit]);
 
   const summary = useMemo(() => summarize(outcomes), [outcomes]);
   const keepPracticing = () => {
@@ -227,6 +233,34 @@ export function Practice({ route }: { route: string[] }) {
 
   const { question, pick } = current;
   const skill = skillById.get(question.skillId)!;
+  if (gated) {
+    const start = () => {
+      store.markLessonSeen(skill.id);
+      window.scrollTo({ top: 0 });
+    };
+    return (
+      <div className="practice-fx">
+        <h1>{scopeTitle(scope)}</h1>
+        <div className="card">
+          <div className="row">
+            <h2 style={{ margin: 0 }}>{skill.name}</h2>
+            <span className="chip chip-good">New skill</span>
+          </div>
+          <p className="muted">A short lesson before your first question. Reading it costs nothing.</p>
+          <LessonView skillId={skill.id}>
+            <div className="row" style={{ marginTop: 18 }}>
+              <button className="btn btn-primary btn-big" onClick={start}>
+                Start with an easy question
+              </button>
+              <button className="btn" onClick={start}>
+                I know this, test me
+              </button>
+            </div>
+          </LessonView>
+        </div>
+      </div>
+    );
+  }
   const template = templateById.get(question.templateId)!;
   const st = store.skills[skill.id];
   const level = st?.level ?? 0;

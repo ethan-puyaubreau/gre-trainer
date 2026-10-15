@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { LessonView } from '../components/LessonView';
 import { Rich, RichInline } from '../components/Rich';
 import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
+import { LESSONS } from '../content/lessons';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextCriteria, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
@@ -430,6 +432,14 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
       <div className="strategy-box">
         <Rich text={skill.strategy} />
       </div>
+      {LESSONS[skill.id] && (
+        <details style={{ marginTop: 12 }}>
+          <summary>
+            <strong>Lesson</strong>
+          </summary>
+          <LessonView skillId={skill.id} />
+        </details>
+      )}
     </dialog>
   );
 }

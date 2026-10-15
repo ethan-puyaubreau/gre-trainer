@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { LessonView } from '../components/LessonView';
 import { Rich, RichInline } from '../components/Rich';
 import { AREA_NAMES, AREAS, templatesBySkill } from '../content';
+import { LESSONS } from '../content/lessons';
 import { href } from '../router';
 
 export function Strategies({ focus }: { focus?: string }) {
@@ -31,6 +33,14 @@ export function Strategies({ focus }: { focus?: string }) {
                   {s.summary}
                 </p>
                 <Rich text={s.strategy} />
+                {LESSONS[s.id] && (
+                  <details style={{ marginTop: 10 }}>
+                    <summary>
+                      <strong>Lesson</strong>
+                    </summary>
+                    <LessonView skillId={s.id} />
+                  </details>
+                )}
                 {(templatesBySkill.get(s.id)?.length ?? 0) > 0 && (
                   <a className="btn" style={{ marginTop: 10, display: 'inline-block' }} href={href('practice', 'skill', s.id)}>
                     Practice

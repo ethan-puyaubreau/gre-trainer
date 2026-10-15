@@ -47,6 +47,8 @@ export interface Settings {
   motion?: 'system' | 'on' | 'off';
   /** When the user last downloaded an export (drives the backup reminder). */
   lastExportAt?: number;
+  /** Show a skill's lesson before its first question (undefined = on). */
+  lessons?: boolean;
 }
 
 export interface ProgressData {
@@ -59,6 +61,8 @@ export interface ProgressData {
   /** Global attempt counter, used to space the repair queue. */
   seq: number;
   settings: Settings;
+  /** Skill ids whose lesson was shown before the first question (absent = none). */
+  lessonsSeen?: string[];
 }
 
 interface Actions {
@@ -74,6 +78,7 @@ interface Actions {
     repair?: Remediation;
   }): AttemptOutcome;
   recordSection(rec: SectionRecord): void;
+  markLessonSeen(skillId: string): void;
   updateSettings(patch: Partial<Settings>): void;
   importData(data: unknown): void;
   reset(): void;
@@ -94,6 +99,7 @@ export function initialData(now = Date.now()): ProgressData {
     sections: [],
     seq: 0,
     settings: { paceSec: DEFAULT_PACE_SEC, showTimer: true, theme: 'system' },
+    lessonsSeen: [],
   };
 }
 
@@ -117,6 +123,7 @@ export function isProgressData(x: unknown): x is ProgressData {
   if (!Array.isArray(x.remediation) || (x.sections !== undefined && !Array.isArray(x.sections))) return false;
   if (x.settings !== undefined && !isObj(x.settings)) return false;
   if (x.seq !== undefined && !isNum(x.seq)) return false;
+  if (x.lessonsSeen !== undefined && !(Array.isArray(x.lessonsSeen) && x.lessonsSeen.every((id) => typeof id === 'string'))) return false;
   return (
     Array.isArray(x.history) &&
     x.history.every(
@@ -192,6 +199,11 @@ export const useProgress = create<ProgressData & Actions>()(
         set({ sections: [...get().sections, rec].slice(-200) });
       },
 
+      markLessonSeen(skillId) {
+        const seen = get().lessonsSeen ?? [];
+        if (!seen.includes(skillId)) set({ lessonsSeen: [...seen, skillId] });
+      },
+
       updateSettings(patch) {
         set({ settings: { ...get().settings, ...patch } });
       },
@@ -220,6 +232,7 @@ export const useProgress = create<ProgressData & Actions>()(
         sections: s.sections,
         seq: s.seq,
         settings: s.settings,
+        lessonsSeen: s.lessonsSeen,
       }),
     },
   ),
@@ -243,6 +256,7 @@ export function exportProgress(): string {
     sections: s.sections,
     seq: s.seq,
     settings: s.settings,
+    lessonsSeen: s.lessonsSeen,
   };
   return JSON.stringify(data);
 }

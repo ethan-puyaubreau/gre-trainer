@@ -18,3 +18,8 @@ export interface Lesson {
 
 /** Lessons keyed by skill id. */
 export const LESSONS: Record<string, Lesson> = { ...arithmeticLessons, ...algebraLessons, ...geometryLessons, ...dataLessons };
+
+/** Whether a skill's lesson comes before its next question: lessons on (undefined = on), the skill untouched (level 0) and its lesson not yet shown. */
+export function lessonDue(skillId: string, o: { enabled?: boolean; level: number; seen?: string[] }): boolean {
+  return o.enabled !== false && skillId in LESSONS && o.level === 0 && !(o.seen ?? []).includes(skillId);
+}
