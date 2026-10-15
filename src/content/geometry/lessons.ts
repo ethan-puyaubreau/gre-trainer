@@ -8,7 +8,7 @@ export const geometryLessons: Record<string, Lesson> = {
       problem: `Two parallel lines are cut by a transversal. At the first line an acute angle measures $3x^\\circ$; at the second line an obtuse angle measures $(x + 100)^\\circ$. Find the obtuse angle.`,
       steps: [
         `Write $3x + (x + 100) = 180$, because an acute angle and an obtuse angle made by parallel lines are supplementary.`,
-        `Solve: $4x + 100 = 180$ gives $4x = 80$, so $x = 20$.`,
+        `Solve: $4x + 100 = 180$ gives $4x = 80$, so $x = 20$, because the equation has one unknown and only this value makes the two angles supplementary.`,
         `The obtuse angle is $x + 100 = 120$, because the question asks for the angle, not for $x$.`,
       ],
       answer: `$120^\\circ$ (check: $60 + 120 = 180$)`,

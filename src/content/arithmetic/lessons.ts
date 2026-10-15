@@ -8,7 +8,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'A positive integer $n$ leaves remainder 4 when divided by 10. Which of 2, 4 and 5 must divide $n$ for every such $n$?',
       steps: [
         'Translate: $n = 10k + 4$ for some integer $k \\ge 0$, because that is what remainder 4 on division by 10 means.',
-        'Factor: $10k + 4 = 2(5k + 2)$. The number 2 divides both 10 and 4, so it divides the whole sum.',
+        'Factor: $10k + 4 = 2(5k + 2)$, because the number 2 divides both 10 and 4 and so divides the whole sum.',
         'Test $k = 0$ and $k = 1$: $n = 4$ and $n = 14$. Since 4 is not divisible by 5 and 14 is not divisible by 4, those two are out, because one counterexample is enough to defeat a "must" claim.',
       ],
       answer: 'Only 2 must divide $n$.',
@@ -23,8 +23,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Which of 21 and 23 can be written as the sum of two primes?',
       steps: [
         'Both totals are odd, so one prime must be even, because odd + odd and even + even are both even.',
-        'The only even prime is 2, so for a total $n$ the other prime must be $n - 2$.',
-        'Test $21 - 2 = 19$: the primes up to $\\sqrt{19}$ are 2 and 3, and neither divides 19, so 19 is prime. Test $23 - 2 = 21 = 3 \\cdot 7$, which is not prime.',
+        'The only even prime is 2, so for a total $n$ the other prime must be $n - 2$, because the two primes add up to $n$.',
+        'Test $21 - 2 = 19$: the primes up to $\\sqrt{19}$ are 2 and 3, and neither divides 19, so 19 is prime, because a composite number always has a prime factor up to its square root. Test $23 - 2 = 21 = 3 \\cdot 7$, which is not prime.',
       ],
       answer: '$21 = 2 + 19$ works; 23 does not.',
     },
@@ -54,7 +54,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       steps: [
         'This is an LCM question, because the buses coincide exactly at common multiples of 12 and 18.',
         'Factor: $12 = 2^2 \\cdot 3$ and $18 = 2 \\cdot 3^2$. Take each prime at its highest power: $2^2 \\cdot 3^2 = 36$, because a common multiple needs every prime power that 12 or 18 contains.',
-        'Check: $36 = 3 \\cdot 12 = 2 \\cdot 18$, so it is a common multiple, and any smaller number would miss a prime power that 12 or 18 needs. Thirty-six minutes after 8:00 is 8:36.',
+        'Check: $36 = 3 \\cdot 12 = 2 \\cdot 18$, so it is a common multiple, and nothing smaller works because it would miss a prime power that 12 or 18 needs. Thirty-six minutes after 8:00 is 8:36.',
       ],
       answer: 'They next leave together at 8:36.',
     },
@@ -69,7 +69,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       steps: [
         'The cycle 428571 has length 6, because those six digits repeat in the same order.',
         'Divide the position by the length: $48 = 6 \\cdot 8 + 0$, because the remainder tells how far into the current cycle the 48th digit sits.',
-        'A remainder of 0 means a cycle has just finished, so take the LAST digit of the cycle, not the first.',
+        'Take the LAST digit of the cycle, not the first, because a remainder of 0 means a cycle has just finished.',
       ],
       answer: 'The 48th digit is 1.',
     },
@@ -85,7 +85,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
         'Count the terms: $50 - 31 + 1 = 20$, because both endpoints are included.',
         'Average the ends: $\\frac{31 + 50}{2} = 40.5$, because in an evenly spaced list the average is the midpoint of first and last.',
         'Multiply: $20 \\times 40.5 = 810$, because the sum is the number of terms times the average.',
-        'Check by pairing: $31 + 50 = 81$, $32 + 49 = 81$, and so on for 10 pairs, so $10 \\times 81 = 810$.',
+        'Check by pairing: $31 + 50 = 81$ and $32 + 49 = 81$, because moving inward adds 1 to one term and takes 1 from the other. There are 10 pairs, so $10 \\times 81 = 810$.',
       ],
       answer: 'The sum is 810.',
     },
@@ -98,7 +98,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
     example: {
       problem: 'Which is greater, $\\frac{7}{11}$ or $\\frac{5}{8}$?',
       steps: [
-        'Both denominators are positive, so $\\frac{7}{11} > \\frac{5}{8}$ exactly when $7 \\cdot 8 > 5 \\cdot 11$. Multiplying both sides by $8 \\cdot 11$ keeps the direction.',
+        'Both denominators are positive, so $\\frac{7}{11} > \\frac{5}{8}$ exactly when $7 \\cdot 8 > 5 \\cdot 11$, because multiplying both sides by $8 \\cdot 11$ keeps the direction.',
         'Compute the two cross products: $7 \\cdot 8 = 56$ and $5 \\cdot 11 = 55$, because they are the numerators once both fractions have the denominator $8 \\cdot 11$.',
         'Since $56 > 55$, the first fraction is larger, because with a common denominator the larger numerator wins. As a check, $0.636\\ldots > 0.625$.',
       ],
@@ -113,7 +113,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
     example: {
       problem: 'Compute $4.5 \\div 0.15$.',
       steps: [
-        'Multiply the top and bottom by 100: $\\frac{4.5}{0.15} = \\frac{450}{15}$. Both decimal points move two places, so the value is unchanged.',
+        'Multiply the top and bottom by 100: $\\frac{4.5}{0.15} = \\frac{450}{15}$, because multiplying both parts by the same number leaves the value unchanged and moves both decimal points two places.',
         'Divide: $450 \\div 15 = 30$, because $15 \\cdot 30 = 450$.',
         'Cross-check with a fraction: $0.15 = \\frac{3}{20}$, so $4.5 \\div \\frac{3}{20} = 4.5 \\cdot \\frac{20}{3} = 30$, because dividing by a fraction means multiplying by its reciprocal.',
       ],
@@ -129,7 +129,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Points A, B, C, D lie in that order on a number line, with $AB = CD$ and $BC = 3 \\cdot AB$. If A is at $-3$ and D is at 17, where is C?',
       steps: [
         'Let $AB = CD = u$. Then $BC = 3u$ and $AD = u + 3u + u = 5u$, because all lengths must share one unit.',
-        'The distance is $AD = 17 - (-3) = 20$, so $5u = 20$ and $u = 4$.',
+        'The distance is $AD = 17 - (-3) = 20$, so $5u = 20$ and $u = 4$, because both expressions measure the same segment.',
         'C is $CD = 4$ to the left of D: $17 - 4 = 13$. This is right because 13 lies between B at 1 and D at 17.',
       ],
       answer: 'C is at 13.',
@@ -175,7 +175,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Simplify $\\sqrt{50} + \\sqrt{18}$.',
       steps: [
         'Pull out perfect squares, because their roots are whole numbers that can leave the radical: $\\sqrt{50} = \\sqrt{25 \\cdot 2} = 5\\sqrt{2}$ and $\\sqrt{18} = \\sqrt{9 \\cdot 2} = 3\\sqrt{2}$.',
-        'Both are multiples of $\\sqrt{2}$, so add the coefficients: $5\\sqrt{2} + 3\\sqrt{2} = 8\\sqrt{2}$, exactly as $5x + 3x = 8x$ with $x = \\sqrt{2}$.',
+        'Both are multiples of $\\sqrt{2}$, so add the coefficients, because $5x + 3x = 8x$ also holds with $x = \\sqrt{2}$: $5\\sqrt{2} + 3\\sqrt{2} = 8\\sqrt{2}$.',
         'Check: $7.07 + 4.24 \\approx 11.31 \\approx 8 \\cdot 1.414$, while $\\sqrt{50 + 18} = \\sqrt{68} \\approx 8.25$ is far off, because radicals never add under the root.',
       ],
       answer: '$\\sqrt{50} + \\sqrt{18} = 8\\sqrt{2}$.',
@@ -235,8 +235,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'A bag holds 240 marbles. One quarter are blue, and the rest are red and green in the ratio $2 : 3$. How many are green?',
       steps: [
         'Take out the known fraction first: blue is $\\frac{1}{4} \\cdot 240 = 60$, so $240 - 60 = 180$ are red or green, because the ratio covers only those two colors.',
-        'The ratio $2 : 3$ makes $2 + 3 = 5$ equal parts, so one part is $180 \\div 5 = 36$.',
-        'Green has 3 parts: $3 \\cdot 36 = 108$. Check: red is $2 \\cdot 36 = 72$, and $72 + 108 = 180$, so the parts use up exactly the marbles that are not blue.',
+        'The ratio $2 : 3$ makes $2 + 3 = 5$ equal parts, so one part is $180 \\div 5 = 36$, because the 180 is split evenly into those 5 parts.',
+        'Green has 3 parts: $3 \\cdot 36 = 108$, because each part is 36. Check: red is $2 \\cdot 36 = 72$, and $72 + 108 = 180$, which is right because red and green must use up the marbles that are not blue.',
       ],
       answer: '108 marbles are green.',
     },
@@ -249,10 +249,10 @@ export const arithmeticLessons: Record<string, Lesson> = {
     example: {
       problem: 'Convert 90 kilometers per hour to meters per second.',
       steps: [
-        'Write $\\frac{90\\text{ km}}{1\\text{ h}} \\times \\frac{1000\\text{ m}}{1\\text{ km}} \\times \\frac{1\\text{ h}}{3600\\text{ s}}$, placing each factor so the old unit cancels.',
+        'Write $\\frac{90\\text{ km}}{1\\text{ h}} \\times \\frac{1000\\text{ m}}{1\\text{ km}} \\times \\frac{1\\text{ h}}{3600\\text{ s}}$, placing each factor so the old unit cancels, because a unit cancels only when it appears once above and once below the fraction bar.',
         'Kilometers cancel with kilometers and hours with hours, leaving meters over seconds, because each factor equals 1.',
         'Multiply the numbers: $\\frac{90 \\cdot 1000}{3600} = \\frac{90{,}000}{3600} = 25$, because 1000 m per km multiplies the number and 3600 s per hour divides it.',
-        'Sanity check: 1 m/s is 3.6 km/h, so 25 m/s is $25 \\times 3.6 = 90$ km/h, the speed we started with.',
+        'Sanity check: $25 \\times 3.6 = 90$ km/h, the speed we started with, because 1 m/s is 3.6 km/h.',
       ],
       answer: '90 km/h is 25 meters per second.',
     },
