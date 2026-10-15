@@ -15,7 +15,8 @@ import { sameTemplates, sameTraps } from './same';
 import { mustTemplates, mustTraps } from './mustbe';
 import { linearRelationTemplates, linearRelationTraps } from './linearRelationQc';
 import { linearParameterTemplates, linearParameterTraps } from './linearParameterNe';
+import { linearWordTemplates, linearWordTraps } from './linearWordMcs';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...linearRelationTemplates, ...linearParameterTemplates, ...linearWordTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...linearRelationTraps, ...linearParameterTraps, ...linearWordTraps };
