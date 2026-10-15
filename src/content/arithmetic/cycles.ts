@@ -1,4 +1,4 @@
-import { qcCompare, valuedChoices } from '../../engine/build';
+import { qcCompare, qcFromSamples, valuedChoices } from '../../engine/build';
 import { frac, Frac } from '../../engine/frac';
 import { decimalDigits, gcd, mod, range, sum } from '../../engine/math';
 import { num, ordinal } from '../../engine/tex';
@@ -34,6 +34,8 @@ interface DigitParams {
   q: number;
   n: number;
   k: number;
+  /** the digit position is only known to lie in n .. n + span - 1 (answer D when the digits disagree with k) */
+  span?: number;
 }
 
 const DIGIT_DENOMS: Record<Difficulty, number[]> = {
@@ -86,6 +88,33 @@ const decimalDigitQC: Template<DigitParams> = {
       const rel = rng.pick(options);
       k = rel === 'C' ? digit : rel === 'A' ? rng.int(Math.max(0, digit - 3), digit - 1) : rng.int(digit + 1, Math.min(9, digit + 3));
     }
+    // Sometimes the position is only known to lie in a short range: the digits there differ, so the comparison can flip (answer D).
+    const span = rng.int(2, 3);
+    const digitAt = (pos: number) => (pos <= prefix.length ? prefix[pos - 1] : cycle[mod(pos - prefix.length - 1, L)]);
+    const around = range(n, n + span - 1).map(digitAt);
+    if (d >= 2 && rng.chance(0.3) && new Set(around).size > 1) {
+      const kRange = around[0];
+      const first: QCChoice = 'C'; // at m = n the digit equals k
+      const L2 = prefix.length;
+      return {
+        params: { p, q, n, k: kRange, span },
+        q: {
+          format: 'qc',
+          info: `$D$ is the decimal form of the fraction $${frac(p, q).toTex({ dfrac: true })}$, and $m$ is an integer with $${n} \\le m \\le ${n + span - 1}$.`,
+          quantityA: 'The $m$th digit to the right of the decimal point in $D$',
+          quantityB: `$${kRange}$`,
+          answer: 'D',
+          traps: { [first]: 'tested-one-value' },
+          explanation: `$${frac(p, q).toTex()} = ${decimalTex(prefix, cycle)}$, so the repeating block has ${L} digits${L2 ? ` after ${L2 === 1 ? 'one non-repeating digit' : `${L2} non-repeating digits`}` : ''}. List the digits in the allowed positions: ${range(n, n + span - 1)
+            .map((pos) => `digit ${pos} is ${digitAt(pos)}`)
+            .join(', ')}.
+
+Compare each with ${kRange}: digit ${n} is equal to it, but digit ${n + around.findIndex((x) => x !== kRange)} is ${around.find((x) => x !== kRange)! > kRange ? 'greater' : 'less'}. Two allowed values of $m$ disagree, so the relationship cannot be determined. (D)
+
+Trap: testing only $m = ${n}$ suggests that the quantities are equal; $m$ takes ${span} values.`,
+        },
+      };
+    }
     const answer = qcCompare(digit, k);
     const trapAnswer = qcCompare(trapDigit, k);
     const traps: QCQuestion['traps'] = trapAnswer !== answer ? { [trapAnswer]: trapId } : undefined;
@@ -129,7 +158,12 @@ Check: the expansion begins $0.${prefix.join('')}${cycle.join('')}${cycle.slice(
       },
     };
   },
-  check(q, { p, q: den, n, k }) {
+  check(q, { p, q: den, n, k, span }) {
+    if (span) {
+      const all = decimalDigits(p, den, n + span - 1);
+      const expected = qcFromSamples(range(n, n + span - 1).map((pos): [number, number] => [all[pos - 1], k]));
+      return q.format === 'qc' && q.answer === expected ? null : `expected ${expected}`;
+    }
     const digit = decimalDigits(p, den, n)[n - 1];
     const expected = qcCompare(digit, k);
     return q.format === 'qc' && q.answer === expected ? null : `expected ${expected}, digit ${digit}`;

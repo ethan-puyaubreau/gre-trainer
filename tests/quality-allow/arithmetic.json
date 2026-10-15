@@ -1,11 +1,1 @@
-{
-  "arith.cycles.decimal-digit": {
-    "qc.never-d": "Both quantities are fixed numbers (a digit and a given digit), so D is impossible."
-  },
-  "arith.exponents.common-base-qc": {
-    "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
-  },
-  "arith.roots.combine-qc": {
-    "qc.never-d": "Both quantities are fixed numbers, so D (cannot be determined) is impossible."
-  }
-}
+{}

@@ -311,6 +311,8 @@ interface CommonBaseParams {
   /** Quantity B = k * b^g */
   k: number;
   g: number;
+  /** n unknown: Quantity A is kb^n (k equal powers), Quantity B is b^n + c */
+  unknownN?: { copies: number; c: number };
 }
 
 /** Exact value of Quantity A by direct BigInt arithmetic (checks). */
@@ -356,6 +358,42 @@ const commonBaseQC: Template<CommonBaseParams> = {
   format: 'qc',
   style: 'factor sums and differences of powers of one base',
   generate(rng, diff) {
+    // Sometimes n is only known to be a positive integer: k equal powers against one power plus a constant can flip with n (answer D).
+    if (diff >= 2 && rng.chance(0.3)) {
+      const b = rng.pick([2, 3, 5]);
+      const copies = rng.pick([2, 3]);
+      const gap = (copies - 1) * b; // at n = 1 the quantities differ by gap - c
+      const flips = rng.chance(0.7);
+      const c = flips ? gap * rng.pick([1, 2, 3, 5]) + rng.pick([0, 0, 1]) : rng.int(1, gap - 1);
+      const sum = Array(copies).fill(`${b}^{n}`).join(' + ');
+      const first: QCChoice = qcCompare(copies * b, b + c); // n = 1
+      let nStar = 1;
+      while (BigInt(copies - 1) * BigInt(b) ** BigInt(nStar) <= BigInt(c)) nStar++;
+      const answer: QCChoice = flips ? 'D' : 'A';
+      const word = (r: QCChoice) => (r === 'C' ? 'equal to' : r === 'A' ? 'greater than' : 'less than');
+      return {
+        params: { form: 'double', b, n: 0, k: c, g: 0, unknownN: { copies, c } },
+        q: {
+          format: 'qc',
+          info: '$n$ is a positive integer.',
+          quantityA: `$${sum}$`,
+          quantityB: `$${b}^{n} + ${c}$`,
+          answer,
+          traps: flips ? { [first]: 'tested-one-value' } : undefined,
+          explanation: `${copies === 2 ? 'Two equal powers' : 'Three equal powers'} add like $x + x${copies === 3 ? ' + x' : ''} = ${copies}x$, so Quantity A is $${copies} \\cdot ${b}^{n}$. Subtract $${b}^{n}$ from both quantities: compare $${copies - 1 === 1 ? '' : `${copies - 1} \\cdot `}${b}^{n}$ with ${c}.
+
+${
+            flips
+              ? `For $n = 1$ this is $${(copies - 1) * b}$ against ${c}: Quantity A is ${word(first)} Quantity B. For $n = ${nStar}$ it is $${(copies - 1) * b ** nStar}$ against ${c}: Quantity A is greater. Two allowed values disagree, so the relationship cannot be determined. (D)
+
+Trap: testing $n = 1$ alone suggests ${first === 'C' ? 'that the quantities are equal' : `that Quantity ${first === 'A' ? 'A' : 'B'} is greater`}; the power keeps growing with $n$.`
+              : `Already for $n = 1$ the powers are $${(copies - 1) * b}$, more than ${c}, and they only grow. So Quantity A is greater. (A)`
+          }
+
+Exponents add only when powers are multiplied: $${b}^{n} + ${b}^{n} \\ne ${b}^{2n}$.`,
+        },
+      };
+    }
     const forms: BaseForm[] = diff === 1 ? ['double', 'triple', 'b-times', 'power-of-power'] : diff === 2 ? ['diff-over-b', 'double', 'next-minus', 'power-of-power'] : ['diff-over-b', 'next-minus', 'triple', 'double'];
     const form = rng.pick(forms);
     const b = form === 'triple' ? rng.pick([2, 3]) : form === 'double' ? rng.pick([2, 2, 3, 5]) : rng.pick([2, 3, 5, 10]);
@@ -458,7 +496,11 @@ ${compare}${slips[form] ? `\n\n${slips[form]}` : ''}`,
       },
     };
   },
-  check(q, { form, b, n, k, g }) {
+  check(q, { form, b, n, k, g, unknownN }) {
+    if (unknownN) {
+      const samples = Array.from({ length: 14 }, (_, i) => i + 1).map((nn) => [unknownN.copies * b ** nn, b ** nn + unknownN.c] as [number, number]);
+      return expectQc(q, qcFromSamples(samples));
+    }
     const A = baseFormValue(form, b, n);
     const B = BigInt(k) * BigInt(b) ** BigInt(g);
     return expectQc(q, A > B ? 'A' : A < B ? 'B' : 'C');

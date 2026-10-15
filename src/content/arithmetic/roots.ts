@@ -1,8 +1,16 @@
-import { flaggedChoices, qcCompare, qcCompareNum, valuedChoices } from '../../engine/build';
+import { flaggedChoices, qcCompare, qcCompareNum, qcFromSamples, valuedChoices } from '../../engine/build';
 import { frac } from '../../engine/frac';
 import { num } from '../../engine/tex';
 import { term } from '../../engine/text';
-import type { QCQuestion, Template } from '../../engine/types';
+import type { QCChoice, QCQuestion, Template } from '../../engine/types';
+
+const swapQC = (a: QCChoice): QCChoice => (a === 'A' ? 'B' : a === 'B' ? 'A' : a);
+const QC_WORDS_LOCAL: Record<QCChoice, string> = {
+  A: 'Quantity A is greater',
+  B: 'Quantity B is greater',
+  C: 'the two quantities are equal',
+  D: 'the relationship cannot be determined',
+};
 
 /** A radical expression term: coef * root_index(radicand). */
 interface Rad {
@@ -29,6 +37,8 @@ interface DiffParams {
   m: number;
   index: 2 | 3;
   op: '-' | '+';
+  /** x unknown: Quantity B is the constant K (swapped columns when `swap`) */
+  unknown?: { K: number; swap: boolean };
 }
 
 const radicalCompareQC: Template<DiffParams> = {
@@ -37,6 +47,44 @@ const radicalCompareQC: Template<DiffParams> = {
   format: 'qc',
   style: 'combine two radicals, compare with one radical',
   generate(rng, d) {
+    // Sometimes the radicand holds an unknown positive integer x: the quantity grows like sqrt(x), so a constant can be passed (answer D).
+    if (d >= 2 && rng.chance(0.3)) {
+      const op: '-' | '+' = rng.pick(['-', '+'] as const);
+      const a = rng.int(2, 7);
+      const b = rng.int(1, a - 1);
+      const k = op === '-' ? a - b : a + b;
+      const flips = k === 1 || rng.chance(0.7);
+      const K = flips ? k * rng.int(1, 4) + rng.pick([0, 0, 1]) : k - rng.int(1, k - 1);
+      const swap = rng.chance(0.4);
+      const radical = (c: number) => (c === 1 ? '\\sqrt{x}' : `\\sqrt{${c * c}x}`);
+      const A = `$${radical(a)} ${op} ${radical(b)}$`;
+      const first: QCChoice = qcCompare(k, K); // x = 1
+      const x2 = Math.floor((K / k) ** 2) + 1;
+      const answer: QCChoice = flips ? 'D' : swap ? 'B' : 'A';
+      const word = (r: QCChoice) => (r === 'C' ? 'equal to' : r === 'A' ? 'greater than' : 'less than');
+      return {
+        params: { a, b, c: 1, m: K, index: 2, op, unknown: { K, swap } },
+        q: {
+          format: 'qc',
+          info: '$x$ is a positive integer.',
+          quantityA: swap ? `$${K}$` : A,
+          quantityB: swap ? A : `$${K}$`,
+          answer,
+          traps: flips ? { [swap ? swapQC(first) : first]: 'tested-one-value' } : undefined,
+          explanation: `Pull the perfect squares out of the radicals: $${radical(a)} = ${a === 1 ? '' : a}\\sqrt{x}$ and $${radical(b)} = ${b === 1 ? '' : b}\\sqrt{x}$, so the radical expression equals $${k === 1 ? '' : k}\\sqrt{x}$.
+
+${
+            flips
+              ? `For $x = 1$ it is ${k}, which is ${word(first)} ${K}. For $x = ${x2}$ it is $${k === 1 ? '' : k}\\sqrt{${x2}} \\approx ${(k * Math.sqrt(x2)).toFixed(1)}$, which is greater than ${K}. Two allowed values disagree, so the relationship cannot be determined. (D)
+
+Trap: testing $x = 1$ alone suggests ${QC_WORDS_LOCAL[swap ? swapQC(first) : first]}; $x$ can be any positive integer and the expression keeps growing.`
+              : `Its smallest value is ${k} (at $x = 1$), already greater than ${K}, and it only grows with $x$. So the radical expression is always greater. (${answer})
+
+Radicals do not subtract under the sign: $\\sqrt{25} - \\sqrt{9} = 2$, not $\\sqrt{16} = 4$.`
+          }`,
+        },
+      };
+    }
     const index: 2 | 3 = d === 3 && rng.chance(0.7) ? 3 : 2;
     const c = index === 2 ? rng.pick([2, 3, 5, 6, 7]) : rng.pick([2, 3, 5, 10]);
     const op: '-' | '+' = d === 1 ? '-' : rng.pick(['-', '+'] as const);
@@ -97,7 +145,14 @@ ${traps ? `Trap: combining under the root gives $${root(Math.abs(slipInside) * c
       },
     };
   },
-  check(q, { a, b, c, m, index, op }) {
+  check(q, { a, b, c, m, index, op, unknown }) {
+    if (unknown) {
+      const samples = Array.from({ length: 800 }, (_, i) => i + 1).map((x) => {
+        const A = op === '-' ? Math.sqrt(a * a * x) - Math.sqrt(b * b * x) : Math.sqrt(a * a * x) + Math.sqrt(b * b * x);
+        return (unknown.swap ? [unknown.K, A] : [A, unknown.K]) as [number, number];
+      });
+      return q.format === 'qc' && q.answer === qcFromSamples(samples) ? null : 'wrong answer for the unknown x';
+    }
     const r = (n: number) => (index === 2 ? Math.sqrt(n) : Math.cbrt(n));
     const A = op === '-' ? r(a ** index * c) - r(b ** index * c) : r(a ** index * c) + r(b ** index * c);
     const expected = qcCompareNum(A, r(m * c), 1e-12);
