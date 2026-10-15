@@ -2,6 +2,7 @@ import type { Template, Trap } from '../../../engine/types';
 import { consecutiveTemplates } from './consecutive';
 import { countMultiplesTemplates, countMultiplesTraps } from './countMultiples';
 import { divisibilityTemplates } from './divisibility';
+import { divisorKindsTemplates, divisorKindsTraps } from './divisorKinds';
 import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
 import { factorsTemplates } from './factors';
@@ -30,5 +31,6 @@ export const integersTemplates: Template<any>[] = [
   ...missingDigitTemplates,
   ...countMultiplesTemplates,
   ...primeExpressionTemplates,
+  ...divisorKindsTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps };
