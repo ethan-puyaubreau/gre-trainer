@@ -1,4 +1,5 @@
 import type { Template } from '../../../engine/types';
+import { weightedPercentTemplates, weightedPercentTraps } from './weighted-percent';
 import { weightedSpeedTemplates, weightedSpeedTraps } from './weighted-speed';
 import { centerFilteredTemplates, centerFilteredTraps } from './center-filtered';
 import { centerOverlapTemplates, centerOverlapTraps } from './center-overlap';
@@ -12,7 +13,7 @@ import { spreadTemplates } from './spread';
 import { weightedTemplates } from './weighted';
 
 export { statsSkills };
-export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps, ...weightedSpeedTraps, ...centerFilteredTraps, ...centerOverlapTraps };
+export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps, ...weightedPercentTraps, ...weightedSpeedTraps, ...centerFilteredTraps, ...centerOverlapTraps };
 
 export const statsTemplates: Template<any>[] = [
   ...centerTemplates.slice(0, 1),
@@ -24,5 +25,6 @@ export const statsTemplates: Template<any>[] = [
   ...centerOverlapTemplates,
   ...centerFilteredTemplates,
   ...weightedSpeedTemplates,
+  ...weightedPercentTemplates,
   ...distributionTemplates,
 ];
