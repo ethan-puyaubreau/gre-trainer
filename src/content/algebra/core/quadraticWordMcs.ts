@@ -74,7 +74,7 @@ const quadraticWordMCS: Template<Params> = {
         const thing = rng.pick(THINGS);
         const rel = mult === 1 ? `${s} feet more than its width` : `${s} feet more than ${mult === 2 ? 'twice' : 'three times'} its width`;
         stem = `The length of a rectangular ${thing} is ${rel}. Its area is ${A} square feet. What is its ${asked === 0 ? 'perimeter' : 'length'}, in feet?`;
-        steps = `Let $w$ be the width in feet. The length is $${mult === 1 ? '' : mult}w + ${s}$, so the area gives $w(${mult === 1 ? '' : mult}w + ${s}) = ${A}$, that is $${mult === 1 ? '' : mult}w^2 + ${s}w - ${A} = 0$. Factor: $(w - ${w})(${mult === 1 ? '' : mult}w + ${mult * w + s}) = 0$, so $w = ${w}$ or $w$ is negative. A width cannot be negative, so $w = ${w}$ and the length is $${mult === 1 ? '' : `${mult} \\cdot `}${w} + ${s} = ${L}$.${asked === 0 ? ` The perimeter is $2(${w} + ${L}) = ${2 * (w + L)}$.` : ''}
+        steps = `Let $w$ be the width in feet. The length is $${mult === 1 ? '' : mult}w + ${s}$, so the area gives $w(${mult === 1 ? '' : mult}w + ${s}) = ${A}$, that is $${mult === 1 ? '' : mult}w^2 + ${s}w - ${A} = 0$. Factor: $(w - ${w})(${mult === 1 ? '' : mult}w + ${mult * w + s}) = 0$, so $w = ${w}$ or $w = ${new Frac(-(mult * w + s), mult).toTex()}$. A width cannot be negative, so $w = ${w}$ and the length is $${mult === 1 ? '' : `${mult} \\cdot `}${w} + ${s} = ${L}$.${asked === 0 ? ` The perimeter is $2(${w} + ${L}) = ${2 * (w + L)}$.` : ''}
 
 Check: $${w} \\cdot ${L} = ${A}$.`;
         rule = 'Name the unknown, write the area as a product of two expressions in it, factor, and discard the negative root.';
