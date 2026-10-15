@@ -18,20 +18,22 @@ const richFields = (l: Lesson): [string, string][] => [
 /** Words as a reader counts them: a `$...$` formula is one word, `\$` is a money sign and not a delimiter. */
 const words = (s: string) =>
   s
-    .replace(/\\$/g, '')
+    .replace(/\\\$/g, '')
     .replace(/\$\$[^$]*\$\$|\$[^$]*\$/g, ' M ')
     .split(/\s+/)
     .filter((w) => /[A-Za-z0-9]/.test(w)).length;
 
 const wordCount = (l: Lesson) => richFields(l).reduce((n, [, s]) => n + words(s), 0);
 
-/** A step says why when it names a reason: "because", "since", "so ...", "which means", "therefore"... */
-const SAYS_WHY = /\b(because|since|so|means|therefore|hence|thus|that is why|which is why)\b/i;
+/** A step says why when it states a reason with an explicit connective. A bare "so" only gives a consequence, not a reason. */
+const SAYS_WHY = /\b(because|since|therefore|hence|thus|that is why|which is why|this is why)\b/i;
 
 describe('word counter', () => {
   it('counts a formula as one word and a money sign as nothing', () => {
-    expect(words('Add $2 \cdot 3 + x$ now')).toBe(3);
-    expect(words('It costs \$5 and \$1{,}200, so $x$ is $\frac{1}{2}$.')).toBe(8);
+    expect(words('Add $2 \\cdot 3 + x$ now')).toBe(3);
+    // The text holds backslash-dollar pairs; the old pattern read "$5 and \$" as one formula.
+    expect(words('Pay \\$5 or \\$6')).toBe(4);
+    expect(words('It costs \\$5 and \\$1{,}200, so $x$ is $\\frac{1}{2}$.')).toBe(9);
     expect(words('Even $$x^2 = 4$$ counts once')).toBe(4);
   });
 });
