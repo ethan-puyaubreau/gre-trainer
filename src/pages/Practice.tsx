@@ -13,7 +13,7 @@ import type { Area, Question } from '../engine/types';
 import { LEVEL_NAMES, nextStep, type AttemptOutcome } from '../mastery/model';
 import { nextPick, type Pick, type PracticeScope } from '../mastery/scheduler';
 import { dodgedTraps, summarize, type SessionOutcome } from '../mastery/session';
-import { go, href } from '../router';
+import { href } from '../router';
 import { useProgress } from '../store/progress';
 import '../fx-practice.css';
 
@@ -215,6 +215,11 @@ export function Practice({ route }: { route: string[] }) {
   const paceSec = store.settings.paceSec;
   const [reasonText, reasonCls] = REASON[pick.reason];
   const nChoices = question.format === 'qc' ? 4 : question.format === 'ne' ? 0 : question.choices.length;
+  // Before the answer, opening the strategy card is a hint (penalised); after the result it is free.
+  const toggleStrategy = () => {
+    setShowHint((v) => !v);
+    if (!result) setHinted(true);
+  };
 
   return (
     <div className="practice-fx">
@@ -257,10 +262,7 @@ export function Practice({ route }: { route: string[] }) {
           <div className="row" style={{ marginTop: 18 }}>
             <button
               className="btn btn-ghost"
-              onClick={() => {
-                setShowHint((v) => !v);
-                setHinted(true);
-              }}
+              onClick={toggleStrategy}
               title="Showing the strategy card means this answer will not count toward mastery"
             >
               {showHint ? 'Hide strategy' : 'Show strategy (hint)'}
@@ -274,7 +276,7 @@ export function Practice({ route }: { route: string[] }) {
             </button>
           </div>
         )}
-        {showHint && !result && (
+        {showHint && (
           <div className="strategy-box">
             <Rich text={skill.strategy} />
           </div>
@@ -318,9 +320,14 @@ export function Practice({ route }: { route: string[] }) {
           </>
         )}
         <span className="kbd">Enter</span> to check / next. <a href={href('')}>Back to dashboard</a> ·{' '}
-        <a href="#" onClick={(e) => (e.preventDefault(), go('strategies', skill.id))}>
+        <button
+          className="btn btn-ghost"
+          onClick={toggleStrategy}
+          aria-expanded={showHint}
+          title={result ? undefined : 'Opening the strategy card means this answer will not count toward mastery'}
+        >
           Strategy card
-        </a>
+        </button>
       </div>
     </div>
   );
