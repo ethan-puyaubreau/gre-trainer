@@ -45,6 +45,10 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Took an odd composite number for a prime',
     fix: 'Odd does not mean prime: $27 = 3 \\cdot 9$, $49 = 7 \\cdot 7$, $51 = 3 \\cdot 17$, $91 = 7 \\cdot 13$. Test the primes up to $\\sqrt{n}$ before calling $n$ prime.',
   },
+  'int-primes-sum-parity': {
+    label: 'Assumed a sum of two primes has to be odd',
+    fix: 'Two odd primes add up to an EVEN number: $22 = 5 + 17$. Only a sum that includes the prime 2 can be odd.',
+  },
   'int-parity-rules': {
     label: 'Misapplied an odd/even rule',
     fix: 'odd $\\pm$ odd = even, odd $\\pm$ even = odd, odd $\\times$ odd = odd, and even $\\times$ any integer = even. A power has the parity of its base.',

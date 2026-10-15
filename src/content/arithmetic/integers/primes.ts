@@ -1,7 +1,9 @@
 import { flaggedChoices, qcCompare, qcFromSamples, textChoices } from '../../../engine/build';
-import { frac, type Frac } from '../../../engine/frac';
+import { frac } from '../../../engine/frac';
 import { isPrime, mod, primesUpTo, range } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
+import { num } from '../../../engine/tex';
+import { plural } from '../../../engine/text';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import {
   QC_WORDS,
@@ -38,8 +40,10 @@ interface CannotParams {
   values: number[];
 }
 
-// n - 2 is an odd composite that looks prime: 49, 77, 91, 119, 121, 133, 143, 161.
-const LOOKALIKE_TARGETS = [51, 79, 93, 121, 123, 135, 145, 163];
+/** Odd n that is NOT a sum of two primes: n - 2 is composite (n >= 9 keeps n - 2 above 1). */
+const isBadOdd = (n: number) => n % 2 === 1 && !isPrime(n - 2);
+// n - 2 is an odd composite with no factor 2, 3 or 5: 49, 77, 91 (hand-checkable primality below 100).
+const LOOKALIKE_TARGETS = [51, 79, 93];
 
 const cannotSum: Template<CannotParams> = {
   id: 'arith.primes.cannot-sum',
@@ -47,51 +51,48 @@ const cannotSum: Template<CannotParams> = {
   format: 'mcs',
   style: 'which integer CANNOT be written as a sum of two primes',
   generate(rng, diff) {
-    let values: number[];
+    const [lo, hi] = diff === 1 ? [9, 47] : diff === 2 ? [21, 99] : [41, 99];
     for (;;) {
-      if (diff === 3) {
-        const bad = rng.pick(LOOKALIKE_TARGETS);
-        const goodPool = range(41, 165).filter((n) => n % 2 === 1 && isPrime(n - 2) && n !== bad);
-        values = [bad, ...rng.sample(goodPool, 4)].sort((a, b) => a - b);
-        if (values[4] - values[0] > 70) continue;
-        break;
-      }
-      const start = diff === 1 ? rng.int(7, 36) : rng.int(20, 66);
-      values = range(start, start + 4);
-      const bad = values.filter((n) => n % 2 === 1 && !isPrime(n - 2));
-      const goodOdd = values.filter((n) => n % 2 === 1 && isPrime(n - 2));
-      if (bad.length === 1 && goodOdd.length >= 1) break;
+      const bad = diff === 3 ? rng.pick(LOOKALIKE_TARGETS) : rng.pick(range(lo, hi).filter(isBadOdd));
+      const goodOdd = range(lo, hi).filter((n) => n % 2 === 1 && isPrime(n - 2) && n !== bad);
+      const evens = range(lo, hi).filter((n) => n % 2 === 0);
+      const nOdd = diff === 1 ? rng.int(1, 2) : diff === 2 ? rng.int(2, 3) : 4;
+      const wrong = [...rng.sample(goodOdd, nOdd), ...rng.sample(evens, 4 - nOdd)];
+      const values = [bad, ...wrong].sort((a, b) => a - b);
+      // No two choices next to each other (that would be a ladder).
+      if (values.some((v, i) => i > 0 && v - values[i - 1] < 2)) continue;
+      const wrongChoices: Choice[] = wrong.map((n) => ({ text: `$${n}$`, trap: n % 2 === 1 ? 'forgot-two-is-prime' : 'int-primes-sum-parity' }));
+      const { choices } = textChoices(rng, `$${bad}$`, wrongChoices, 'keep');
+      const ordered = [...choices].sort((a, b) => Number(a.text.slice(1, -1)) - Number(b.text.slice(1, -1)));
+      const answer = ordered.findIndex((c) => c.text === `$${bad}$`);
+
+      const oddWrong = wrong.filter((n) => n % 2 === 1);
+      const evenWrong = wrong.filter((n) => n % 2 === 0);
+      const oddLines = oddWrong.map((n) => `$${n} = 2 + ${n - 2}$`);
+      const split = evenWrong.length ? goldbachSplit(evenWrong[0])! : null;
+      const trap: string[] = [];
+      if (oddWrong.length) trap.push(`forgetting that 2 is prime makes every odd number look impossible, yet ${listAnd(oddLines)} ${oddLines.length > 1 ? 'work' : 'works'}`);
+      if (split)
+        trap.push(`a sum of two primes need not be odd, since two odd primes add to an even number: $${evenWrong[0]} = ${split[0]} + ${split[1]}$`);
+      return {
+        params: { values },
+        q: {
+          format: 'mcs',
+          stem: 'Which of the following integers CANNOT be written as the sum of two prime numbers?',
+          choices: ordered,
+          answer,
+          explanation: `Two odd primes add up to an even number, so an odd sum needs the only even prime: $n = 2 + (n - 2)$ with $n - 2$ prime.
+
+Test the odd choices: ${listAnd(
+            values.filter((n) => n % 2 === 1).map((n) => (isPrime(n - 2) ? `$${n} - 2 = ${n - 2}$ is prime` : `$${n} - 2 = ${n - 2}$ is not prime ($${compositeReason(n - 2)}$)`)),
+          )}. So ${bad} cannot be written as a sum of two primes.
+
+Trap: ${trap.join('; ')}.
+
+Rule: an odd number is a sum of two primes exactly when it is 2 plus a prime.`,
+        },
+      };
     }
-    const answerValue = values.find((n) => n % 2 === 1 && !isPrime(n - 2))!;
-    const wrong: Choice[] = values
-      .filter((n) => n !== answerValue)
-      .map((n) => ({ text: `$${n}$`, ...(n % 2 === 1 ? { trap: 'forgot-two-is-prime' } : {}) }));
-    const { choices } = textChoices(rng, `$${answerValue}$`, wrong, 'keep');
-    // Keep ascending order.
-    const ordered = [...choices].sort((a, b) => Number(a.text.slice(1, -1)) - Number(b.text.slice(1, -1)));
-    const answer = ordered.findIndex((c) => c.text === `$${answerValue}$`);
-    const lines = values.map((n) => {
-      if (n % 2 === 0) {
-        const [p, q] = goldbachSplit(n)!;
-        return `- ${n} is even: $${n} = ${p} + ${q}$ ✓`;
-      }
-      if (isPrime(n - 2)) return `- ${n} is odd and $${n} - 2 = ${n - 2}$ is prime: $${n} = 2 + ${n - 2}$ ✓`;
-      return `- ${n} is odd and $${n} - 2 = ${n - 2}$ is not prime ($${compositeReason(n - 2)}$) ✗`;
-    });
-    return {
-      params: { values },
-      q: {
-        format: 'mcs',
-        stem: 'Which of the following integers CANNOT be written as the sum of two prime numbers?',
-        choices: ordered,
-        answer,
-        explanation: `Two odd primes always add up to an even number. So an odd number can be the sum of two primes only if one of them is 2, the only even prime; that is, only if $n - 2$ is prime.
-
-${lines.join('\n')}
-
-So ${answerValue} is the only one that cannot be written as a sum of two primes. If you forget that 2 is prime, every odd choice looks impossible; check $n - 2$ instead.`,
-      },
-    };
   },
   check(q, { values }) {
     return expectMcsBy(q, (i) => !sumOfTwoPrimesBrute(values[i]));
@@ -100,14 +101,26 @@ So ${answerValue} is the only one that cannot be written as a sum of two primes.
 
 /* ------------------------------------------------------------------ 2. Two primes with an odd sum or odd difference (NE) */
 
+type OddAsk = 'product' | 'larger' | 'diff' | 'sum' | 'sumsq';
+
 interface OddSumParams {
   mode: 'sum' | 'diff';
   n: number;
-  ask: 'product' | 'larger' | 'diff' | 'sum';
+  ask: OddAsk;
+  frame: number;
 }
 
-const askValue = (ask: OddSumParams['ask'], p: number, q: number) =>
-  ask === 'product' ? p * q : ask === 'larger' ? Math.max(p, q) : ask === 'diff' ? Math.abs(q - p) : p + q;
+const askValue = (ask: OddAsk, p: number, q: number) =>
+  ask === 'product' ? p * q : ask === 'larger' ? Math.max(p, q) : ask === 'diff' ? Math.abs(q - p) : ask === 'sumsq' ? p * p + q * q : p + q;
+
+const ASK_TEX: Record<OddAsk, string> = { product: '$pq$', larger: '$q$', diff: '$q - p$', sum: '$p + q$', sumsq: '$p^2 + q^2$' };
+const ASK_WORDS: Record<OddAsk, string> = {
+  product: 'their product',
+  larger: 'the greater of the two primes',
+  diff: 'the difference between the greater prime and the smaller one',
+  sum: 'their sum',
+  sumsq: 'the sum of their squares',
+};
 
 const oddSum: Template<OddSumParams> = {
   id: 'arith.primes.odd-sum',
@@ -115,50 +128,65 @@ const oddSum: Template<OddSumParams> = {
   format: 'ne',
   style: 'two primes with an odd sum (or odd difference): one of them is 2',
   generate(rng, diff) {
-    const mode: OddSumParams['mode'] = diff === 3 && rng.chance(0.6) ? 'diff' : 'sum';
+    // d1 and d2 use the sum of the two primes, d3 their difference. Each level has its own wording and its own set of questions.
+    const mode: OddSumParams['mode'] = diff === 3 ? 'diff' : 'sum';
     let n: number;
     do {
-      n = mode === 'sum' ? rng.int(diff === 1 ? 9 : 25, diff === 1 ? 45 : diff === 2 ? 99 : 150) : rng.int(9, 79);
+      n = mode === 'sum' ? rng.int(9, 99) : rng.int(5, 95);
     } while (n % 2 === 0 || !isPrime(mode === 'sum' ? n - 2 : n + 2));
     const p = 2;
     const q = mode === 'sum' ? n - 2 : n + 2;
-    const ask: OddSumParams['ask'] =
-      mode === 'diff' ? rng.pick(['sum', 'product'] as const) : diff === 1 ? rng.pick(['larger', 'product'] as const) : rng.pick(['product', 'diff'] as const);
+    const ask: OddAsk =
+      diff === 1
+        ? rng.pick(['larger', 'product', 'diff'] as const)
+        : diff === 2
+          ? rng.pick(['product', 'diff', 'sumsq'] as const)
+          : rng.pick(['sum', 'product', 'larger', 'sumsq'] as const);
+    const frame = rng.int(0, 1);
     const value = askValue(ask, p, q);
-    const askTex = { product: '$pq$', larger: 'the greater of the two primes', diff: '$q - p$', sum: '$p + q$' }[ask];
     let stem: string;
-    if (mode === 'sum') {
-      stem =
-        ask === 'larger'
-          ? `The sum of two prime numbers is ${n}. What is the greater of the two primes?`
-          : ask === 'diff'
-            ? `If $p$ and $q$ are prime numbers such that $p < q$ and $p + q = ${n}$, what is the value of $q - p$?`
-            : `If $p$ and $q$ are prime numbers and $p + q = ${n}$, what is the value of $pq$?`;
-    } else {
-      stem = `If $p$ and $q$ are prime numbers and $q - p = ${n}$, what is the value of ${askTex}?`;
-    }
+    if (diff === 1)
+      stem = [`The sum of two prime numbers is ${n}. What is ${ASK_WORDS[ask]}?`, `Two prime numbers add up to ${n}. What is ${ASK_WORDS[ask]}?`][frame];
+    else if (diff === 2)
+      stem = [
+        `If $p$ and $q$ are prime numbers with $p < q$ and $p + q = ${n}$, what is the value of ${ASK_TEX[ask]}?`,
+        `Let $p$ and $q$ be prime numbers such that $p < q$ and $p + q = ${n}$. What is the value of ${ASK_TEX[ask]}?`,
+      ][frame];
+    else
+      stem = [
+        `If $p$ and $q$ are prime numbers and $q - p = ${n}$, what is the value of ${ASK_TEX[ask]}?`,
+        `$p$ and $q$ are prime numbers, and $q$ is ${n} more than $p$. What is the value of ${ASK_TEX[ask]}?`,
+      ][frame];
     const why =
       mode === 'sum'
-        ? `If both primes were odd, their sum would be even. Since ${n} is odd, one of the primes must be the only even prime, 2, and the other is $${n} - 2 = ${q}$, which is prime.`
-        : `If both primes were odd, their difference would be even. Since ${n} is odd, one of them is 2. It must be the smaller one, $p = 2$ (otherwise $p$ would be negative), so $q = ${n} + 2 = ${q}$, which is prime.`;
+        ? `If both primes were odd, their sum would be even. Since ${n} is odd, one of the primes is the only even prime, 2, and the other is $${n} - 2 = ${q}$, which is prime.`
+        : `If both primes were odd, their difference would be even. Since ${n} is odd, one of them is 2, and it must be the smaller one (otherwise $p$ would be negative). So $p = 2$ and $q = ${n} + 2 = ${q}$, which is prime.`;
     const calc =
       ask === 'product'
-        ? `$pq = 2 \\cdot ${q} = ${value}$.`
+        ? `Then $pq = 2 \\cdot ${q} = ${value}$.`
         : ask === 'larger'
           ? `The greater prime is ${q}.`
           : ask === 'diff'
-            ? `$q - p = ${q} - 2 = ${value}$.`
-            : `$p + q = 2 + ${q} = ${value}$.`;
+            ? `Then $q - p = ${q} - 2 = ${value}$.`
+            : ask === 'sumsq'
+              ? `Then $p^2 + q^2 = 2^2 + ${q}^2 = 4 + ${num(q * q)} = ${num(value)}$.`
+              : `Then $p + q = 2 + ${q} = ${value}$.`;
+    const check = mode === 'sum' ? `Check: $2 + ${q} = ${n}$, and ${q} is prime.` : `Check: $${q} - 2 = ${n}$, and ${q} is prime.`;
     return {
-      params: { mode, n, ask },
+      params: { mode, n, ask, frame },
       q: {
         format: 'ne',
         stem,
-        ...(ask === 'diff' && mode === 'sum' ? { prefix: '$q - p =$' } : {}),
         answer: frac(value),
-        explanation: `${why} So ${calc}
+        explanation: `All primes except 2 are odd, so the parity of the ${mode === 'sum' ? 'sum' : 'difference'} tells you where 2 is.
 
-Looking for two odd primes is hopeless: two odd numbers always have an even ${mode === 'sum' ? 'sum' : 'difference'}. The key is remembering that 2 is prime.`,
+${why} ${calc}
+
+${check}
+
+Trap: looking for two odd primes cannot work, since two odd numbers always have an even ${mode === 'sum' ? 'sum' : 'difference'}.
+
+Rule: an odd ${mode === 'sum' ? 'sum' : 'difference'} of two primes forces one of them to be 2.`,
       },
     };
   },
@@ -168,7 +196,7 @@ Looking for two odd primes is hopeless: two odd numbers always have an even ${mo
       if (!primeBySieve(p)) continue;
       const other = mode === 'sum' ? n - p : p + n; // other = q
       if (other < 2 || other > 4000 || !primeBySieve(other)) continue;
-      if (mode === 'sum' && ask === 'diff' && !(p < other)) continue;
+      if (mode === 'sum' && !(p < other)) continue;
       vals.add(askValue(ask, p, other));
     }
     if (vals.size !== 1) return `${vals.size} possible values: ${[...vals]}`;
@@ -276,7 +304,7 @@ Checking only the first pair you find is not enough when more than one pair work
 
 /* ------------------------------------------------------------------ 4. Primes near a bound / counting primes (QC) */
 
-type BoundsMode = 'least-greatest' | 'count-k' | 'count-less' | 'count-count';
+type BoundsMode = 'least-greatest' | 'count-k' | 'count-less' | 'count-count' | 'x-range';
 
 interface BoundsParams {
   mode: BoundsMode;
@@ -319,7 +347,12 @@ const primeBoundsQC: Template<BoundsParams> = {
   format: 'qc',
   style: 'least prime above / greatest prime below, counting primes in a range',
   generate(rng, diff) {
-    const modes: BoundsMode[] = diff === 1 ? ['least-greatest', 'count-less'] : diff === 2 ? ['least-greatest', 'count-k'] : ['count-count', 'count-k', 'least-greatest'];
+    const modes: BoundsMode[] =
+      diff === 1
+        ? ['least-greatest', 'count-less']
+        : diff === 2
+          ? ['least-greatest', 'count-k', 'x-range']
+          : ['count-count', 'count-k', 'least-greatest', 'x-range', 'x-range'];
     const mode = rng.pick(modes);
     const top = diff === 1 ? 50 : diff === 2 ? 100 : 130;
     for (;;) {
@@ -345,6 +378,18 @@ const primeBoundsQC: Template<BoundsParams> = {
         valB = prevPrime(b);
         trapA = nextPrime(a, looksPrime);
         trapB = prevPrime(b, looksPrime);
+      } else if (mode === 'x-range') {
+        // x runs over a short range: the least prime above x changes with x, so the comparison can flip.
+        a = rng.int(10, top - 12);
+        b = a + rng.int(4, 9);
+        const vs = range(a, b).map((x) => nextPrime(x));
+        const roll = rng.next();
+        k = roll < 0.6 ? rng.pick(vs) : roll < 0.8 ? Math.min(...vs) - rng.int(1, 3) : Math.max(...vs) + rng.int(1, 3);
+        valA = vs[0];
+        valB = k;
+        trapA = vs[0];
+        trapB = k;
+        trapId = 'tested-one-value';
       } else if (mode === 'count-less') {
         b = rng.int(12, 40);
         valA = range(1, b - 1).filter((m) => isPrime(m)).length;
@@ -380,7 +425,9 @@ const primeBoundsQC: Template<BoundsParams> = {
         trapB = countBetween(a2, b2, looksPrime);
       }
       if (k < 0) continue;
-      const answer = qcCompare(valA, valB);
+      const xs = mode === 'x-range' ? range(a, b).map((x) => nextPrime(x)) : [];
+      const answer: QCChoice =
+        mode === 'x-range' ? (new Set(xs.map((v) => qcCompare(v, k))).size === 1 ? qcCompare(xs[0], k) : 'D') : qcCompare(valA, valB);
       const trapAnswer = qcCompare(trapA, trapB);
       const traps: QCQuestion['traps'] = trapAnswer !== answer ? { [trapAnswer]: trapId } : undefined;
       // Mostly prefer questions where the careless reading changes the answer.
@@ -389,7 +436,24 @@ const primeBoundsQC: Template<BoundsParams> = {
       let quantityA: string;
       let quantityB: string;
       let explanation: string;
-      if (mode === 'least-greatest') {
+      let info: string | undefined;
+      if (mode === 'x-range') {
+        info = `$x$ is an integer, and $${a} \\le x \\le ${b}$.`;
+        quantityA = 'The least prime number greater than $x$';
+        quantityB = `$${k}$`;
+        const word = (v: number) => (v > k ? `greater than ${k}` : v < k ? `less than ${k}` : `equal to ${k}`);
+        const x1 = a;
+        const x2 = range(a, b).find((x) => qcCompare(nextPrime(x), k) !== qcCompare(nextPrime(x1), k));
+        explanation = `The least prime above $x$ changes as $x$ moves, so test the ends of the range.
+
+For $x = ${x1}$ it is ${nextPrime(x1)}, which is ${word(nextPrime(x1))}.${
+          answer === 'D'
+            ? ` For $x = ${x2}$ it is ${nextPrime(x2!)}, which is ${word(nextPrime(x2!))}. Two allowed values of $x$ disagree, so the relationship cannot be determined. (D)`
+            : ` The least prime above $x$ is ${[...new Set(xs)].join(', ')} as $x$ runs from ${a} to ${b}: all ${answer === 'A' ? 'greater than' : answer === 'B' ? 'less than' : 'equal to'} ${k}, so ${QC_WORDS[answer]}. (${answer})`
+        }
+
+${answer === 'D' ? `Trap: testing only $x = ${x1}$ suggests ${QC_WORDS[qcCompare(nextPrime(x1), k)]}; ` : ''}an unknown $x$ calls for at least two tests, at different gaps between primes.`;
+      } else if (mode === 'least-greatest') {
         const compA = oddComposites(a + 1, valA - 1);
         const compB = oddComposites(valB + 1, b - 1);
         quantityA = `The least prime number greater than ${a}`;
@@ -420,7 +484,7 @@ Compare ${valA} with ${k}: ${QC_WORDS[answer]}. (${answer})`;
         const c2 = oddComposites(a2 + 1, b2 - 1);
         quantityA = `The number of prime numbers between ${a} and ${b}`;
         quantityB = `The number of prime numbers between ${a2} and ${b2}`;
-        explanation = `Between ${a} and ${b} the primes are ${primeList(a, b)} (${valA} primes). Between ${a2} and ${b2} they are ${primeList(a2, b2)} (${valB} primes).
+        explanation = `Between ${a} and ${b} the primes are ${primeList(a, b)} (${plural(valA, 'prime')}). Between ${a2} and ${b2} they are ${primeList(a2, b2)} (${plural(valB, 'prime')}).
 
 Compare ${valA} with ${valB}: ${QC_WORDS[answer]}. (${answer})
 
@@ -428,7 +492,7 @@ ${c1.length + c2.length ? `Odd does not mean prime: ${listAnd([...c1, ...c2].sli
       }
       return {
         params: { mode, a, b, a2, b2, k },
-        q: { format: 'qc', quantityA, quantityB, answer, traps, explanation },
+        q: { format: 'qc', ...(info ? { info } : {}), quantityA, quantityB, answer, traps, explanation },
       };
     }
   },
@@ -446,6 +510,11 @@ ${c1.length + c2.length ? `Odd does not mean prime: ${listAnd([...c1, ...c2].sli
     } else if (mode === 'count-k') {
       A = primesIn(a + 1, b - 1).length;
       B = k;
+    } else if (mode === 'x-range') {
+      return expectQc(
+        q,
+        qcFromSamples(range(a, b).map((x): [number, number] => [primesIn(x + 1, x + 200)[0], k])),
+      );
     } else {
       A = primesIn(a + 1, b - 1).length;
       B = primesIn(a2 + 1, b2 - 1).length;
@@ -593,9 +662,9 @@ const parityMust: Template<ParityParams> = {
         scenario === 'xyz' ? `$z$ is ${v.z ? 'odd' : 'even'}` : v.p === 0 ? '$p = 2$' : v.q === 0 ? '$q = 2$' : 'both are odd';
       const lines = picks.map((e, i) => {
         const tex = plainToTex(e.plain);
-        if (!varies[i]) return `- $${tex}$ is always ${pats[i][0] ? 'odd' : 'even'} ${correct[i] ? '✓' : '✗'}`;
+        if (!varies[i]) return `- $${tex}$: always ${pats[i][0] ? 'odd' : 'even'} ${correct[i] ? '✓' : '✗'}`;
         const when = (par: number) => reps.flatMap((v, j) => (pats[i][j] === par ? [caseText(v)] : [])).join(' or ');
-        return `- $${tex}$ is even if ${when(0)}, but odd if ${when(1)}: it can be either ✗`;
+        return `- $${tex}$: even if ${when(0)}, odd if ${when(1)} ✗`;
       });
       const intro: Record<Scenario, string> = {
         xy: 'Work with parities only: $x$ is even and $y$ is odd.',
@@ -649,79 +718,86 @@ ${tail[scenario]}`,
 
 /* ------------------------------------------------------------------ 6. Parity decides the sign of (-1)^p (QC) */
 
-type PItem = 'sq-plus-next' | 'product' | 'sum' | 'r-times-sum' | 'sq-plus-self' | 'square-next' | 'odd-3r1' | 'any-sum';
+/** What is known about the integers r and t, with one worked example per parity case. */
+interface PScenario {
+  text: string;
+  /** Worked examples (r, t), one for each parity case the statement allows. */
+  eg: [number, number][];
+  /** True if t is used. */
+  t: boolean;
+  /** Does (r, t) satisfy the statement? (used by check on many actual integers) */
+  ok: (r: number, t: number) => boolean;
+}
 
-const P_ITEMS: Record<PItem, { info: string; p: string; parity: 'even' | 'odd' | 'either'; why: string; sample: (r: number, t: number) => number; consecutive: boolean }> = {
-  'sq-plus-next': {
-    info: '$r$ and $t$ are consecutive integers, and $p = r^2 + t$.',
-    p: 'r^2 + t',
-    parity: 'odd',
-    why: '$r^2$ has the same parity as $r$, and consecutive integers have opposite parities. So $r^2 + t$ is odd + even or even + odd: always odd. For example, $r = 2, t = 3$: $p = 7$; $r = 3, t = 2$: $p = 11$.',
-    sample: (r, t) => r * r + t,
-    consecutive: true,
-  },
-  product: {
-    info: '$r$ and $t$ are consecutive integers, and $p = rt$.',
-    p: 'rt',
-    parity: 'even',
-    why: 'One of two consecutive integers is even, so their product is always even. For example, $4 \\cdot 5 = 20$ and $(-3)(-2) = 6$.',
-    sample: (r, t) => r * t,
-    consecutive: true,
-  },
-  sum: {
-    info: '$r$ and $t$ are consecutive integers, and $p = r + t$.',
-    p: 'r + t',
-    parity: 'odd',
-    why: 'Consecutive integers have opposite parities, so their sum is odd + even: always odd. For example, $4 + 5 = 9$.',
-    sample: (r, t) => r + t,
-    consecutive: true,
-  },
-  'r-times-sum': {
-    info: '$r$ and $t$ are consecutive integers, and $p = r(r + t)$.',
-    p: 'r(r + t)',
-    parity: 'either',
-    why: '$r + t$ is odd, so $p$ has the same parity as $r$, which can be either. For example, $r = 2, t = 3$ gives $p = 10$ (even), but $r = 3, t = 4$ gives $p = 21$ (odd).',
-    sample: (r, t) => r * (r + t),
-    consecutive: true,
-  },
-  'sq-plus-self': {
-    info: '$r$ is an integer, and $p = r^2 + r$.',
-    p: 'r^2 + r',
-    parity: 'even',
-    why: '$r^2 + r = r(r + 1)$ is a product of two consecutive integers, so it is always even. For example, $r = 3$: $p = 12$; $r = -4$: $p = 12$.',
-    sample: (r) => r * r + r,
-    consecutive: false,
-  },
-  'square-next': {
-    info: '$r$ is an integer, and $p = r^2 + 2r + 1$.',
-    p: 'r^2 + 2r + 1',
-    parity: 'either',
-    why: '$p = (r + 1)^2$ has the same parity as $r + 1$, which can be either. For example, $r = 1$ gives $p = 4$ (even), but $r = 2$ gives $p = 9$ (odd).',
-    sample: (r) => r * r + 2 * r + 1,
-    consecutive: false,
-  },
-  'odd-3r1': {
-    info: '$r$ is an odd integer, and $p = 3r + 1$.',
-    p: '3r + 1',
-    parity: 'even',
-    why: '$3r$ is odd $\\times$ odd = odd, so $3r + 1$ is odd + 1 = even. For example, $r = 5$: $p = 16$.',
-    sample: (r) => 3 * r + 1,
-    consecutive: false,
-  },
-  'any-sum': {
-    info: '$r$ and $t$ are integers, and $p = r + t$.',
-    p: 'r + t',
-    parity: 'either',
-    why: 'Without more information, $r + t$ can be even ($2 + 4 = 6$) or odd ($2 + 3 = 5$).',
-    sample: (r, t) => r + t,
-    consecutive: false,
-  },
+const P_SCENARIOS: Record<string, PScenario> = {
+  consec: { text: '$r$ and $t$ are consecutive integers', eg: [[2, 3], [3, 2]], t: true, ok: (r, t) => Math.abs(r - t) === 1 },
+  oddR: { text: '$r$ is an odd integer', eg: [[3, 0]], t: false, ok: (r) => Math.abs(r % 2) === 1 },
+  evenR: { text: '$r$ is an even integer', eg: [[4, 0]], t: false, ok: (r) => r % 2 === 0 },
+  anyR: { text: '$r$ is an integer', eg: [[2, 0], [3, 0]], t: false, ok: () => true },
+  anyRT: { text: '$r$ and $t$ are integers', eg: [[2, 4], [2, 3], [3, 2], [3, 5]], t: true, ok: () => true },
+  oddEven: { text: '$r$ is odd and $t$ is even', eg: [[3, 2]], t: true, ok: (r, t) => Math.abs(r % 2) === 1 && t % 2 === 0 },
+};
+
+interface PExpr {
+  tex: string;
+  f: (r: number, t: number) => number;
+  t: boolean;
+}
+
+// The three levels use different expressions, so their questions never coincide.
+const P_EXPRS: Record<1 | 2 | 3, PExpr[]> = {
+  1: [
+    { tex: 'r + t', f: (r, t) => r + t, t: true },
+    { tex: 'rt', f: (r, t) => r * t, t: true },
+    { tex: 'r + t + 1', f: (r, t) => r + t + 1, t: true },
+    { tex: 'rt + 1', f: (r, t) => r * t + 1, t: true },
+    { tex: '2r + t', f: (r, t) => 2 * r + t, t: true },
+    { tex: 'r + 2t', f: (r, t) => r + 2 * t, t: true },
+    { tex: '2r + 1', f: (r) => 2 * r + 1, t: false },
+    { tex: 'r + 3', f: (r) => r + 3, t: false },
+    { tex: '3r', f: (r) => 3 * r, t: false },
+    { tex: '5r + 2', f: (r) => 5 * r + 2, t: false },
+  ],
+  2: [
+    { tex: 'r^2 + t', f: (r, t) => r * r + t, t: true },
+    { tex: 'r^2 + r', f: (r) => r * r + r, t: false },
+    { tex: 'rt + r', f: (r, t) => r * t + r, t: true },
+    { tex: 'r(r + t)', f: (r, t) => r * (r + t), t: true },
+    { tex: 'r^2 + 1', f: (r) => r * r + 1, t: false },
+    { tex: 'r^2 + 2r', f: (r) => r * r + 2 * r, t: false },
+    { tex: '3r + t', f: (r, t) => 3 * r + t, t: true },
+    { tex: 'r(t + 1)', f: (r, t) => r * (t + 1), t: true },
+    { tex: 'r^2 + t^2', f: (r, t) => r * r + t * t, t: true },
+    { tex: 'r^3 + 1', f: (r) => r ** 3 + 1, t: false },
+  ],
+  3: [
+    { tex: 'r^3 + r', f: (r) => r ** 3 + r, t: false },
+    { tex: 'r^2 t + t', f: (r, t) => r * r * t + t, t: true },
+    { tex: 'r^2 + rt + t^2', f: (r, t) => r * r + r * t + t * t, t: true },
+    { tex: 'r^3 + t^3', f: (r, t) => r ** 3 + t ** 3, t: true },
+    { tex: 'rt(r + t)', f: (r, t) => r * t * (r + t), t: true },
+    { tex: '(r + 1)(t + 1)', f: (r, t) => (r + 1) * (t + 1), t: true },
+    { tex: 'r^2 + r + 1', f: (r) => r * r + r + 1, t: false },
+    { tex: 'r^2 - t', f: (r, t) => r * r - t, t: true },
+    { tex: '(r + t)^2 + r', f: (r, t) => (r + t) ** 2 + r, t: true },
+    { tex: 'r^4 + 3r', f: (r) => r ** 4 + 3 * r, t: false },
+  ],
+};
+
+const SCENARIOS_BY_LEVEL: Record<1 | 2 | 3, string[]> = {
+  1: ['consec', 'oddR', 'evenR', 'oddEven'],
+  2: ['consec', 'oddR', 'anyR', 'oddEven', 'anyRT'],
+  3: ['consec', 'anyR', 'anyRT', 'oddEven', 'evenR'],
 };
 
 interface PPowParams {
-  item: PItem;
+  scenario: string;
+  expr: string;
+  shift: 0 | 1;
   bv: number;
 }
+
+const pStem = (sc: PScenario, expr: PExpr) => `${sc.text}, and $p = ${expr.tex}$.`;
 
 const parityPowerQC: Template<PPowParams> = {
   id: 'arith.primes.parity-power-qc',
@@ -729,43 +805,64 @@ const parityPowerQC: Template<PPowParams> = {
   format: 'qc',
   style: 'parity of an expression decides the sign of (-1)^p',
   generate(rng, diff) {
-    const items: PItem[] =
-      diff === 1 ? ['sum', 'product', 'sq-plus-self', 'any-sum'] : diff === 2 ? ['sq-plus-next', 'product', 'odd-3r1', 'square-next', 'sq-plus-self'] : ['sq-plus-next', 'r-times-sum', 'square-next', 'odd-3r1'];
-    const item = rng.pick(items);
-    const it = P_ITEMS[item];
-    const bv = rng.pick([-1, 1, 0]);
-    const vals = it.parity === 'even' ? [1] : it.parity === 'odd' ? [-1] : [1, -1];
-    const rels = new Set(vals.map((v) => qcCompare(v, bv)));
-    const answer: QCChoice = rels.size === 1 ? [...rels][0] : 'D';
-    let traps: QCQuestion['traps'];
-    if (answer !== 'D') traps = { D: 'int-parity-rules' };
-    else traps = { [qcCompare(1, bv)]: 'tested-one-value' };
-    const value = it.parity === 'even' ? 'Here $p$ is even, so $(-1)^p = 1$' : it.parity === 'odd' ? 'Here $p$ is odd, so $(-1)^p = -1$' : 'So $(-1)^p$ can be 1 or $-1$';
-    return {
-      params: { item, bv },
-      q: {
-        format: 'qc',
-        info: it.info,
-        quantityA: '$(-1)^{p}$',
-        quantityB: `$${bv}$`,
-        answer,
-        traps,
-        explanation: `$(-1)^p$ is 1 when $p$ is even and $-1$ when $p$ is odd, so only the parity of $p = ${it.p}$ matters.
+    for (;;) {
+      const scenario = rng.pick(SCENARIOS_BY_LEVEL[diff]);
+      const sc = P_SCENARIOS[scenario];
+      const expr = rng.pick(P_EXPRS[diff]);
+      if (expr.t && !sc.t) continue;
+      // Parity of p in every worked case.
+      const pars = sc.eg.map(([r, t]) => Math.abs(expr.f(r, t) % 2));
+      const kind = new Set(pars).size > 1 ? 'either' : pars[0] === 0 ? 'even' : 'odd';
+      // Aim at about 30% of D, the rest split between even and odd.
+      if (kind === 'either' ? rng.chance(0.4) : false) continue;
+      const shift = rng.pick([0, 1]) as 0 | 1;
+      const bv = rng.pick([-1, 1, 0]);
+      const A = (par: number) => ((par + shift) % 2 === 0 ? 1 : -1);
+      const vals = [...new Set(pars.map(A))];
+      const answer: QCChoice = new Set(vals.map((v) => qcCompare(v, bv))).size === 1 ? qcCompare(vals[0], bv) : 'D';
+      const traps: QCQuestion['traps'] =
+        answer === 'D' ? { [qcCompare(A(pars[0]), bv)]: 'tested-one-value' } : { D: 'int-parity-rules' };
+      const exponent = shift ? 'p + 1' : 'p';
+      const caseText = sc.eg
+        .map(([r, t], i) => {
+          const val = expr.f(r, t);
+          const who = sc.t ? `$r = ${r}$, $t = ${t}$` : `$r = ${r}$`;
+          return `${who}: $p = ${val}$, ${pars[i] ? 'odd' : 'even'}`;
+        })
+        .join('; ');
+      const aTex = `$(-1)^{${exponent}}$`;
+      const valueLine =
+        vals.length === 2
+          ? `So ${aTex} is 1 in some cases and $-1$ in others.`
+          : `So ${aTex} is always $${vals[0]}$: $p$ is ${pars[0] ? 'odd' : 'even'}${shift ? `, so $p + 1$ is ${pars[0] ? 'even' : 'odd'}` : ''}.`;
+      return {
+        params: { scenario, expr: expr.tex, shift, bv },
+        q: {
+          format: 'qc',
+          info: pStem(sc, expr),
+          quantityA: aTex,
+          quantityB: `$${bv}$`,
+          answer,
+          traps,
+          explanation: `A power of $-1$ is 1 when the exponent is even and $-1$ when it is odd, so only the parity of ${shift ? '$p + 1$' : '$p$'} matters.
 
-${it.why}
+Test every case the statement allows: ${caseText}. Rules: odd + odd and even + even are even, odd + even is odd, a product is even if a factor is even${expr.tex.includes('^') ? ', a power keeps the parity of its base' : ''}.
 
-${value}. Compare with ${bv < 0 ? '$-1$' : bv}: ${QC_WORDS[answer]}. (${answer})`,
-      },
-    };
-  },
-  check(q, { item, bv }) {
-    const it = P_ITEMS[item];
-    const samples: [Frac, number][] = [];
-    for (let r = -15; r <= 15; r++) {
-      if (item === 'odd-3r1' && Math.abs(r % 2) !== 1) continue;
-      const ts = it.consecutive ? [r - 1, r + 1] : [r, r + 1, r + 2, r + 5];
-      for (const t of ts) samples.push([frac(-1).pow(it.sample(r, t)), bv]);
+${valueLine} Compare with $${bv}$: ${QC_WORDS[answer]}. (${answer})
+
+${answer === 'D' ? `Trap: the first case alone suggests ${QC_WORDS[qcCompare(A(pars[0]), bv)]}; one test is not enough.` : `Trap: the unknown ${sc.t ? '$r$ and $t$' : '$r$'} tempts D, but the parity of $p$ is the same in every case.`}`,
+        },
+      };
     }
+  },
+  check(q, { scenario, expr, shift, bv }, rng) {
+    const sc = P_SCENARIOS[scenario];
+    const level = ([1, 2, 3] as const).find((l) => P_EXPRS[l].some((e) => e.tex === expr))!;
+    const e = P_EXPRS[level].find((x) => x.tex === expr)!;
+    const samples: [number, number][] = [];
+    for (let r = -12; r <= 12; r++)
+      for (let t = -12; t <= 12; t++) if (sc.ok(r, t)) samples.push([(((e.f(r, t) + shift) % 2) + 2) % 2 === 0 ? 1 : -1, bv]);
+    void rng;
     return expectQc(q, qcFromSamples(samples));
   },
 };

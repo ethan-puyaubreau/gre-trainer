@@ -125,23 +125,6 @@
   "arith.percent.weighted-mcs": {
     "distractors.trapped": "baseline"
   },
-  "arith.primes.cannot-sum": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline"
-  },
-  "arith.primes.odd-sum": {
-    "artifacts.so-the": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.primes.parity-power-qc": {
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.primes.prime-bounds-qc": {
-    "artifacts.plural-1": "baseline",
-    "qc.never-d": "baseline"
-  },
   "arith.rates.approx-cost-mcs": {
     "distractors.trapped": "baseline"
   },
