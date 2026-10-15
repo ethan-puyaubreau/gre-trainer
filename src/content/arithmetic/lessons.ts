@@ -23,7 +23,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Which of 21 and 23 can be written as the sum of two primes?',
       steps: [
         'Both totals are odd, so one prime must be even, because odd + odd and even + even are both even.',
-        'The only even prime is 2, so the other prime must be $n - 2$.',
+        'The only even prime is 2, so for a total $n$ the other prime must be $n - 2$.',
         'Test $21 - 2 = 19$: the primes up to $\\sqrt{19}$ are 2 and 3, and neither divides 19, so 19 is prime. Test $23 - 2 = 21 = 3 \\cdot 7$, which is not prime.',
       ],
       answer: '$21 = 2 + 19$ works; 23 does not.',
@@ -33,13 +33,13 @@ export const arithmeticLessons: Record<string, Lesson> = {
 
   'arith.factors': {
     idea: 'Break a number into primes, $N = p^a q^b \\cdots$. A divisor picks an exponent from $0$ to $a$ for $p$, from $0$ to $b$ for $q$, and so on, so $N$ has $(a + 1)(b + 1)\\cdots$ divisors.',
-    recognize: 'If you see "how many divisors", "factors of $N$" or a product of unknown integers, think prime factorization. Isolate the product and apply every condition before you count.',
+    recognize: 'If you see "how many divisors", "factors of $N$" or a product of unknown integers, think prime factorization. With unknown integers, isolate the product first: $(4x)(7y) = 756$ gives $xy = 27$, because dividing both sides by 28 removes the coefficients. Then apply every condition (both greater than 1, distinct) before you count.',
     example: {
       problem: 'How many positive divisors does 72 have?',
       steps: [
         'Factor: $72 = 8 \\cdot 9 = 2^3 \\cdot 3^2$, because primes are the building blocks of every divisor.',
-        'A divisor uses 2 to the power 0, 1, 2 or 3 (4 choices) and 3 to the power 0, 1 or 2 (3 choices). Any other prime or larger power would not divide 72.',
-        'Multiply the independent choices: $4 \\cdot 3 = 12$. This count already includes 1 and 72 themselves.',
+        'A divisor uses 2 to the power 0, 1, 2 or 3 (4 choices) and 3 to the power 0, 1 or 2 (3 choices), because any other prime or larger power would not divide 72.',
+        'Multiply the independent choices: $4 \\cdot 3 = 12$, because every power of 2 pairs with every power of 3. This count already includes 1 and 72 themselves.',
       ],
       answer: '72 has 12 positive divisors.',
     },
@@ -53,8 +53,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Two buses leave a station together at 8:00. One leaves every 12 minutes, the other every 18 minutes. When do they next leave together?',
       steps: [
         'This is an LCM question, because the buses coincide exactly at common multiples of 12 and 18.',
-        'Factor: $12 = 2^2 \\cdot 3$ and $18 = 2 \\cdot 3^2$. Take each prime at its highest power: $2^2 \\cdot 3^2 = 36$.',
-        'Check: $36 = 3 \\cdot 12 = 2 \\cdot 18$, and nothing smaller is a multiple of both. Thirty-six minutes after 8:00 is 8:36.',
+        'Factor: $12 = 2^2 \\cdot 3$ and $18 = 2 \\cdot 3^2$. Take each prime at its highest power: $2^2 \\cdot 3^2 = 36$, because a common multiple needs every prime power that 12 or 18 contains.',
+        'Check: $36 = 3 \\cdot 12 = 2 \\cdot 18$, so it is a common multiple, and any smaller number would miss a prime power that 12 or 18 needs. Thirty-six minutes after 8:00 is 8:36.',
       ],
       answer: 'They next leave together at 8:36.',
     },
@@ -68,7 +68,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'The decimal $\\frac{3}{7} = 0.\\overline{428571}$ repeats forever. What is the 48th digit after the decimal point?',
       steps: [
         'The cycle 428571 has length 6, because those six digits repeat in the same order.',
-        'Divide the position by the length: $48 = 6 \\cdot 8 + 0$. The remainder tells how far into the current cycle the 48th digit sits.',
+        'Divide the position by the length: $48 = 6 \\cdot 8 + 0$, because the remainder tells how far into the current cycle the 48th digit sits.',
         'A remainder of 0 means a cycle has just finished, so take the LAST digit of the cycle, not the first.',
       ],
       answer: 'The 48th digit is 1.',
@@ -78,12 +78,12 @@ export const arithmeticLessons: Record<string, Lesson> = {
 
   'arith.consecutive': {
     idea: 'An evenly spaced list adds up to (number of terms) $\\times$ (average), and the average is halfway between the first and last terms. Consecutive integers from $a$ to $b$ inclusive number $b - a + 1$.',
-    recognize: 'If you see "the sum of the integers from $a$ to $b$", consecutive even or odd integers, or multiples of $k$ in a range, count the terms first (for multiples of $k$: $\\frac{\\text{last} - \\text{first}}{k} + 1$), then average the ends.',
+    recognize: 'If you see "the sum of the integers from $a$ to $b$", consecutive even or odd integers, or multiples of $k$ in a range, count the terms first, then average the ends. For multiples of $k$, first and last are the first and last multiples inside the range, and the count is $\\frac{\\text{last} - \\text{first}}{k} + 1$. Consecutive evens or odds have $k = 2$, so the evens from 4 to 20 number $\\frac{20 - 4}{2} + 1 = 9$.',
     example: {
       problem: 'What is $31 + 32 + \\cdots + 50$?',
       steps: [
         'Count the terms: $50 - 31 + 1 = 20$, because both endpoints are included.',
-        'Average the ends: $\\frac{31 + 50}{2} = 40.5$. In an evenly spaced list the average is the midpoint of first and last.',
+        'Average the ends: $\\frac{31 + 50}{2} = 40.5$, because in an evenly spaced list the average is the midpoint of first and last.',
         'Multiply: $20 \\times 40.5 = 810$, because the sum is the number of terms times the average.',
         'Check by pairing: $31 + 50 = 81$, $32 + 49 = 81$, and so on for 10 pairs, so $10 \\times 81 = 810$.',
       ],
@@ -99,9 +99,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'Which is greater, $\\frac{7}{11}$ or $\\frac{5}{8}$?',
       steps: [
         'Both denominators are positive, so $\\frac{7}{11} > \\frac{5}{8}$ exactly when $7 \\cdot 8 > 5 \\cdot 11$. Multiplying both sides by $8 \\cdot 11$ keeps the direction.',
-        'Compute the two cross products: $7 \\cdot 8 = 56$ and $5 \\cdot 11 = 55$.',
-        'Since $56 > 55$, the first fraction is larger. As a check, $0.636\\ldots > 0.625$.',
-        'Adding 1 to both parts of $\\frac{7}{11}$ gives $\\frac{8}{12} = \\frac{2}{3}$, a different value, so only multiplying or dividing both parts by the same number is safe.',
+        'Compute the two cross products: $7 \\cdot 8 = 56$ and $5 \\cdot 11 = 55$, because they are the numerators once both fractions have the denominator $8 \\cdot 11$.',
+        'Since $56 > 55$, the first fraction is larger, because with a common denominator the larger numerator wins. As a check, $0.636\\ldots > 0.625$.',
       ],
       answer: '$\\frac{7}{11}$ is greater.',
     },
@@ -131,7 +130,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       steps: [
         'Let $AB = CD = u$. Then $BC = 3u$ and $AD = u + 3u + u = 5u$, because all lengths must share one unit.',
         'The distance is $AD = 17 - (-3) = 20$, so $5u = 20$ and $u = 4$.',
-        'C is $CD = 4$ to the left of D: $17 - 4 = 13$. It lies between B at 1 and D at 17, as it should.',
+        'C is $CD = 4$ to the left of D: $17 - 4 = 13$. This is right because 13 lies between B at 1 and D at 17.',
       ],
       answer: 'C is at 13.',
     },
@@ -145,8 +144,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       problem: 'If $-1 < x < 0$, which of $x$, $x^2$, $x^3$ and $\\frac{1}{x}$ is greatest, and which is least?',
       steps: [
         'Pick a test value in the range, $x = -\\frac{1}{2}$, because a negative fraction shows the pattern.',
-        'Compute: $x^2 = \\frac{1}{4}$, $x^3 = -\\frac{1}{8}$, $\\frac{1}{x} = -2$. Order them: $-2 < -\\frac{1}{2} < -\\frac{1}{8} < \\frac{1}{4}$.',
-        'Confirm with $x = -\\frac{1}{4}$, which gives $-4 < -\\frac{1}{4} < -\\frac{1}{64} < \\frac{1}{16}$, because one value alone is not proof.',
+        'Compute: $x^2 = \\frac{1}{4}$, $x^3 = -\\frac{1}{8}$, $\\frac{1}{x} = -2$. Order them: $-2 < -\\frac{1}{2} < -\\frac{1}{8} < \\frac{1}{4}$, because only the square is positive and, among negatives, the one nearer zero is larger.',
+        'A second value from the same zone, $x = -\\frac{1}{4}$, gives $-4 < -\\frac{1}{4} < -\\frac{1}{64} < \\frac{1}{16}$, the same order. It repeats because everywhere in this zone $x^2$ is positive, $x^3$ is smaller in size than $x$ and $\\frac{1}{x}$ is larger in size than 1.',
       ],
       answer: '$x^2$ is greatest and $\\frac{1}{x}$ is least.',
     },
@@ -154,7 +153,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
   },
 
   'arith.exponents': {
-    idea: 'Exponent rules only work on a common base. Rewrite every power with the same base first, then add, subtract or multiply the exponents. Even exponents erase a minus sign: $(-2)^4 = 16$, but $(-2)^3 = -8$.',
+    idea: 'Adding or subtracting exponents needs a common base. Rewrite every power with the same base first, then add, subtract or multiply the exponents. Also $a^0 = 1$ and $a^{-n} = \\frac{1}{a^n}$. Even exponents erase a minus sign: $(-2)^4 = 16$, but $(-2)^3 = -8$.',
     recognize: 'If you see mixed bases such as 2, 4 and 8, negative or zero exponents, or a negative base like $(-x)^n$, move to a common base and check the parity of $n$.',
     example: {
       problem: 'Compute $\\frac{8^2 \\cdot 4^3}{2^5}$.',
@@ -162,7 +161,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
         'Rewrite in base 2: $8^2 = (2^3)^2 = 2^6$ and $4^3 = (2^2)^3 = 2^6$, because a power of a power multiplies the exponents.',
         'Multiply the numerator: $2^6 \\cdot 2^6 = 2^{12}$, because exponents add when you multiply the same base.',
         'Divide: $\\frac{2^{12}}{2^5} = 2^7 = 128$, because exponents subtract when you divide.',
-        'Check with plain numbers: $8^2 \\cdot 4^3 = 64 \\cdot 64 = 4096$ and $4096 \\div 32 = 128$.',
+        'Check with plain numbers, since the rules must agree with direct arithmetic: $8^2 \\cdot 4^3 = 64 \\cdot 64 = 4096$ and $4096 \\div 32 = 128$.',
       ],
       answer: 'The value is 128.',
     },
@@ -170,13 +169,13 @@ export const arithmeticLessons: Record<string, Lesson> = {
   },
 
   'arith.roots': {
-    idea: 'Simplify each radical by pulling out perfect squares (or cubes). Only radicals with the same number under the root can then be combined, like $5x + 3x$. Cube roots work the same way: $\\sqrt[3]{54} = 3\\sqrt[3]{2}$.',
-    recognize: 'If you see a sum or difference of roots, or a comparison like $3\\sqrt{5}$ against $\\sqrt{40}$, simplify first and put a coefficient inside the root only after squaring it.',
+    idea: 'Simplify each radical by pulling out perfect squares (or cubes), using $\\sqrt{ab} = \\sqrt{a}\\sqrt{b}$ for positive $a$ and $b$. Only radicals with the same number under the root can then be combined, like $5x + 3x$. Cube roots work the same way: $\\sqrt[3]{54} = 3\\sqrt[3]{2}$.',
+    recognize: 'If you see a sum or difference of roots, or a comparison like $3\\sqrt{5}$ against $\\sqrt{40}$, simplify first. Put a coefficient inside the root only after squaring it: $3\\sqrt{5} = \\sqrt{9 \\cdot 5} = \\sqrt{45}$, which is larger than $\\sqrt{40}$.',
     example: {
       problem: 'Simplify $\\sqrt{50} + \\sqrt{18}$.',
       steps: [
-        'Pull out perfect squares: $\\sqrt{50} = \\sqrt{25 \\cdot 2} = 5\\sqrt{2}$ and $\\sqrt{18} = \\sqrt{9 \\cdot 2} = 3\\sqrt{2}$.',
-        'Both are multiples of $\\sqrt{2}$, so add the coefficients: $5\\sqrt{2} + 3\\sqrt{2} = 8\\sqrt{2}$.',
+        'Pull out perfect squares, because their roots are whole numbers that can leave the radical: $\\sqrt{50} = \\sqrt{25 \\cdot 2} = 5\\sqrt{2}$ and $\\sqrt{18} = \\sqrt{9 \\cdot 2} = 3\\sqrt{2}$.',
+        'Both are multiples of $\\sqrt{2}$, so add the coefficients: $5\\sqrt{2} + 3\\sqrt{2} = 8\\sqrt{2}$, exactly as $5x + 3x = 8x$ with $x = \\sqrt{2}$.',
         'Check: $7.07 + 4.24 \\approx 11.31 \\approx 8 \\cdot 1.414$, while $\\sqrt{50 + 18} = \\sqrt{68} \\approx 8.25$ is far off, because radicals never add under the root.',
       ],
       answer: '$\\sqrt{50} + \\sqrt{18} = 8\\sqrt{2}$.',
@@ -186,13 +185,13 @@ export const arithmeticLessons: Record<string, Lesson> = {
 
   'arith.order-of-operations': {
     idea: 'Substitute every value inside parentheses, then follow the order: parentheses, exponents, multiplication and division left to right, then addition and subtraction left to right. Remember $-3^2 = -9$ but $(-3)^2 = 9$.',
-    recognize: 'If you see an expression with given values, a defined operation like $a \\star b$ or negative inputs, write each substitution in full and work one operation at a time. On QC questions with given values, compute both sides completely.',
+    recognize: 'If you see an expression with given values, a defined operation like $a \\star b$ or negative inputs, write each substitution in full and work one operation at a time. On QC questions with given values, compute both sides completely: every value is fixed, so the answer can never be D.',
     example: {
       problem: 'If $r = 2$ and $s = -3$, what is $r - s^2 + rs$?',
       steps: [
         'Substitute with parentheses: $2 - (-3)^2 + (2)(-3)$, because a bare minus sign is easy to lose.',
         'Exponent first: $(-3)^2 = 9$, since the parentheses put the minus sign inside the square. The product is $(2)(-3) = -6$.',
-        'Now add and subtract left to right: $2 - 9 + (-6) = -13$.',
+        'Now add and subtract left to right: $2 - 9 + (-6) = -13$, because addition and subtraction rank equally.',
       ],
       answer: 'The value is $-13$.',
     },
@@ -201,15 +200,15 @@ export const arithmeticLessons: Record<string, Lesson> = {
 
   'arith.percent': {
     idea: 'A percent is a multiplier on a base: $+8\\%$ is $\\times 1.08$ and $-20\\%$ is $\\times 0.80$. Percent change divides by the ORIGINAL value. Also, $x\\%$ of $y$ equals $y\\%$ of $x$, so 8% of 25 is 25% of 8, which is 2.',
-    recognize: 'If you see "increased by", "reduced to" or "what percent more", name the original amount and write an equation with a multiplier. Percents without base amounts cannot become dollars.',
+    recognize: 'If you see "increased by", "reduced to" or "what percent more", name the original amount and write an equation with a multiplier. Percents without base amounts cannot become dollars, so comparing percent cuts of unknown prices is D.',
     example: {
-      problem: 'After a 20% discount, a jacket costs 60 dollars. What was the original price?',
+      problem: 'After a 20% discount, a jacket costs \\$60. What was the original price?',
       steps: [
         'Let the original price be $P$. A 20% discount leaves 80% of it, so $0.8P = 60$, because the discount is taken on the original.',
-        'Divide: $P = \\frac{60}{0.8} = 75$.',
-        'Check: 20% of 75 is 15, and $75 - 15 = 60$. Adding 20% to 60 would give 72, the wrong base.',
+        'Divide both sides by 0.8: $P = \\frac{60}{0.8} = 75$, because that undoes the multiplication.',
+        'Check: 20% of 75 is 15, and $75 - 15 = 60$. Adding 20% to 60 would give 72, which is wrong because the 20% is taken of the original price, not of the sale price.',
       ],
-      answer: 'The original price was 75 dollars.',
+      answer: 'The original price was \\$75.',
     },
     traps: ['num-reverse-percent', 'num-percent-wrong-base', 'num-change-only'],
   },
@@ -218,13 +217,13 @@ export const arithmeticLessons: Record<string, Lesson> = {
     idea: 'Successive percent changes multiply, they never add. Turn each change into a multiplier and chain them.',
     recognize: 'If you see "discount then tax", "increase then decrease" or several years of growth, multiply the multipliers. Each percent applies to the NEW amount, so undoing a $+25\\%$ change takes $-20\\%$, not $-25\\%$.',
     example: {
-      problem: 'A 400-dollar bike is discounted 30%, then a 10% tax is added to the sale price. What is the final price?',
+      problem: 'A \\$400 bike is discounted 30%, then a 10% tax is added to the sale price. What is the final price?',
       steps: [
         'Write multipliers: a 30% discount is $\\times 0.70$ and a 10% tax is $\\times 1.10$, because each percent is a fraction of the current price.',
-        'Discount first: $400 \\times 0.70 = 280$. The tax applies to 280, not to the original 400.',
+        'Discount first: $400 \\times 0.70 = 280$, because the tax is charged on the sale price, not on the original 400.',
         'Then tax: $280 \\times 1.10 = 308$. Adding the percents ($-30\\% + 10\\% = -20\\%$) would give 320, which is wrong because the changes multiply.',
       ],
-      answer: 'The final price is 308 dollars.',
+      answer: 'The final price is \\$308.',
     },
     traps: ['num-add-percents', 'num-second-on-original', 'num-percent-cancel'],
   },
@@ -237,7 +236,7 @@ export const arithmeticLessons: Record<string, Lesson> = {
       steps: [
         'Take out the known fraction first: blue is $\\frac{1}{4} \\cdot 240 = 60$, so $240 - 60 = 180$ are red or green, because the ratio covers only those two colors.',
         'The ratio $2 : 3$ makes $2 + 3 = 5$ equal parts, so one part is $180 \\div 5 = 36$.',
-        'Green has 3 parts: $3 \\cdot 36 = 108$. Check: red is $2 \\cdot 36 = 72$, and $72 + 108 = 180$.',
+        'Green has 3 parts: $3 \\cdot 36 = 108$. Check: red is $2 \\cdot 36 = 72$, and $72 + 108 = 180$, so the parts use up exactly the marbles that are not blue.',
       ],
       answer: '108 marbles are green.',
     },
@@ -252,8 +251,8 @@ export const arithmeticLessons: Record<string, Lesson> = {
       steps: [
         'Write $\\frac{90\\text{ km}}{1\\text{ h}} \\times \\frac{1000\\text{ m}}{1\\text{ km}} \\times \\frac{1\\text{ h}}{3600\\text{ s}}$, placing each factor so the old unit cancels.',
         'Kilometers cancel with kilometers and hours with hours, leaving meters over seconds, because each factor equals 1.',
-        'Compute: $\\frac{90 \\cdot 1000}{3600} = \\frac{90{,}000}{3600} = 25$.',
-        'Sanity check: 1 m/s is 3.6 km/h, and $25 \\times 3.6 = 90$.',
+        'Multiply the numbers: $\\frac{90 \\cdot 1000}{3600} = \\frac{90{,}000}{3600} = 25$, because 1000 m per km multiplies the number and 3600 s per hour divides it.',
+        'Sanity check: 1 m/s is 3.6 km/h, so 25 m/s is $25 \\times 3.6 = 90$ km/h, the speed we started with.',
       ],
       answer: '90 km/h is 25 meters per second.',
     },
