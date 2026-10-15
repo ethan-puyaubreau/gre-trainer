@@ -3,7 +3,7 @@ import { Frac, frac } from '../../../engine/frac';
 import { gcd, lcm } from '../../../engine/math';
 import { lin, num, paren } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, close, intExcept, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, trapChoices, type Ex } from './util';
+import { N, V, add, close, intExcept, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, trapChoices, evalFrac, type Ex } from './util';
 
 /* ================================================================== 1. Solve a linear equation (MCS) */
 
@@ -407,18 +407,37 @@ ${m === 1 ? '' : `Multiply by ${m}: $${m * (a - dd)}x = ${num(m * (e - b))}$. `}
 
 interface LiteralParams {
   kind: 'relation' | 'solve-for' | 'harmonic';
+  /** relation: [a, b, c]. solve-for: [p, q, r, form]. harmonic: [k, 0, 0, 2]. */
   k: number[];
   /** relation: [coef r, coef s] per choice. Otherwise expression trees. */
   rels: [number, number][];
   exprs: Ex[];
+  /** Names of the variables of the relation, or of a, b, c in the harmonic form. */
+  vars: string[];
 }
 
-const relTex = ([cr, cs]: [number, number]) => `${lin([[cr, 'r']])} = ${lin([[cs, 's']])}`;
+const relTex = ([cr, cs]: [number, number], vr = 'r', vs = 's') => `${lin([[cr, vr]])} = ${lin([[cs, vs]])}`;
 const normRel = ([cr, cs]: [number, number]): string => {
   const g = gcd(cr, cs) || 1;
   const sg = cr < 0 ? -1 : 1;
   return `${(sg * cr) / g},${(sg * cs) / g}`;
 };
+
+/** First x of the list where the formula e (in the variable v) does not give back x; y is the value fed to it. */
+function probe(yOf: (x: Frac) => Frac | null, e: Ex, v: string, xs: number[]): { x: Frac; y: Frac; got: Frac } | null {
+  for (const xn of xs) {
+    const x = new Frac(xn);
+    const y = yOf(x);
+    if (!y) continue;
+    try {
+      const got = evalFrac(e, { [v]: y });
+      if (!got.eq(x)) return { x, y, got };
+    } catch {
+      /* zero denominator: try another x */
+    }
+  }
+  return null;
+}
 
 const literalMCS: Template<LiteralParams> = {
   id: 'alg.linear-equations.literal-mcs',
@@ -426,137 +445,200 @@ const literalMCS: Template<LiteralParams> = {
   format: 'mcs',
   style: 'literal equations and the relation an equation forces',
   generate(rng, d) {
-    const kind: LiteralParams['kind'] = rng.pick(d === 1 ? ['solve-for', 'solve-for', 'relation'] : d === 2 ? ['relation', 'solve-for', 'harmonic'] : ['relation', 'relation', 'solve-for', 'harmonic']);
-    if (kind === 'relation') {
-      let a: number;
-      let b: number;
-      do [a, b] = rng.sample([1, 2, 3, 4, 5], 2);
-      while (gcd(a, b) !== 1);
-      const c = d === 3 ? a + b : (() => {
-        let t: number;
-        do t = rng.int(2, 9);
-        while (t === a || t === b);
-        return t;
-      })();
-      // (r + s)/c = r/a + s/b  <=>  b(a - c) r = a(c - b) s
-      let cr = b * (a - c);
-      let cs = a * (c - b);
-      const g = gcd(cr, cs);
-      cr /= g;
-      cs /= g;
-      if (cr < 0) {
-        cr = -cr;
-        cs = -cs;
-      }
-      const correct: [number, number] = [cr, cs];
-      const pool: { v: [number, number]; trap?: string }[] = [
-        { v: [cr, -cs], trap: 'alg-sign-slip' },
-        { v: [Math.abs(cs), Math.sign(cs) * cr], trap: 'alg-swapped-coefficients' },
-        { v: [1, 1] },
-        { v: [b, a] },
-        { v: [b, -a] },
-        { v: [b * b, a * a] },
-        { v: [b * b, -a * a] },
-        { v: [a, b] },
-        { v: [cr + 1, cs] },
-      ];
-      const seen = new Set([normRel(correct)]);
-      const wrong: { v: [number, number]; trap?: string }[] = [];
-      for (const w of d === 3 ? pool : [pool[0], pool[1], ...rng.shuffle(pool.slice(2))]) {
-        if (wrong.length === 4) break;
-        if (w.v[0] === 0 || w.v[1] === 0 || seen.has(normRel(w.v))) continue;
-        seen.add(normRel(w.v));
-        wrong.push(w);
-      }
-      const ordered = [{ v: correct, ok: true as const }, ...wrong.map((w) => ({ ...w, ok: false as const }))].sort(
-        (x, y) => Math.abs(x.v[0]) - Math.abs(y.v[0]) || Math.abs(x.v[1]) - Math.abs(y.v[1]) || y.v[1] - x.v[1],
-      );
-      const choices = ordered.map((o) => ({ text: `$${relTex(o.v)}$`, ...('trap' in o && o.trap ? { trap: o.trap } : {}) }));
-      const answer = ordered.findIndex((o) => o.ok);
-      const lhsCoef = b * (a - c);
-      const rhsCoef = a * (c - b);
-      return {
-        params: { kind, k: [a, b, c], rels: ordered.map((o) => o.v), exprs: [] },
-        q: {
-          format: 'mcs',
-          stem: `If $\\dfrac{r + s}{${c}} = \\dfrac{r}{${a}} + \\dfrac{s}{${b}}$, which of the following must be true?`,
-          choices,
-          answer,
-          explanation: `Multiply both sides by $${c * a * b}$ (the product of the denominators): $${a * b}(r + s) = ${c * b}r + ${c * a}s$.
-
-Collect the $r$ terms on one side and the $s$ terms on the other: $${lin([[lhsCoef, 'r']])} = ${lin([[rhsCoef, 's']])}$${relTex([lhsCoef, rhsCoef]) !== relTex(correct) ? `, or $${relTex(correct)}$` : ''}.
-
-A sign slip while moving terms gives $${relTex([cr, -cs])}$; check your answer with numbers, for example $r = ${Math.abs(cs)}$, $s = ${cs < 0 ? -cr : cr}$.`,
-        },
-      };
-    }
-    if (kind === 'solve-for') {
-      const form = rng.pick(d === 1 ? ['affine'] : ['affine', 'mobius']);
-      if (form === 'affine') {
-        // y = (p x + q) / r  ->  x = (r y - q) / p
-        let p: number;
-        let q: number;
-        let r: number;
-        do {
-          p = rng.int(2, 7);
-          q = intExcept(rng, -9, 9, 0);
-          r = rng.int(2, 6);
-        } while (gcd(gcd(p, q), r) !== 1 || gcd(gcd(r, q), p) !== 1);
-        const yv = V('y');
-        const correct = div(lx(r, -q, 'y'), N(p));
-        const wrongs: { e: Ex; trap?: string }[] = [
-          { e: div(lx(r, q, 'y'), N(p)), trap: 'alg-move-term-sign' },
-          { e: div(mul(N(r), add(yv, N(-q))), N(p)), trap: 'alg-undo-order' },
-          { e: div(lx(p, -q, 'y'), N(r)), trap: 'alg-swapped-coefficients' },
-          { e: div(lx(1, -q, 'y'), N(p * r)) },
-          { e: lx(new Frac(r, p), -q, 'y') },
+    for (;;) {
+      const kind: LiteralParams['kind'] = rng.pick(d === 1 ? ['solve-for', 'solve-for', 'relation'] : d === 2 ? ['relation', 'solve-for', 'harmonic'] : ['relation', 'relation', 'solve-for', 'harmonic']);
+      if (kind === 'relation') {
+        const [vr, vs] = rng.pick([['r', 's'], ['m', 'n'], ['u', 'v'], ['p', 'q'], ['x', 'y']]);
+        let a: number;
+        let b: number;
+        do [a, b] = rng.sample([2, 3, 4, 5, 6, 7], 2);
+        while (gcd(a, b) !== 1);
+        const c =
+          d === 3
+            ? a + b
+            : (() => {
+                let t: number;
+                do t = rng.int(2, 9);
+                while (t === a || t === b);
+                return t;
+              })();
+        // (r + s)/c = r/a + s/b  <=>  b(a - c) r = a(c - b) s
+        let cr = b * (a - c);
+        let cs = a * (c - b);
+        const g = gcd(cr, cs);
+        cr /= g;
+        cs /= g;
+        if (cr < 0) {
+          cr = -cr;
+          cs = -cs;
+        }
+        const correct: [number, number] = [cr, cs];
+        const ab = a * b;
+        const bc = b * c;
+        const ac = a * c;
+        const pool: { v: [number, number]; trap: string; why: string }[] = [
+          { v: [cr, -cs], trap: 'alg-sign-slip', why: `a sign error when collecting the terms` },
+          { v: [Math.abs(cs), Math.sign(cs) * cr], trap: 'alg-swapped-coefficients', why: `swapping the two coefficients` },
+          { v: [ab + bc, ac - ab], trap: 'alg-move-term-sign', why: `moving the $${vr}$ term across with the wrong sign` },
+          { v: [ab - bc, ac + ab], trap: 'alg-move-term-sign', why: `moving the $${vs}$ term across with the wrong sign` },
+          { v: [1 - bc, ac - 1], trap: 'alg-lcd-partial', why: `multiplying only the two fractions on the right by $${ab}$` },
         ];
-        return finishSolveFor(rng, 'solve-for', [p, q, r, 0], correct, wrongs, `If $y = \\dfrac{${lin([[p, 'x'], [q, '']])}}{${r}}$, which of the following expresses $x$ in terms of $y$?`,
-          `Undo the operations in reverse order. Multiply both sides by ${r}: $${r}y = ${lin([[p, 'x'], [q, '']])}$. Subtract $${num(q)}$: $${lin([[r, 'y'], [-q, '']])} = ${p}x$. Divide by ${p}: $x = ${texEx(correct)}$.
+        const seen = new Set([normRel(correct)]);
+        const wrong: typeof pool = [];
+        for (const w of rng.shuffle(pool)) {
+          if (w.v[0] === 0 || w.v[1] === 0 || seen.has(normRel(w.v))) continue;
+          seen.add(normRel(w.v));
+          wrong.push(w);
+        }
+        if (wrong.length < 4) continue;
+        const kept = wrong.slice(0, 4);
+        const ordered = [{ v: correct, ok: true as const }, ...kept.map((w) => ({ ...w, ok: false as const }))].sort(
+          (x, y) => Math.abs(x.v[0]) - Math.abs(y.v[0]) || Math.abs(x.v[1]) - Math.abs(y.v[1]) || y.v[1] - x.v[1],
+        );
+        const choices = ordered.map((o) => ({ text: `$${relTex(o.v, vr, vs)}$`, ...('trap' in o ? { trap: o.trap } : {}) }));
+        const answer = ordered.findIndex((o) => o.ok);
+        const lhsCoef = b * (a - c);
+        const rhsCoef = ac - ab;
+        const both = (x: Frac, y: Frac) => ({ l: x.add(y).div(c), r: x.div(a).add(y.div(b)) });
+        const good = both(new Frac(cs), new Frac(cr));
+        const w0 = kept[0];
+        const bad = both(new Frac(w0.v[1]), new Frac(w0.v[0]));
+        const explanation = `To find a relation, clear the denominators, then collect the $${vr}$ terms on one side and the $${vs}$ terms on the other.
 
-Check with a number: $x = 1$ gives $y = ${new Frac(p + q, r).toTex()}$, and the formula returns 1.`);
+Multiply both sides by $${c * a * b}$, the product of the denominators:$${ab}(${vr} + ${vs}) = ${bc}${vr} + ${ac}${vs}$. Subtract $${bc}${vr}$ and $${ab}${vs}$ from both sides: $${relTex([lhsCoef, rhsCoef], vr, vs)}$${relTex([lhsCoef, rhsCoef], vr, vs) !== relTex(correct, vr, vs) ? `, which simplifies to $${relTex(correct, vr, vs)}$` : ''}.
+
+Check: $${vr} = ${num(cs)}$ and $${vs} = ${num(cr)}$ make both sides of the original equal $${good.l.toTex()}$.
+
+Trap: $${relTex(w0.v, vr, vs)}$ comes from ${w0.why}. Take $${vr} = ${num(w0.v[1])}$, $${vs} = ${num(w0.v[0])}$, which satisfy it: the original sides are $${bad.l.toTex()}$ and $${bad.r.toTex()}$, not equal.
+
+Rule: scale every term by the same number, then move terms one at a time.`;
+        return {
+          params: { kind, k: [a, b, c], rels: ordered.map((o) => o.v), exprs: [], vars: [vr, vs] },
+          q: {
+            format: 'mcs',
+            stem: rng.pick([
+              `If $\\dfrac{${vr} + ${vs}}{${c}} = \\dfrac{${vr}}{${a}} + \\dfrac{${vs}}{${b}}$, which of the following must be true?`,
+              `If $\\dfrac{${vr}}{${a}} + \\dfrac{${vs}}{${b}} = \\dfrac{${vr} + ${vs}}{${c}}$, which of the following must be true?`,
+              `The numbers $${vr}$ and $${vs}$ satisfy $\\dfrac{${vr} + ${vs}}{${c}} = \\dfrac{${vr}}{${a}} + \\dfrac{${vs}}{${b}}$. Which of the following relations do they satisfy?`,
+            ]),
+            choices,
+            answer,
+            explanation,
+          },
+        };
       }
-      // y = (x + p)/(x - q)  ->  x = (q y + p)/(y - 1)
-      let p = rng.int(1, 9);
-      let q = rng.int(1, 9);
-      if (p === q) q = p + 1;
-      if (rng.chance(0.3) && p !== q) p = -p;
-      const correct = div(lx(q, p, 'y'), lx(1, -1, 'y'));
-      const wrongs: { e: Ex; trap?: string }[] = [
-        { e: div(lx(q, -p, 'y'), lx(1, -1, 'y')), trap: 'alg-move-term-sign' },
-        { e: div(lx(q, p, 'y'), lx(1, 1, 'y')), trap: 'alg-move-term-sign' },
-        { e: div(N(p + q), lx(1, -1, 'y')) },
-        { e: div(lx(q, p, 'y'), add(N(1), mul(N(-1), V('y')))), trap: 'alg-sign-slip' },
-        { e: lx(q, p, 'y') },
-      ];
-      return finishSolveFor(rng, 'solve-for', [p, q, 0, 1], correct, wrongs, `If $y = \\dfrac{${lin([[1, 'x'], [p, '']])}}{${lin([[1, 'x'], [-q, '']])}}$ and $x \\ne ${q}$, which of the following expresses $x$ in terms of $y$?`,
-        `Multiply both sides by $${lin([[1, 'x'], [-q, '']])}$: $${lin([[1, 'xy'], [-q, 'y']])} = ${lin([[1, 'x'], [p, '']])}$. Put the $x$ terms on the left: $xy - x = ${lin([[q, 'y'], [p, '']])}$, so $x(y - 1) = ${lin([[q, 'y'], [p, '']])}$ and $x = ${texEx(correct)}$.
+      if (kind === 'solve-for') {
+        const form = rng.pick(d === 1 ? ['affine'] : ['affine', 'mobius']);
+        if (form === 'affine') {
+          // y = (p x + q) / r  ->  x = (r y - q) / p
+          let p: number;
+          let q: number;
+          let r: number;
+          do {
+            p = rng.int(2, 7);
+            q = intExcept(rng, -9, 9, 0);
+            r = rng.int(2, 6);
+          } while (gcd(gcd(p, q), r) !== 1 || gcd(gcd(r, q), p) !== 1);
+          const correct = div(lx(r, -q, 'y'), N(p));
+          const wrongs: { e: Ex; trap: string; why: string }[] = rng.shuffle([
+            { e: div(lx(r, q, 'y'), N(p)), trap: 'alg-move-term-sign', why: `adding $${num(q)}$ instead of subtracting it when moving it across` },
+            { e: div(mul(N(r), add(V('y'), N(-q))), N(p)), trap: 'alg-undo-order', why: `subtracting $${num(q)}$ from $y$ before multiplying by ${r}` },
+            { e: div(lx(p, -q, 'y'), N(r)), trap: 'alg-swapped-coefficients', why: `swapping ${p} and ${r}` },
+            { e: div(lx(1, -q, 'y'), N(p * r)), trap: 'alg-inverse-operation', why: `dividing by ${r} where it should multiply` },
+            { e: lx(new Frac(r, p), -q, 'y'), trap: 'alg-divide-partial', why: `dividing only $${r}y$ by ${p}, not $${num(-q)}$` },
+          ]);
+          const out = finishSolveFor(
+            rng,
+            kind,
+            [p, q, r, 0],
+            ['x', 'y'],
+            correct,
+            wrongs,
+            `If $y = \\dfrac{${lin([[p, 'x'], [q, '']])}}{${r}}$, which of the following expresses $x$ in terms of $y$?`,
+            (x) => new Frac(p).mul(x).add(q).div(r),
+            `Solving for $x$ means undoing the operations done to it, in reverse order.
 
-Watch the signs when you move $${q}y$ and $x$ across the equals sign.`);
+Multiply both sides by ${r}: $${r}y = ${lin([[p, 'x'], [q, '']])}$. ${q > 0 ? `Subtract ${q}` : `Add ${-q}`} on both sides: $${lin([[r, 'y'], [-q, '']])} = ${p}x$. Divide both sides by ${p}: $x = ${texEx(correct)}$. The division by ${r} was the last thing done to $x$, so it is the first thing undone.
+
+Check: $x = 1$ gives $y = ${new Frac(p + q, r).toTex()}$, and the formula returns $1$.`,
+            'Undo the operations in the reverse order, one at a time.',
+          );
+          if (out) return out;
+          continue;
+        }
+        // y = (x + p)/(x - q)  ->  x = (q y + p)/(y - 1)
+        let p = rng.int(1, 9);
+        let q = rng.int(1, 9);
+        if (p === q) q = p + 1;
+        if (rng.chance(0.3)) p = -p;
+        const correct = div(lx(q, p, 'y'), lx(1, -1, 'y'));
+        const wrongs: { e: Ex; trap: string; why: string }[] = rng.shuffle([
+          { e: div(lx(q, -p, 'y'), lx(1, -1, 'y')), trap: 'alg-move-term-sign', why: `moving $${num(p)}$ across with the wrong sign` },
+          { e: div(lx(q, p, 'y'), lx(1, 1, 'y')), trap: 'alg-move-term-sign', why: `moving $x$ across with the wrong sign, which makes $y + 1$` },
+          { e: div(lx(q, p, 'y'), add(N(1), mul(N(-1), V('y')))), trap: 'alg-sign-slip', why: `writing the factor as $1 - y$ instead of $y - 1$` },
+          { e: div(lx(p, q, 'y'), lx(1, -1, 'y')), trap: 'alg-swapped-coefficients', why: `swapping the numbers $${num(p)}$ and $${num(q)}$` },
+          { e: lx(q, p, 'y'), trap: 'alg-factor-skipped', why: `stopping at $x(y - 1) = ${lin([[q, 'y'], [p, '']])}$ without dividing by $y - 1$` },
+        ]);
+        const out2 = finishSolveFor(
+          rng,
+          kind,
+          [p, q, 0, 1],
+          ['x', 'y'],
+          correct,
+          wrongs,
+          `If $y = \\dfrac{${lin([[1, 'x'], [p, '']])}}{${lin([[1, 'x'], [-q, '']])}}$ and $x \\ne ${q}$, which of the following expresses $x$ in terms of $y$?`,
+          (x) => (x.eq(q) ? null : x.add(p).div(x.sub(q))),
+          `$x$ sits in the numerator and the denominator: clear the denominator, gather the $x$ terms, then factor $x$ out.
+
+Multiply both sides by $${lin([[1, 'x'], [-q, '']])}$: $${lin([[1, 'xy'], [-q, 'y']])} = ${lin([[1, 'x'], [p, '']])}$. Put the $x$ terms on the left: $xy - x = ${lin([[q, 'y'], [p, '']])}$. Factor: $x(y - 1) = ${lin([[q, 'y'], [p, '']])}$. Divide by $y - 1$ (it is not 0, since $y = 1$ would force $${num(p)} = ${num(-q)}$): $x = ${texEx(correct)}$.
+
+Check: $x = 0$ gives $y = ${new Frac(-p, q).toTex()}$, and the formula returns $0$.`,
+          'Collect every term that contains the unknown, factor it out, then divide.',
+        );
+        if (out2) return out2;
+        continue;
+      }
+      // harmonic: 1/a + k/b = 1/c  -> c = ab / (b + k a)
+      const kk = rng.pick(d === 2 ? [2] : [2, 3]);
+      const [va, vb, vc] = rng.pick([['a', 'b', 'c'], ['p', 'q', 'r'], ['u', 'v', 'w'], ['f', 'g', 'h']]);
+      const A = V(va);
+      const Bv = V(vb);
+      const denom = add(Bv, mul(N(kk), A));
+      const correct = div(mul(A, Bv), denom);
+      const wrongs: { e: Ex; trap: string; why: string }[] = rng.shuffle([
+        { e: add(A, div(Bv, N(kk))), trap: 'alg-reciprocal-sum', why: `flipping each fraction separately, as if $\\frac{1}{${va}} + \\frac{${kk}}{${vb}}$ became $${va} + \\frac{${vb}}{${kk}}$` },
+        { e: div(denom, mul(A, Bv)), trap: 'alg-forgot-reciprocal', why: `stopping at $\\frac{1}{${vc}}$ and not flipping` },
+        { e: div(mul(A, Bv), add(Bv, mul(N(-kk), A))), trap: 'alg-sign-slip', why: `a sign error in the denominator` },
+        { e: div(mul(A, Bv), add(mul(N(kk), Bv), A)), trap: 'alg-swapped-coefficients', why: `putting the ${kk} on $${vb}$ instead of $${va}$` },
+        { e: div(mul(A, Bv), add(A, Bv)), trap: 'alg-dropped-term', why: `dropping the ${kk}` },
+      ]);
+      const kTerm = `\\dfrac{${kk}}{${vb}}`;
+      const out3 = finishSolveFor(
+        rng,
+        'harmonic',
+        [kk, 0, 0, 2],
+        [va, vb, vc],
+        correct,
+        wrongs,
+        `If $${va}$, $${vb}$ and $${vc}$ are positive and $\\dfrac{1}{${va}} + ${kTerm} = \\dfrac{1}{${vc}}$, which of the following expresses $${vc}$ in terms of $${va}$ and $${vb}$?`,
+        null,
+        `Reciprocals on both sides: add the fractions on the left over a common denominator, then take the reciprocal of both sides.
+
+$\\dfrac{1}{${va}} + ${kTerm} = \\dfrac{${vb} + ${kk}${va}}{${va}${vb}}$. This equals $\\dfrac{1}{${vc}}$, and equal fractions have equal reciprocals, so $${vc} = ${texEx(correct)}$.
+
+Check: $${va} = 2$ and $${vb} = 3$ give $\\frac{1}{2} + \\frac{${kk}}{3} =${new Frac(1, 2).add(new Frac(kk, 3)).toTex()}$, so $${vc} = ${new Frac(1).div(new Frac(1, 2).add(new Frac(kk, 3))).toTex()}$, which is what the formula gives.`,
+        'A sum of fractions is combined first; only then can you flip.',
+      );
+      if (out3) return out3;
     }
-    // harmonic: 1/a + k/b = 1/c  -> c = ab / (b + k a)
-    const kk = rng.pick(d === 2 ? [1, 2] : [1, 2, 3]);
-    const correct = div(mul(V('a'), V('b')), kk === 1 ? add(V('a'), V('b')) : add(V('b'), mul(N(kk), V('a'))));
-    const wrongs: { e: Ex; trap?: string }[] = [
-      { e: kk === 1 ? add(V('a'), V('b')) : add(V('a'), div(V('b'), N(kk))), trap: 'alg-reciprocal-sum' },
-      { e: div(kk === 1 ? add(V('a'), V('b')) : add(V('b'), mul(N(kk), V('a'))), mul(V('a'), V('b'))), trap: 'alg-forgot-reciprocal' },
-      { e: div(mul(V('a'), V('b')), kk === 1 ? add(V('a'), mul(N(-1), V('b'))) : add(V('a'), mul(N(kk), V('b')))) },
-      { e: div(mul(N(kk), V('a'), V('b')), add(V('a'), V('b'))) },
-      { e: div(mul(V('a'), V('b')), N(kk + 1)) },
-    ];
-    const kTerm = kk === 1 ? '\\dfrac{1}{b}' : `\\dfrac{${kk}}{b}`;
-    return finishSolveFor(rng, 'harmonic', [kk, 0, 0, 2], correct, wrongs, `If $a$, $b$ and $c$ are positive and $\\dfrac{1}{a} + ${kTerm} = \\dfrac{1}{c}$, which of the following expresses $c$ in terms of $a$ and $b$?`,
-      `Add the fractions on the left: $\\dfrac{1}{a} + ${kTerm} = \\dfrac{${kk === 1 ? 'b + a' : `b + ${kk}a`}}{ab}$. This equals $\\dfrac{1}{c}$, so $c$ is the reciprocal: $c = ${texEx(correct)}$.
-
-$\\frac{1}{c}$ is not $c$: stopping before taking the reciprocal gives the upside-down answer, and $\\frac{1}{a} + \\frac{1}{b} \\ne \\frac{1}{a + b}$.`);
   },
-  check(q, { kind, k, rels, exprs }, rng) {
+  check(q, { kind, k, rels, exprs, vars }, rng) {
     if (q.format !== 'mcs') return 'wrong format';
     const matches: number[] = [];
     if (kind === 'relation') {
       const [a, b, c] = k;
       rels.forEach((rel, i) => {
-        if (q.choices[i].text !== `$${relTex(rel)}$`) matches.push(-100);
+        if (q.choices[i].text !== `$${relTex(rel, vars[0], vars[1])}$`) matches.push(-100);
         let ok = true;
         for (const r of [1.7, -3.2, 5]) {
           // solve (r + s)/c - r/a - s/b = 0 for s (linear in s)
@@ -581,7 +663,7 @@ $\\frac{1}{c}$ is not $c$: stopping before taking the reciprocal gives the upsid
             const a = 0.5 + rng.next() * 9;
             const b = 0.5 + rng.next() * 9;
             const c = 1 / (1 / a + kk / b);
-            if (!close(evalEx(e, { a, b }), c, 1e-9)) ok = false;
+            if (!close(evalEx(e, { [vars[0]]: a, [vars[1]]: b }), c, 1e-9)) ok = false;
           }
         }
         if (ok) matches.push(i);
@@ -593,33 +675,70 @@ $\\frac{1}{c}$ is not $c$: stopping before taking the reciprocal gives the upsid
   },
 };
 
+/**
+ * Builds the MCS of a "solve for" question: the correct expression and four named wrong ones (the order
+ * of `wrongs` is already shuffled). `yOf` gives y for a chosen x so that the cited trap can be refuted with
+ * a number; null for the harmonic form, which is refuted with sample values of a and b.
+ */
 function finishSolveFor(
   rng: Parameters<Template['generate']>[0],
   kind: LiteralParams['kind'],
   k: number[],
+  vars: string[],
   correct: Ex,
-  wrongs: { e: Ex; trap?: string }[],
+  wrongs: { e: Ex; trap: string; why: string }[],
   stem: string,
-  explanation: string,
+  yOf: ((x: Frac) => Frac | null) | null,
+  method: string,
+  rule: string,
 ) {
   const seen = new Set([texEx(correct)]);
-  const kept = wrongs.filter((w) => {
-    const t = texEx(w.e);
-    if (seen.has(t)) return false;
-    seen.add(t);
-    return true;
-  });
+  const kept = wrongs
+    .filter((w) => {
+      const t = texEx(w.e);
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    })
+    .slice(0, 4);
+  if (kept.length < 4) return null;
   const { choices, answer } = textChoices(
     rng,
     `$${texEx(correct)}$`,
-    kept.slice(0, 4).map((w) => ({ text: `$${texEx(w.e)}$`, ...(w.trap ? { trap: w.trap } : {}) })),
+    kept.map((w) => ({ text: `$${texEx(w.e)}$`, trap: w.trap })),
   );
   const all = [correct, ...kept.map((w) => w.e)];
   const exprs = choices.map((c) => all.find((e) => `$${texEx(e)}$` === c.text)!);
+  const t = kept[0];
+  let refute = '';
+  if (yOf) {
+    const pr = probe(yOf, t.e, 'y', [1, 2, 3, 0, -1, -2, 4, 5]);
+    if (pr) refute = `Test it with $x = ${pr.x.toTex()}$: then $y = ${pr.y.toTex()}$, and $${texEx(t.e)}$ returns $${pr.got.toTex()}$ instead of $${pr.x.toTex()}$.`;
+  } else {
+    const [va, vb] = vars;
+    const kk = k[0];
+    for (const [a, b] of [[2, 3], [2, 4], [3, 6], [4, 2], [3, 5]]) {
+      const c = new Frac(1).div(new Frac(1, a).add(new Frac(kk, b)));
+      const got = evalFrac(t.e, { [va]: new Frac(a), [vb]: new Frac(b) });
+      if (!got.eq(c)) {
+        refute = `Test it with $${va} = ${a}$ and $${vb} = ${b}$: then $\\frac{1}{${a}} + \\frac{${kk}}{${b}} = ${new Frac(1).div(c).toTex()}$, so $${vars[2]} = ${c.toTex()}$, but the formula gives $${got.toTex()}$.`;
+        break;
+      }
+    }
+  }
   return {
-    params: { kind, k, rels: [] as [number, number][], exprs },
-    q: { format: 'mcs' as const, stem, choices, answer, explanation },
+    params: { kind, k, rels: [] as [number, number][], exprs, vars },
+    q: {
+      format: 'mcs' as const,
+      stem,
+      choices,
+      answer,
+      explanation: `${method}
+
+Trap: $${texEx(t.e)}$ comes from ${t.why}. ${refute}
+
+${rule}`,
+    },
   };
 }
-
 export const linearTemplates = [solveLinearMCS, fractionQC, shortcutNE, literalMCS];

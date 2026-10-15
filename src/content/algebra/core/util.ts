@@ -308,3 +308,28 @@ export function trapChoices<T extends { value: FracLike; trap: string }>(
     kept: kept.sort((a, b) => uniq.indexOf(a) - uniq.indexOf(b)), // priority order: cite kept[0]
   };
 }
+
+/** Exact value of an expression tree (integer exponents only); throws on a zero denominator. */
+export function evalFrac(e: Ex, env: Record<string, Frac>): Frac {
+  switch (e.k) {
+    case 'n':
+      return e.v;
+    case 'v': {
+      const v = env[e.s];
+      if (!v) throw new Error(`evalFrac: no value for ${e.s}`);
+      return v;
+    }
+    case 'add':
+      return e.t.reduce((s, t) => s.add(evalFrac(t, env)), new Frac(0));
+    case 'mul':
+      return e.f.reduce((p, f) => p.mul(evalFrac(f, env)), new Frac(1));
+    case 'pow':
+      return evalFrac(e.b, env).pow(evalFrac(e.e, env).toNumber());
+    case 'div':
+      return evalFrac(e.a, env).div(evalFrac(e.b, env));
+    case 'neg':
+      return evalFrac(e.a, env).neg();
+    case 'abs':
+      return evalFrac(e.a, env).abs();
+  }
+}

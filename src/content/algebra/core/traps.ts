@@ -139,6 +139,18 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Undid the operations in the wrong order',
     fix: 'To solve $y = \\frac{px + q}{r}$ for $x$, undo the LAST operation first: multiply by $r$, then subtract $q$, then divide by $p$.',
   },
+  'alg-inverse-operation': {
+    label: 'Used the wrong inverse operation',
+    fix: 'To undo a division by $r$, MULTIPLY by $r$; to undo a multiplication, divide. Test the result with a number.',
+  },
+  'alg-divide-partial': {
+    label: 'Divided only one term',
+    fix: 'Dividing both sides by $p$ divides EVERY term: $\\frac{ry - q}{p} = \\frac{ry}{p} - \\frac{q}{p}$.',
+  },
+  'alg-factor-skipped': {
+    label: 'Stopped before dividing by the factor taken out of $x$',
+    fix: 'From $x(y - 1) = qy + p$, divide both sides by $y - 1$: $x = \\frac{qy + p}{y - 1}$.',
+  },
   'alg-reciprocal-sum': {
     label: '$\\frac{1}{a} + \\frac{1}{b} = \\frac{1}{a + b}$',
     fix: '$\\frac{1}{a} + \\frac{1}{b} = \\frac{a + b}{ab}$. Taking reciprocals of a sum term by term is not allowed.',
