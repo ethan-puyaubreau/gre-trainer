@@ -1,4 +1,5 @@
 import type { Template } from '../../../engine/types';
+import { centerOverlapTemplates, centerOverlapTraps } from './center-overlap';
 import { centerTemplates } from './center';
 import { centerQCTemplates } from './center-qc';
 import { distributionTemplates } from './distributions';
@@ -9,7 +10,7 @@ import { spreadTemplates } from './spread';
 import { weightedTemplates } from './weighted';
 
 export { statsSkills };
-export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps };
+export const statsTraps = { ...baseStatsTraps, ...spreadSetTraps, ...centerOverlapTraps };
 
 export const statsTemplates: Template<any>[] = [
   ...centerTemplates.slice(0, 1),
@@ -18,5 +19,6 @@ export const statsTemplates: Template<any>[] = [
   ...weightedTemplates,
   ...spreadTemplates,
   ...spreadSetTemplates,
+  ...centerOverlapTemplates,
   ...distributionTemplates,
 ];
