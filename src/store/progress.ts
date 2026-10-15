@@ -121,11 +121,10 @@ export const NOT_AN_EXPORT = 'This file is not a GRE Trainer progress export.';
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const isNum = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
 
-/** The optional settings, checked when present: a bad value would reach the pages unguarded. */
+/** The optional settings, checked when present: a bad value would reach the pages unguarded. The exam date is not checked here: importData drops a bad one. */
 function validSettings(s: Record<string, unknown>): boolean {
   const g = s.dailyGoal;
-  const goalOk = g === undefined || (typeof g === 'number' && Number.isInteger(g) && g >= MIN_DAILY_GOAL && g <= MAX_DAILY_GOAL);
-  return goalOk && (s.examDate === undefined || isExamDate(s.examDate));
+  return g === undefined || (typeof g === 'number' && Number.isInteger(g) && g >= MIN_DAILY_GOAL && g <= MAX_DAILY_GOAL);
 }
 
 /** Shape check for an imported file: every field the pages read without a guard must be there. */
@@ -230,7 +229,10 @@ export const useProgress = create<ProgressData & Actions>()(
       importData(data) {
         if (!isProgressData(data)) throw new Error(NOT_AN_EXPORT);
         // Both migrations leave data already in the current shape untouched.
-        set({ ...initialData(), ...migrateStyleCredits(dropWeakFlags(data)), settings: { ...initialData().settings, ...data.settings } });
+        const settings = { ...initialData().settings, ...data.settings };
+        // A date that is not a real day (an older build saved whatever the date field passed through while typing) counts as unset, not as a bad file.
+        if (!isExamDate(settings.examDate)) delete settings.examDate;
+        set({ ...initialData(), ...migrateStyleCredits(dropWeakFlags(data)), settings });
       },
 
       reset() {

@@ -155,15 +155,24 @@ describe('lessons seen', () => {
     for (const bad of [0, 201, -5, 2.5, NaN, '20', null]) expect(isProgressData(withGoal(bad))).toBe(false);
   });
 
-  it('accepts an exam date that is a real YYYY-MM-DD day and rejects anything else', () => {
-    const withDate = (examDate: unknown) => ({ ...initialData(), settings: { ...initialData().settings, examDate } });
-    for (const ok of [undefined, '2026-12-05', '2028-02-29']) expect(isProgressData(withDate(ok))).toBe(true);
-    for (const bad of ['', '2027-02-29', '2026-13-01', '12/05/2026', 20261205, null]) expect(isProgressData(withDate(bad))).toBe(false);
-  });
-
   it('keeps the exam date through an import', () => {
     useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, examDate: '2026-12-05' } });
     expect(useProgress.getState().settings.examDate).toBe('2026-12-05');
+  });
+
+  it('imports a file whose exam date is not a real day, keeping the rest and clearing the date', () => {
+    // What the date field passes through while the year is retyped, and other junk.
+    const answer = { qid: 'x#1#1', skillId: 's', templateId: 't', correct: true, timeMs: 5, at: 1, mode: 'practice' as const, traps: [], hinted: false };
+    for (const bad of ['0002-12-05', '20261-12-05', '', '2027-02-29', '12/05/2026', 20261205, null]) {
+      const data = { ...initialData(), history: [answer], settings: { ...initialData().settings, dailyGoal: 35, lessons: false, examDate: bad } };
+      expect(isProgressData(data), String(bad)).toBe(true);
+      useProgress.getState().importData(data);
+      const s = useProgress.getState();
+      expect(s.settings.examDate, String(bad)).toBeUndefined();
+      expect(s.settings.dailyGoal).toBe(35);
+      expect(s.settings.lessons).toBe(false);
+      expect(s.history).toHaveLength(1);
+    }
   });
 
   it('keeps the daily goal through an import', () => {

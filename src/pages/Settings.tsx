@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatClock } from '../components/Timer';
-import { DEFAULT_DAILY_GOAL, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
+import { DEFAULT_DAILY_GOAL, isExamDate, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
 import { exportProgress, isProgressData, NOT_AN_EXPORT, useProgress } from '../store/progress';
 
@@ -15,6 +15,9 @@ export function Settings() {
   const goal = settings.dailyGoal ?? DEFAULT_DAILY_GOAL;
   const [goalText, setGoalText] = useState(String(goal));
   useEffect(() => setGoalText(String(goal)), [goal]);
+  // Same for the date: while the year is retyped the field passes through values that are not real days (0002-12-05), and only a real one is saved.
+  const [dateText, setDateText] = useState(settings.examDate ?? '');
+  useEffect(() => setDateText(settings.examDate ?? ''), [settings.examDate]);
 
   const download = () => {
     updateSettings({ lastExportAt: Date.now() });
@@ -96,12 +99,27 @@ export function Settings() {
           <input
             type="date"
             style={fieldStyle}
-            value={settings.examDate ?? ''}
-            onChange={(e) => updateSettings({ examDate: e.target.value || undefined })}
+            value={dateText}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDateText(v);
+              if (v === '') updateSettings({ examDate: undefined });
+              else if (isExamDate(v)) updateSettings({ examDate: v });
+            }}
+            // Focus moving between the day, month and year parts is not leaving the field.
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDateText(settings.examDate ?? '');
+            }}
             aria-label="Exam date"
           />
-          {settings.examDate && (
-            <button className="btn btn-ghost" onClick={() => updateSettings({ examDate: undefined })}>
+          {dateText !== '' && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setDateText('');
+                updateSettings({ examDate: undefined });
+              }}
+            >
               Clear
             </button>
           )}
