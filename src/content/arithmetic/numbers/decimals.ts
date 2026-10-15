@@ -502,6 +502,7 @@ const moneyNE: Template<MoneyParams> = {
         count = Math.floor(left / cents[1]);
       }
       const ceilCount = Math.ceil(left / cents[1]);
+      if (ceilCount === count) return moneyNE.generate(rng, d); // no rounding slip possible: draw again
       const remainder = left - count * cents[1];
       return {
         params: { mode, prices: cents, qty: [1, count], bill: 0, budget },
@@ -512,7 +513,7 @@ const moneyNE: Template<MoneyParams> = {
           )} each. What is the greatest number of ${items[1][1]} ${name} can buy?`,
           answer: F(count),
           suffix: items[1][1],
-          traps: ceilCount !== count ? [{ value: F(ceilCount), trap: 'num-round-up-count' }] : [],
+          traps: [{ value: F(ceilCount), trap: 'num-round-up-count' }],
           explanation: `After the ${items[0][0]}, ${name} has $${usd(budget, 2)} - ${priceTex(cents[0])} = ${usd(left / 100, 2)}$ left. Then $${usd(left / 100, 2)} \\div ${priceTex(
             cents[1],
           )} \\approx ${(left / cents[1]).toFixed(2)}$, so ${name} can buy ${count} ${items[1][1]} (they cost ${usd((count * cents[1]) / 100, 2)}, leaving ${usd(
@@ -534,6 +535,7 @@ Rounding ${(left / cents[1]).toFixed(2)} up to ${ceilCount} would cost more mone
     const parts = cents.map((c, i) => `${qty[i]} \\times ${priceTex(c)} = ${usd((qty[i] * c) / 100, 2)}`);
     const sumLine = `$${parts.join('$, $')}$. Total: ${usd(total / 100, 2)}.`;
     if (mode === 'total') {
+      if (swapped === total) return moneyNE.generate(rng, d); // the quantities paired with the wrong prices would give the same total
       return {
         params: { mode, prices: cents, qty, bill: 0, budget: 0 },
         q: {
@@ -541,7 +543,7 @@ Rounding ${(left / cents[1]).toFixed(2)} up to ${ceilCount} would cost more mone
           stem: `A store sells ${sells}. What is the total cost, in dollars, of ${amounts}?`,
           answer: F(total, 100),
           prefix: '\\$',
-          traps: swapped !== total ? [{ value: F(swapped, 100), trap: 'num-wrong-pairs' }] : [],
+          traps: [{ value: F(swapped, 100), trap: 'num-wrong-pairs' }],
           explanation: `Multiply each quantity by its own price, then add: ${sumLine}${
             swapped !== total ? `\n\nPairing the quantities with the wrong prices gives ${usd(swapped / 100, 2)}.` : ''
           }`,

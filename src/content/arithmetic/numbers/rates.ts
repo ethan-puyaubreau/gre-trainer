@@ -1,7 +1,8 @@
 import { flaggedChoices, qcCompare, qcFromSamples, valuedChoices } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { decimal, num, plain, usd } from '../../../engine/tex';
-import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
+import type { Rng } from '../../../engine/rng';
+import type { Difficulty, QCChoice, QCQuestion, QuestionBody, Template } from '../../../engine/types';
 import { close, dec, plainNum, QC_REL, expectMCM, expectMCS, expectNE, expectQC, F, fd, numChoices, pickWeighted, qcEnd, spreadFillers, swapQC } from './util';
 
 /* ================================================================== 1. Rate x time with a unit conversion (QC) */
@@ -533,12 +534,8 @@ const CU_WHO: Record<string, string[][]> = {
   'cents-oz': [['nuts', 'rice', 'coffee beans', 'dried fruit', 'almonds', 'cheese'], [], []],
 };
 
-const compoundNE: Template<CUParams> = {
-  id: 'arith.rates.compound-ne',
-  skill: 'arith.rates',
-  format: 'ne',
-  style: 'convert a rate between compound units',
-  generate(rng, d) {
+/** One conversion question. A mistaken value equal to the right one is no trap: the caller draws again. */
+function buildCompound(rng: Rng, d: Difficulty): { q: QuestionBody; params: CUParams } {
     const mode: CUMode =
       d === 1 ? rng.pick(['cents-oz', 'kmh-ms', 'mph-fps'] as const) : d === 2 ? rng.pick(['mph-fps', 'ml-day', 'dollars-cents'] as const) : rng.pick(['fps-mph', 'ml-day', 'dollars-cents'] as const);
     const who = rng.pick(CU_WHO[mode][d - 1]);
@@ -563,7 +560,7 @@ const compoundNE: Template<CUParams> = {
           traps: [
             { value: wrong60, trap: 'num-time-conversion' },
             { value: inverted, trap: 'num-inverted-conversion' },
-          ].filter((t) => t.value.isTerminating() && !t.value.eq(ans)),
+          ].filter((t) => t.value.isTerminating()),
           explanation:
             mode === 'mph-fps'
               ? `Write the conversion as fractions that cancel the old units. $${mph}\\,\\frac{\\text{mi}}{\\text{h}} \\times \\frac{5{,}280\\text{ ft}}{1\\text{ mi}} \\times \\frac{1\\text{ h}}{3{,}600\\text{ s}} = \\frac{${num(mph * 5280)}}{3{,}600} = ${num(fps)}$ feet per second.
@@ -593,7 +590,7 @@ Trap: an hour has 3,600 seconds, not 60 (${plainNum(wrong60)} comes from multipl
             { value: F(v * 1000, 60), trap: 'num-time-conversion' },
             { value: F(v * 36, 10), trap: 'num-inverted-conversion' },
             { value: F(v, 3600), trap: 'num-decimal-shift' },
-          ].filter((t) => t.value.isTerminating() && !t.value.eq(ans)),
+          ].filter((t) => t.value.isTerminating()),
           explanation: `$${v}\\,\\frac{\\text{km}}{\\text{h}} \\times \\frac{1{,}000\\text{ m}}{1\\text{ km}} \\times \\frac{1\\text{ h}}{3{,}600\\text{ s}} = \\frac{${num(v * 1000)}}{3{,}600} = ${dec(ans)}$ meters per second.
 
 Check: ${plainNum(ans)} meters per second for 3,600 seconds is ${plain(ans.toNumber() * 3600)} meters, which is ${v} kilometers.
@@ -616,7 +613,7 @@ Trap: an hour has 3,600 seconds, not 60, and metres per second is a smaller numb
             { value: F(v, 60), trap: 'num-decimal-shift' },
             { value: F(v * 100, 3600), trap: 'num-time-conversion' },
             { value: F(v * 6000), trap: 'num-inverted-conversion' },
-          ].filter((t) => t.value.isTerminating() && !t.value.eq(ans)),
+          ].filter((t) => t.value.isTerminating()),
           explanation: `$${v}\\,\\frac{\\text{dollars}}{\\text{h}} \\times \\frac{100\\text{ cents}}{1\\text{ dollar}} \\times \\frac{1\\text{ h}}{60\\text{ min}} = \\frac{${num(v * 100)}}{60} = ${dec(ans)}$ cents per minute.
 
 Check: ${plainNum(ans)} cents per minute for 60 minutes is ${plain(ans.toNumber() * 60)} cents, which is ${v} dollars.
@@ -640,7 +637,7 @@ Trap: ${plainNum(F(v, 60))} is the number of dollars per minute, not cents; and 
           traps: [
             { value: F(c * 16), trap: 'num-decimal-shift' },
             { value: F(c, 16 * 100), trap: 'num-inverted-conversion' },
-          ].filter((t) => t.value.isTerminating() && !t.value.eq(ans)),
+          ].filter((t) => t.value.isTerminating()),
           explanation: `$${c}\\,\\frac{\\text{cents}}{\\text{oz}} \\times \\frac{16\\text{ oz}}{1\\text{ lb}} = ${num(c * 16)}$ cents per pound, and ${plain(c * 16)} cents is ${usd((c * 16) / 100, 2)}.
 
 Check: 100 cents make a dollar, so ${plain(c * 16)} cents is $${plain(c * 16)} \\div 100 = ${dec(ans)}$ dollars.
@@ -662,7 +659,7 @@ Trap: ${plain(c * 16)} is the price in cents; the answer must be in dollars.`,
         traps: [
           { value: F(ml * 60, 1000), trap: 'num-time-conversion' },
           { value: F(ml * 1440), trap: 'num-decimal-shift' },
-        ].filter((t) => !t.value.eq(ans)),
+        ],
         explanation: `One day has $24 \\times 60 = 1{,}440$ minutes. $${ml} \\times 1{,}440 = ${num(ml * 1440)}$ milliliters, which is $${num(ml * 1440)} \\div 1{,}000 = ${dec(ans)}$ liters.
 
 Check: ${plainNum(ans)} liters is ${plain(ml * 1440)} milliliters, and $${num(ml * 1440)} \\div 1{,}440 = ${ml}$ per minute.
@@ -670,6 +667,23 @@ Check: ${plainNum(ans)} liters is ${plain(ml * 1440)} milliliters, and $${num(ml
 Trap: using 60 minutes (one hour) instead of 1,440 gives the loss in one hour; ${plain(ml * 1440)} is the answer in milliliters, not liters.`,
       },
     };
+  
+}
+
+const compoundNE: Template<CUParams> = {
+  id: 'arith.rates.compound-ne',
+  skill: 'arith.rates',
+  format: 'ne',
+  style: 'convert a rate between compound units',
+  generate(rng, d) {
+    for (;;) {
+      const out = buildCompound(rng, d);
+      const q = out.q;
+      if (q.format === 'ne') {
+        const ans = q.answer;
+        if (!(q.traps ?? []).some((t) => t.value.eq(ans))) return out;
+      }
+    }
   },
   check(q, { mode, v }) {
     // Recompute through a different route (base units step by step).

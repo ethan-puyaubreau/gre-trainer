@@ -580,7 +580,8 @@ You do not need $x$ and $y$ separately.`;
         const Q = base ** q;
         stem = `If $${P}^{x} \\cdot ${Q}^{${c}} = ${base}^{${k}}$, what is the value of $x$?`;
         const wrongX = k - q * c; // treats P^x as base^x
-        if (wrongX !== answer && wrongX > 0) traps.push({ value: wrongX, trap: 'int-base-change-exponent' });
+        if (wrongX === answer || wrongX <= 0) continue; // the slip must give a different, positive value
+        traps.push({ value: wrongX, trap: 'int-base-change-exponent' });
         explanation = `Rewrite with base ${base}: $${P}^{x} = ${base}^{${p}x}$ and $${Q}^{${c}} = ${base}^{${q * c}}$. Multiplying adds exponents: $${base}^{${p}x + ${q * c}} = ${base}^{${k}}$, so $${p}x + ${q * c} = ${k}$ and $x = ${answer}$.
 
 Writing $${P}^{x}$ as $${base}^{x}$ forgets that ${P} is $${base}^{${p}}$.`;
@@ -611,7 +612,8 @@ Writing $${P}^{x}$ as $${base}^{x}$ forgets that ${P} is $${base}^{${p}}$.`;
         // forgot to distribute: p x + c = q x + d
         if ((c - d) % (q - p) === 0) {
           const wrongX = (c - d) / (q - p);
-          if (wrongX !== answer) traps.push({ value: wrongX, trap: 'int-exponent-distribute' });
+          if (wrongX === answer) continue;
+          traps.push({ value: wrongX, trap: 'int-exponent-distribute' });
         }
         explanation = `Write both sides with base ${base}: $${P} = ${base}^{${p}}$ and $${Q} = ${base}^{${q}}$. Then $${base}^{${p}(${expTex(c)})} = ${base}^{${q}(${expTex(d)})}$, so the exponents are equal:
 
@@ -661,7 +663,7 @@ $x$ is negative: a reciprocal base needs a negative exponent to give a number gr
           stem,
           ...(prefix ? { prefix } : {}),
           answer: frac(answer),
-          traps: traps.filter((t, i, arr) => t.value !== answer && arr.findIndex((u) => u.value === t.value) === i).map((t) => ({ value: frac(t.value), trap: t.trap })),
+          traps: traps.filter((t, i, arr) => arr.findIndex((u) => u.value === t.value) === i).map((t) => ({ value: frac(t.value), trap: t.trap })),
           explanation,
         },
       };

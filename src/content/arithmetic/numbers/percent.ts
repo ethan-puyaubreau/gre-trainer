@@ -624,8 +624,8 @@ const profitNE: Template<PCParams> = {
       const asDecimal = F(Math.floor((change / c) * 100 + 0.5), 100);
       const item = rng.pick(PC_ITEMS);
       const traps: { value: Frac; trap: string }[] = [];
-      if (wrongBase !== ans) traps.push({ value: F(wrongBase), trap: 'num-percent-wrong-base' });
-      if (!asDecimal.eq(ans)) traps.push({ value: asDecimal, trap: 'num-percent-as-decimal' });
+      if (wrongBase === ans || asDecimal.eq(ans)) continue; // a slip that gives the right answer is no trap: draw again
+      traps.push({ value: F(wrongBase), trap: 'num-percent-wrong-base' }, { value: asDecimal, trap: 'num-percent-as-decimal' });
       const stem =
         mode === 'profit'
           ? `A dealer bought a ${item} for ${usd(c)} and later sold it for ${usd(s)}. The dealer's profit was what percent of the dealer's cost? Give your answer to the nearest whole percent.`
@@ -1009,6 +1009,7 @@ const reverseNE: Template<RvParams> = {
           ? { s: 'the price of a used car', again: 'the price of the car', unit: '', money: true }
           : { s: 'the price of a printer', again: 'the price of the printer', unit: '', money: true },
       ]);
+      if (naive.eq(orig)) return reverseNE.generate(rng, d);
       const verb = up ? 'increased' : 'decreased';
       return {
         params: { mode, p, q: 0, n: now, up },
@@ -1017,7 +1018,7 @@ const reverseNE: Template<RvParams> = {
           stem: `After ${thing.s} ${verb} by ${P(p)}, it was ${thing.money ? usd(now) : plain(now)}. What was ${thing.again} before the ${up ? 'increase' : 'decrease'}?`,
           answer: F(orig),
           ...(thing.money ? { prefix: '\\$' } : { suffix: thing.unit }),
-          traps: naive.eq(orig) ? [] : [{ value: naive, trap: 'num-reverse-percent' }],
+          traps: [{ value: naive, trap: 'num-reverse-percent' }],
           explanation: `If the original amount is $x$, then $${dec(mult)}x = ${num(now)}$, so $x = \\frac{${num(now)}}{${dec(mult)}} = ${num(orig)}$.
 
 ${up ? 'Taking' : 'Adding'} ${P(p)} ${up ? 'off' : 'back to'} ${plain(now)} gives ${plainNum(naive)}, which is wrong: the ${P(p)} was computed on the original amount, not on ${plain(now)}.`,
@@ -1028,6 +1029,7 @@ ${up ? 'Taking' : 'Adding'} ${P(p)} ${up ? 'off' : 'back to'} ${plain(now)} give
       const p = rng.pick([20, 25, 30, 40, 50, 60, 75, 80, 150]);
       const q = rng.pick([10, 20, 25, 40, 50, 60, 120]);
       const ans = F(p * q, 100);
+      if (ans.eq(p + q) || ans.eq(p * q)) return reverseNE.generate(rng, d);
       return {
         params: { mode, p, q, n: 0, up: true },
         q: {
@@ -1038,7 +1040,7 @@ ${up ? 'Taking' : 'Adding'} ${P(p)} ${up ? 'off' : 'back to'} ${plain(now)} give
           traps: [
             { value: F(p + q), trap: 'num-add-percents' },
             { value: F(p * q), trap: 'num-decimal-shift' },
-          ].filter((t) => !t.value.eq(ans)),
+          ],
           explanation: `$x = ${dec(F(p, 100))}y$ and $y = ${dec(F(q, 100))}z$, so $x = ${dec(F(p, 100))} \\times ${dec(F(q, 100))}z = ${dec(ans.div(100))}z$. That is ${P(ans)} of $z$.
 
 Percents of percents multiply: adding them (${p + q}) or forgetting to divide by 100 (${plain(p * q)}) are the usual slips.`,
@@ -1062,6 +1064,7 @@ Percents of percents multiply: adding them (${p + q}) or forgetting to divide by
         ['Ines', 'Theo'],
       ]);
       const reverse = F(Math.floor(F(1).sub(ratio.inv()).mul(1000).toNumber() + 0.5), 10);
+      if (ans.eq(p + q) || ans.eq(reverse)) continue; // a slip that gives the right answer is no trap: draw again
       return {
         params: { mode, p, q, n: 0, up: true },
         q: {
@@ -1072,7 +1075,7 @@ Percents of percents multiply: adding them (${p + q}) or forgetting to divide by
           traps: [
             { value: F(p + q), trap: 'num-add-percents' },
             { value: reverse, trap: 'num-percent-greater-less' },
-          ].filter((t) => !t.value.eq(ans)),
+          ],
           explanation: `Let ${names[0]}'s original salary be $a$ and ${names[1]}'s be $b$. Then $${dec(F(100 + p, 100))}a = ${dec(F(100 - q, 100))}b$, so $\\frac{b}{a} = \\frac{${dec(F(100 + p, 100))}}{${dec(F(100 - q, 100))}} \\approx ${ratio.toNumber().toFixed(4)}$.
 
 So $b$ is about ${(exact.toNumber()).toFixed(3)}% greater than $a$, which rounds to ${dec(ans)}. Adding the percents (${p + q}) is wrong because the two changes are taken on different bases.`,

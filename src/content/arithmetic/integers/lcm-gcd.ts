@@ -553,6 +553,7 @@ ${
 
 The product $${t1} \\cdot ${t2}$ seconds is also a common multiple, but not the first one.`;
       }
+      if (traps.some((t) => t.value.eq(answer))) continue; // a trap equal to the answer is no trap: draw again
       return {
         params: { kind, nums },
         q: {
@@ -560,7 +561,7 @@ The product $${t1} \\cdot ${t2}$ seconds is also a common multiple, but not the 
           stem,
           answer,
           suffix,
-          traps: traps.filter((t) => !t.value.eq(answer)),
+          traps,
           explanation,
         },
       };

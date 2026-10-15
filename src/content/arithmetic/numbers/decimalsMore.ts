@@ -344,6 +344,7 @@ const decimalPointNE: Template<DPParams> = {
       const x = F(r, 10 ** (k / 2));
       const wrongWay = F(r * 10 ** (k / 2));
       const noRoot = F(c, 10 ** k);
+      if (wrongWay.eq(x) || noRoot.eq(x)) return decimalPointNE.generate(rng, d);
       return {
         params: { mode, k, dir: 'right', c: F(c) },
         q: {
@@ -384,13 +385,14 @@ Check: moving the point gives $${decimal(x.mul(10 ** k))}$, and $${c} \\times \\
           ? `x - ${mult} = ${decimal(c)}`
           : `${mult} - x = ${decimal(c)}`;
     const coef = mode === 'sum' ? F(1).add(F(1, factor)) : dir === 'left' ? F(1).sub(F(1, factor)) : F(factor - 1);
+    if (wrong.eq(x)) return decimalPointNE.generate(rng, d); // the slip would give the right number: draw again
     return {
       params: { mode, k, dir, c },
       q: {
         format: 'ne',
         stem,
         answer: x,
-        traps: wrong.isTerminating() && !wrong.eq(x) ? [{ value: wrong, trap: 'num-decimal-shift' }] : [],
+        traps: wrong.isTerminating() ? [{ value: wrong, trap: 'num-decimal-shift' }] : [],
         explanation: `Moving the decimal point ${place} ${dir === 'left' ? 'divides' : 'multiplies'} the number by ${num(factor)}. With $x$ the original number: $${eq}$, so $${decimal(coef)}x = ${decimal(c)}$ and $x = ${decimal(x)}$.
 
 Check: ${dir === 'left' ? `$${decimal(x)} \\to ${decimal(shifted)}$` : `$${decimal(x)} \\to ${decimal(shifted)}$`}, and ${mode === 'sum' ? `$${decimal(x)} + ${decimal(shifted)} = ${decimal(c)}$` : `the difference is $${decimal(c)}$`}.`,

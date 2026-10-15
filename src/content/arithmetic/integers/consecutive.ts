@@ -187,13 +187,15 @@ Numbers divisible by both ${k} and ${k2} are the multiples of ${L}, not of $${k}
 Adding ${nk} and ${nk2} without subtracting counts each multiple of ${L} twice.`;
       }
     }
+    // A mistaken count that equals the right one (or is not a count at all) is no trap: draw again.
+    if (traps.some((t) => t.value === answer || t.value <= 0)) return countMultiples.generate(rng, diff);
     return {
       params: { kind, a, b, k, k2 },
       q: {
         format: 'ne',
         stem,
         answer: frac(answer),
-        traps: traps.filter((t, i, arr) => t.value !== answer && t.value > 0 && arr.findIndex((u) => u.value === t.value) === i).map((t) => ({ value: frac(t.value), trap: t.trap })),
+        traps: traps.filter((t, i, arr) => arr.findIndex((u) => u.value === t.value) === i).map((t) => ({ value: frac(t.value), trap: t.trap })),
         explanation,
       },
     };
@@ -866,6 +868,7 @@ Do not forget to count ${p1}, and add back the ${c} people who left.`;
 
 $\\frac{${a}}{${b}} = ${segs}$ counts the gaps between posts, not the posts.`;
     }
+    if (traps.some((t) => t.value === answer)) return linePosition.generate(rng, diff);
     return {
       params: { kind, a, b, c },
       q: {
@@ -873,7 +876,7 @@ $\\frac{${a}}{${b}} = ${segs}$ counts the gaps between posts, not the posts.`;
         stem,
         answer: frac(answer),
         suffix,
-        traps: traps.filter((t) => t.value !== answer).map((t) => ({ value: frac(t.value), trap: t.trap })),
+        traps: traps.map((t) => ({ value: frac(t.value), trap: t.trap })),
         explanation,
       },
     };

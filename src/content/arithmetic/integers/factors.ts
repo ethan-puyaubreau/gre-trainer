@@ -647,7 +647,7 @@ const squareMultiplier: Template<MultParams> = {
       k = fac.reduce((s, [p, e]) => s * p ** ((power - (e % power)) % power), 1);
       const rad = fac.reduce((s, [p]) => s * p, 1);
       if (k === 1 || N > (diff === 1 ? 150 : 3000) || N < 12 || (diff === 1 && k > 40)) continue;
-      if (diff >= 2 && (k === rad || k === N)) continue; // make the shortcut answers wrong
+      if (k === rad || k === (power === 2 ? N : N * N)) continue; // the shortcut answers must be wrong
       if (k > 500) continue;
       break;
     }
@@ -669,8 +669,8 @@ const squareMultiplier: Template<MultParams> = {
     const bigK = power === 2 ? N : N * N; // always works, never least here
     const traps = [
       ...(bigK <= 1e7 ? [{ value: frac(bigK), trap: 'int-least-multiplier' }] : []),
-      ...(rad !== k ? [{ value: frac(rad), trap: 'int-least-multiplier' }] : []),
-    ].filter((t) => !t.value.eq(k));
+      { value: frac(rad), trap: 'int-least-multiplier' },
+    ];
     const bigText = power === 2 ? `Multiplying by ${plain(N)} itself` : `Multiplying by $${num(N)}^2$`;
     const radText = radWorks
       ? ` Multiplying by every prime factor once (${plain(rad)}) also works but is not the least.`
@@ -684,7 +684,9 @@ const squareMultiplier: Template<MultParams> = {
             ? [
                 `What is the least positive integer $k$ such that $${num(N)}k$ is the ${word} of an integer?`,
                 `What is the smallest positive integer $k$ for which $${num(N)}k$ is a perfect ${word}?`,
-              ][rng.int(0, 1)]
+                `If $k$ is the smallest positive integer such that $${num(N)}k$ is a perfect ${word}, what is $k$?`,
+                `Find the least positive integer $k$ for which $${num(N)}k$ is the ${word} of an integer.`,
+              ][rng.int(0, 3)]
             : diff === 2
               ? [
                   `If $k$ is a positive integer and $${num(N)}k$ is the ${word} of an integer, what is the least possible value of $k$?`,

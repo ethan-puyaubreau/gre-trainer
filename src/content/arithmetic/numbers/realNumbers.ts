@@ -711,7 +711,8 @@ const absValueNE: Template<AbsParams> = {
         traps.push({ value: F(strict ? 2 * b + 1 : 2 * b - 1), trap: strict ? 'counted-endpoint' : 'num-boundary-value' });
         traps.push({ value: F(strict ? b - 1 : b + 1), trap: 'num-abs-one-solution' });
       }
-      const filtered = traps.filter((t) => !t.value.eq(count));
+      if (traps.some((t) => t.value.eq(count))) return absValueNE.generate(rng, d);
+      const filtered = traps;
       return {
         params: { mode, k, a, b, strict, c: 0, e: 0 },
         q: {
@@ -737,7 +738,7 @@ The integers in this range are $${first}$ through $${last}$: $${last} - ${first 
       do {
         a = rng.int(-12, 12);
         b = rng.int(2, 15);
-      } while (a === 0 || (k === 2 && (a + b) % 2 !== 0));
+      } while (a === 0 || a === b || (k === 2 && (a + b) % 2 !== 0)); // a = b would make one solution 0, the same as the trap value
       // |kx - a| = b: x = (a + b)/k or (a - b)/k; sum = 2a/k
       const sols = [F(a + b, k), F(a - b, k)];
       const sum = sols[0].add(sols[1]);
@@ -748,7 +749,7 @@ The integers in this range are $${first}$ through $${last}$: $${last} - ${first 
           format: 'ne',
           stem: `What is the sum of all the values of $x$ that satisfy $|${inner}| = ${b}$?`,
           answer: sum,
-          traps: [{ value: sols[0], trap: 'num-abs-one-solution' }].filter((t) => !t.value.eq(sum)),
+          traps: [{ value: sols[0], trap: 'num-abs-one-solution' }],
           explanation: `$|${inner}| = ${b}$ means $${inner} = ${b}$ or $${inner} = -${b}$, so $x = ${sols[0].toTex()}$ or $x = ${sols[1].toTex()}$.
 
 The sum is $${sols[0].toTex()} + ${sols[1].toTex().startsWith('-') ? `(${sols[1].toTex()})` : sols[1].toTex()} = ${sum.toTex()}$. (The two solutions are symmetric about $${F(a, k).toTex()}$, so the sum is twice that.) Forgetting the negative case gives only $${sols[0].toTex()}$.`,
@@ -766,6 +767,7 @@ The sum is $${sols[0].toTex()} + ${sols[1].toTex().startsWith('-') ? `(${sols[1]
     const ds = xs.flatMap((x) => ys.map((y) => Math.abs(x - y)));
     const ans = ask === 'greatest' ? Math.max(...ds) : Math.min(...ds);
     const naive = Math.abs(a + b - (c + e));
+    if (naive === ans) return absValueNE.generate(rng, d);
     const fmt = (v: number, s: string) => `${s} ${v >= 0 ? '-' : '+'} ${Math.abs(v)}`;
     return {
       params: { mode, k: ask === 'least' ? -1 : 1, a, b, strict: false, c, e },
@@ -773,10 +775,10 @@ The sum is $${sols[0].toTex()} + ${sols[1].toTex().startsWith('-') ? `(${sols[1]
         format: 'ne',
         stem: `If $|${fmt(a, 'x')}| = ${b}$ and $|${fmt(c, 'y')}| = ${e}$, what is the ${ask} possible value of $|x - y|$?`,
         answer: F(ans),
-        traps: naive !== ans ? [{ value: F(naive), trap: 'num-abs-one-solution' }] : [],
+        traps: [{ value: F(naive), trap: 'num-abs-one-solution' }],
         explanation: `$x = ${xs[0]}$ or $x = ${xs[1]}$, and $y = ${ys[0]}$ or $y = ${ys[1]}$. The four distances $|x - y|$ are ${ds.join(', ')}.
 
-The ${ask} is ${ans}. Using only $x = ${xs[1]}$ and $y = ${ys[1]}$ gives ${naive}${naive === ans ? ', which happens to be right here, but the other cases must be checked' : ''}.`,
+The ${ask} is ${ans}. Using only $x = ${xs[1]}$ and $y = ${ys[1]}$ gives ${naive}, which is not the ${ask} of the four.`,
       },
     };
   },

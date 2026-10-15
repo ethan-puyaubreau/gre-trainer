@@ -681,7 +681,8 @@ const tickMarks: Template<TickParams> = {
     const fractionBoxes = style === 'fraction' || !P.isTerminating();
     const s2 = b.sub(a).div(m + 1);
     const P2 = a.add(s2.mul(ip - ia));
-    const trapOk = !P2.eq(P) && (fractionBoxes || P2.isTerminating());
+    if (P2.eq(P)) return tickMarks.generate(rng, d); // counting marks instead of intervals would give the same point: draw again
+    const trapOk = fractionBoxes || P2.isTerminating();
     const fmt = (x: Frac) => coordTex(x, style);
     const figure: NumberLineFigure = {
       kind: 'numberLine',

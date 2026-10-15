@@ -310,7 +310,7 @@ A product of radicals is the root of the product: $\\sqrt{a} \\cdot \\sqrt{b} = 
       coefs = rng.sample([1, 2, 3, 4, 5, 6], n);
       signs = coefs.map((_, i) => (i === 0 ? 1 : rng.chance(0.4) ? -1 : 1));
       k = coefs.reduce((s, c, i) => s + signs[i] * c, 0);
-    } while (Math.abs(k) <= 1);
+    } while (Math.abs(k) <= 1 || coefs.reduce((acc, c) => acc + c * c, 0) === k * k);
     const radicands = coefs.map((c) => c * c * r);
     const value = k * k * r;
     const naive = radicands.reduce((s, x) => s + x, 0);

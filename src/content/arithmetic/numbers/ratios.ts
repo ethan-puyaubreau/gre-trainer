@@ -126,8 +126,9 @@ const fractionThenRatio: Template<FTRParams> = {
     const whole = (N * (ask === 2 ? r : s)) / (r + s);
     const wrongPart = ask === 2 ? g3 : g2;
     const traps: { value: Frac; trap: string }[] = [];
-    if (Number.isInteger(whole) && whole !== ans) traps.push({ value: F(whole), trap: 'num-ratio-whole' });
-    if (wrongPart !== ans) traps.push({ value: F(wrongPart), trap: 'num-ratio-wrong-part' });
+    if (wrongPart === ans || (Number.isInteger(whole) && whole === ans)) return fractionThenRatio.generate(rng, d); // a slip that gives the right answer is no trap
+    if (Number.isInteger(whole)) traps.push({ value: F(whole), trap: 'num-ratio-whole' });
+    traps.push({ value: F(wrongPart), trap: 'num-ratio-wrong-part' });
     const Ntext = ctx.money ? usd(N) : plain(N);
     const f = F(a, b).toTex();
     const stem = `${ctx.text(Ntext, `$${f}$`, relText(ctx, r, s))} ${ctx.ask(ctx.names[ask - 1])}`;
@@ -359,6 +360,7 @@ const ratioChange: Template<RCParams> = {
       const traps: { value: Frac; trap: string }[] = [{ value: F(m), trap: 'num-ratio-parts' }];
       if (ask === 'changed-after') traps.push({ value: F(p * m), trap: 'num-before-after' });
       if (ask === 'total-before') traps.push({ value: F(g1 + g2), trap: 'num-before-after' });
+      if (traps.some((t) => t.value.eq(ans))) continue; // a slip that gives the right answer is no trap
       const [n1, n2] = ctx.g;
       const event = change > 0 ? ctx.join(change) : ctx.leave(-change);
       const question =
@@ -374,7 +376,7 @@ const ratioChange: Template<RCParams> = {
           stem: `${ctx.where}, the ratio of the number of ${n1} to the number of ${n2} is ${p} to ${q}. If ${event}, the ratio of ${n1} to ${n2} becomes ${r} to ${s}. (No other changes are made.) ${question}`,
           answer: F(ans),
           suffix: ask === 'other' ? ctx.unit[1] : ask === 'changed-after' ? ctx.unit[0] : `${n1} and ${n2}`,
-          traps: traps.filter((t) => !t.value.eq(ans)),
+          traps,
           explanation: `Write the counts with one unknown: ${n1} $= ${cm(p)}$ and ${n2} $= ${cm(q)}$. After the change, $\\frac{${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}}{${cm(q)}} = ${s === 1 ? r : `\\frac{${r}}{${s}}`}$, so ${s === 1 ? `$${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)} = ${cm(r * q)}$` : `$${s}(${cm(p)} ${change > 0 ? '+' : '-'} ${Math.abs(change)}) = ${cm(r * q)}$, that is, $${cm(s * p)} ${change > 0 ? '+' : '-'} ${s * Math.abs(change)} = ${cm(r * q)}$`}, which gives $m = ${m}$.
 
 So there were ${p * m} ${n1} and ${q * m} ${n2}${ask === 'changed-after' ? `, and after the change there are ${plural(g1, ctx.sing[0], n1)}` : ''}. Check: $${g1} : ${g2} = ${r} : ${s}$. The answer is ${ans}, not $m = ${m}$ (the size of one part).`,

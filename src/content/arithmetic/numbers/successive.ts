@@ -327,7 +327,8 @@ const overallNE: Template<OVParams> = {
         const paid = F(P0).mul(mult(-disc)).mul(mult(tax));
         if (!paid.mul(100).isInt()) continue;
         const naive = paid.div(mult(tax - disc));
-        const traps = naive.isTerminating() && !naive.eq(P0) ? [{ value: naive, trap: 'num-add-percents' }] : [];
+        if (!naive.isTerminating() || naive.eq(P0)) continue;
+        const traps = [{ value: naive, trap: 'num-add-percents' }];
         return {
           params: { mode, changes: [-disc, tax], paid },
           q: {
@@ -352,6 +353,7 @@ Do not combine the two changes into a single ${Math.abs(tax - disc)}% ${tax > di
     const added = 100 + a + b;
     if (mode === 'percent-of') {
       const ans = m.mul(100);
+      if (ans.eq(added)) return overallNE.generate(rng, d);
       return {
         params: { mode, changes: [a, b], paid: F(0) },
         q: {
@@ -359,7 +361,7 @@ Do not combine the two changes into a single ${Math.abs(tax - disc)}% ${tax > di
           stem: `The price of a ${item} was ${changeWord(a)} by ${Math.abs(a)}%, and then the new price was ${changeWord(b)} by ${Math.abs(b)}%. The final price was what percent of the original price?`,
           answer: ans,
           suffix: '%',
-          traps: ans.eq(added) ? [] : [{ value: F(added), trap: 'num-add-percents' }],
+          traps: [{ value: F(added), trap: 'num-add-percents' }],
           explanation: `Multiply the multipliers: $${dec(mult(a))} \\times ${dec(mult(b))} = ${dec(m)}$, so the final price is $${dec(ans)}\\%$ of the original.
 
 Adding the percents gives ${added}%, which ignores that the second change is applied to the new price.`,
@@ -370,6 +372,7 @@ Adding the percents gives ${added}%, which ignores that the second change is app
     if (net.sign() === 0) return overallNE.generate(rng, d);
     const up = net.sign() > 0;
     const naive = Math.abs(a + b);
+    if (naive === 0 || net.abs().eq(naive)) return overallNE.generate(rng, d); // adding the percents would be right (or zero): draw again
     return {
       params: { mode, changes: [a, b], paid: F(0) },
       q: {
@@ -377,7 +380,7 @@ Adding the percents gives ${added}%, which ignores that the second change is app
         stem: `The number of ${group} ${changeWord(a)} by ${Math.abs(a)}% in one year and then ${changeWord(b)} by ${Math.abs(b)}% the next year. Over the two years, by what percent did the number ${up ? 'increase' : 'decrease'}?`,
         answer: net.abs(),
         suffix: '%',
-        traps: naive !== 0 && !net.abs().eq(naive) ? [{ value: F(naive), trap: 'num-add-percents' }] : [],
+        traps: [{ value: F(naive), trap: 'num-add-percents' }],
         explanation: `Overall multiplier: $${dec(mult(a))} \\times ${dec(mult(b))} = ${dec(m)}$. The number is $${dec(m.mul(100))}\\%$ of the original, so it ${up ? 'increased' : 'decreased'} by $${dec(net.abs())}\\%$.
 
 Adding the percents gives ${a + b > 0 ? 'an increase' : 'a decrease'} of ${naive}%, but the second change applies to the new number, not the original.`,
