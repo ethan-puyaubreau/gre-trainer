@@ -1,7 +1,7 @@
 import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { num, ordinal } from '../../../engine/tex';
-import { term } from '../../../engine/text';
+import { plural, term } from '../../../engine/text';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { choiceValuesMatch, expectMcm, expectMcs, expectNe, expectQc, qcEnd, trapChoices, uniqueIndex } from './util';
 
@@ -42,11 +42,13 @@ const nthTerm: Template<NthParams> = {
           stem: `In a sequence, the first term is $${num(a1)}$ and each term after the first is ${diffWords(dd)} the preceding term. What is the ${ordinal(n)} term of the sequence?`,
           answer: frac(ans),
           traps: [{ value: frac(a1 + n * dd), trap: 'algw-seq-off-by-one' }],
-          explanation: `Going from the 1st term to the ${ordinal(n)} term takes ${n - 1} steps of $${num(dd)}$, not ${n}:
+          explanation: `The same amount is added each time, so this is an arithmetic sequence and the ${ordinal(n)} term needs one step fewer than its position. Going from the 1st term to the ${ordinal(n)} term takes ${n - 1} steps of $${num(dd)}$, not ${n}:
 
 $$${sub(n)} = ${num(a1)} + (${n} - 1)(${num(dd)}) = ${num(a1)} ${dd * (n - 1) < 0 ? '-' : '+'} ${num(Math.abs(dd * (n - 1)))} = ${num(ans)}$$
 
-Using ${n} steps gives $${num(a1 + n * dd)}$, one step too far.`,
+Check: the 2nd term needs 1 step, not 2, which is why the count is the position minus 1.
+
+Trap: using ${n} steps gives $${num(a1 + n * dd)}$, one step too far. Rule: the $n$th term is $a_1 + (n - 1)d$.`,
         },
       };
     }
@@ -79,11 +81,13 @@ Using ${n} steps gives $${num(a1 + n * dd)}$, one step too far.`,
           stem: `In the sequence $a_1, a_2, a_3, \\ldots$, each term after the first is obtained by adding the same constant to the preceding term. If $${sub(m)} = ${num(am)}$ and $${sub(n)} = ${num(an)}$, what is the value of $${sub(k)}$?`,
           answer: frac(ak),
           traps: traps.filter((t) => !t.value.eq(ak)),
-          explanation: `From $${sub(m)}$ to $${sub(n)}$ there are $${n} - ${m} = ${n - m}$ steps, so the constant is $\\frac{${num(an)} - ${am < 0 ? `(${num(am)})` : num(am)}}{${n - m}} = ${num(dd)}$.
+          explanation: `Two terms of an arithmetic sequence fix the constant: count the steps between them. From $${sub(m)}$ to $${sub(n)}$ there are $${n} - ${m} = ${n - m}$ steps, so the constant is $\\frac{${num(an)} - ${am < 0 ? `(${num(am)})` : num(am)}}{${n - m}} = ${num(dd)}$.
 
 From $${sub(n)}$ to $${sub(k)}$ there are $${k} - ${n} = ${k - n}$ steps: $${sub(k)} = ${num(an)} ${(k - n) * dd < 0 ? '-' : '+'} ${num(Math.abs((k - n) * dd))} = ${num(ak)}$.
 
-Count steps (differences of positions), not terms: dividing by ${n - m + 1} instead of ${n - m} gives the wrong constant.`,
+Check: from $${sub(m)} = ${num(am)}$ with constant $${num(dd)}$, the term $${sub(k)}$ is ${plural(Math.abs(k - m), 'step')} ${k > m ? 'later' : 'earlier'}, and $${num(am)} ${k > m ? '+' : '-'} ${Math.abs(k - m)}(${num(dd)}) = ${num(ak)}$.
+
+Trap: dividing by ${n - m + 1} instead of ${n - m} counts terms, not steps, and gives the wrong constant. Rule: steps = difference of positions.`,
         },
       };
     }
@@ -125,11 +129,13 @@ Count steps (differences of positions), not terms: dividing by ${n - m + 1} inst
         stem: `In the sequence $a_1, a_2, a_3, \\ldots$, each term after the first is equal to the preceding term multiplied by a constant $r$.${cond} If $${sub(m)} = ${num(am)}$ and $${sub(n)} = ${num(an)}$, what is the value of $${sub(k)}$?`,
         answer: ak,
         traps: traps.filter((t) => !t.value.eq(ak)),
-        explanation: `From $${sub(m)}$ to $${sub(n)}$ the term is multiplied by $r$ ${steps} times: $r^{${steps}} = ${am.eq(1) ? '' : `\\frac{${num(an)}}{${num(am)}} = `}${num(an.div(am))}$, so $r = ${num(r)}$${evenSteps ? ' (the sign is fixed by the given condition)' : ''}.
+        explanation: `Each term is the previous one times the same $r$, so the ratio of two terms is a power of $r$. From $${sub(m)}$ to $${sub(n)}$ the term is multiplied by $r$ ${steps} times: $r^{${steps}} = ${am.eq(1) ? '' : `\\frac{${num(an)}}{${num(am)}} = `}${num(an.div(am))}$, so $r = ${num(r)}$${evenSteps ? ' (the sign is fixed by the given condition)' : ''}.
 
 Then $${sub(k)} = ${sub(n)} \\cdot ${k - n === 1 ? 'r' : `r^{${k - n}}`} = ${num(an)} \\cdot ${(r.sign() < 0 || !r.isInt() ? `\\left(${num(r)}\\right)` : num(r)) + (k - n === 1 ? '' : `^{${k - n}}`)} = ${num(ak)}$.
 
-The terms are multiplied, not increased by a constant, so do not use differences.`,
+Check: $${sub(m)} \\cdot r^{${steps}} = ${num(am)} \\cdot ${num(r.pow(steps))} = ${num(an)}$, which matches the given term.
+
+Trap: ${arithGuess.isTerminating() ? `adding a constant, as in an arithmetic sequence, would give $${num(arithGuess)}$. ` : ''}The terms are multiplied, not increased by a constant. Rule: in a geometric sequence, $\\frac{a_n}{a_m} = r^{n-m}$.`,
       },
     };
   },
@@ -233,9 +239,13 @@ const recursiveSeq: Template<RecParams> = {
             stem: `The sequence $a_1, a_2, a_3, \\ldots$ is defined by $a_1 = ${num(a1)}$ and $a_n = ${linRule(p, q)}$ for all $n > 1$. What is the value of $${sub(k)}$?`,
             answer: frac(ans),
             traps,
-            explanation: `Apply the rule one term at a time, multiplying first and then ${q < 0 ? 'subtracting' : 'adding'} ${Math.abs(q)}: ${steps}.
+            explanation: `Each term is built from the one before it, so compute the terms in order. Apply the rule one term at a time, multiplying first and then ${q < 0 ? 'subtracting' : 'adding'} ${Math.abs(q)}: ${steps}.
 
-So $${sub(k)} = ${num(ans)}$. Count carefully: $${sub(k)}$ needs ${k - 1} applications of the rule.`,
+So $${sub(k)} = ${num(ans)}$. Count carefully: $${sub(k)}$ needs ${k - 1} applications of the rule.
+
+Check: the rule applied to $${sub(k - 1)} = ${num(seq[k - 2])}$ gives $${p === 1 ? '' : p === -1 ? '-' : p}(${num(seq[k - 2])}) ${q < 0 ? '-' : '+'} ${Math.abs(q)} = ${num(ans)}$.
+
+Trap: stopping one term early leaves $${num(seq[k - 2])}$, going one term too far reaches $${num(seq[k])}$, and adding ${Math.abs(q)} before multiplying gives $${num(wrong[k - 1])}$. Rule: multiply first, then add, one term at a time.`,
           },
         };
       }
@@ -269,12 +279,16 @@ So $${sub(k)} = ${num(ans)}$. Count carefully: $${sub(k)}$ needs ${k - 1} applic
             stem: `In the sequence $a_1, a_2, a_3, \\ldots$, $a_1 = ${num(a1)}$, $a_2 = ${num(a2)}$, and $a_n = ${ruleTex}$ for all $n \\ge 3$. What is the value of $${sub(k)}$?`,
             answer: frac(ans),
             traps,
-            explanation: `Each term uses the two terms before it. Listing the terms: $${seq
+            explanation: `Each term uses the two terms before it, so list the terms in order until you reach the one asked for. Listing the terms: $${seq
               .slice(0, k)
               .map((x, i) => `${sub(i + 1)} = ${num(x)}`)
               .join(',\\ ')}$.
 
-So $${sub(k)} = ${num(ans)}$.`,
+So $${sub(k)} = ${num(ans)}$.
+
+Check: apply the rule once more to the two terms just before it. $${sub(k)} = ${u === 1 ? '' : u === -1 ? '-' : u}(${num(seq[k - 2])}) ${v < 0 ? '-' : '+'} ${Math.abs(v) === 1 ? '' : `${Math.abs(v)}`}(${num(seq[k - 3])}) = ${num(ans)}$.
+
+Trap: stopping one term early gives $${num(seq[k - 2])}$ and going one term too far gives $${num(seq[k])}$. Rule: count the terms as you list them.`,
           },
         };
       }
@@ -313,7 +327,9 @@ So $${sub(k)} = ${num(ans)}$.`,
 
 Going back from $${sub(g)} = ${num(ag)}$: ${back}.
 
-Applying the rule forward to $${sub(g)}$ gives $${sub(g + 1)} = ${num(forwardTrap)}$, a later term, not an earlier one.`,
+Check: going forward from $a_1 = ${num(a1)}$ the terms are $${seq.map((x) => num(x)).join(' \\to ')}$, which ends at the given $${num(ag)}$.
+
+Trap: applying the rule forward to $${sub(g)}$ gives $${sub(g + 1)} = ${num(forwardTrap)}$, a later term, not an earlier one.${w.isTerminating() ? ` Dividing before undoing the ${q < 0 ? 'subtraction' : 'addition'} gives $${num(w)}$.` : ''} Rule: undo the last operation first.`,
           },
         };
       }
@@ -327,6 +343,10 @@ Applying the rule forward to $${sub(g)}$ gives $${sub(g + 1)} = ${num(forwardTra
     } while (a1 === a2 || (a1 + a2) % 2 === 0);
     const k = rng.int(5, 8);
     const ans = frac(a1 + a2, 2);
+    // slip: average only the two previous terms each time
+    const w = [frac(a1), frac(a2)];
+    while (w.length < k) w.push(w[w.length - 1].add(w[w.length - 2]).div(2));
+    const slip = w[k - 1];
     return {
       params: { ...base, kind: 'mean', start: [a1, a2], target: k },
       q: {
@@ -336,16 +356,14 @@ Applying the rule forward to $${sub(g)}$ gives $${sub(g + 1)} = ${num(forwardTra
 Give your answer as a fraction.`,
         answer: ans,
         fractionBoxes: true,
-        traps: (() => {
-          const w = [frac(a1), frac(a2)];
-          while (w.length < k) w.push(w[w.length - 1].add(w[w.length - 2]).div(2));
-          return w[k - 1].eq(ans) ? [] : [{ value: w[k - 1], trap: 'algw-mean-two-terms' }];
-        })(),
+        traps: [{ value: slip, trap: 'algw-mean-two-terms' }],
         explanation: `The 3rd term is $\\frac{${num(a1)} + ${a2 < 0 ? `(${num(a2)})` : num(a2)}}{2} = ${num(ans)}$.
 
 Adding a number equal to the current mean does not change the mean, so the 4th term is again $${num(ans)}$, and so is every term after it. The ${ordinal(k)} term is $${num(ans)}$.
 
-No long computation is needed: once a term equals the mean of everything before it, the sequence is constant from then on.`,
+Check: the 4th term is $\\frac{${num(a1)} + ${a2 < 0 ? `(${num(a2)})` : num(a2)} + ${ans.sign() < 0 ? `(${num(ans)})` : num(ans)}}{3} = ${num(ans)}$.
+
+Trap: averaging only the two previous terms, instead of all the terms before, gives $${num(slip)}$ for the ${ordinal(k)} term. Rule: once a term equals the mean of everything before it, the sequence is constant from then on.`,
       },
     };
   },
@@ -431,7 +449,11 @@ const seqCompareQC: Template<SeqQcParams> = {
           traps,
           explanation: `The first term is unknown, but it cancels in a difference: from $${sub(n)}$ to $${sub(m)}$ there are $${m} - ${n} = ${m - n}$ steps of $${num(dd)}$, so $${sub(m)} - ${sub(n)} = ${m - n}(${num(dd)}) = ${num(exact)}$.
 
-Compare $${num(exact)}$ with $${num(N)}$. ${qcEnd(answer)}`,
+Check: every sequence with this constant has the same difference, whatever its first term.
+
+Compare $${num(exact)}$ with $${num(N)}$. ${qcEnd(answer)}
+
+Trap: counting ${m - n + 1} steps, the terms from ${n} to ${m} inclusive, gives $${num(trapV)}$ instead of $${num(exact)}$. Rule: steps = difference of positions.`,
         },
       };
     }
@@ -463,7 +485,9 @@ Quantity A minus Quantity B is $${dd} - a_1$. ${
                 : `Since $a_1 < ${dd}$, it is positive. ${qcEnd('A')}`
           }
 
-Doubling the position does not double the term: the first term gets in the way.`,
+${cons === 'none' ? `Two cases: for $a_1 = 0$ the difference is $${dd}$, so Quantity A is greater; for $a_1 = ${2 * dd}$ it is $-${dd}$, so Quantity B is greater.` : `Check: for $a_1 = ${cons === 'gt' ? dd + 1 : dd - 1}$ the difference is $${cons === 'gt' ? -1 : 1}$, ${cons === 'gt' ? 'negative' : 'positive'} as claimed.`}
+
+Trap: doubling the position does not double the term, because the first term gets in the way. Rule: write both quantities in terms of $a_1$ and $d$ before comparing.`,
         },
       };
     }
@@ -487,10 +511,16 @@ Doubling the position does not double the term: the first term gets in the way.`
           answer,
           traps,
           explanation: off
-            ? `Let the constant be $d$. Then $${sub(lo)} = ${num(V)} - ${term(j, 'd')}$ and $${sub(hi)} = ${num(V)} + ${term(j + 1, 'd')}$, so $${sub(lo)} + ${sub(hi)} = ${num(2 * V)} + d$, which depends on $d$: it equals $${num(2 * V)}$ only if $d = 0$. ${qcEnd('D')}`
+            ? `Let the constant be $d$. Then $${sub(lo)} = ${num(V)} - ${term(j, 'd')}$ and $${sub(hi)} = ${num(V)} + ${term(j + 1, 'd')}$, so $${sub(lo)} + ${sub(hi)} = ${num(2 * V)} + d$, which depends on $d$: it equals $${num(2 * V)}$ only if $d = 0$. Two cases: for $d = 0$ the sum is $${num(2 * V)}$, equal to ${N === 2 * V ? 'Quantity B' : `$${num(2 * V)}$`}; for $d = 2$ it is $${num(2 * V + 2)}$, larger. ${qcEnd('D')}
+
+Trap: the two terms are not the same distance from $${sub(k)}$, so the constant no longer cancels. Rule: terms equally far on both sides of a known term add to twice that term.`
             : `Let the constant be $d$. Terms equally far from $${sub(k)}$ balance: $${sub(lo)} = ${num(V)} - ${term(j, 'd')}$ and $${sub(hi)} = ${num(V)} + ${term(j, 'd')}$, so $${sub(lo)} + ${sub(hi)} = 2(${num(V)}) = ${num(2 * V)}$ whatever $d$ is.
 
-Compare $${num(2 * V)}$ with $${num(N)}$. ${qcEnd(answer)}`,
+Check: for $d = 2$ the terms are $${num(V - 2 * j)}$ and $${num(V + 2 * j)}$, which still add to $${num(2 * V)}$.
+
+Compare $${num(2 * V)}$ with $${num(N)}$. ${qcEnd(answer)}
+
+Trap: do not try values of $d$ one by one when the quantity does not depend on $d$. Rule: terms equally far on both sides of a known term add to twice that term.`,
         },
       };
     }
@@ -517,7 +547,11 @@ Compare $${num(2 * V)}$ with $${num(N)}$. ${qcEnd(answer)}`,
           traps,
           explanation: `Going from $${sub(n)}$ to $${sub(m)}$ multiplies by $${r}$ a total of $${m} - ${n} = ${gap}$ times, so $\\frac{${sub(m)}}{${sub(n)}} = ${rT}^{${gap}} = ${num(exact)}$, whatever $a_1$ is.
 
-Compare $${num(exact)}$ with $${num(N)}$. ${qcEnd(answer)}`,
+Check: with $a_1 = 1$ the terms are $${Array.from({ length: gap + 1 }, (_, i) => num(r ** i)).join(', ')}$, and the last divided by the first is $${num(exact)}$.
+
+Compare $${num(exact)}$ with $${num(N)}$. ${qcEnd(answer)}
+
+Trap: using ${gap + 1} factors of $${r}$ instead of ${gap} gives $${num(trapV)}$. Rule: the ratio of two terms is $r$ to the power of the difference of their positions.`,
         },
       };
     }
@@ -546,7 +580,11 @@ ${
             : cons === 'pos'
               ? `The terms are positive, so multiplying by ${r ** (m - n)} makes $${sub(m)}$ larger. ${qcEnd('A')}`
               : `The terms are negative, so multiplying by ${r ** (m - n)} moves $${sub(m)}$ farther below 0: it is smaller. ${qcEnd('B')}`
-        }`,
+        }
+
+${cons === 'none' ? '' : `Check: with $a_1 = ${cons === 'pos' ? 1 : -1}$ the terms are $${num((cons === 'pos' ? 1 : -1) * r ** (n - 1))}$ and $${num((cons === 'pos' ? 1 : -1) * r ** (m - 1))}$, in that order.
+
+`}Trap: multiplying by a number above 1 does not always make a term larger; it does only when the terms are positive. Rule: for a ratio above 1, positive terms grow and negative terms fall.`,
       },
     };
   },
@@ -804,6 +842,8 @@ const sequenceSum: Template<SumParams> = {
     let traps: { value: Frac; trap: string }[] = [];
     let stem: string;
     let explanation: string;
+    let check: string;
+    let rule: string;
     let params: SumParams;
     if (kind === 'first-n') {
       const a1 = rng.int(1, 12);
@@ -825,7 +865,9 @@ const sequenceSum: Template<SumParams> = {
       params = { ...base, a1, d: dd, from: 1, to: n };
       const shown = [0, 1, 2, 3].map((i) => num(a1 + i * dd)).join(', ');
       stem = `What is the sum of the first ${n} terms of the sequence $${shown}, \\ldots$, in which each term after the first is ${dd} more than the preceding term?`;
-      explanation = `The ${ordinal(n)} term is $${a1} + ${n - 1}(${dd}) = ${last}$. The terms are evenly spaced, so their average is the average of the first and last terms, $\\frac{${a1} + ${last}}{2} = ${num(frac(a1 + last, 2))}$.
+      check = `the same method on only the first two terms, $${a1}$ and $${a1 + dd}$, gives $2 \\times ${num(frac(2 * a1 + dd, 2))} = ${2 * a1 + dd} = ${a1} + ${a1 + dd}$.`;
+      rule = 'sum = number of terms $\\times$ average of the first and last terms.';
+      explanation = `Evenly spaced terms form an arithmetic sequence, so find the last term first. The ${ordinal(n)} term is $${a1} + ${n - 1}(${dd}) = ${last}$. The terms are evenly spaced, so their average is the average of the first and last terms, $\\frac{${a1} + ${last}}{2} = ${num(frac(a1 + last, 2))}$.
 
 Sum $= ${n} \\times ${num(frac(a1 + last, 2))} = ${num(correct)}$.`;
     } else if (kind === 'range') {
@@ -849,7 +891,9 @@ Sum $= ${n} \\times ${num(frac(a1 + last, 2))} = ${num(correct)}$.`;
       ].filter((t) => t.value.isInt());
       params = { ...base, p, c, from, to };
       stem = `The sequence $a_1, a_2, a_3, \\ldots$ is defined by $a_k = ${p}k ${c < 0 ? '-' : '+'} ${Math.abs(c)}$ for all positive integers $k$. What is the sum of the terms from $${sub(from)}$ to $${sub(to)}$, inclusive?`;
-      explanation = `$${sub(from)} = ${term(from)}$ and $${sub(to)} = ${term(to)}$. From term ${from} to term ${to} there are $${to} - ${from} + 1 = ${count}$ terms, evenly spaced (each ${p} more than the one before).
+      check = `the first and last terms are $${count - 1}$ steps of ${p} apart, since $${term(to)} - ${term(from)} = ${(count - 1) * p}$, which confirms ${count} terms.`;
+      rule = 'count the terms as last position $-$ first position $+ 1$, then use count $\\times$ average of the ends.';
+      explanation = `A linear formula gives evenly spaced terms, so count them, then use their average. $${sub(from)} = ${term(from)}$ and $${sub(to)} = ${term(to)}$. From term ${from} to term ${to} there are $${to} - ${from} + 1 = ${count}$ terms, evenly spaced (each ${p} more than the one before).
 
 Sum $= ${count} \\times \\frac{${term(from)} + ${term(to)}}{2} = ${num(correct)}$.`;
     } else {
@@ -872,7 +916,9 @@ Sum $= ${count} \\times \\frac{${term(from)} + ${term(to)}}{2} = ${num(correct)}
       ].filter((t) => t.value.isInt());
       params = { ...base, a1, r, from: 1, to: n };
       stem = `In the sum $${seq.slice(0, 3).map((x) => num(x)).join(' + ')} + \\cdots + ${num(last)}$, each term after the first is ${r} times the preceding term. What is the value of the sum?`;
-      explanation = `First count the terms: $${num(last)} = ${a1 === 1 ? '' : `${a1} \\cdot `}${r}^{${n - 1}}$, so there are ${n} terms: $${seq.map((x) => num(x)).join(' + ')}$.
+      check = `neighbouring terms keep the ratio ${r}, for example $${num(seq[1])} \\div ${num(seq[0])} = ${r}$, and the list ends at $${num(last)}$.`;
+      rule = 'count the terms by powers of the ratio, then add them or use the geometric-sum formula.';
+      explanation = `Each term is a multiple of the one before, so this is a geometric sum: count the terms, then add them. First count the terms: $${num(last)} = ${a1 === 1 ? '' : `${a1} \\cdot `}${r}^{${n - 1}}$, so there are ${n} terms: $${seq.map((x) => num(x)).join(' + ')}$.
 
 Adding them gives $${num(correct)}$. (Shortcut: $${a1 === 1 ? '' : a1}${a1 === 1 ? '' : '\\cdot'}\\frac{${r}^{${n}} - 1}{${r} - 1} = ${num(correct)}$.)`;
     }
@@ -893,7 +939,9 @@ Adding them gives $${num(correct)}$. (Shortcut: $${a1 === 1 ? '' : a1}${a1 === 1
     params.values = res.values;
     return { params, q: { format: 'mcs', stem, choices: res.choices, answer: res.answer, explanation: `${explanation}
 
-Trap: $${num(cited.value)}$ comes from ${WHY[cited.trap]}.` } };
+Check: ${check}
+
+Trap: $${num(cited.value)}$ comes from ${WHY[cited.trap]}; it is $${num(cited.value.sub(correct).abs())}$ away from the true sum $${num(correct)}$. Rule: ${rule}` } };
   },
   check(q, prm) {
     const err = choiceValuesMatch(q, prm.values, fmtN);
