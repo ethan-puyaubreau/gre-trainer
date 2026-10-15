@@ -60,7 +60,7 @@ const cmp = (x: number, y: number): QCChoice => (Math.abs(x - y) < 1e-9 * Math.m
 const dc = (x: number) => (Number.isInteger(x) ? String(x) : Number(x.toFixed(2)).toString());
 const fx = (n: number, d: number) => {
   const f = new Frac(n, d);
-  return f.isInt() ? f.toTex() : `${f.toTex()} \approx ${dc(n / d)}`;
+  return f.isInt() ? f.toTex() : `${f.toTex()} \\approx\\ ${dc(n / d)}`;
 };
 
 /** Geometry for check(): AB on top (length a), CD at the bottom (length b), offset x0, height h. */
@@ -188,7 +188,7 @@ const trapezoid: Template<Params> = {
       if (wl !== answer) wrong[wl] = 'geo-sim-diag-area-linear';
       const half = cmp(2 * S + 2 * S, N);
       if (half !== answer && !(half in wrong)) wrong[half] = 'geo-sim-diag-midpoint';
-      why = `${sim}${eqNote} Area scales with the square of the ratio: triangle $${nA}${nB}E$ has area $${S} \\cdot (\\frac{${a}}{${b}})^2 = ${dc((S * a * a) / (b * b))}$. Each side triangle has area $${S} \\cdot \\frac{${a}}{${b}} = ${dc((S * a) / b)}$ (the same for both, the geometric mean of the two similar areas). Total: $${fx(S * (a + b) * (a + b), b * b)}$.`;
+      why = `${sim}${eqNote} Area scales with the square of the ratio: triangle $${nA}${nB}E$ has area $${S} \\cdot (\\frac{${a}}{${b}})^2 = ${fx(S * a * a, b * b)}$. Each side triangle has area $${S} \\cdot \\frac{${a}}{${b}} = ${fx(S * a, b)}$ (the same for both, the geometric mean of the two similar areas). Total: $${fx(S * (a + b) * (a + b), b * b)}$.`;
     }
     const kept = qcTraps(answer, wrong);
     const SAY: Record<string, string> = {
