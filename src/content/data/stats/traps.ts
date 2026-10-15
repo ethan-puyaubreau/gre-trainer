@@ -317,6 +317,26 @@ export const statsTraps: Record<string, Trap> = {
     label: 'Compared raw distances from the mean instead of standard units',
     fix: 'Divide each distance from the mean by that distribution\u2019s standard deviation before comparing.',
   },
+  'stat-sd-swap-units': {
+    label: 'Matched the numbers of standard deviations with the wrong values',
+    fix: 'Write each value as mean $\\pm$ units $\\times$ SD: the value below the mean uses its own unit count, the value above uses its own.',
+  },
+  'stat-sd-half-gap': {
+    label: 'Halved the gap as if each value were one standard deviation away',
+    fix: 'The gap between the values is the sum of their unit counts times the SD ($z_1 + z_2$), not 2 standard deviations unless both counts are 1.',
+  },
+  'stat-sd-gap': {
+    label: 'Gave the gap between the two values as the standard deviation',
+    fix: 'The gap covers $z_1 + z_2$ standard deviations: divide it by that number to get one standard deviation.',
+  },
+  'stat-raw-score': {
+    label: 'Chose the greatest score',
+    fix: 'Scores on different tests are not comparable. Convert each to standard units: (score $-$ mean) $\\div$ SD.',
+  },
+  'stat-sd-divided-by-mean': {
+    label: 'Divided the gap by the mean instead of the standard deviation',
+    fix: 'Standard units divide the distance from the mean by the standard deviation, not by the mean.',
+  },
   'stat-sd-midpoint': {
     label: 'Put the mean halfway between the two values',
     fix: 'The mean is halfway only when the two values are the same number of SDs from it. Set up value = mean $\\pm$ $z \\times$ SD for both values and solve.',
@@ -328,6 +348,10 @@ export const statsTraps: Record<string, Trap> = {
   'stat-normal-one-side': {
     label: 'Used a two-sided percent for one side of the mean',
     fix: 'About 68% lie within 1 SD on both sides together; between the mean and 1 SD on one side there are only about 34%.',
+  },
+  'stat-normal-missed-region': {
+    label: 'Left out a region that is inside the range',
+    fix: 'List every region between the two values on the figure and add all of their percents, including the tail beyond the last tick mark when the range is open.',
   },
   'stat-normal-complement': {
     label: 'Found the percent outside the range instead of inside',

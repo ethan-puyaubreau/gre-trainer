@@ -1,7 +1,8 @@
-import { flaggedChoices, numericChoices, qcFromSamples } from '../../../engine/build';
+import { flaggedChoices, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { num, ordinal, plain } from '../../../engine/tex';
 import type { Choice, GeometryFigure, QCChoice, QCQuestion, TableFigure, Template } from '../../../engine/types';
+import { trapOnlyChoices } from '../prob/util';
 import { fTex, medianByRank, medianF, normalCdf, normalPercent, QC_WORDS, sortAsc } from './util';
 
 const flip = (c: QCChoice): QCChoice => (c === 'A' ? 'B' : c === 'B' ? 'A' : c);
@@ -102,10 +103,11 @@ const freqTable: Template<FreqParams> = {
         const inside = probs.slice(a, b).reduce((x, y) => x + y, 0);
         const answer = new Frac(inside, 100);
         const extra = a > 0 ? inside + probs[a - 1] : b < 5 ? inside + probs[b] : inside;
+        if (inside === 50 || extra === inside) continue; // a mistake that gives the answer is not a mistake
         const traps = [
           { value: new Frac(100 - inside, 100), trap: 'stat-interval-complement' },
           { value: new Frac(extra, 100), trap: 'stat-interval-extra' },
-        ].filter((t) => !t.value.eq(answer));
+        ];
         const ask = kind === 'between' ? `$${a} < X < ${b}$` : kind === 'greater' ? `$X > ${a}$` : `$X < ${b}$`;
         return {
           params: { mode, ...none, probs, a, b },
@@ -146,11 +148,11 @@ Check: all five probabilities add up to $1$, so the answer is also $1$ minus the
         const med = medianF(list);
         const freqMed = medianF(counts);
         const distinctMed = medianF(values);
-        if (med.eq(distinctMed) && rng.chance(0.7)) continue;
+        if (med.eq(distinctMed) || med.eq(freqMed)) continue; // a mistake that gives the answer is not a mistake
         const traps = [
           { value: freqMed, trap: 'stat-freq-as-data' },
           { value: distinctMed, trap: 'stat-freq-ignored' },
-        ].filter((t) => !t.value.eq(med));
+        ];
         const pos = N % 2 ? `the ${ordinal((N + 1) / 2)} value` : `the average of the ${ordinal(N / 2)} and ${ordinal(N / 2 + 1)} values`;
         let cum = 0;
         const cumText = values
@@ -181,7 +183,7 @@ The median is not the median of the counts ($${fTex(freqMed)}$) or of the ${k} l
       if (!mean.isTerminating() || !mean.mul(100).isInt()) continue;
       const unweighted = new Frac(values.reduce((x, y) => x + y, 0), k);
       const countsOver = new Frac(N, k);
-      if (unweighted.eq(mean)) continue;
+      if (unweighted.eq(mean) || countsOver.eq(mean)) continue; // a mistake that gives the answer is not a mistake
       return {
         params: { mode, ...none, values, counts },
         q: {
@@ -192,7 +194,7 @@ The median is not the median of the counts ($${fTex(freqMed)}$) or of the ${k} l
           traps: [
             { value: unweighted, trap: 'stat-freq-ignored' },
             { value: countsOver, trap: 'stat-freq-as-data' },
-          ].filter((t) => !t.value.eq(mean)),
+          ],
           explanation: `Multiply each value by its frequency and add: $${values.map((v, i) => `${v}(${counts[i]})`).join(' + ')} = ${num(total)}$. Divide by the number of ${ctx.who}, ${N}: $${num(total)} \\div ${N} = ${fTex(mean)}$.
 
 Averaging the ${k} listed values ($${fTex(unweighted)}$) ignores how many ${ctx.who} have each value.`,
@@ -396,34 +398,63 @@ const withinSD: Template<WithinParams> = {
       const lo = m - half;
       const hi = m + half;
       if (!Number.isInteger(lo) || lo < 0) continue;
-      const cands = new Set<number>([
-        lo - rng.int(1, 3),
-        lo + rng.int(0, 2),
-        m + rng.int(-Math.floor(half / 2), Math.floor(half / 2)),
-        hi - rng.int(0, 2),
-        hi + rng.int(1, 3),
-        rng.chance(0.5) ? m - half - s : m + half + s,
-        rng.chance(0.5) ? m + Math.round(half / 2) + 1 : m - Math.round(half / 2) - 1,
-        m + s,
-      ]);
-      const vals = [...cands].filter((v) => v >= 0);
-      if (vals.length < 6) continue;
-      const values = sortAsc(rng.sample(vals, 6));
-      const isIn = (v: number) => Math.abs(v - m) * 10 <= k10 * s;
-      const correct = (v: number) => (kind === 'within' ? isIn(v) : !isIn(v));
-      const nCorrect = values.filter(correct).length;
-      if (nCorrect < 1 || nCorrect > 5) continue;
       const kTex = fTex(new Frac(k10, 10));
-      const items: (Choice & { correct: boolean })[] = values.map((v) => {
-        let trap: string | undefined;
-        if (!correct(v)) {
-          const nearEdge = Math.abs(Math.abs(v - m) - half) <= 3;
-          if (kind === 'within') trap = nearEdge ? 'stat-sd-interval-edge' : 'stat-sd-units';
-          else if (nearEdge) trap = 'stat-sd-interval-edge';
+      const inside = (v: number) => lo <= v && v <= hi;
+      // Right values, and wrong values each with the mistake that leads to them.
+      const rights: number[] = [];
+      const wrongs: { v: number; trap: string; why: string }[] = [];
+      const addRight = (v: number) => {
+        if (v >= 0 && !rights.includes(v)) rights.push(v);
+      };
+      const addWrong = (v: number, trap: string, why: string) => {
+        if (v >= 0 && !wrongs.some((w) => Math.abs(w.v - v) <= 2)) wrongs.push({ v, trap, why }); // no neighbours
+      };
+      if (kind === 'within') {
+        addRight(lo);
+        addRight(hi);
+        addRight(m + rng.int(-Math.floor(half / 2), Math.floor(half / 2)));
+        addRight(lo + rng.int(1, 2));
+        addRight(hi - rng.int(1, 2));
+        const e1 = rng.int(1, 2);
+        const e2 = rng.int(1, 2);
+        addWrong(lo - e1, 'stat-sd-interval-edge', `$${num(lo - e1)}$ is just beyond the edge $${num(lo)}$, so it is more than $${kTex}$ standard deviations from the mean`);
+        addWrong(hi + e2, 'stat-sd-interval-edge', `$${num(hi + e2)}$ is just beyond the edge $${num(hi)}$, so it is more than $${kTex}$ standard deviations from the mean`);
+        const far = (v: number) => `$${num(v)}$ is $${num(Math.abs(v - m))}$ from the mean, but $${kTex}$ standard deviation${k10 === 10 ? ' is' : 's are'} only $${num(half)}$`;
+        addWrong(m + half + s, 'stat-sd-units', far(m + half + s));
+        addWrong(m - half - s, 'stat-sd-units', far(m - half - s));
+        const mid = Math.ceil(s / 2) + 2;
+        addWrong(m + half + mid, 'stat-sd-units', far(m + half + mid));
+        addWrong(m - half - mid, 'stat-sd-units', far(m - half - mid));
+      } else {
+        addRight(lo - rng.int(1, 3));
+        addRight(hi + rng.int(1, 3));
+        addRight(m + half + s);
+        addRight(m - half - s);
+        addRight(m + half + Math.ceil(s / 2) + 2);
+        addRight(m - half - Math.ceil(s / 2) - 2);
+        addWrong(lo, 'stat-sd-interval-edge', `$${num(lo)}$ is exactly $${kTex}$ standard deviations from the mean, not more than that`);
+        addWrong(hi, 'stat-sd-interval-edge', `$${num(hi)}$ is exactly $${kTex}$ standard deviations from the mean, not more than that`);
+        // inside, farther than k (not k standard deviations) from the mean, and clear of the edges
+        for (const sign of [-1, 1]) {
+          const dist = Math.round(half / 2) + rng.int(0, Math.max(0, Math.floor(half / 4)));
+          const v = m + sign * dist;
+          if (dist > k10 / 10 && dist < half - 2 && inside(v))
+            addWrong(v, 'stat-sd-units', `$${num(v)}$ is $${num(dist)}$ from the mean, which beats the number $${kTex}$ but is less than the $${num(half)}$ that $${kTex}$ standard deviations make`);
         }
-        return { text: `$${num(v)}$`, correct: correct(v), ...(trap ? { trap } : {}) };
+      }
+      const nWrong = Math.min(wrongs.length, rng.int(3, 4));
+      if (nWrong < 3 || rights.length < 2) continue;
+      const pickedWrong = rng.shuffle(wrongs).slice(0, nWrong);
+      const pickedRight = rng.sample(rights, Math.min(rights.length, rng.int(2, 3)));
+      const values = sortAsc([...pickedRight, ...pickedWrong.map((w) => w.v)]);
+      const correct = (v: number) => (kind === 'within' ? inside(v) : !inside(v));
+      if (values.some((v) => correct(v) === !!pickedWrong.find((w) => w.v === v))) continue;
+      const items: (Choice & { correct: boolean })[] = values.map((v) => {
+        const w = pickedWrong.find((x) => x.v === v);
+        return { text: `$${num(v)}$`, correct: !w, ...(w ? { trap: w.trap } : {}) };
       });
       const { choices, answer } = flaggedChoices(items);
+      const cite = rng.pick(pickedWrong);
       return {
         params: { m, s, k10, kind, values },
         q: {
@@ -432,11 +463,13 @@ const withinSD: Template<WithinParams> = {
           instruction: 'Indicate all such values.',
           choices,
           answer,
-          explanation: `$${kTex}$ standard deviation${k10 === 10 ? ' is' : 's are'} $${kTex} \\times ${s} = ${num(half)}$. The values within that distance of the mean are those from $${m} - ${num(half)} = ${num(lo)}$ to $${m} + ${num(half)} = ${num(hi)}$, inclusive.
+          explanation: `Turn the standard deviations into units: $${kTex}$ standard deviation${k10 === 10 ? ' is' : 's are'} $${kTex} \\times ${s} = ${num(half)}$. The values within that distance of the mean run from $${m} - ${num(half)} = ${num(lo)}$ to $${m} + ${num(half)} = ${num(hi)}$, inclusive.
 
-${kind === 'within' ? `So the values in the interval from $${num(lo)}$ to $${num(hi)}$ are the answers` : `So the answers are the values less than $${num(lo)}$ or greater than $${num(hi)}$`}: ${
-            values.filter(correct).map((v) => `$${num(v)}$`).join(', ')
-          }. Remember that the interval extends $${num(half)}$ on both sides of the mean.`,
+${kind === 'within' ? `So the values from $${num(lo)}$ to $${num(hi)}$ qualify` : `So the values below $${num(lo)}$ or above $${num(hi)}$ qualify`}: ${values.filter(correct).map((v) => `$${num(v)}$`).join(', ')}.
+
+Trap: ${cite.why}.
+
+Within $k$ standard deviations means at most $k \\times$ SD away, on both sides of the mean.`,
         },
       };
     }
@@ -483,23 +516,48 @@ const sdUnits: Template<UnitsParams> = {
     const none = { v1: 0, z1: 0, v2: 0, z2: 0, people: [] as [number, number, number][], options: [] as number[] };
     if (mode === 'compare') {
       for (;;) {
-        const people = Array.from({ length: 5 }, () => {
-          const sd = rng.int(2, 12) * (rng.chance(0.5) ? 1 : 5);
-          const mean = rng.int(10, 80) * 5;
-          const z = rng.int(-4, 12) / 4;
-          return [mean + z * sd, mean, sd] as [number, number, number];
-        });
-        if (people.some(([x]) => !Number.isInteger(x) || x <= 0)) continue;
-        const zs = people.map(([x, mu, sd]) => (x - mu) / sd);
-        const best = Math.max(...zs);
-        if (zs.filter((z) => Math.abs(z - best) < 1e-9).length > 1) continue;
-        const raw = people.map(([x, mu]) => x - mu);
-        const iRaw = raw.indexOf(Math.max(...raw));
-        const iBest = zs.indexOf(best);
-        if (iRaw === iBest && rng.chance(0.8)) continue;
+        // five students; each wrong student is the winner of one tempting rule, the right one has the greatest z
+        let found: { people: [number, number, number][]; winners: Record<string, number> } | null = null;
+        for (let tries = 0; tries < 400 && !found; tries++) {
+          const people = Array.from({ length: 5 }, () => {
+            const sd = rng.int(2, 12) * (rng.chance(0.5) ? 1 : 5);
+            const mean = rng.int(10, 80) * 5;
+            const z = rng.int(-4, 12) / 4;
+            return [mean + z * sd, mean, sd] as [number, number, number];
+          });
+          if (people.some(([x]) => !Number.isInteger(x) || x <= 0)) continue;
+          const zs = people.map(([x, mu, sd]) => (x - mu) / sd);
+          const argmax = (vals: number[]) => {
+            const best = Math.max(...vals);
+            const at = vals.flatMap((v, i) => (Math.abs(v - best) < 1e-9 ? [i] : []));
+            return at.length === 1 ? at[0] : -1;
+          };
+          const winners = {
+            best: argmax(zs),
+            'stat-sd-direction': argmax(zs.map((z) => -z)),
+            'stat-raw-score': argmax(people.map(([x]) => x)),
+            'stat-raw-distance': argmax(people.map(([x, mu]) => x - mu)),
+            'stat-sd-divided-by-mean': argmax(people.map(([x, mu]) => (x - mu) / mu)),
+          };
+          const idx = Object.values(winners);
+          if (idx.includes(-1) || new Set(idx).size < 5) continue;
+          found = { people, winners };
+        }
+        if (!found) continue;
+        const { people, winners } = found;
+        const iBest = winners.best;
         const names = rng.sample(NAMES, 5);
+        const trapOf = new Map<number, string>(Object.entries(winners).flatMap(([t, i]) => (t === 'best' ? [] : [[i, t] as [number, string]])));
         const tableRows = people.map(([x, mu, sd], i) => [names[i], `$${num(x)}$`, `$${num(mu)}$`, `$${num(sd)}$`]);
-        const choices: Choice[] = names.map((nm, i) => ({ text: nm, ...(i === iRaw && i !== iBest ? { trap: 'stat-raw-distance' } : {}) }));
+        const choices: Choice[] = names.map((nm, i) => ({ text: nm, ...(trapOf.has(i) ? { trap: trapOf.get(i)! } : {}) }));
+        const zText = (i: number) => fTex(new Frac(people[i][0] - people[i][1], people[i][2]));
+        const [tIdx, tId] = rng.pick([...trapOf.entries()]);
+        const trapWhy: Record<string, string> = {
+          'stat-sd-direction': `${names[tIdx]} is the farthest below the mean, at $${zText(tIdx)}$ standard deviations`,
+          'stat-raw-score': `${names[tIdx]} has the greatest score, $${num(people[tIdx][0])}$, but on a test with mean $${num(people[tIdx][1])}$ that is only $${zText(tIdx)}$ standard deviations above the mean`,
+          'stat-raw-distance': `${names[tIdx]} is $${num(people[tIdx][0] - people[tIdx][1])}$ above the mean, the greatest raw gap, but that test has a standard deviation of $${num(people[tIdx][2])}$, so the gap is only $${zText(tIdx)}$ standard deviations`,
+          'stat-sd-divided-by-mean': `dividing ${names[tIdx]}'s gap by the mean instead of the standard deviation ranks first, but the gap is $${zText(tIdx)}$ standard deviations`,
+        };
         return {
           params: { ...none, mode, people },
           q: {
@@ -508,10 +566,14 @@ const sdUnits: Template<UnitsParams> = {
             stem: `Five students each took a different test. The table shows each student's score, together with the mean and the standard deviation of all the scores on that student's test. Relative to the other people who took the same test, which student's score was the greatest number of standard deviations above the mean?`,
             choices,
             answer: iBest,
-            explanation: `Convert each score to standard units: (score − mean) ÷ standard deviation.
+            explanation: `Compare standard units, not raw scores: (score − mean) ÷ standard deviation.
 ${people.map(([x, mu, sd], i) => `- ${names[i]}: $(${num(x)} - ${num(mu)}) \\div ${num(sd)} = ${fTex(new Frac(x - mu, sd))}$`).join('\n')}
 
-${names[iBest]} is the greatest number of standard deviations above the mean. ${iRaw !== iBest ? `${names[iRaw]} has the largest raw difference from the mean, but that test has a larger spread.` : ''}`,
+${names[iBest]} has the greatest, $${fTex(new Frac(people[iBest][0] - people[iBest][1], people[iBest][2]))}$, so ${names[iBest]} is the greatest number of standard deviations above the mean.
+
+Trap: ${trapWhy[tId]}.
+
+Different tests have different spreads: only standard units compare them.`,
           },
         };
       }
@@ -530,36 +592,57 @@ ${names[iBest]} is the greatest number of standard deviations above the mean. ${
       const v2 = v2t / 10;
       if (d > 1 && (Number.isInteger(v1) === false || Number.isInteger(v2) === false) && rng.chance(0.7)) continue;
       const target10 = mode === 'mean' ? mu10 : s10;
-      const step = d === 1 ? 10 : 1; // choices step by 1 (easy) or by 0.1
-      const start = target10 - step * rng.int(0, 4);
-      const options = [0, 1, 2, 3, 4].map((i) => start + i * step);
-      const mid10 = (v1t + v2t) / 2;
-      const wrongS = (v2t - v1t) / Math.abs(z2 - z1 || 1);
-      const trapFor = (o: number): string | undefined => {
-        if (o === target10) return undefined;
-        if (mode === 'mean' && Math.abs(o - mid10) < 0.5) return 'stat-sd-midpoint';
-        if (mode === 'sd' && Math.abs(o - wrongS) < 0.5) return 'stat-sd-z-subtract';
-        return undefined;
-      };
-      const choices = options.map((o) => ({ text: `$${num(o / 10)}$`, ...(trapFor(o) ? { trap: trapFor(o)! } : {}) }));
-      if (options.some((o) => o <= 0)) continue;
+      const gap10 = v2t - v1t;
+      const mid10 = gap10 / 2 + v1t;
+      const sWrong10 = z1 === z2 ? NaN : gap10 / Math.abs(z2 - z1);
       const zt = (z: number) => `${fTex(frac(z * 10).div(10))} standard deviation${z === 1 ? '' : 's'}`;
+      const mk = (value10: number, trap: string, why: string) => ({ value: value10, trap, why });
+      // each wrong choice is the result of one mistake
+      const candidates =
+        mode === 'mean'
+          ? [
+              mk(mid10, 'stat-sd-midpoint', `the midpoint $${num(mid10 / 10)}$ is the mean only if both values are the same number of standard deviations away`),
+              mk(v1t + z2 * s10, 'stat-sd-swap-units', `matching the units the other way round gives $${num((v1t + z2 * s10) / 10)}$, but the lower value is ${zt(z1)} below the mean`),
+              mk(v2t - z1 * s10, 'stat-sd-swap-units', `matching the units the other way round gives $${num((v2t - z1 * s10) / 10)}$, but the upper value is ${zt(z2)} above the mean`),
+              mk(v1t + s10, 'stat-sd-units', `counting one standard deviation from the lower value gives $${num((v1t + s10) / 10)}$, but it is ${zt(z1)} below the mean`),
+              mk(v2t - s10, 'stat-sd-units', `counting one standard deviation from the upper value gives $${num((v2t - s10) / 10)}$, but it is ${zt(z2)} above the mean`),
+              ...(z1 === z2 ? [] : [mk(v1t + z1 * sWrong10, 'stat-sd-z-subtract', `subtracting the units, ${fTex(frac(Math.max(z1, z2) * 10).div(10))} − ${fTex(frac(Math.min(z1, z2) * 10).div(10))}, gives $${num((v1t + z1 * sWrong10) / 10)}$, but the values are on opposite sides of the mean`)]),
+            ]
+          : [
+              ...(z1 === z2 ? [] : [mk(sWrong10, 'stat-sd-z-subtract', `subtracting the units, ${fTex(frac(Math.max(z1, z2) * 10).div(10))} − ${fTex(frac(Math.min(z1, z2) * 10).div(10))}, gives $${num(sWrong10 / 10)}$, but the values are on opposite sides of the mean`)]),
+              mk(gap10 / 2, 'stat-sd-half-gap', `halving the gap treats each value as one standard deviation from the mean, which gives $${num(gap10 / 20)}$`),
+              mk(gap10, 'stat-sd-gap', `$${num(gap10 / 10)}$ is the whole gap between the two values, not one standard deviation`),
+              mk(z1 * s10, 'stat-sd-units', `$${num((z1 * s10) / 10)}$ is the distance from the mean to the lower value, which is ${zt(z1)}`),
+              mk(z2 * s10, 'stat-sd-units', `$${num((z2 * s10) / 10)}$ is the distance from the mean to the upper value, which is ${zt(z2)}`),
+            ];
+      const usable = candidates.filter((c) => Number.isInteger(c.value) && c.value > 0 && (d > 1 || c.value % 10 === 0));
+      const built = trapOnlyChoices(
+        rng,
+        target10,
+        rng.shuffle(usable.map((c) => ({ ...c, value: c.value }))),
+        (v) => `$${num(v.n / 10)}$`,
+      );
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      const options = built.choices.map((c) => Math.round(Number(c.text.replace(/[$]/g, '').replace(/\{,\}/g, '')) * 10));
       return {
         params: { ...none, mode, v1, z1, v2, z2, options },
         q: {
           format: 'mcs',
           stem: `In a certain distribution, the value $${num(v1)}$ is ${zt(z1)} below the mean and the value $${num(v2)}$ is ${zt(z2)} above the mean. What is the ${mode === 'mean' ? 'mean' : 'standard deviation'} of the distribution?`,
-          choices,
-          answer: options.indexOf(target10),
+          choices: built.choices,
+          answer: built.answer,
           explanation: `Let $m$ be the mean and $s$ the standard deviation. Then $${num(v1)} = m - ${coef(z1)}s$ and $${num(v2)} = m + ${coef(z2)}s$.
 
-Subtracting, $${num(v2)} - ${num(v1)} = ${fTex(frac((z1 + z2) * 10).div(10))}s$, so $s = \\dfrac{${num((v2t - v1t) / 10)}}{${fTex(frac((z1 + z2) * 10).div(10))}} = ${num(s10 / 10)}$. ${
+The two values are ${fTex(frac((z1 + z2) * 10).div(10))} standard deviations apart (add the units, because they are on opposite sides of the mean): $${num(v2)} - ${num(v1)} = ${fTex(frac((z1 + z2) * 10).div(10))}s$, so $s = \\dfrac{${num((v2t - v1t) / 10)}}{${fTex(frac((z1 + z2) * 10).div(10))}} = ${num(s10 / 10)}$. ${
             mode === 'mean' ? `Then $m = ${num(v1)} + ${z1 === 1 ? num(s10 / 10) : `${coef(z1)}(${num(s10 / 10)})`} = ${num(mu10 / 10)}$.` : ''
           }
 
-The two values are ${fTex(frac((z1 + z2) * 10).div(10))} standard deviations apart (add the units, because they are on opposite sides of the mean). ${
-            mode === 'mean' && z1 !== z2 ? `The mean is not halfway between them (that would be $${num(mid10 / 10)}$), because they are different distances from the mean.` : ''
-          }`,
+Check: $${num(mu10 / 10)} + ${z2 === 1 ? num(s10 / 10) : `${coef(z2)}(${num(s10 / 10)})`} = ${num(v2)}$.
+
+Trap: ${cite.why}.
+
+Add the unit counts when the values are on opposite sides of the mean.`,
         },
       };
     }
@@ -648,9 +731,11 @@ interface NormalParams {
   z1: number;
   z2: number;
   N: number;
-  /** estimate-sd: the value and its stated percentile. */
+  /** estimate-sd: two values and their stated percentiles. */
   v: number;
+  v2: number;
   pct: number;
+  pct2: number;
   options: number[];
 }
 
@@ -665,36 +750,58 @@ const normalDist: Template<NormalParams> = {
     const mu = rng.int(ctx.mu[0] / 5, ctx.mu[1] / 5) * 5;
     const sigma = rng.int(ctx.sd[0], ctx.sd[1]);
     const intro = `The figure shows a normal distribution with mean 0 and standard deviation 1, with the approximate percent of the distribution in each of the six regions.`;
-    const none = { z1: 0, z2: 0, N: 0, v: 0, pct: 0, options: [] as number[] };
+    const none = { z1: 0, z2: 0, N: 0, v: 0, v2: 0, pct: 0, pct2: 0, options: [] as number[] };
 
     if (mode === 'estimate-sd') {
       for (;;) {
-        const z = rng.pick([-2, -1, 1, 2]);
-        const pct = Math.round(normalCdfFromRegions(z));
+        // v1 sits at the 2nd or 16th percentile (z = -2 or -1), v2 at the 84th or 98th (z = 1 or 2)
+        const za = rng.pick([-2, -1]);
+        const zb = rng.pick([1, 2]);
+        const span = zb - za;
         const step = rng.pick(sigma >= 40 ? [10, 20] : [2, 5]);
         const s = step * rng.int(2, 6);
-        const v = mu + z * s;
-        if (v <= 0) continue;
-        const startK = rng.int(Math.max(1, s / step - 4), s / step);
-        const options = [0, 1, 2, 3, 4].map((i) => (startK + i) * step);
-        if (!options.includes(s)) continue;
-        // Misjudging the number of standard deviations: 2 instead of 1 gives s/2, 1 instead of 2 gives 2s.
-        const slipS = Math.abs(z) === 2 ? 2 * s : s / 2;
-        const trapFor = (o: number) => (o !== s && o === slipS ? 'stat-normal-sd-count' : undefined);
-        const choices = options.map((o) => ({ text: `$${num(o)}$`, ...(trapFor(o) ? { trap: trapFor(o)! } : {}) }));
+        if ((span * s) % 12) continue; // the gap must divide evenly by 2, 3 and 4
+        const v1 = mu + za * s;
+        const v2 = mu + zb * s;
+        if (v1 <= 0) continue;
+        const gap = v2 - v1;
+        const pa = normalCdfFromRegions(za);
+        const pb = normalCdfFromRegions(zb);
+        const spanTo = (n: number) => gap / n;
+        const zs = Math.abs(zb - Math.abs(za));
+        const mk = (value: number, trap: string, why: string) => ({ value, trap, why });
+        const candidates = [
+          mk(spanTo(1), 'stat-sd-gap', `$${num(spanTo(1))}$ is the whole gap between the two values, not one standard deviation`),
+          mk(spanTo(2), 'stat-sd-half-gap', `halving the gap treats each value as one standard deviation from the mean, which gives $${num(spanTo(2))}$`),
+          mk(spanTo(3), 'stat-normal-sd-count', `a span of 3 standard deviations gives $${num(spanTo(3))}$, but these percentiles are ${span} apart`),
+          mk(spanTo(4), 'stat-normal-sd-count', `a span of 4 standard deviations gives $${num(spanTo(4))}$, but these percentiles are ${span} apart`),
+          ...(zs > 0 ? [mk(spanTo(zs), 'stat-sd-z-subtract', `subtracting the units, ${Math.max(zb, Math.abs(za))} − ${Math.min(zb, Math.abs(za))}, gives $${num(spanTo(zs))}$, but the values are on opposite sides of the mean`)] : []),
+          mk(Math.abs(za) * s, 'stat-sd-units', `$${num(Math.abs(za) * s)}$ is the distance from the mean to the lower value, which is ${Math.abs(za)} standard deviation${Math.abs(za) === 1 ? '' : 's'}`),
+          mk(zb * s, 'stat-sd-units', `$${num(zb * s)}$ is the distance from the mean to the upper value, which is ${zb} standard deviation${zb === 1 ? '' : 's'}`),
+        ].filter((c) => Number.isInteger(c.value) && c.value > 0);
+        const built = trapOnlyChoices(rng, s, rng.shuffle(candidates), (v) => `$${num(v.n)}$`);
+        if (!built) continue;
+        const cite = rng.pick(built.used);
+        const options = built.choices.map((c) => Number(c.text.replace(/[${}]/g, '').replace(/,/g, '')));
         return {
-          params: { ...none, mode, mu, sigma: s, v, pct, options },
+          params: { ...none, mode, mu, sigma: s, v: v1, v2, pct: pa, pct2: pb, options },
           q: {
             format: 'mcs',
             figure: normalFigure(),
             stem: `${intro}
 
-The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit}. A ${ctx.noun.replace(/s$/, '')} of $${num(v)}$ ${ctx.unit} is at approximately the ${ordinal(pct)} percentile of the distribution. Which of the following is closest to the standard deviation of the distribution, in ${ctx.unit}?`,
-            choices,
-            answer: options.indexOf(s),
-            explanation: `From the figure, the percent of the distribution below each tick mark is: $-2$: 2%, $-1$: 16%, $0$: 50%, $1$: 84%, $2$: 98%. So the ${ordinal(pct)} percentile is about ${Math.abs(z)} standard deviation${Math.abs(z) === 1 ? '' : 's'} ${z < 0 ? 'below' : 'above'} the mean.
+The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed. A ${ctx.noun.replace(/s$/, '')} of $${num(v1)}$ ${ctx.unit} is at approximately the ${ordinal(pa)} percentile of the distribution, and a ${ctx.noun.replace(/s$/, '')} of $${num(v2)}$ ${ctx.unit} is at approximately the ${ordinal(pb)} percentile. Which of the following is closest to the standard deviation of the distribution, in ${ctx.unit}?`,
+            choices: built.choices,
+            answer: built.answer,
+            explanation: `From the figure, the percent of the distribution below each tick mark is: $-2$: 2%, $-1$: 16%, $0$: 50%, $1$: 84%, $2$: 98%. So the ${ordinal(pa)} percentile is ${Math.abs(za)} standard deviation${Math.abs(za) === 1 ? '' : 's'} below the mean and the ${ordinal(pb)} percentile is ${zb} standard deviation${zb === 1 ? '' : 's'} above it.
 
-So $${num(v)}$ is about ${Math.abs(z) === 1 ? 'one standard deviation' : 'two standard deviations'} ${z < 0 ? 'below' : 'above'} $${num(mu)}$: ${Math.abs(z) === 1 ? `$s \\approx ${num(Math.abs(v - mu))}$` : `$2s \\approx ${num(Math.abs(v - mu))}$, so $s \\approx ${num(s)}$`}.`,
+The two values are ${span} standard deviations apart: $${num(v2)} - ${num(v1)} = ${num(gap)}$, so $s = \\dfrac{${num(gap)}}{${span}} = ${num(s)}$.
+
+Check: the mean is $${num(v1)} + ${Math.abs(za)}(${num(s)}) = ${num(mu)}$, and $${num(mu)} + ${zb === 1 ? num(s) : `${zb}(${num(s)})`} = ${num(v2)}$.
+
+Trap: ${cite.why}.
+
+Add the units when the values are on opposite sides of the mean.`,
           },
         };
       }
@@ -703,8 +810,8 @@ So $${num(v)}$ is about ${Math.abs(z) === 1 ? 'one standard deviation' : 'two st
     // percent or count between two values
     for (;;) {
       const edges = [-Infinity, -2, -1, 0, 1, 2, Infinity];
-      let i1 = rng.int(0, 5);
-      let i2 = rng.int(i1 + 1, 6);
+      const i1 = rng.int(0, 5);
+      const i2 = rng.int(i1 + 1, 6);
       if (i1 === 0 && i2 === 6) continue;
       if (d === 1 && (i1 === 0 || i2 === 6) && rng.chance(0.5)) continue;
       const z1 = edges[i1];
@@ -713,61 +820,87 @@ So $${num(v)}$ is about ${Math.abs(z) === 1 ? 'one standard deviation' : 'two st
       const valueAt = (z: number) => mu + z * sigma;
       const ask =
         z1 === -Infinity ? `less than $${num(valueAt(z2))}$ ${ctx.unit}` : z2 === Infinity ? `greater than $${num(valueAt(z1))}$ ${ctx.unit}` : `between $${num(valueAt(z1))}$ and $${num(valueAt(z2))}$ ${ctx.unit}`;
-      // traps: two-sided percents used for one side; complement
       const oneSided = (z1 === 0 || z2 === 0) && Number.isFinite(z1) && Number.isFinite(z2) ? 2 * pct : null;
-      const set = [2, 14, 16, 34, 48, 50, 68, 82, 84, 96, 98];
-      const trapList: { value: number; trap: string }[] = [];
-      if (oneSided !== null && oneSided < 100) trapList.push({ value: oneSided, trap: 'stat-normal-one-side' });
-      if (100 - pct !== pct) trapList.push({ value: 100 - pct, trap: 'stat-normal-complement' });
-      if (mode === 'count') {
-        const N = rng.pick([500, 1000, 2000, 5000, 10000]);
-        const ans = (pct * N) / 100;
-        const { choices, answer } = numericChoices(rng, {
-          correct: ans,
-          traps: trapList.map((t) => ({ value: (t.value * N) / 100, trap: t.trap })).concat([{ value: pct, trap: 'stat-normal-percent-only' }]),
-          fillers: rng.shuffle(set.filter((p) => p !== pct)).map((p) => (p * N) / 100),
-          format: (v) => `$${fTex(v)}$`,
-          step: (5 * N) / 100,
-        });
+      const count = mode === 'count';
+      const N = count ? rng.pick([500, 1000, 2000, 5000, 10000]) : 100;
+      const show = (p: number) => (count ? `$${num((p * N) / 100)}$` : `$${p}\\%$`);
+      const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
+      // each wrong choice is the result of one mistake, as a percent first
+      const traps = rng.shuffle([
+        ...(oneSided !== null && oneSided < 100 ? [mk(oneSided, 'stat-normal-one-side', (v) => `${v} uses the percent for both sides of the mean together, but this range lies on one side only`)] : []),
+        mk(100 - pct, 'stat-normal-complement', (v) => `${v} uses the part of the distribution outside the range, not inside it`),
+        ...(i1 > 0 ? [mk(pct + REGIONS[i1 - 1], 'stat-interval-extra', (v) => `adding the neighbouring ${REGIONS[i1 - 1]}% region gives ${v}, but that region is outside the range`)] : []),
+        ...(i2 < 6 ? [mk(pct + REGIONS[i2], 'stat-interval-extra', (v) => `adding the neighbouring ${REGIONS[i2]}% region gives ${v}, but that region is outside the range`)] : []),
+        ...(i1 > 0 && i2 < 6
+          ? [mk(pct + REGIONS[i1 - 1] + REGIONS[i2], 'stat-interval-extra', (v) => `adding both neighbouring regions (${REGIONS[i1 - 1]}% and ${REGIONS[i2]}%) gives ${v}, but those regions are outside the range`)]
+          : []),
+        ...(i2 - i1 > 1
+          ? [
+              mk(pct - REGIONS[i1], 'stat-normal-missed-region', (v) => `leaving out the ${REGIONS[i1]}% region gives ${v}, but that region is inside the range`),
+              mk(pct - REGIONS[i2 - 1], 'stat-normal-missed-region', (v) => `leaving out the ${REGIONS[i2 - 1]}% region gives ${v}, but that region is inside the range`),
+            ]
+          : []),
+        ...(i2 - i1 > 2
+          ? [
+              mk(REGIONS[i1], 'stat-normal-missed-region', (v) => `reading only the first region of the range gives ${v}, but the range also includes the regions after it`),
+              mk(REGIONS[i2 - 1], 'stat-normal-missed-region', (v) => `reading only the last region of the range gives ${v}, but the range also includes the regions before it`),
+            ]
+          : []),
+        ...(i1 + i2 === 6 && pct % 2 === 0 ? [mk(pct / 2, 'stat-normal-one-side', (v) => `${v} is the percent for one side of the mean, but this range covers both sides`)] : []),
+        ...(i2 - i1 === 1 && (i1 === 0 || i2 === 6) ? [mk(i1 === 0 ? REGIONS[1] : REGIONS[4], 'stat-normal-missed-region', (v) => `reading only the region next to the end gives ${v}, but the tail beyond it is inside the range too`)] : []),
+      ]).filter((t) => t.value >= 1 && t.value <= 99);
+      const candidates = traps.map((t) => ({ value: (t.value * N) / 100, trap: t.trap, why: t.why, pctValue: t.value }));
+      if (count) candidates.push({ value: pct, trap: 'stat-normal-percent-only', why: () => `${pct} is the percent, not the number of ${ctx.who}`, pctValue: pct });
+      const built = trapOnlyChoices(
+        rng,
+        (pct * N) / 100,
+        rng.shuffle(candidates.filter((c) => Number.isInteger(c.value))),
+        (v) => (count ? `$${fTex(v)}$` : `$${v.n}\\%$`),
+      );
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      const trapLine = `Trap: ${cite.why(show(cite.pctValue))}.`;
+      const ans = (pct * N) / 100;
+      const parts = REGIONS.slice(Z_EDGES.indexOf(z1), Z_EDGES.indexOf(z2));
+      const options = built.choices.map((c) => Number(c.text.replace(/[$\\%]/g, '').replace(/\{,\}/g, '').replace(/,/g, '')));
+      if (count) {
         return {
-          params: { ...none, mode, mu, sigma, z1, z2, N, options: choices.map((c) => Number(c.text.replace(/[${}]/g, '').replace(/,/g, ''))) },
+          params: { ...none, mode, mu, sigma, z1, z2, N, options },
           q: {
             format: 'mcs',
             figure: normalFigure(),
             stem: `${intro}
 
 The ${ctx.noun} of ${plain(N)} ${ctx.who} are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit} and a standard deviation of $${num(sigma)}$ ${ctx.unit}. Approximately how many of the ${ctx.who} have ${ctx.noun.replace(/s$/, '')}s ${ask}?`,
-            choices,
-            answer,
-            explanation: `${explainBounds(mu, sigma, z1, z2)} From the figure, the part ${regionWords(z1, z2)} holds about ${pct}% of the distribution.
+            choices: built.choices,
+            answer: built.answer,
+            explanation: `${explainBounds(mu, sigma, z1, z2)} From the figure, the part ${regionWords(z1, z2)} holds about ${pct}% of the distribution${parts.length === 1 ? '' : `: $${parts.map((r) => `${r}\\%`).join(' + ')} = ${pct}\\%$`}.
 
-$${pct}\\%$ of $${num(N)}$ is $${num(ans)}$.`,
+$${pct}\\%$ of $${num(N)}$ is $${num(ans)}$.
+
+${trapLine}
+
+Convert distances to standard units, add the region percents, then apply the percent to the total.`,
           },
         };
       }
-      const { choices, answer } = numericChoices(rng, {
-        correct: pct,
-        traps: trapList,
-        fillers: rng.shuffle(set.filter((p) => p !== pct)),
-        format: (v) => `$${v.toNumber()}\\%$`,
-        step: 5,
-      });
       return {
-        params: { ...none, mode, mu, sigma, z1, z2, options: choices.map((c) => Number(c.text.replace(/[$\\%]/g, ''))) },
+        params: { ...none, mode, mu, sigma, z1, z2, options },
         q: {
           format: 'mcs',
           figure: normalFigure(),
           stem: `${intro}
 
 The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distributed with a mean of $${num(mu)}$ ${ctx.unit} and a standard deviation of $${num(sigma)}$ ${ctx.unit}. Approximately what percent of the ${ctx.who} have ${ctx.noun.replace(/s$/, '')}s ${ask}?`,
-          choices,
-          answer,
-          explanation: `${explainBounds(mu, sigma, z1, z2)} So the question asks for the part of the figure ${regionWords(z1, z2)}. ${(() => {
-            const parts = REGIONS.slice(Z_EDGES.indexOf(z1), Z_EDGES.indexOf(z2));
-            return parts.length === 1
-              ? `That region holds about $${pct}\\%$.`
-              : `Add the percents of those regions: $${parts.map((r) => `${r}\\%`).join(' + ')} = ${pct}\\%$.`;
-          })()}${oneSided !== null ? ` (The familiar ${2 * pct}% is for both sides of the mean together.)` : ''}`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `${explainBounds(mu, sigma, z1, z2)} So the question asks for the part of the figure ${regionWords(z1, z2)}. ${
+            parts.length === 1 ? `That region holds about $${pct}\\%$.` : `Add the percents of those regions: $${parts.map((r) => `${r}\\%`).join(' + ')} = ${pct}\\%$.`
+          }
+
+${trapLine}${oneSided !== null ? ` (The familiar ${2 * pct}% is for both sides of the mean together.)` : ''}
+
+Convert distances to standard units, then add the percents of the regions between them.`,
         },
       };
     }
@@ -776,11 +909,15 @@ The ${ctx.noun} of ${ctx.who} in a large group are approximately normally distri
     if (q.format !== 'mcs') return 'wrong format';
     // Numerical integration of the normal density, independent of the figure's rounded percents.
     if (p.mode === 'estimate-sd') {
-      // For each candidate SD, compute the percentile of v; pick the candidate closest to the stated one.
+      // For each candidate SD, take the mean that fits the first percentile best and compare the second.
       let best = 0;
       let bestErr = Infinity;
       p.options.forEach((s, i) => {
-        const err = Math.abs(100 * normalCdf((p.v - p.mu) / s) - p.pct);
+        let err = Infinity;
+        for (let mu = p.v - 2.5 * s; mu <= p.v2 + 2.5 * s; mu += s / 100) {
+          const e = Math.abs(100 * normalCdf((p.v - mu) / s) - p.pct) + Math.abs(100 * normalCdf((p.v2 - mu) / s) - p.pct2);
+          if (e < err) err = e;
+        }
         if (err < bestErr) {
           bestErr = err;
           best = i;

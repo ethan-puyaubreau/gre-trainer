@@ -17,15 +17,6 @@
     "bank.size": "baseline",
     "bank.difficulty": "baseline"
   },
-  "data.distributions.normal": {
-    "distractors.trapped": "baseline"
-  },
-  "data.distributions.sd-units": {
-    "distractors.trapped": "baseline"
-  },
-  "data.distributions.within-sd": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.decades-how-many": {
     "distractors.trapped": "baseline"
   },
