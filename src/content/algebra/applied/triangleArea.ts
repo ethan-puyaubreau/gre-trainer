@@ -129,7 +129,7 @@ Trap: measuring the height from the $x$-axis uses $|${num(yc)}| = ${Math.abs(yc)
         { value: frac(y0 - h), trap: 'alg-ca-wrong-side' },
       ].filter((t) => !t.value.eq(k));
       const note: Record<string, string> = {
-        'alg-ca-no-double': `dividing $${S}$ by the base without doubling gives $${num(traps.find((t) => t.trap === 'alg-ca-no-double')?.value ?? 0)}$ and a triangle of area $${num(frac(S, 2))}$`,
+        'alg-ca-no-double': `using $h = \\frac{${S}}{${w}} = ${frac(S, w).toTex()}$, without the factor 2, gives $k = ${num(traps.find((t) => t.trap === 'alg-ca-no-double')?.value ?? 0)}$, a triangle of area only $${num(frac(S, 2))}$`,
         'alg-ca-height-not-coord': `$${h}$ is the height, not the coordinate`,
         'alg-ca-wrong-side': `subtracting the height gives $${num(y0 - h)}$, which puts the vertex below the base`,
       };
