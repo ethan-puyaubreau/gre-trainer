@@ -89,6 +89,7 @@ function splitRich(s: string): { math: string[]; prose: string[] } {
 
 /** Words ending in "s" that may follow "1" without being a plural noun. One per line, sorted. */
 const NOT_PLURAL = new Set([
+  'across',
   'adds',
   'always',
   'answers',
