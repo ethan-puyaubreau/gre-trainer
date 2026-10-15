@@ -285,6 +285,26 @@ export const probTraps: Record<string, Trap> = {
     label: 'Read the wrong row or column',
     fix: 'Match the row and column headings (and the legend) to the exact years and categories in the question before reading a value.',
   },
+  'prob-di-not-applied': {
+    label: 'Did not apply the change',
+    fix: 'Apply the percent change to the amount: multiply by the growth factor, 1 plus a rise or 1 minus a fall.',
+  },
+  'prob-di-change-only': {
+    label: 'Gave the size of the change instead of the new amount',
+    fix: 'A percent change of the amount is only the difference; the new amount is the old one plus (or minus) it.',
+  },
+  'prob-di-compound-overshoot': {
+    label: 'Thought compounding adds more than it does',
+    fix: 'Multiply the growth factors: 1.1 times 1.2 is 1.32, only 2 points above the sum of the percents (30%).',
+  },
+  'prob-di-both-changes': {
+    label: 'Required the changes to agree, or accepted any single change',
+    fix: 'Combine the two changes: multiply the growth factors and compare the product with 1.',
+  },
+  'prob-di-miscount': {
+    label: 'Miscounted the rows that satisfy the condition',
+    fix: 'Test every row separately against the condition, then count the rows that pass.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

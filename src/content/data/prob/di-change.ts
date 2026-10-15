@@ -1,11 +1,11 @@
 // Data interpretation family: a table of year-over-year percent changes for five entities (DA-05).
 
-import { flaggedChoices, numericChoices } from '../../../engine/build';
+import { flaggedChoices } from '../../../engine/build';
 import { frac, Frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
 import { decimal, num, usd } from '../../../engine/tex';
-import type { Choice, Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
-import { countWordChoices, mcmCheck, mcsCheck, neCheckNum, roundFrac, tieDistance, WORDS } from './util';
+import type { Difficulty, QuestionBody, TableFigure, Template } from '../../../engine/types';
+import { mcmCheck, mcsCheck, neCheckNum, roundFrac, tieDistance, trapOnlyChoices } from './util';
 
 const SKILL = 'data.interpretation';
 const SET = 'data.interpretation.percent-change-table';
@@ -108,55 +108,87 @@ const valueAfterChanges: Template<ValueParams> = {
   style: 'apply two successive percent changes to a given amount',
   generate(rng, d) {
     const D = makeChangeData(rng, d);
-    const mode: ValueParams['mode'] = d === 1 ? rng.pick(['forward1', 'forward2'] as const) : d === 2 ? 'forward2' : rng.pick(['backward', 'forward2'] as const);
-    const i = d === 1 ? rng.pick([D.roles.cancel, D.roles.up, D.roles.down, D.roles.free]) : rng.int(0, 4);
-    const [a, b] = D.ch[i];
-    const unit = D.ctx.money ? 50000 : 10000;
-    const v1 = rng.int(D.ctx.money ? 8 : 3, D.ctx.money ? 18 : 9) * unit;
-    const v2 = (v1 * (100 + a)) / 100;
-    const v3 = (v1 * (100 + a) * (100 + b)) / 10000;
-    const [y1, y2, y3] = D.years;
-    const round = (x: number) => Math.round(x);
-    let stem: string;
-    let correct: number;
-    const traps: { value: number; trap: string }[] = [];
-    let explanation: string;
-    if (mode === 'forward1') {
-      correct = v2;
-      stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y1} was ${amount(D, v1)}, what was its ${D.ctx.measure} in ${y2}?`;
-      traps.push({ value: v3, trap: 'prob-di-wrong-column' }, { value: round((v1 * (100 - a)) / 100), trap: 'prob-di-sign' });
-      explanation = `Read the ${y1} to ${y2} column for ${NAMES[i]}: ${spct(a)}. So the ${y2} ${D.ctx.measure} was $${num(v1)} \\times ${mult(a)} = ${num(v2)}$.`;
-    } else if (mode === 'forward2') {
-      correct = v3;
-      stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y1} was ${amount(D, v1)}, what was its ${D.ctx.measure} in ${y3}?`;
-      traps.push({ value: round((v1 * (100 + a + b)) / 100), trap: 'prob-add-percents' }, { value: v2, trap: 'prob-di-one-step' });
-      if (a + b === 0) traps.unshift({ value: v1, trap: 'prob-percent-cancel' });
-      traps.push({ value: round((v1 * (100 + b)) / 100), trap: 'prob-di-one-step' });
-      explanation = `Apply the two changes one after the other: $${num(v1)} \\times ${mult(a)} = ${num(v2)}$, then $${num(v2)} \\times ${mult(b)} = ${num(v3)}$.
+    for (;;) {
+      const mode: ValueParams['mode'] = d === 1 ? rng.pick(['forward1', 'forward2'] as const) : d === 2 ? 'forward2' : rng.pick(['backward', 'forward2'] as const);
+      const i = d === 1 ? rng.pick([D.roles.cancel, D.roles.up, D.roles.down, D.roles.free]) : rng.int(0, 4);
+      const [a, b] = D.ch[i];
+      const unit = D.ctx.money ? 50000 : 10000;
+      const v1 = rng.int(D.ctx.money ? 8 : 3, D.ctx.money ? 18 : 9) * unit;
+      const v2 = (v1 * (100 + a)) / 100;
+      const v3 = (v1 * (100 + a) * (100 + b)) / 10000;
+      const [y1, y2, y3] = D.years;
+      const round = (x: number) => Math.round(x);
+      const shown = (v: number) => (D.ctx.money ? usd(v) : v.toLocaleString('en-US'));
+      let stem: string;
+      let correct: number;
+      let explanation: string;
+      let check: string;
+      let rule: string;
+      const traps: { value: number; trap: string; why: (v: string) => string }[] = [];
+      const T = (value: number, trap: string, why: (v: string) => string) => traps.push({ value, trap, why });
+      if (mode === 'forward1') {
+        correct = v2;
+        stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y1} was ${amount(D, v1)}, what was its ${D.ctx.measure} in ${y2}?`;
+        T(v3, 'prob-di-wrong-column', (v) => `using the ${y2} to ${y3} change as well gives ${v}, which is the ${y3} amount`);
+        T(round((v1 * (100 + b)) / 100), 'prob-di-wrong-column', (v) => `applying the ${y2} to ${y3} change to the ${y1} amount gives ${v}`);
+        T(round((v1 * (100 - a)) / 100), 'prob-di-sign', (v) => `applying the change in the wrong direction gives ${v}`);
+        T(v1, 'prob-di-not-applied', (v) => `${v} is the ${y1} amount: the change was not applied`);
+        T(round((v1 * Math.abs(a)) / 100), 'prob-di-change-only', (v) => `${v} is the size of the change, not the new amount`);
+        explanation = `Read the ${y1} to ${y2} column for ${NAMES[i]}: ${spct(a)}. So the ${y2} ${D.ctx.measure} was $${num(v1)} \\times ${mult(a)} = ${num(v2)}$.`;
+        check = `$${num(v2)} - ${num(v1)} = ${num(v2 - v1)}$, which is ${Math.abs(a)} percent of ${num(v1)}.`;
+        rule = 'A percent change applies to the amount it starts from.';
+      } else if (mode === 'forward2') {
+        correct = v3;
+        stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y1} was ${amount(D, v1)}, what was its ${D.ctx.measure} in ${y3}?`;
+        T(round((v1 * (100 + a + b)) / 100), 'prob-add-percents', (v) => `adding the percents, ${snum(a)} and ${snum(b)}, gives ${v}, which ignores that the second change applies to the ${y2} amount`);
+        T(v2, 'prob-di-one-step', (v) => `${v} is the ${y2} amount: only the first change was applied`);
+        T(round((v1 * (100 + b)) / 100), 'prob-di-one-step', (v) => `applying only the second change gives ${v}`);
+        T(round((v1 * (100 - a) * (100 - b)) / 10000), 'prob-di-sign', (v) => `applying both changes in the wrong direction gives ${v}`);
+        T(round((v1 * (100 + a) * (100 + a)) / 10000), 'prob-di-wrong-column', (v) => `applying the first change twice gives ${v}`);
+        T(round((v1 * (100 + b) * (100 + b)) / 10000), 'prob-di-wrong-column', (v) => `applying the second change twice gives ${v}`);
+        if (a * b < 0) T(v1, 'prob-percent-cancel', (v) => `assuming the increase and the decrease cancel gives ${v}, but the second percent applies to a different base`);
+        explanation = `Apply the two changes one after the other: $${num(v1)} \\times ${mult(a)} = ${num(v2)}$, then $${num(v2)} \\times ${mult(b)} = ${num(v3)}$.`;
+        check = `$${num(v3)} \\div ${mult(b)} \\div ${mult(a)} = ${num(v1)}$, the ${y1} amount.`;
+        rule = 'Successive percent changes multiply: each one applies to the amount left by the one before.';
+      } else {
+        correct = v1;
+        stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y3} was ${amount(D, v3)}, what was its ${D.ctx.measure} in ${y1}?`;
+        T(round((v3 * (100 - a) * (100 - b)) / 10000), 'prob-percent-reverse', (v) => `undoing each change with the opposite percent gives ${v}, but that does not undo it`);
+        T(round((v3 * (100 - a - b)) / 100), 'prob-add-percents', (v) => `adding the percents and reversing them gives ${v}`);
+        T(round((v3 * 100) / (100 + b)), 'prob-di-one-step', (v) => `undoing only the second change gives ${v}, the ${y2} amount`);
+        T(round((v3 * 100) / (100 + a)), 'prob-di-one-step', (v) => `undoing only the first change gives ${v}`);
+        T(round((v3 * 10000) / ((100 - a) * (100 - b))), 'prob-di-sign', (v) => `dividing by the wrong growth factors gives ${v}`);
+        T(v3, 'prob-di-not-applied', (v) => `${v} is the ${y3} amount: the changes were not undone`);
+        explanation = `Work backward by dividing: the ${y2} amount was $${num(v3)} \\div ${mult(b)} = ${num(v2)}$, and the ${y1} amount was $${num(v2)} \\div ${mult(a)} = ${num(v1)}$.`;
+        check = `$${num(v1)} \\times ${mult(a)} \\times ${mult(b)} = ${num(v3)}$.`;
+        rule = 'To undo a percent change, divide by its growth factor; do not apply the opposite percent.';
+      }
+      const built = trapOnlyChoices(
+        rng,
+        correct,
+        rng.shuffle(traps.filter((t) => t.value > 0)),
+        (v) => (D.ctx.money ? usd(v.n) : v.n.toLocaleString('en-US')),
+      );
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      return {
+        params: { i, mode, base: mode === 'backward' ? v3 : v1 },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `${explanation}
 
-${
-  a + b === 0
-    ? `A ${Math.abs(a)} percent increase and a ${Math.abs(a)} percent decrease do not cancel: the second percent applies to a different base.`
-    : `Adding the percents (${snum(a)} and ${snum(b)}) gives ${amount(D, round((v1 * (100 + a + b)) / 100))}, which ignores that the second change applies to the ${y2} amount.`
-}`;
-    } else {
-      correct = v1;
-      stem = `If ${ent(D, i)}'s ${D.ctx.measure} in ${y3} was ${amount(D, v3)}, what was its ${D.ctx.measure} in ${y1}?`;
-      traps.push({ value: round((v3 * (100 - a) * (100 - b)) / 10000), trap: 'prob-percent-reverse' }, { value: round((v3 * (100 - a - b)) / 100), trap: 'prob-add-percents' }, { value: round((v3 * 100) / (100 + b)), trap: 'prob-di-one-step' });
-      explanation = `Work backward by dividing: the ${y2} amount was $${num(v3)} \\div ${mult(b)} = ${num(v2)}$, and the ${y1} amount was $${num(v2)} \\div ${mult(a)} = ${num(v1)}$.
+Check: ${check}
 
-Reversing a percent change by applying the opposite percent ($\\times ${mult(-b)}$ and $\\times ${mult(-a)}$) does not undo it, because the base changes.`;
+Trap: ${cite.why(shown(cite.value))}.
+
+${rule}`,
+        },
+      };
     }
-    const signSlip = round((mode === 'backward' ? v3 * 10000 / ((100 - a) * (100 - b)) : v1 * (100 - a) * (100 - b) / 10000));
-    if (mode !== 'forward1') traps.push({ value: signSlip, trap: 'prob-di-sign' });
-    const fillers = [round(correct * 1.1 / 1000) * 1000, round(correct * 0.9 / 1000) * 1000, round(correct * 1.2 / 1000) * 1000];
-    const { choices, answer } = numericChoices(rng, {
-      correct,
-      traps: traps.filter((t) => t.value !== correct && t.value > 0),
-      fillers,
-      format: (v) => (D.ctx.money ? usd(v.toNumber()) : `${v.toNumber().toLocaleString('en-US')}`),
-    });
-    return { params: { i, mode, base: mode === 'backward' ? v3 : v1 }, q: { format: 'mcs', figure: D.figure, stem, choices, answer, explanation } };
   },
   check(q, { i, mode, base }) {
     const [a, b] = readChanges(q)[i];
@@ -197,7 +229,16 @@ const percentOfYear: Template<PercentOfParams> = {
         if (roundFrac(v, 1) && (v.mul(10).isInt() || tieDistance(v, 1) > 0.02)) cands.push({ i, nm, dn, v });
       }
     const pool = cands.length ? cands : [{ i: D.roles.up, nm: 1, dn: 0, v: frac(100 + D.ch[D.roles.up][0]) }];
-    const { i, nm, dn, v } = rng.pick(pool);
+    const trapVals = (c: { i: number; nm: number; dn: number }): Frac[] => {
+      const [ca, cb] = D.ch[c.i];
+      if (c.nm === 1 && c.dn === 0) return [frac(ca)];
+      if (c.nm === 2 && c.dn === 0) return [frac(100 + ca + cb)];
+      if (c.nm === 1 && c.dn === 2) return [frac(100 - cb), frac(100 + cb)];
+      return [frac(100 - ca - cb), frac((100 + ca) * (100 + cb), 100)];
+    };
+    // a mistake that gives the answer is not a mistake: prefer rows where all of them differ
+    const okPool = pool.filter((c) => !trapVals(c).some((t) => t.eq(roundFrac(c.v, 1) ?? c.v)));
+    const { i, nm, dn, v } = rng.pick(okPool.length ? okPool : pool);
     const answer = roundFrac(v, 1) ?? v;
     const [a, b] = D.ch[i];
     const y = D.years;
@@ -331,6 +372,7 @@ const mustBeTrue: Template<MustParams> = {
       s: { kind: 'more-greater', i: up, thr: thrUp },
       text: `The ${m} of ${ent(D, up)} in ${y[2]} was more than ${thrUp} percent greater than its ${m} in ${y[0]}.`,
       truth: upTrue,
+      ...(upTrue ? {} : { trap: 'prob-di-compound-overshoot' }),
       why: `For ${NAMES[up]}: $${mult(ua)} \\times ${mult(ub)} = ${decimal(frac((100 + ua) * (100 + ub), 10000))}$, an increase of ${decimal(frac(Math.round(actualUp * 100), 100))}%, which is ${upTrue ? 'more' : 'less'} than ${thrUp}%.`,
     });
     // 4. An increase and an equal decrease do not cancel (or a near-cancel is a net loss).
@@ -419,36 +461,59 @@ const countEntities: Template<CountParams> = {
   style: 'for how many entities was the last year above (below) the first',
   generate(rng, d) {
     const D = makeChangeData(rng, d);
-    const up = rng.chance(0.5);
     const y = D.years;
-    const net = D.ch.map(([a, b]) => (100 + a) * (100 + b) - 10000);
-    const count = net.filter((x) => (up ? x > 0 : x < 0)).length;
-    const naive = D.ch.filter(([a, b]) => (up ? a + b > 0 : a + b < 0)).length;
-    const words = WORDS.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-    const cw = countWordChoices(rng, count, 5);
-    const choices: Choice[] = cw.choices.map((c) => ({ text: c.text, ...(c.text === (naive === 0 ? 'None' : words[naive]) && naive !== count ? { trap: 'prob-add-percents' } : {}) }));
-    const lines = D.ch
-      .map(([a, b], k) => `- ${NAMES[k]}: $${mult(a)} \\times ${mult(b)} = ${decimal(frac((100 + a) * (100 + b), 10000))}$ (${net[k] > 0 ? 'higher' : 'lower'})`)
-      .join('\n');
-    return {
-      params: { up },
-      q: {
-        format: 'mcs',
-        figure: D.figure,
-        stem: `For how many of the five ${D.ctx.entities} was the ${D.ctx.measure} in ${y[2]} ${up ? 'greater' : 'less'} than the ${D.ctx.measure} in ${y[0]}?`,
-        choices,
-        answer: cw.answer,
-        explanation: `Multiply the two growth factors for each ${D.ctx.entity}: a product above 1 means the ${y[2]} amount was higher than the ${y[0]} amount.
+    let lastUp = false;
+    for (let tries = 0; ; tries++) {
+      // counting the entities that went up is often 0 or 1: ask it less often than the (larger) count of those that went down
+      const countUp = D.ch.filter(([a, b]) => (100 + a) * (100 + b) > 10000).length;
+      const up: boolean = tries % 2 === 0 ? rng.chance(countUp >= 2 ? 0.5 : 0.27) : !lastUp;
+      lastUp = up;
+      const dir = up ? 'higher' : 'lower';
+      const ok = ([a, b]: [number, number]) => (up ? (100 + a) * (100 + b) > 10000 : (100 + a) * (100 + b) < 10000);
+      const rows = D.ch;
+      const count = rows.filter(ok).length;
+      const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
+      const naive = rows.filter(([a, b]) => (up ? a + b > 0 : a + b < 0)).length;
+      const first = rows.filter(([a]) => (up ? a > 0 : a < 0)).length;
+      const last = rows.filter(([, b]) => (up ? b > 0 : b < 0)).length;
+      const both = rows.filter(([a, b]) => (up ? a > 0 && b > 0 : a < 0 && b < 0)).length;
+      const either = rows.filter(([a, b]) => (up ? a > 0 || b > 0 : a < 0 || b < 0)).length;
+      const opposite = rows.filter((r) => !ok(r)).length;
+      const traps = [
+        mk(naive, 'prob-add-percents', (v) => `adding the two percents for each ${D.ctx.entity} gives ${v}, but a decrease after an increase of the same size is a net loss`),
+        mk(first, 'prob-di-one-step', (v) => `looking only at the ${y[0]} to ${y[1]} change gives ${v}`),
+        mk(last, 'prob-di-wrong-column', (v) => `looking only at the ${y[1]} to ${y[2]} change gives ${v}`),
+        mk(both, 'prob-di-both-changes', (v) => `requiring both changes to go the same way gives ${v}, but one big change can outweigh a small one`),
+        mk(either, 'prob-di-both-changes', (v) => `accepting any one change in that direction gives ${v}, but the two changes must be combined`),
+        mk(opposite, 'prob-wrong-event', (v) => `${v} counts the ${D.ctx.entities} that are ${up ? 'lower' : 'higher'}, the other direction`),
+      ];
+      const generic = [0, 1, 2, 3, 4, 5].map((n) => mk(n, 'prob-di-miscount', (v) => `${v} comes from a miscount: only ${count} of the five ${D.ctx.entities} qualify`));
+      const built = trapOnlyChoices(rng, count, [...rng.shuffle(traps), ...generic], (v) => `$${v.n}$`, 5, 0, true);
+      if (!built) continue;
+      const cite = rng.pick(built.used);
+      const lines = D.ch
+        .map(([a, b], k) => `- ${NAMES[k]}: $${mult(a)} \\times ${mult(b)} = ${decimal(frac((100 + a) * (100 + b), 10000))}$ (${ok([a, b]) ? dir : up ? 'lower' : 'higher'}${ok([a, b]) ? ' ✓' : ''})`)
+        .join('\n');
+      return {
+        params: { up },
+        q: {
+          format: 'mcs',
+          figure: D.figure,
+          stem: `For how many of the five ${D.ctx.entities} was the ${D.ctx.measure} in ${y[2]} ${up ? 'greater' : 'less'} than the ${D.ctx.measure} in ${y[0]}?`,
+          choices: built.choices,
+          answer: built.answer,
+          explanation: `Multiply the two growth factors for each ${D.ctx.entity}: a product ${up ? 'above' : 'below'} 1 means the ${y[2]} amount was ${up ? 'higher' : 'lower'} than the ${y[0]} amount.
 
 ${lines}
 
-So the answer is ${words[count].toLowerCase()}.${
-          naive !== count
-            ? ` Adding the percents instead gives ${naive === 0 ? 'none' : words[naive].toLowerCase()}: a change of $+k\\%$ followed by $-k\\%$ (or by a slightly smaller decrease) is still a net loss.`
-            : ''
-        }`,
-      },
-    };
+So the answer is $${count}$.
+
+Trap: ${cite.why(`$${cite.value}$`)}.
+
+Successive percent changes multiply; compare the product with 1.`,
+        },
+      };
+    }
   },
   check(q, { up }) {
     const ch = readChanges(q);
@@ -457,7 +522,7 @@ So the answer is ${words[count].toLowerCase()}.${
       const v3 = 500 * (1 + a / 100) * (1 + b / 100);
       if (up ? v3 > 500 + 1e-9 : v3 < 500 - 1e-9) count++;
     }
-    return mcsCheck(q, ['None', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'][count]);
+    return mcsCheck(q, `$${count}$`);
   },
 };
 

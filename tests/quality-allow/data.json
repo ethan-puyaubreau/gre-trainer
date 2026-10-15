@@ -26,15 +26,6 @@
   "data.interpretation.mixed-times": {
     "distractors.trapped": "baseline"
   },
-  "data.interpretation.pct-change-count": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.pct-change-must": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.pct-change-value": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.pie-remove": {
     "distractors.trapped": "baseline"
   },

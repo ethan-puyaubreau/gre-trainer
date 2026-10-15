@@ -217,11 +217,14 @@ export function commas(x: number, maxDec = 2): string {
 
 /**
  * Select-one choices made only of the right value and named mistakes, ascending, the right one at a
- * random rank (uniform, pulled into the ranks the mistakes allow). A mistake that gives the right value is
- * not a distractor and is left out; a `must` mistake (one the explanation cites) that gives the right
- * value, or too few different mistakes, make this return null so the generator draws again.
+ * random rank (uniform, pulled into the ranks the mistakes allow). A mistake that gives the right
+ * value is not a distractor and is left out; a `must` mistake (one the explanation cites) that gives
+ * the right value, or too few different mistakes, make this return null so the generator draws again.
  * Mistakes are used in the order given, `must` ones first on their side of the right value.
- * `used` lists the mistakes that became choices, so an explanation can cite one of them.
+ * With `uniformRank` the right value takes any rank the mistakes allow with equal chance (for counts, where few ranks are possible).
+ * `minGap` keeps every value at least that far from the right one and from the others kept before
+ * it (for "closest to" questions). `used` lists the mistakes that became choices, so an explanation
+ * can cite one of them; `values` is the value of each choice, in choice order.
  */
 export function trapOnlyChoices<T extends { value: Frac | number; trap: string; must?: boolean }>(
   rng: Rng,
@@ -229,8 +232,11 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
   traps: T[],
   format: (v: Frac) => string,
   count = 5,
-): { choices: Choice[]; answer: number; used: T[] } | null {
+  minGap = 0,
+  uniformRank = false,
+): { choices: Choice[]; answer: number; used: T[]; values: Frac[] } | null {
   const right = Frac.of(correct);
+  const far = (a: Frac, b: Frac) => minGap <= 0 || Math.abs(a.sub(b).toNumber()) >= minGap - 1e-9;
   const seen: { v: Frac; item: T; must: boolean }[] = [];
   for (const t of traps) {
     const v = Frac.of(t.value);
@@ -239,8 +245,11 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
       continue;
     }
     const dup = seen.find((x) => x.v.eq(v));
-    if (dup) dup.must ||= !!t.must;
-    else seen.push({ v, item: t, must: !!t.must });
+    if (dup) {
+      dup.must ||= !!t.must;
+      continue;
+    }
+    if (far(v, right) && seen.every((x) => far(v, x.v))) seen.push({ v, item: t, must: !!t.must });
   }
   const below = seen.filter((x) => x.v.lt(right));
   const above = seen.filter((x) => x.v.gt(right));
@@ -250,7 +259,7 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
   const lo = Math.max(mustBelow, count - 1 - above.length);
   const hi = Math.min(below.length, count - 1 - mustAbove);
   if (lo > hi) return null;
-  const r = Math.min(Math.max(rng.int(0, count - 1), lo), hi);
+  const r = uniformRank ? lo + rng.int(0, hi - lo) : Math.min(Math.max(rng.int(0, count - 1), lo), hi);
   const take = (list: typeof seen, k: number) => [...list.filter((x) => x.must), ...list.filter((x) => !x.must)].slice(0, k);
   const all = [
     ...take(below, r).map((x) => ({ v: x.v, item: x.item, ok: false })),
@@ -261,5 +270,6 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
     choices: all.map((x) => ({ text: format(x.v), ...(x.item ? { trap: x.item.trap } : {}) })),
     answer: all.findIndex((x) => x.ok),
     used: all.flatMap((x) => (x.item ? [x.item] : [])),
+    values: all.map((x) => x.v),
   };
 }
