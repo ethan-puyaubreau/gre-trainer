@@ -1,5 +1,5 @@
-// Picks the next question: repair queue first (a missed skill coming back in a different style),
-// then spaced reviews, skills in progress and new skills, interleaved.
+// Picks the next question: repair queue first (a missed skill coming back), then due reviews (the most
+// overdue one 60% of the time), then reviews, skills in progress and new skills, interleaved.
 
 import type { Rng } from '../engine/rng';
 import type { Area, Difficulty, Skill, Template } from '../engine/types';
@@ -31,6 +31,9 @@ export interface SchedulerInput {
   /** Skill of the previous question (avoid repeating it in mixed modes). */
   lastSkill?: string;
 }
+
+/** Chance that a due review jumps the queue ahead of the interleaved buckets. */
+const DUE_FIRST = 0.6;
 
 export interface Pick {
   skillId: string;
@@ -102,6 +105,11 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
     if (due.length) return make(rng.pick(due), 'review');
     const mastered = playable.filter((s) => stateOf(s.id).level === 4 && notLast(s));
     return mastered.length ? make(rng.pick(mastered), 'review') : null;
+  }
+
+  // Due reviews first: the most overdue one most of the time, the interleaved buckets below otherwise.
+  if (due.length && rng.chance(DUE_FIRST)) {
+    return make(due.reduce((a, b) => (stateOf(b.id).dueAt! < stateOf(a.id).dueAt! ? b : a)), 'review');
   }
 
   const inProgress = playable

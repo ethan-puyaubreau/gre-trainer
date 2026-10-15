@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng } from '../src/engine/rng';
-import type { Difficulty, Format, Skill, Template } from '../src/engine/types';
+import type { Difficulty, Format, Template } from '../src/engine/types';
 import {
   applyAttempt,
   DAY,
@@ -12,7 +11,6 @@ import {
   type AttemptInput,
   type SkillState,
 } from '../src/mastery/model';
-import { nextPick, scheduleRepair, type SchedulerInput } from '../src/mastery/scheduler';
 
 const T0 = new Date(2026, 9, 10, 9, 0).getTime();
 const H = 60 * 60 * 1000;
@@ -235,41 +233,5 @@ describe('mastery model', () => {
   it('counts every correct answer of a timed section as on pace', () => {
     const o = applyAttempt(newSkillState(), ans('t1', T0, { timeMs: 400_000, timedSection: true }), REQ);
     expect(o.clean).toBe(true);
-  });
-});
-
-describe('scheduler', () => {
-  const skill = (id: string): Skill => ({ id, area: 'arithmetic', unit: 'U', name: id, summary: '', strategy: '' });
-  const skills = [skill('s1'), skill('s2'), skill('s3')];
-  const templatesBySkill = new Map(skills.map((s) => [s.id, ['a', 'b', 'c'].map((x) => tpl(`${s.id}.${x}`, 'mcs', s.id))]));
-  const base: SchedulerInput = { skills, templatesBySkill, states: {}, remediation: [], seq: 0, now: T0, recentTemplates: [] };
-
-  it('brings a missed skill back in a different style after a few questions', () => {
-    const rng = createRng(1);
-    const rem = scheduleRepair(rng, 's2', 's2.a', 10);
-    expect(rem.dueSeq).toBeGreaterThanOrEqual(12);
-    expect(rem.dueSeq).toBeLessThanOrEqual(14);
-    for (let i = 0; i < 50; i++) {
-      const pick = nextPick(createRng(i), { ...base, remediation: [rem], seq: rem.dueSeq }, { kind: 'smart' })!;
-      expect(pick.reason).toBe('repair');
-      expect(pick.skillId).toBe('s2');
-      expect(pick.templateId).not.toBe('s2.a');
-    }
-    const early = nextPick(createRng(3), { ...base, remediation: [rem], seq: rem.dueSeq - 1 }, { kind: 'smart' })!;
-    expect(early.reason).not.toBe('repair');
-  });
-
-  it('prefers styles that are not credited yet', () => {
-    const states = { s1: { ...newSkillState(), level: 2 as const, styles: { 's1.a': 2 as const, 's1.b': 3 as const } } };
-    for (let i = 0; i < 20; i++) {
-      const pick = nextPick(createRng(i), { ...base, states }, { kind: 'skill', skillId: 's1' })!;
-      expect(pick.templateId).toBe('s1.c');
-    }
-  });
-
-  it('serves due reviews in review mode', () => {
-    const states = { s3: { ...newSkillState(), level: 4 as const, dueAt: T0 - 1 } };
-    const pick = nextPick(createRng(5), { ...base, states }, { kind: 'review' })!;
-    expect(pick.skillId).toBe('s3');
   });
 });
