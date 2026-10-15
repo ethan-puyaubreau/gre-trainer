@@ -2,23 +2,6 @@
   "arith.cycles.decimal-digit": {
     "qc.never-d": "Both quantities are fixed numbers (a digit and a given digit), so D is impossible."
   },
-  "arith.decimals.percent-power-ten": {
-    "artifacts.exp-1": "baseline",
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.decimals.repeating-qc": {
-    "bank.difficulty": "baseline",
-    "qc.never-d": "baseline"
-  },
-  "arith.decimals.sci-notation": {
-    "artifacts.exp-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "arith.decimals.terminating": {
-    "distractors.trapped": "baseline"
-  },
   "arith.exponents.common-base-qc": {
     "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
   },

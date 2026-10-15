@@ -78,20 +78,21 @@ const terminatingMCM: Template<TermParams> = {
       const { choices, answer } = flaggedChoices(
         items.map((it) => {
           const ok = it.kind === 'term' || it.kind === 'disguised';
-          return { text: `$\\frac{${it.p}}{${it.q}}$`, correct: ok, ...(it.kind === 'lookalike' ? { trap: 'num-terminating-test' } : {}) };
+          return { text: `$\\frac{${it.p}}{${it.q}}$`, correct: ok, ...(!ok ? { trap: 'num-terminating-test' } : {}) };
         }),
       );
       const lines = items.map((it) => {
         const red = F(it.p, it.q);
         const f = `\\frac{${it.p}}{${it.q}}`;
-        if (it.kind === 'disguised')
-          return `- $${f} = ${red.toTex()}$, and ${factorEq(red.d)} has no prime factors other than 2 and 5 ✓ ($${decimal(red)}$)`;
-        if (it.kind === 'term') return `- $${f}$: ${factorEq(it.q)} has no prime factors other than 2 and 5 ✓ ($${decimal(red)}$)`;
+        if (it.kind === 'disguised') return `- $${f} = ${red.toTex()}$, ${factorEq(red.d)}: only 2 and 5 ✓`;
+        if (it.kind === 'term') return `- $${f}$: ${factorEq(it.q)}: only 2 and 5 ✓`;
         const bad = factorize(red.d)
           .map(([p]) => p)
           .filter((p) => p !== 2 && p !== 5);
-        return `- $${f}$: ${factorEq(red.d)} has the prime factor${bad.length > 1 ? 's' : ''} ${bad.join(' and ')} ✗ ($${repeatingTex(red.n, red.d)}$)`;
+        return `- $${f}$: ${factorEq(red.d)} has the factor${bad.length > 1 ? 's' : ''} ${bad.join(' and ')} ✗`;
       });
+      const firstYes = items.find((it) => it.kind === 'term' || it.kind === 'disguised')!;
+      const firstNo = items.find((it) => it.kind === 'repeat' || it.kind === 'lookalike')!;
       const hasDisguised = items.some((it) => it.kind === 'disguised');
       const hasLook = items.some((it) => it.kind === 'lookalike');
       return {
@@ -103,11 +104,11 @@ const terminatingMCM: Template<TermParams> = {
           choices,
           answer,
           explanation: `A fraction in lowest terms is a terminating decimal exactly when its denominator has no prime factors other than 2 and 5. Reduce first, then factor the denominator:
-${lines.join('\n')}${
+${lines.join('\n')}
+
+Check: $\\frac{${firstYes.p}}{${firstYes.q}} = ${decimal(F(firstYes.p, firstYes.q))}$ stops, while $\\frac{${firstNo.p}}{${firstNo.q}} = ${repeatingTex(firstNo.p, firstNo.q)}$ repeats.${
             hasDisguised || hasLook
-              ? `\n\n${hasDisguised ? 'Reducing matters: a factor such as 3 or 7 in the denominator can cancel with the numerator. ' : ''}${
-                  hasLook ? 'A denominator that contains 2 or 5 is not enough: every other prime factor must be gone.' : ''
-                }`
+              ? `\n\nTrap: a 2 or a 5 in the denominator is not enough${hasDisguised ? ', and other primes can cancel with the numerator, so reduce first' : ''}.`
               : ''
           }`,
         },
@@ -352,8 +353,18 @@ const sciNotation: Template<SciParams> = {
         const s = rng.pick(okS);
         const values = [0, 1, 2, 3, 4].map((t) => normalize(val.mul(pow10(t - s)), 0));
         const fmt = (v: Frac) => (v.isInt() ? num(v.toNumber()) : decimal(v));
-        const choices = values.map((v, t) => ({ text: `$${fmt(v.r.mul(pow10(v.e)))}$`, ...(Math.abs(t - s) === 1 ? { trap: 'num-decimal-shift' } : {}) }));
+        const choices = values.map((v, t) => ({ text: `$${fmt(v.r.mul(pow10(v.e)))}$`, ...(t !== s ? { trap: 'num-decimal-shift' } : {}) }));
         const ab = a.mul(b);
+        const digitsVal = (A0 * B0) / C0;
+        const E = -i + j + l;
+        const ten = (e: number) => (e === 0 ? '1' : e === 1 ? '10' : `10^{${e}}`);
+        const shortcut =
+          A0 % C0 === 0
+            ? `$${A0} \\div ${C0} = ${A0 / C0}$, then $${A0 / C0} \\times ${B0} = ${digitsVal}$`
+            : B0 % C0 === 0
+              ? `$${B0} \\div ${C0} = ${B0 / C0}$, then $${B0 / C0} \\times ${A0} = ${digitsVal}$`
+              : `$\\frac{${A0} \\cdot ${B0}}{${C0}} = ${digitsVal}$`;
+        const near = values[s === 0 ? 1 : s - 1];
         return {
           params: { mode, a, b, c, m: 0, n: 0, p: 0, values },
           q: {
@@ -363,15 +374,13 @@ const sciNotation: Template<SciParams> = {
 What is the value of the expression above?`,
             choices,
             answer: s,
-            explanation: `The numerator is $${decimal(a)} \\times ${num(b.toNumber())} = ${decimal(ab)}$. ${
-              l > 0
-                ? `To divide by $${decimal(c)}$, move the decimal point ${l} place${l > 1 ? 's' : ''} to the right in both numbers: $${decimal(ab)} \\div ${decimal(c)} = ${decimal(
-                    ab.mul(10 ** l),
-                  )} \\div ${C0} = ${fmt(val)}$.`
-                : `Then $${decimal(ab)} \\div ${C0} = ${fmt(val)}$.`
-            }
+            explanation: `The choices have the same digits, so keep the digits and the powers of 10 apart.
 
-The choices differ only by powers of 10, so the whole question is where the decimal point goes. The choices next to the right one come from moving it one place too far.`,
+Write each number as digits times a power of 10: $${decimal(a)} = ${A0} \\times ${ten(-i)}$, $${num(b.toNumber())} = ${B0} \\times ${ten(j)}$, $${decimal(c)} = ${C0}${l > 0 ? ` \\times ${ten(-l)}` : ''}$. The digits give ${shortcut}; the powers of 10 give $${ten(E)}$. So the value is $${digitsVal} \\times ${ten(E)} = ${fmt(val)}$.
+
+Check: $${fmt(val)} \\times ${decimal(c)} = ${decimal(ab)}$, the numerator.
+
+Trap: $${fmt(near.r.mul(pow10(near.e)))}$ and the other choices come from miscounting the powers of 10 by one place or more. Count them: each factor $10^{k}$ moves the decimal point $k$ places.`,
           },
         };
       }
@@ -385,7 +394,7 @@ The choices differ only by powers of 10, so the whole question is where the deci
       const m = rng.int(d === 3 ? -8 : -4, 9);
       const n = rng.int(d === 3 ? -9 : -5, 8);
       const p = d === 3 ? rng.int(-7, 6) : rng.int(-4, 6);
-      if (p === 0 || m === 0 || n === 0) continue;
+      if (p === 0 || m === 0 || n === 0 || m === 1 || n === 1 || p === 1) continue; // an exponent 1 would print as 10^1
       const e0 = m + n - p;
       const correct = normalize(raw, e0);
       const cands: { r: Frac; e: number; trap?: string }[] = [
@@ -393,15 +402,16 @@ The choices differ only by powers of 10, so the whole question is where the deci
         { r: correct.r, e: correct.e + 1, trap: 'num-decimal-shift' },
         { r: correct.r, e: correct.e - 1, trap: 'num-decimal-shift' },
         { ...normalize(raw, m + n + p), trap: 'num-exponent-sign' },
-        normalize(a.mul(b).mul(c), e0),
-        { r: correct.r, e: correct.e + 2 },
-        { r: correct.r, e: correct.e - 2 },
+        { ...normalize(a.mul(b).mul(c), e0), trap: 'num-divided-wrong' },
+        { r: correct.r, e: correct.e + 2, trap: 'num-decimal-shift' },
+        { r: correct.r, e: correct.e - 2, trap: 'num-decimal-shift' },
       ];
       const uniq: typeof cands = [];
       for (const x of [cands[0], cands[3], ...rng.shuffle([cands[1], cands[2], cands[4], cands[5], cands[6]])])
         if (!uniq.some((u) => u.r.eq(x.r) && u.e === x.e)) uniq.push(x);
       const picked = uniq.slice(0, 5);
       if (picked.length < 5) continue;
+      if (picked.some((x) => x.e === 1) || e0 === 1 || normalize(raw, m + n + p).e === 1) continue; // no 10^{1}
       const valueOf = (x: { r: Frac; e: number }) => x.r.toNumber() * 10 ** x.e;
       const ordered = [...picked].sort((x, y) => valueOf(x) - valueOf(y));
       const answer = ordered.findIndex((x) => x === picked[0]);

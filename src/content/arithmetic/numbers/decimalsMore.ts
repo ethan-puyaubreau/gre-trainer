@@ -2,11 +2,11 @@ import { qcCompare } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { decimal, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { close, expectMCS, expectQC, F, pct, pickWeighted, qcEnd, qcFromFloatSamples, plainNum, swapQC } from './util';
+import { close, expectMCS, expectQC, F, pickWeighted, qcEnd, qcFromFloatSamples, plainNum, relClose, swapQC } from './util';
 
 /* ================================================================== 1. Repeating decimals vs terminating values (QC) */
 
-type RepMode = 'sum-one' | 'vs-trunc' | 'vs-frac';
+type RepMode = 'sum-one' | 'vs-trunc' | 'vs-frac' | 'digit';
 
 interface RepParams {
   mode: RepMode;
@@ -17,6 +17,7 @@ interface RepParams {
   swap: boolean;
 }
 
+const QC_REL_WORDS: Record<QCChoice, string> = { A: 'Quantity A greater', B: 'Quantity B greater', C: 'the two quantities equal', D: 'an undetermined relation' };
 const repTex = (block: string) => `0.\\overline{${block}}`;
 const repValue = (block: string) => F(Number(block), 10 ** block.length - 1);
 
@@ -33,11 +34,13 @@ const repeatingQC: Template<RepParams> = {
             ['sum-one', 4],
             ['vs-trunc', 3],
             ['vs-frac', 2],
+            ['digit', 1],
           ]
         : [
             ['sum-one', 3],
             ['vs-trunc', 3],
             ['vs-frac', 3],
+            ['digit', 3],
           ],
     );
     const swap = rng.chance(0.4);
@@ -47,10 +50,12 @@ const repeatingQC: Template<RepParams> = {
     let qb: string;
     let trapRel: QCChoice | null = null;
     let why: string;
+    let relOverride: QCChoice | null = null;
+    let extraInfo = '';
     if (mode === 'sum-one') {
-      const two = d === 3 && rng.chance(0.6);
+      const two = d >= 2 && rng.chance(d === 2 ? 0.6 : 0.7);
       if (two) {
-        const x = rng.int(12, 87);
+        const x = d === 2 ? rng.int(12, 49) : rng.int(50, 87);
         const s = pickWeighted(rng, [
           [99, 3],
           [100, 3],
@@ -86,9 +91,9 @@ const repeatingQC: Template<RepParams> = {
         v.eq(1) ? ' $= 1$' : `, which is ${v.gt(1) ? 'greater' : 'less'} than 1`
       }.${trapRel ? ` Adding only the digits you see ($${decimal(naive)}$) ignores that every repeating decimal is a little more than its first ${L === 1 ? 'digit' : 'block'}.` : ''}`;
     } else if (mode === 'vs-trunc') {
-      const L = d === 1 ? 1 : rng.pick([1, 2]);
+      const L = d === 1 ? 1 : 2;
       let blk: string;
-      do blk = L === 1 ? String(rng.int(1, 8)) : String(rng.int(10, 98));
+      do blk = L === 1 ? String(rng.int(1, 8)) : String(d === 2 ? rng.int(10, 49) : rng.int(50, 98));
       while (L === 2 && blk[0] === blk[1]);
       blocks = [blk];
       const v = repValue(blk);
@@ -108,21 +113,51 @@ const repeatingQC: Template<RepParams> = {
           ? `It starts with $0.${blk}$, so it is less than $${decimal(other)}$: indeed $${repTex(blk)} = \\frac{${Number(blk)}}{${10 ** L - 1}} \\approx ${v.toNumber().toFixed(4)}$.`
           : `The two agree on the digits shown, and the repeating decimal has more nonzero digits after them, so it is greater.`
       }`;
+    } else if (mode === 'digit') {
+      // x is a digit: 0.xxx... = x/9 runs from 1/9 to 1 (and 0.999... is exactly 1), so a comparison value inside that range cannot be decided
+      blocks = [];
+      const others: Frac[] = [F(1, 5), F(1, 4), F(3, 10), F(1, 3), F(2, 5), F(1, 2), F(3, 5), F(2, 3), F(3, 4), F(4, 5), F(9, 10), F(1), F(1, 10), F(1, 20)];
+      other = rng.pick(others);
+      const xs = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      const rels = new Set(xs.map((x) => qcCompare(F(x, 9), other)));
+      relOverride = rels.size === 1 ? [...rels][0] : 'D';
+      const first = qcCompare(F(1, 9), other);
+      trapRel = relOverride === 'D' ? first : null;
+      extraInfo = ' The digit $x$ is a positive integer less than 10.';
+      qa = '$0.\\overline{x}$';
+      qb = `$${other.isTerminating() ? decimal(other) : other.toTex()}$`;
+      const lo = xs.find((x) => qcCompare(F(x, 9), other) !== first);
+      why =
+        relOverride === 'D'
+          ? `$0.\\overline{x} = \\frac{x}{9}$, so it runs from $\\frac{1}{9} \\approx 0.111$ (for $x = 1$) to $0.\\overline{9} = 1$ (for $x = 9$). $x = 1$ gives ${QC_REL_WORDS[first]}, but $x = ${lo}$ gives ${QC_REL_WORDS[qcCompare(F(lo!, 9), other)]}. Two allowed values disagree, so the relationship cannot be determined.`
+          : `$0.\\overline{x} = \\frac{x}{9}$ lies between $\\frac{1}{9}$ and $1$ for every allowed $x$, and every such value is ${relOverride === 'A' ? 'greater' : 'less'} than $${other.isTerminating() ? decimal(other) : other.toTex()}$.`;
     } else {
-      const choices: [string, Frac][] = [
-        ['3', F(1, 3)],
-        ['6', F(2, 3)],
-        ['09', F(1, 11)],
-        ['18', F(2, 11)],
-        ['27', F(3, 11)],
-        ['36', F(4, 11)],
-        ['45', F(5, 11)],
-        ['54', F(6, 11)],
-        ['63', F(7, 11)],
-        ['81', F(9, 11)],
-        ['12', F(4, 33)],
-        ['15', F(5, 33)],
-      ];
+      const choices: [string, Frac][] = (
+        d === 1
+          ? [
+              ['3', F(1, 3)],
+              ['6', F(2, 3)],
+              ['09', F(1, 11)],
+              ['18', F(2, 11)],
+              ['27', F(3, 11)],
+            ]
+          : d === 2
+            ? [
+                ['36', F(4, 11)],
+                ['45', F(5, 11)],
+                ['54', F(6, 11)],
+                ['63', F(7, 11)],
+                ['81', F(9, 11)],
+              ]
+            : [
+                ['12', F(4, 33)],
+                ['15', F(5, 33)],
+                ['21', F(7, 33)],
+                ['24', F(8, 33)],
+                ['30', F(10, 33)],
+                ['39', F(13, 33)],
+              ]
+      ) as [string, Frac][];
       const [blk, frac] = rng.pick(choices);
       blocks = [blk];
       const kase = rng.pick(['C', 'C', 'near'] as const);
@@ -140,15 +175,15 @@ const repeatingQC: Template<RepParams> = {
       }.`;
     }
     const v = blocks.map(repValue).reduce((a, b) => a.add(b), F(0));
-    const rel = qcCompare(v, other);
+    const rel = relOverride ?? qcCompare(v, other);
     const answer = swap ? swapQC(rel) : rel;
     const tr = trapRel && trapRel !== rel ? (swap ? swapQC(trapRel) : trapRel) : null;
-    const traps: QCQuestion['traps'] = tr ? { [tr]: 'num-repeating-truncate' } : undefined;
+    const traps: QCQuestion['traps'] = tr ? { [tr]: mode === 'digit' ? 'tested-one-value' : 'num-repeating-truncate' } : undefined;
     return {
       params: { mode, blocks, other, swap },
       q: {
         format: 'qc',
-        info: 'A bar over one or more digits means that those digits repeat without end; for example, $0.\\overline{25} = 0.252525\\ldots$',
+        info: `A bar over one or more digits means that those digits repeat without end; for example, $0.\\overline{25} = 0.252525\\ldots$${extraInfo}`,
         quantityA: swap ? qb : qa,
         quantityB: swap ? qa : qb,
         answer,
@@ -159,7 +194,17 @@ ${qcEnd(answer)}`,
       },
     };
   },
-  check(q, { blocks, other, swap }) {
+  check(q, { mode, blocks, other, swap }) {
+    if (mode === 'digit') {
+      // x = 1..9: expand 0.xxx... to 16 digits and compare with the other value
+      const samples: [number, number][] = [];
+      for (let x = 1; x <= 9; x++) {
+        let sum = 0;
+        for (let i = 0; i < 16; i++) sum += x * 10 ** -(i + 1);
+        samples.push(swap ? [other.toNumber(), sum] : [sum, other.toNumber()]);
+      }
+      return expectQC(q, qcFromFloatSamples(samples, 1e-12));
+    }
     // Expand the repeating decimals to many digits and add them as floating-point numbers.
     let sum = 0;
     for (const b of blocks) {
@@ -173,77 +218,98 @@ ${qcEnd(answer)}`,
   },
 };
 
-/* ================================================================== 2. A power of 10 as a percent of another (MCS) */
+/* ================================================================== 2. A percent of a number written with a power of 10 (MCS) */
 
 interface PTParams {
+  /** the percent, e.g. 0.5 for "0.5 percent" */
   q: Frac;
-  /** relation y = x + c for each choice; null = the multiplicative decoy */
-  rels: (number | null)[];
-  mult: number;
+  /** mantissa and exponent of the number: b x 10^k */
+  b: Frac;
+  k: number;
+  /** the five choices, as exact values */
+  values: Frac[];
 }
 
-const QS: { q: Frac; d: number[] }[] = [
-  { q: F(1), d: [1, 2] },
-  { q: F(10), d: [1, 2] },
-  { q: F(1, 100), d: [2, 3] },
-  { q: F(1000), d: [2, 3] },
-  { q: F(1, 1000), d: [3] },
-  { q: F(10000), d: [3] },
-];
+// Each level has its own percents and mantissas, so no question appears at two levels.
+const PT_Q: Record<1 | 2 | 3, Frac[]> = {
+  1: [F(1), F(10), F(5), F(50), F(20), F(25)],
+  2: [fdec(0.5), fdec(2.5), fdec(0.1), fdec(0.2), fdec(0.4), fdec(0.8)],
+  3: [fdec(0.05), fdec(0.25), fdec(0.02), fdec(0.15), F(125), F(150)],
+};
+const PT_B: Record<1 | 2 | 3, Frac[]> = {
+  1: [2, 3, 4, 5, 6, 8].map((x) => F(x)),
+  2: [1.2, 2.4, 3.5, 4.5, 6.4, 7.5].map(fdec),
+  3: [1.6, 2.5, 3.2, 4.8, 7.2, 9.6].map(fdec),
+};
+
+/** Exact Frac from a short decimal literal. */
+function fdec(x: number): Frac {
+  return F(Math.round(x * 1000), 1000);
+}
 
 const percentPowerTen: Template<PTParams> = {
   id: 'arith.decimals.percent-power-ten',
   skill: 'arith.decimals',
   format: 'mcs',
-  style: 'a power of 10 written as a percent of another power of 10',
+  style: 'a percent of a number written with a power of 10, answered as a decimal',
   generate(rng, d) {
-    const { q } = rng.pick(QS.filter((x) => x.d.includes(d)));
-    // 10^x = (q / 100) 10^y  ->  x = y + log10(q) - 2  ->  y = x + (2 - log10 q)
-    const lg = Math.round(Math.log10(q.toNumber()));
-    const c = 2 - lg;
-    const forgot100 = -lg; // treated q% as q
-    const reversed = -c;
-    const mult = 10 ** Math.abs(c === 0 ? 2 : c);
-    // Uniform position for the answer among 5 relations y = x + r (sorted by r); the two classic slips
-    // are kept when they fit on their side, then neighbors fill each side.
-    const target = rng.int(0, 4);
-    const slips = [reversed, forgot100].filter((v, i, arr) => v !== c && arr.indexOf(v) === i);
-    const lowSide = slips.filter((v) => v < c).slice(0, target);
-    const highSide = slips.filter((v) => v > c).slice(0, 4 - target);
-    for (let k = 1; lowSide.length < target; k++) if (!lowSide.includes(c - k)) lowSide.push(c - k);
-    for (let k = 1; highSide.length < 4 - target; k++) if (!highSide.includes(c + k)) highSide.push(c + k);
-    const final: (number | null)[] = [...lowSide, c, ...highSide].sort((a, b) => a - b);
-    const relTex = (r: number | null) => (r === null ? `$y = ${num(mult)}x$` : r === 0 ? '$y = x$' : `$y = x ${r > 0 ? '+' : '-'} ${Math.abs(r)}$`);
-    const trapOf = (r: number | null) => (r === null ? undefined : r === c ? undefined : r === reversed ? 'num-exponent-sign' : r === forgot100 ? 'num-percent-as-number' : undefined);
-    const choices = final.map((r) => ({ text: relTex(r), ...(trapOf(r) ? { trap: trapOf(r)! } : {}) }));
-    const qTex = pct(q);
-    const qDec = q.div(100);
-    return {
-      params: { q, rels: final, mult },
-      q: {
-        format: 'mcs',
-        stem: `If $x$ and $y$ are integers and $10^{x}$ is equal to $${qTex}$ of $10^{y}$, which of the following must be true?`,
-        choices,
-        answer: final.indexOf(c),
-        explanation: `$${qTex}$ is $\\frac{${q.isInt() ? num(q.toNumber()) : decimal(q)}}{100} = ${decimal(qDec)} = 10^{${lg - 2}}$. So $10^{x} = 10^{${lg - 2}} \\cdot 10^{y} = 10^{y ${lg - 2 < 0 ? '-' : '+'} ${Math.abs(lg - 2)}}$, which means $x = y ${lg - 2 < 0 ? '-' : '+'} ${Math.abs(lg - 2)}$, that is, ${relTex(c)}.
+    const level = d as 1 | 2 | 3;
+    for (;;) {
+      const q = rng.pick(PT_Q[level]);
+      const b = rng.pick(PT_B[level]);
+      const k = rng.int(level === 1 ? 2 : level === 2 ? 3 : 4, level === 1 ? 5 : level === 2 ? 7 : 8);
+      const N = b.mul(10 ** k);
+      const value = q.div(100).mul(N);
+      if (value.lt(F(1, 100)) || value.gt(F(10 ** 6))) continue;
+      // Every wrong value is a decimal point put in the wrong place by a known slip.
+      const slips: { f: Frac; trap: string; say: string }[] = [
+        { f: value.mul(100), trap: 'int-percent-not-divided', say: 'treating the percent as a plain number and never dividing by 100' },
+        { f: value.div(100), trap: 'num-decimal-shift', say: 'dividing by 100 twice' },
+        { f: value.mul(10), trap: 'num-decimal-shift', say: 'moving the decimal point one place too far to the right' },
+        { f: value.div(10), trap: 'num-decimal-shift', say: 'moving the decimal point one place too far to the left' },
+        { f: value.mul(1000), trap: 'num-decimal-shift', say: 'moving the decimal point three places too far to the right' },
+        { f: value.div(1000), trap: 'num-decimal-shift', say: 'moving the decimal point three places too far to the left' },
+        { f: value.mul(10000), trap: 'num-decimal-shift', say: 'counting four extra zeros' },
+        { f: value.div(10000), trap: 'num-decimal-shift', say: 'dividing by 100 twice and then shifting again' },
+      ].filter((x) => x.f.isTerminating());
+      const wrong = rng.shuffle(slips);
+      const below = wrong.filter((x) => x.f.lt(value));
+      const above = wrong.filter((x) => x.f.gt(value));
+      let target = rng.int(0, 4);
+      target = Math.max(Math.min(target, below.length), 4 - above.length);
+      const picked = [...below.slice(0, target), ...above.slice(0, 4 - target)];
+      if (picked.length !== 4) continue;
+      const all = [{ f: value, ok: true, trap: '', say: '' }, ...picked.map((x) => ({ ...x, ok: false }))].sort((x, y) => x.f.cmp(y.f));
+      const fmt = (v: Frac) => (v.isInt() ? num(v.toNumber()) : decimal(v));
+      const texts = all.map((x) => `$${fmt(x.f)}$`);
+      if (new Set(texts).size !== 5) continue;
+      const choices = all.map((x, i) => ({ text: texts[i], ...(x.ok ? {} : { trap: x.trap }) }));
+      const answer = all.findIndex((x) => x.ok);
+      const bTex = `${decimal(b)} \\times 10^{${k}}`;
+      const stem = rng.chance(0.5) ? `What is ${plainNum(q)} percent of $${bTex}$?` : `Which of the following is equal to ${plainNum(q)} percent of $${bTex}$?`;
+      const cited = picked.slice(0, 2).map((x) => `$${fmt(x.f)}$ comes from ${x.say}`);
+      return {
+        params: { q, b, k, values: all.map((x) => x.f) },
+        q: {
+          format: 'mcs',
+          stem,
+          choices,
+          answer,
+          explanation: `Turn the percent into a decimal first: ${plainNum(q)} percent means ${plainNum(q)} out of 100, that is $${decimal(q.div(100))}$.
 
-${
-          forgot100 === reversed
-            ? `Forgetting to divide the percent by 100, or moving the exponent to the wrong side, gives ${relTex(reversed)}.`
-            : `Two slips to avoid: forgetting that a percent is divided by 100 (that would give ${relTex(forgot100)}), and moving the exponent to the wrong side (${relTex(reversed)}).`
-        } Exponents of 10 add and subtract; they do not multiply the variables.`,
-      },
-    };
+The number is $${bTex} = ${fmt(N)}$, so the answer is $${decimal(q.div(100))} \\times ${fmt(N)} = ${fmt(value)}$.
+
+Check: 1 percent of $${fmt(N)}$ is $${fmt(N.div(100))}$, and ${plainNum(q)} percent is ${plainNum(q)} times that: $${fmt(N.div(100).mul(q))}$.
+
+Trap: ${cited.join('; ')}. A percent is always a number out of 100.`,
+        },
+      };
+    }
   },
-  check(q, { q: qq, rels, mult }) {
-    // Numeric check with actual numbers: for several y, find x with 10^x = (q/100) 10^y, then test each relation.
-    const ok = rels.map((r) =>
-      [3, 7, 12].every((y) => {
-        const x = Math.round(Math.log10((qq.toNumber() / 100) * 10 ** y));
-        return r === null ? y === mult * x : y === x + r;
-      }),
-    );
-    const hits = ok.flatMap((v, i) => (v ? [i] : []));
+  check(q, { q: qq, b, k, values }) {
+    // Floating-point evaluation of the percent of the number, compared with each choice.
+    const expected = (qq.toNumber() / 100) * (b.toNumber() * 10 ** k);
+    const hits = values.flatMap((v, i) => (relClose(v.toNumber(), expected, 1e-9) ? [i] : []));
     return expectMCS(q, hits.length === 1 ? hits[0] : -1);
   },
 };

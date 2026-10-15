@@ -45,6 +45,10 @@ export const numbersTraps: Record<string, Trap> = {
     label: 'Misplaced the decimal point (off by a power of 10)',
     fix: 'Count powers of 10 carefully: write each number as digits times a power of 10, multiply the digits, then add (or subtract) the exponents.',
   },
+  'num-divided-wrong': {
+    label: 'Multiplied by the divisor instead of dividing',
+    fix: 'Dividing by $c \\times 10^{p}$ divides the decimal parts and subtracts $p$ from the exponent: $\\frac{6 \\times 10^{4}}{2 \\times 10^{2}} = 3 \\times 10^{2}$, not $12 \\times 10^{6}$.',
+  },
   'num-exponent-sign': {
     label: 'Added an exponent that should be subtracted',
     fix: 'Dividing by $10^{p}$ subtracts $p$ from the exponent: $\\frac{10^{7}}{10^{-3}} = 10^{7 - (-3)} = 10^{10}$.',
