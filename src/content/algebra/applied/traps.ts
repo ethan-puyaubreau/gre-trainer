@@ -447,6 +447,10 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Allowed a concentration that a mixture cannot reach',
     fix: 'A mixture of two solutions is a weighted average: strictly between the two concentrations, and closer to the one used in larger amount.',
   },
+  'algw-condition-reversed': {
+    label: 'Read the condition on the amounts backwards',
+    fix: 'More of a solution pulls the mixture toward it: more of the weaker solution puts the mixture below the plain average, more of the stronger puts it above.',
+  },
   'algw-pure-adds-volume': {
     label: 'Forgot that the added substance also adds volume',
     fix: 'Adding $y$ liters of pure substance increases BOTH the amount of substance and the total volume: use $\\frac{\\text{substance} + y}{\\text{volume} + y}$.',
@@ -470,6 +474,34 @@ export const appliedTrapMap: Record<string, Trap> = {
   'algw-interest-vs-value': {
     label: 'Gave the interest instead of the total value',
     fix: 'The value of the account is the principal plus the interest: $P(1 + r)^n$, not $P(1 + r)^n - P$.',
+  },
+  'algw-years-off-by-one': {
+    label: 'Used one year too many or too few',
+    fix: '"After 2 years" means 2 multiplications by $1 + r$ (or 2 years of $Prt$): count the years in the question, not the years that have already passed.',
+  },
+  'algw-value-times-years': {
+    label: 'Multiplied the one-year value by the number of years',
+    fix: 'Compound growth multiplies the balance by $1 + r$ each year, giving $P(1 + r)^n$; multiplying $P(1 + r)$ by $n$ counts the principal $n$ times.',
+  },
+  'algw-percent-not-decimal': {
+    label: 'Used the percent as a plain number',
+    fix: 'Convert the percent before computing: 4 percent is $0.04$, so $I = P \\times 0.04 \\times t$.',
+  },
+  'algw-yearly-interest': {
+    label: 'Stopped at the interest of one year',
+    fix: 'The interest of one year is $\\frac{I}{t}$; the principal is that amount divided by the rate: $P = \\frac{I}{rt}$.',
+  },
+  'algw-rate-divided-by-years': {
+    label: 'Divided the rate by the number of years',
+    fix: 'Interest grows with the years, so $I = Prt$ and $P = \\frac{I}{rt}$: the years sit in the denominator with the rate.',
+  },
+  'algw-periods-off-by-one': {
+    label: 'Miscounted the compounding periods',
+    fix: 'Compounded quarterly for one year means exactly 4 periods, each multiplying by $1 + \\frac{r}{4}$: not 3, not 5.',
+  },
+  'algw-doubling-misplaced': {
+    label: 'Put the doubling or its exponent in the wrong place',
+    fix: '$n$ doublings give $2^n \\cdot P$: the exponent belongs on the 2, not on $P$ and not on a number of years.',
   },
   'algw-linear-growth': {
     label: 'Treated doubling as linear growth',

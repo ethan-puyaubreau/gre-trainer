@@ -1,8 +1,8 @@
 import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { num } from '../../../engine/tex';
-import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dx, valuedChoices, expectMcm, expectMcs, expectQc, money, NAMES, qcEnd, uniqueIndex } from './util';
+import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
+import { choiceValuesMatch, dx, trapChoices, expectMcm, expectMcs, expectQc, money, NAMES, qcEnd, uniqueIndex } from './util';
 
 const pct = (p: number | Frac) => `${p instanceof Frac ? dx(p) : p} percent`;
 
@@ -53,11 +53,13 @@ const mixture: Template<MixParams> = {
             answer: c,
             suffix: 'percent',
             traps: avg.eq(c) ? [] : [{ value: avg, trap: 'algw-average-percents' }],
-            explanation: `Track the ${S.s}: $${dx(frac(p, 100))}(${x}) + ${dx(frac(q, 100))}(${y}) = ${dx(frac(x * p, 100))} + ${dx(frac(y * q, 100))} = ${dx(frac(x * p + y * q, 100))}$ liters of ${S.s} in $${x + y}$ liters of mixture.
+            explanation: `Two solutions are mixed in different amounts, so track the ${S.s} itself: $${dx(frac(p, 100))}(${x}) + ${dx(frac(q, 100))}(${y}) = ${dx(frac(x * p, 100))} + ${dx(frac(y * q, 100))} = ${dx(frac(x * p + y * q, 100))}$ liters of ${S.s} in $${x + y}$ liters of mixture.
 
 Concentration: $\\frac{${dx(frac(x * p + y * q, 100))}}{${x + y}} = ${dx(c.div(100))}$, that is, ${dx(c)} percent.
 
-The plain average of the percents (${dx(avg)}) is wrong because the amounts are different: the mixture is closer to the ${x > y ? `${p} percent` : `${q} percent`} solution, which makes up more of it.`,
+Check: the result lies between ${p} and ${q}, closer to the ${x > y ? `${p} percent` : `${q} percent`} solution, which makes up more of the mixture.
+
+Trap: the plain average of the percents, ${dx(avg)}, is right only for equal volumes, but here the volumes are ${x} and ${y} liters. Rule: weight each percent by its volume.`,
           },
         };
       }
@@ -79,11 +81,15 @@ The plain average of the percents (${dx(avg)}) is wrong because the amounts are 
             answer: w,
             suffix: 'liters',
             traps: [{ value: total, trap: 'algw-total-vs-added' }],
-            explanation: `Water adds volume but no ${S.s}. The container has $${dx(frac(p, 100))}(${x}) = ${dx(frac(x * p, 100))}$ liters of ${S.s}, and that must be ${q} percent of the new total:
+            explanation: `Water adds volume but no ${S.s}, so the amount of ${S.s} stays fixed while the total grows. The container has $${dx(frac(p, 100))}(${x}) = ${dx(frac(x * p, 100))}$ liters of ${S.s}, and that must be ${q} percent of the new total:
 
 $$${dx(frac(q, 100))}T = ${dx(frac(x * p, 100))} \\quad\\Rightarrow\\quad T = ${num(total)} \\text{ liters}$$
 
-So $${num(total)} - ${x} = ${num(w)}$ liters of water must be added. ${num(total)} liters is the final volume, not the amount added.`,
+So $${num(total)} - ${x} = ${num(w)}$ liters of water must be added.
+
+Check: $\\frac{${dx(frac(x * p, 100))}}{${num(total)}} = ${dx(frac(q, 100))}$, that is, ${q} percent.
+
+Trap: ${num(total)} liters is the final volume, not the amount added; adding that much water would bring the volume to ${num(total.add(x))} liters. Rule: water added = final volume $-$ starting volume.`,
           },
         };
       }
@@ -105,13 +111,15 @@ So $${num(total)} - ${x} = ${num(w)}$ liters of water must be added. ${num(total
             answer: y,
             suffix: 'liters',
             traps: naive.eq(y) || !naive.isTerminating() ? [] : [{ value: naive, trap: 'algw-pure-adds-volume' }],
-            explanation: `Let $y$ be the liters of pure ${S.s} added. It increases both the ${S.s} and the total volume:
+            explanation: `Pure ${S.s} is all ${S.s}, so adding it changes the amount and the volume together. Let $y$ be the liters added:
 
 $$\\frac{${dx(frac(x * p, 100))} + y}{${x} + y} = ${dx(frac(q, 100))} \\quad\\Rightarrow\\quad ${dx(frac(x * p, 100))} + y = ${dx(frac(x * q, 100))} + ${dx(frac(q, 100))}y$$
 
 So $${dx(frac(100 - q, 100))}y = ${dx(frac(x * (q - p), 100))}$ and $y = ${dx(y)}$ liters.
 
-Using ${dx(frac(q - p, 100))} × ${x} = ${dx(naive)} forgets that the added ${S.s} also adds to the volume.`,
+Check: $\\frac{${dx(frac(x * p, 100).add(y))}}{${dx(y.add(x))}} = ${dx(frac(q, 100))}$, that is, ${q} percent.
+
+Trap: $${dx(frac(q - p, 100))} \\times ${x} = ${dx(naive)}$ forgets that the added ${S.s} also adds to the volume, so it falls short of ${q} percent. Rule: pure ${S.s} raises the amount and the total together.`,
           },
         };
       }
@@ -134,11 +142,11 @@ Using ${dx(frac(q - p, 100))} × ${x} = ${dx(naive)} forgets that the added ${S.
           answer: y,
           suffix: 'liters',
           traps: inv.isTerminating() && !inv.eq(y) ? [{ value: inv, trap: 'algw-mixture-ratio-inverted' }] : [],
-          explanation: `Let $y$ be the liters of the ${a} percent solution. Amount of ${S.s}: $${dx(frac(a, 100))}y + ${dx(frac(b * x, 100))} = ${dx(frac(c, 100))}(y + ${x})$.
+          explanation: `Two strengths and a target: write the amount of ${S.s} before and after. Let $y$ be the liters of the ${a} percent solution. Amount of ${S.s}: $${dx(frac(a, 100))}y + ${dx(frac(b * x, 100))} = ${dx(frac(c, 100))}(y + ${x})$.
 
 So $${dx(frac(a - c, 100))}y = ${dx(frac(x * (c - b), 100))}$ and $y = ${dx(y)}$ liters.
 
-Quick check by balance: the ${b} percent solution is ${c - b} points below the target and the ${a} percent solution is ${a - c} points above, so the amounts must be in the ratio ${a - c} : ${c - b}, and $${x} \\times \\frac{${c - b}}{${a - c}} = ${dx(y)}$. Flipping the ratio gives $${inv.isTerminating() ? dx(inv) : num(inv)}$.`,
+Quick check by balance: the ${b} percent solution is ${c - b} points below the target and the ${a} percent solution is ${a - c} points above, so the amounts must be in the ratio ${a - c} : ${c - b}, and $${x} \\times \\frac{${c - b}}{${a - c}} = ${dx(y)}$. Trap: flipping the ratio gives $${inv.isTerminating() ? dx(inv) : num(inv)}$, which would put more of the weaker solution than of the stronger one at a target nearer the stronger one. Rule: amounts are in inverse proportion to the distances from the target.`,
         },
       };
     }
@@ -171,7 +179,7 @@ Quick check by balance: the ${b} percent solution is ${c - b} points below the t
  * =========================================================================================== */
 
 interface InterestQcParams {
-  mode: 'simple-compound' | 'frequency' | 'unknown-principal' | 'doubling' | 'two-rates';
+  mode: 'simple-compound' | 'frequency' | 'unknown-principal' | 'doubling' | 'two-rates' | 'years-unknown';
   P: number;
   r: number;
   r2: number;
@@ -190,6 +198,21 @@ function grow(P: Frac, rate: number, years: number, k = 1): Frac {
   return v;
 }
 
+/** "(1.04)" or "(1.04)^{3}": the yearly multiplier raised to n (no exponent 1). */
+const mult = (r: number, n: number) => (n === 1 ? `(${dx(frac(100 + r, 100))})` : `(${dx(frac(100 + r, 100))})^{${n}}`);
+
+/** Three ways of naming the same account: the noun of "The ... of" and the subject with its principal. */
+const ACCOUNTS = [
+  (P: number) => `The value of an investment of ${money(P)}`,
+  (P: number) => `The balance of an account opened with ${money(P)}`,
+  (P: number) => `The amount in a savings account opened with ${money(P)}`,
+];
+const DOUBLERS = [
+  (k: number) => `The value of an investment doubles every ${k} years.`,
+  (k: number) => `The balance of an account doubles every ${k} years.`,
+  (k: number) => `A sum of money doubles in value every ${k} years.`,
+];
+
 const interestQC: Template<InterestQcParams> = {
   id: 'alg.mixtures-interest.interest-qc',
   skill: 'alg.mixtures-interest',
@@ -197,23 +220,30 @@ const interestQC: Template<InterestQcParams> = {
   style: 'simple versus compound interest, doubling',
   generate(rng, d) {
     const mode = rng.pick(
-      d === 1 ? (['simple-compound', 'doubling', 'simple-compound'] as const) : d === 2 ? (['frequency', 'unknown-principal', 'doubling', 'simple-compound'] as const) : (['unknown-principal', 'two-rates', 'frequency'] as const),
+      d === 1
+        ? (['simple-compound', 'simple-compound', 'doubling', 'years-unknown', 'years-unknown'] as const)
+        : d === 2
+          ? (['frequency', 'unknown-principal', 'unknown-principal', 'doubling', 'simple-compound', 'years-unknown'] as const)
+          : (['unknown-principal', 'two-rates', 'frequency', 'years-unknown'] as const),
     );
     const base: InterestQcParams = { mode, P: 0, r: 0, r2: 0, n: 0, swap: false, K: 0, bound: 'none', bv: 0, m: 0 };
     const swap = rng.chance(0.4);
     const side = (a: string, b: string) => (swap ? [b, a] : [a, b]);
+    const frame = rng.int(0, ACCOUNTS.length - 1);
+    const who = ACCOUNTS[frame];
+    const yrs = (n: number) => `${n} year${n === 1 ? '' : 's'}`;
     if (mode === 'simple-compound') {
-      const n = rng.pick([1, 2, 2, 3]);
-      const P = n === 3 ? rng.pick([10000, 20000]) : rng.pick([1000, 2000, 5000, 10000]);
-      const r = rng.pick([2, 4, 5, 6, 8, 10]);
+      const n = d === 1 ? rng.pick([1, 2, 2]) : rng.pick([2, 3, 3]);
+      const P = d === 1 ? rng.pick([1000, 2000, 5000]) : n === 3 ? rng.pick([10000, 20000]) : rng.pick([4000, 8000, 10000]);
+      const r = d === 1 ? rng.pick([2, 4, 5, 10]) : rng.pick([3, 6, 8, 12]);
       const simple = frac(P).mul(100 + r * n).div(100);
       const comp = grow(frac(P), r, n);
-      const [qa, qb] = side(
-        `The value of an investment of ${money(P)} after ${n} year${n === 1 ? '' : 's'} at ${r} percent simple annual interest`,
-        `The value of an investment of ${money(P)} after ${n} year${n === 1 ? '' : 's'} at ${r} percent annual interest, compounded annually`,
-      );
+      const cents = !simple.isInt() || !comp.isInt();
+      const [qa, qb] = side(`${who(P)} after ${yrs(n)} at ${r} percent simple annual interest`, `${who(P)} after ${yrs(n)} at ${r} percent annual interest, compounded annually`);
       const answer = swap ? qcCompare(comp, simple) : qcCompare(simple, comp);
       const traps: QCQuestion['traps'] = answer !== 'C' ? { C: 'algw-simple-for-compound' } : undefined;
+      const gap = comp.sub(simple);
+      const first = frac(P).mul(100 + r).div(100);
       return {
         params: { ...base, P, r, n, swap },
         q: {
@@ -222,22 +252,31 @@ const interestQC: Template<InterestQcParams> = {
           quantityB: qb,
           answer,
           traps,
-          explanation: `Simple interest: $${num(P)}(1 + ${n} \\times ${dx(frac(r, 100))}) = ${money(simple, !simple.isInt())}$. Compound interest: $${num(P)}(${dx(frac(100 + r, 100))})^{${n}} = ${money(comp, !comp.isInt())}$.
+          explanation: `The same sum earns the same rate in both, so only the method differs. Simple interest adds ${r} percent of the original every year: $${num(P)}(1 + ${n} \\times ${dx(frac(r, 100))}) = ${money(simple, cents)}$. Compound interest multiplies by $${dx(frac(100 + r, 100))}$ each year: $${num(P)}${mult(r, n)} = ${money(comp, cents)}$.
 
-${n === 1 ? 'For a single year the two methods agree: interest has not yet had time to earn interest.' : 'With compounding, the interest of each year also earns interest, so after the first year the compound value is larger.'} ${qcEnd(answer)}`,
+${
+            n === 1
+              ? `Check: after one year the interest has had no time to earn interest, so the two agree. ${qcEnd(answer)}`
+              : `Check: after the first year both hold ${money(first, !first.isInt())}. In year 2 simple interest again earns ${money(frac(P * r, 100), !frac(P * r, 100).isInt())}, but compound interest earns ${r} percent of ${money(first, !first.isInt())}, which is ${money(first.mul(r).div(100), !first.mul(r).div(100).isInt())}. ${qcEnd(answer)}`
+          }
+
+${
+            n === 1
+              ? `Trap: assuming compound interest always beats simple interest overlooks the one-year case, where both give ${money(simple, cents)}.`
+              : `Trap: treating the two methods as equal because the rate is the same misses ${money(gap, !gap.isInt())}.`
+          } Rule: compound exceeds simple only from the second year on.`,
         },
       };
     }
     if (mode === 'frequency') {
-      const P = rng.pick([1000, 2000, 4000, 10000]);
-      const r = rng.pick([4, 6, 8, 10, 12]);
+      const P = d === 2 ? rng.pick([1000, 2000, 4000]) : rng.pick([5000, 10000, 20000]);
+      const r = d === 2 ? rng.pick([4, 6, 8]) : rng.pick([10, 12, 14, 16]);
       const semi = grow(frac(P), r, 1, 2);
       const annual = grow(frac(P), r, 1, 1);
-      const [qa, qb] = side(
-        `The value after 1 year of ${money(P)} invested at ${r} percent annual interest, compounded annually`,
-        `The value after 1 year of ${money(P)} invested at ${r} percent annual interest, compounded semiannually`,
-      );
+      const cents = !semi.isInt() || !annual.isInt();
+      const [qa, qb] = side(`${who(P)} after 1 year at ${r} percent annual interest, compounded annually`, `${who(P)} after 1 year at ${r} percent annual interest, compounded semiannually`);
       const answer = swap ? qcCompare(semi, annual) : qcCompare(annual, semi);
+      const half = frac(P).mul(r).div(200);
       return {
         params: { ...base, P, r, swap },
         q: {
@@ -246,66 +285,122 @@ ${n === 1 ? 'For a single year the two methods agree: interest has not yet had t
           quantityB: qb,
           answer,
           traps: { C: 'algw-compounding-frequency' },
-          explanation: `Compounded annually: $${num(P)}(${dx(frac(100 + r, 100))}) = ${money(annual, !annual.isInt())}$. Compounded semiannually, each half year earns $\\frac{${r}}{2} = ${r / 2}$ percent: $${num(P)}(${dx(frac(200 + r, 200))})^2 = ${money(semi, !semi.isInt())}$.
+          explanation: `Both quantities use the same yearly rate and differ only in how often interest is credited. Annually: $${num(P)}(${dx(frac(100 + r, 100))}) = ${money(annual, cents)}$. Semiannually, each half year earns $\\frac{${r}}{2} = ${r / 2}$ percent: $${num(P)}(${dx(frac(200 + r, 200))})^2 = ${money(semi, cents)}$.
 
-The interest earned in the first half year earns interest in the second half, so semiannual compounding gives more. ${qcEnd(answer)}`,
+Check: the first half year already adds ${money(half, !half.isInt())}, and the second half year earns ${r / 2} percent of that too, which is where the extra ${money(semi.sub(annual), !semi.sub(annual).isInt())} comes from. ${qcEnd(answer)}
+
+Trap: assuming "same yearly rate, same value" misses that interest credited at mid-year earns interest. Rule: the more often interest is credited, the larger the value.`,
         },
       };
     }
     if (mode === 'unknown-principal') {
-      const r = rng.pick([10, 20]);
-      const factor = frac((100 + r) * (100 + r), 10000); // 1.21 or 1.44
-      const gain = factor.sub(1); // 0.21 or 0.44
-      const K = rng.pick([100, 200, 300, 420, 500, 840]);
+      const r = rng.pick(d === 2 ? [10, 20] : [10, 20, 30]);
+      const factor = frac((100 + r) * (100 + r), 10000); // 1.21, 1.44, 1.69
+      const gain = factor.sub(1); // 0.21, 0.44, 0.69
+      const K = rng.pick(d === 2 ? [100, 200, 300, 400, 500] : [150, 250, 350, 450, 600, 750]);
       const th = frac(K).div(gain);
+      const thR = Math.round(th.toNumber());
       const bound: InterestQcParams['bound'] = rng.pick(['none', 'none', 'gt', 'lt']);
       let bv = 0;
       if (bound === 'gt') bv = Math.ceil(th.toNumber() / 100) * 100 + rng.pick([0, 100, 500]);
       if (bound === 'lt') bv = Math.floor(th.toNumber() / 100) * 100 - rng.pick([0, 100]);
       const effBound = bound === 'lt' && bv <= 0 ? 'none' : bound;
       const answer: QCChoice = effBound === 'none' ? 'D' : effBound === 'gt' ? 'A' : 'B';
-      const traps: QCQuestion['traps'] = answer === 'D' ? { A: 'algw-single-case' } : { D: 'algw-single-case' };
+      const traps: QCQuestion['traps'] = answer === 'D' ? { A: 'algw-single-case', B: 'algw-single-case' } : { D: 'algw-single-case' };
+      const small = 100;
+      const big = 10000;
+      const aSmall = factor.mul(small);
+      const aBig = factor.mul(big);
+      const subject = frame === 0 ? `An investment of $x$ dollars` : frame === 1 ? `An account opened with $x$ dollars` : `A savings account opened with $x$ dollars`;
+      const diffAt = (x: number) => factor.mul(x).sub(x + K);
       return {
         params: { ...base, r, K, bound: effBound, bv },
         q: {
           format: 'qc',
-          info: `An investment of $x$ dollars earns ${r} percent annual interest, compounded annually.${effBound === 'gt' ? ` $x > ${num(bv)}$` : effBound === 'lt' ? ` $0 < x < ${num(bv)}$` : ''}`,
-          quantityA: 'The value of the investment, in dollars, after 2 years',
+          info: `${subject} earns ${r} percent annual interest, compounded annually.${effBound === 'gt' ? ` $x > ${num(bv)}$` : effBound === 'lt' ? ` $0 < x < ${num(bv)}$` : ''}`,
+          quantityA: 'The value, in dollars, after 2 years',
           quantityB: `$x + ${num(K)}$`,
           answer,
           traps,
-          explanation: `After 2 years the value is $x(${dx(frac(100 + r, 100))})^2 = ${dx(factor)}x$. Compare $${dx(factor)}x$ with $x + ${num(K)}$: subtract $x$ from both, leaving $${dx(gain)}x$ versus ${num(K)}, that is, $x$ versus $\\frac{${num(K)}}{${dx(gain)}} \\approx ${num(Math.round(th.toNumber()))}$.
+          explanation: `Quantity A depends on the unknown $x$, so locate where the two quantities cross. After 2 years A is $x(${dx(frac(100 + r, 100))})^2 = ${dx(factor)}x$. Subtracting $x$ from both sides leaves $${dx(gain)}x$ versus $${num(K)}$, so they cross at $x = \\frac{${num(K)}}{${dx(gain)}} \\approx ${num(thR)}$.
 
 ${
             effBound === 'none'
-              ? `The investment could be smaller or larger than that (for instance ${money(100)} or ${money(10000)}). ${qcEnd('D')}`
+              ? `Nothing restricts $x$. Test two values. For $x = ${small}$: A is ${money(aSmall, !aSmall.isInt())} and B is ${money(small + K)}, so B is larger. For $x = ${num(big)}$: A is ${money(aBig)} and B is ${money(big + K)}, so A is larger. Different cases give different answers. ${qcEnd('D')}
+
+Trap: testing only $x = ${small}$ suggests B is always larger, and testing only $x = ${num(big)}$ suggests A is. Rule: if both orders occur, the answer is D.`
               : effBound === 'gt'
-                ? `Since $x > ${num(bv)}$, which is more than $\\frac{${num(K)}}{${dx(gain)}}$, Quantity A is larger. ${qcEnd('A')}`
-                : `Since $x < ${num(bv)}$, which is less than $\\frac{${num(K)}}{${dx(gain)}}$, Quantity B is larger. ${qcEnd('B')}`
+                ? `Here $x > ${num(bv)}$, which is beyond the crossing point $${num(thR)}$. Check: at $x = ${num(bv)}$ the difference A $-$ B is $${dx(gain)}(${num(bv)}) - ${num(K)} = ${num(diffAt(bv))}$, and it only grows as $x$ grows. ${qcEnd('A')}
+
+Trap: trying a small investment like $x = ${small}$ makes B larger, but ${small} is not allowed. Rule: test only values the condition permits.`
+                : `Here $0 < x < ${num(bv)}$, which stays below the crossing point $${num(thR)}$. Check: at $x = ${num(bv)}$ the difference A $-$ B is $${dx(gain)}(${num(bv)}) - ${num(K)} = ${num(diffAt(bv))}$, and it is more negative for smaller $x$. ${qcEnd('B')}
+
+Trap: a large investment like $x = ${num(big)}$ makes A larger, but it is not allowed. Rule: test only values the condition permits.`
           }`,
         },
       };
     }
     if (mode === 'doubling') {
-      const k = rng.pick([3, 4, 5, 6, 8, 10]);
-      const n = rng.int(2, 4);
+      const k = rng.pick(d === 1 ? [3, 4, 5] : [6, 8, 10, 12]);
+      const n = rng.int(2, d === 1 ? 3 : 4);
       const exact = 2 ** n;
       const m = rng.pick([exact, exact, 2 * n, n + 1, 2 ** (n + 1), 2 ** (n - 1)]);
       const answer = qcCompare(exact, m);
       const trapAns = qcCompare(2 * n, m);
       const traps: QCQuestion['traps'] = trapAns !== answer ? { [trapAns]: 'algw-linear-growth' } : answer === 'C' ? { D: 'algw-single-case' } : undefined;
+      const lin = 2 * n;
       return {
         params: { ...base, n, m, K: k },
         q: {
           format: 'qc',
-          info: `The value of an investment doubles every ${k} years.`,
-          quantityA: `The value of the investment after ${n * k} years`,
-          quantityB: `${m} times the initial value of the investment`,
+          info: DOUBLERS[frame](k),
+          quantityA: `The value after ${n * k} years`,
+          quantityB: `${m} times the initial value`,
           answer,
           traps,
-          explanation: `${n * k} years is ${n} periods of ${k} years, and the value doubles in each: $2^{${n}} = ${exact}$ times the initial value, whatever that value is.
+          explanation: `${n * k} years is ${n} periods of ${k} years, and the value is multiplied by 2 in each, whatever the starting amount: $2^{${n}} = ${exact}$ times the initial value.
 
-Compare ${exact} with ${m}. ${qcEnd(answer)} The growth is not linear: ${n} doublings multiply by $2^{${n}}$, not by ${2 * n}.`,
+Check by stepping: $1 \\to 2 \\to 4 \\to \\cdots$ after ${n} doublings gives ${exact}. Compare ${exact} with ${m}. ${qcEnd(answer)}
+
+Trap: adding the initial value in each period gives ${lin} times after ${n} periods, short of ${exact}, because every period doubles what is already there. Rule: $n$ doublings multiply by $2^n$.`,
+        },
+      };
+    }
+    if (mode === 'years-unknown') {
+      const P = rng.pick(d === 1 ? [1000, 2000, 5000] : d === 2 ? [4000, 8000, 10000] : [10000, 20000, 50000]);
+      const r = rng.pick(d === 1 ? [2, 4, 5, 10] : d === 2 ? [3, 6, 8, 12] : [14, 15, 16, 20]);
+      const bound: InterestQcParams['bound'] = rng.pick(['none', 'gt']);
+      const [qa, qb] = side(
+        `${who(P)} after $n$ years at ${r} percent annual interest, compounded annually`,
+        `${who(P)} after $n$ years at ${r} percent simple annual interest`,
+      );
+      const answer: QCChoice = bound === 'none' ? 'D' : swap ? 'B' : 'A';
+      const one = frac(P).mul(100 + r).div(100);
+      const s2 = frac(P).mul(100 + 2 * r).div(100);
+      const c2 = grow(frac(P), r, 2);
+      const cents = !one.isInt() || !s2.isInt() || !c2.isInt();
+      const traps: QCQuestion['traps'] = bound === 'none' ? { [swap ? 'B' : 'A']: 'algw-single-case' } : { D: 'algw-single-case' };
+      return {
+        params: { ...base, P, r, swap, bound },
+        q: {
+          format: 'qc',
+          info: bound === 'none' ? '$n$ is a positive integer.' : '$n$ is an integer greater than 1.',
+          quantityA: qa,
+          quantityB: qb,
+          answer,
+          traps,
+          explanation:
+            bound === 'none'
+              ? `$n$ is not fixed, so test the smallest allowed value and a larger one. For $n = 1$ both methods give $${num(P)}(${dx(frac(100 + r, 100))}) = ${money(one, cents)}$, so the quantities are equal. For $n = 2$ simple interest gives ${money(s2, cents)} and compound interest ${money(c2, cents)}, so the compound value is larger.
+
+Two allowed values, two different relationships. ${qcEnd('D')}
+
+Trap: trying only $n = 2$ suggests the compound value always wins, but after a single year no interest has yet earned interest. Rule: test the boundary value of a variable first.`
+              : `$n$ is at least 2, so check the first allowed value. For $n = 2$ simple interest gives $${num(P)}(1 + 2 \\times ${dx(frac(r, 100))}) = ${money(s2, cents)}$ and compound interest $${num(P)}${mult(r, 2)} = ${money(c2, cents)}$, so the compound value is larger by ${money(c2.sub(s2), !c2.sub(s2).isInt())}.
+
+Each further year adds the same ${money(frac(P * r, 100), !frac(P * r, 100).isInt())} under simple interest, but compound interest earns ${r} percent of a balance already above ${money(c2, cents)}, so the gap only widens. The compound value is always larger. ${qcEnd(answer)}
+
+Trap: using $n = 1$ gives a tie at ${money(one, cents)}, but 1 is not allowed. Rule: use only values the condition permits.`,
         },
       };
     }
@@ -325,6 +420,13 @@ Compare ${exact} with ${m}. ${qcEnd(answer)} The growth is not linear: ${n} doub
       const answer = swap ? qcCompare(compI, simpleI) : qcCompare(simpleI, compI);
       const naive: QCChoice = r1 > r2 ? (swap ? 'B' : 'A') : 'C';
       const traps: QCQuestion['traps'] = naive !== answer ? { [naive]: 'algw-simple-for-compound' } : undefined;
+      const yearS = frac(P).mul(frac(Math.round(r1 * 10), 1000));
+      const yearC = frac(P).mul(r2).div(100);
+      const trapText = compI.gt(simpleI)
+        ? r1 > r2
+          ? `the simple rate, ${r1} percent, is the higher one, yet it loses: ${money(simpleI, !simpleI.isInt())} against ${money(compI, !compI.isInt())}`
+          : `equal rates do not mean equal interest: ${money(simpleI, !simpleI.isInt())} against ${money(compI, !compI.isInt())}`
+        : `assuming compounding always wins ignores the higher simple rate: ${money(simpleI, !simpleI.isInt())} beats ${money(compI, !compI.isInt())}`;
       return {
         params: { ...base, P, r: r1, r2, n, swap },
         q: {
@@ -333,9 +435,11 @@ Compare ${exact} with ${m}. ${qcEnd(answer)} The growth is not linear: ${n} doub
           quantityB: qb,
           answer,
           traps,
-          explanation: `Simple: $${num(P)} \\times ${dx(frac(Math.round(r1 * 10), 1000))} \\times ${n} = ${money(simpleI, !simpleI.isInt())}$. Compound: $${num(P)}(${dx(frac(100 + r2, 100))})^{${n}} - ${num(P)} = ${money(compI, !compI.isInt())}$.
+          explanation: `The rates differ in kind (simple versus compound), so compute both interests. Simple: $${num(P)} \\times ${dx(frac(Math.round(r1 * 10), 1000))} \\times ${n} = ${money(simpleI, !simpleI.isInt())}$. Compound: $${num(P)}${mult(r2, n)} - ${num(P)} = ${money(compI, !compI.isInt())}$.
 
-${qcEnd(answer)} A higher simple rate does not automatically win: compounding adds interest on interest every year.`,
+Check: simple interest repeats the same ${money(yearS, !yearS.isInt())} every year. Compound interest earns ${money(yearC, !yearC.isInt())} in year 1 and more in each later year, because the balance keeps growing. ${qcEnd(answer)}
+
+Trap: ${trapText}. Rule: compare the amounts, not only the rates.`,
         },
       };
     }
@@ -365,6 +469,15 @@ ${qcEnd(answer)} A higher simple rate does not automatically win: compounding ad
         let v = x;
         for (let y = 0; y < 2; y++) v = v.add(v.mul(prm.r).div(100));
         samples.push([v, x.add(prm.K)]);
+      }
+      return expectQc(q, qcFromSamples(samples));
+    }
+    if (prm.mode === 'years-unknown') {
+      const samples: [Frac, Frac][] = [];
+      for (let n = prm.bound === 'gt' ? 2 : 1; n <= 4; n++) {
+        const comp = grow(frac(prm.P), prm.r, n);
+        const simple = frac(prm.P).mul(100 + prm.r * n).div(100);
+        samples.push(prm.swap ? [simple, comp] : [comp, simple]);
       }
       return expectQc(q, qcFromSamples(samples));
     }
@@ -399,8 +512,9 @@ interface GrowthParams {
   n: number;
   I: number;
   k: number;
-  /** For numeric kinds: choice values; for doubling: coefficient/exponent pairs. */
+  /** For numeric kinds: choice values; for doubling: unused. */
   values: Frac[];
+  /** For doubling: the choices as coef * P^pow. */
   forms: { coef: number; pow: number }[];
   cents: boolean;
 }
@@ -414,124 +528,155 @@ const growth: Template<GrowthParams> = {
     const kind: GrowthParams['kind'] = d === 1 ? rng.pick(['compound-value', 'principal'] as const) : d === 2 ? rng.pick(['compound-value', 'doubling-expr', 'principal'] as const) : rng.pick(['quarterly', 'doubling-expr', 'compound-value'] as const);
     const base: GrowthParams = { kind, P: 0, r: 0, n: 0, I: 0, k: 0, values: [], forms: [], cents: false };
     const nm = rng.pick(NAMES);
-    if (kind === 'doubling-expr') {
-      const k = rng.pick([3, 4, 5, 6, 7, 8, 9, 10, 12]);
-      const n = rng.int(3, 5);
-      const forms = [
-        { coef: n, pow: 1 },
-        { coef: 2 * n, pow: 1 },
-        { coef: 2 ** (n - 1), pow: 1 },
-        { coef: 2 ** n, pow: 1 },
-        { coef: 1, pow: n },
-      ];
-      const uniq = forms.filter((f, i) => forms.findIndex((g) => g.coef === f.coef && g.pow === f.pow) === i);
-      while (uniq.length < 5) uniq.push({ coef: 2 ** (n + uniq.length - 3), pow: 1 });
-      const ordered = uniq.slice(0, 5).sort((a, b) => a.pow - b.pow || a.coef - b.coef);
-      const ftex = (f: { coef: number; pow: number }) => (f.pow === 1 ? `${f.coef}P` : `P^{${f.pow}}`);
-      const trapOf = (f: { coef: number; pow: number }) =>
-        f.pow > 1 ? undefined : f.coef === n || f.coef === 2 * n ? 'algw-linear-growth' : f.coef === 2 ** (n - 1) ? 'algw-geo-exponent' : undefined;
-      const choices: Choice[] = ordered.map((f) => {
-        const t = f.coef === 2 ** n && f.pow === 1 ? undefined : trapOf(f);
-        return { text: `$${ftex(f)}$`, ...(t ? { trap: t } : {}) };
-      });
-      const answer = ordered.findIndex((f) => f.coef === 2 ** n && f.pow === 1);
-      return {
-        params: { ...base, k, n, forms: ordered },
-        q: {
-          format: 'mcs',
-          stem: `${nm} invested $P$ dollars in an account. The value of the account doubles every ${k} years. If ${nm} makes no deposits or withdrawals, which of the following represents the value of the account, in dollars, after ${n * k} years?`,
-          choices,
-          answer,
-          explanation: `${n * k} years contain ${n} doubling periods of ${k} years each. After each period the value is multiplied by 2: $P \\to 2P \\to 4P \\to \\cdots$, so after ${n} periods it is $2^{${n}}P = ${2 ** n}P$.
+    const frame = rng.int(0, 2);
+    for (;;) {
+      if (kind === 'doubling-expr') {
+        const k = rng.pick([3, 4, 5, 6, 7, 8, 9, 10, 12]);
+        const n = rng.int(3, 5);
+        // Each wrong form is a named slip; its key orders the choices (coefficient first, powers of P last).
+        const key = (f: { coef: number; pow: number }) => (f.pow === 1 ? f.coef : 1e6 * f.pow + f.coef);
+        const ftex = (f: { coef: number; pow: number }) => (f.pow === 1 ? `${f.coef}P` : f.coef === 1 ? `P^{${f.pow}}` : `(${f.coef === 2 ** f.pow ? 2 : f.coef}P)^{${f.pow}}`);
+        const cands: { value: number; trap: string; why: string; form: { coef: number; pow: number } }[] = [
+          { form: { coef: n, pow: 1 }, trap: 'algw-linear-growth', why: `adding $P$ once per period (${n} periods)` },
+          { form: { coef: 2 * n, pow: 1 }, trap: 'algw-linear-growth', why: `adding $2P$ once per period (${n} periods)` },
+          { form: { coef: 2 ** (n - 1), pow: 1 }, trap: 'algw-geo-exponent', why: 'doubling one time too few' },
+          { form: { coef: 1, pow: n }, trap: 'algw-doubling-misplaced', why: `putting the exponent ${n} on $P$ instead of on the 2` },
+          { form: { coef: 2 ** (n + 1), pow: 1 }, trap: 'algw-geo-exponent', why: 'doubling one time too many' },
+          { form: { coef: 2 ** n, pow: n }, trap: 'algw-doubling-misplaced', why: `raising the whole $2P$ to the power ${n}` },
+          { form: { coef: 2 ** k, pow: 1 }, trap: 'algw-doubling-misplaced', why: `using the ${k} years of one period as the number of doublings` },
+        ].map((c) => ({ ...c, value: key(c.form) }));
+        const correctForm = { coef: 2 ** n, pow: 1 };
+        const texts = new Map<number, string>([[key(correctForm), ftex(correctForm)], ...cands.map((c) => [c.value, ftex(c.form)] as [number, string])]);
+        const res = trapChoices(rng, key(correctForm), cands, (v) => `$${texts.get(v.toNumber())}$`);
+        if (!res) continue;
+        const forms = res.values.map((v) => (v.toNumber() === key(correctForm) ? correctForm : cands.find((c) => c.value === v.toNumber())!.form));
+        const cited = res.kept[0];
+        const chain = Array.from({ length: n + 1 }, (_, i) => 3 * 2 ** i).join(' \\to ');
+        const atThree = cited.form.coef * 3 ** cited.form.pow;
+        return {
+          params: { ...base, k, n, forms },
+          q: {
+            format: 'mcs',
+            stem:
+              frame === 0
+                ? `${nm} invested $P$ dollars in an account. The value of the account doubles every ${k} years. If ${nm} makes no deposits or withdrawals, which of the following represents the value of the account, in dollars, after ${n * k} years?`
+                : frame === 1
+                  ? `The balance of an account that starts at $P$ dollars doubles every ${k} years, with no deposits or withdrawals. Which of the following represents the balance, in dollars, after ${n * k} years?`
+                  : `A fund worth $P$ dollars doubles in value every ${k} years. If nothing is added or withdrawn, which of the following represents its value, in dollars, after ${n * k} years?`,
+            choices: res.choices,
+            answer: res.answer,
+            explanation: `"Doubles every ${k} years" over ${n * k} years means $\\frac{${n * k}}{${k}} = ${n}$ doublings, and each one multiplies the current value by 2: $P \\to 2P \\to 4P \\to \\cdots$, so the value is $2^{${n}}P = ${2 ** n}P$.
 
-$${n}P$ or $${2 * n}P$ treat the growth as linear, $${2 ** (n - 1)}P$ misses one doubling, and $P^{${n}}$ puts the exponent on the wrong thing.`,
-        },
-      };
-    }
-    let correct: Frac;
-    let traps: { value: Frac; trap: string }[] = [];
-    let stem: string;
-    let explanation: string;
-    let fmt: (v: Frac) => string;
-    let params: GrowthParams;
-    if (kind === 'compound-value') {
-      for (;;) {
-        const P = rng.pick([1000, 2000, 2500, 4000, 5000, 8000, 10000, 20000]);
-        const r = rng.pick([2, 3, 4, 5, 6, 8, 10]);
+Check with $P = 3$: $${chain}$, and the last value is $${3 * 2 ** n} = ${2 ** n} \\times 3$.
+
+Trap: $${ftex(cited.form)}$ comes from ${cited.why}; for $P = 3$ it equals $${num(atThree)}$, not $${3 * 2 ** n}$. Rule: $n$ doublings multiply by $2^n$.`,
+          },
+        };
+      }
+      let correct: Frac;
+      let cands: { value: Frac; trap: string; why: string }[] = [];
+      let stem: string;
+      let explanation: (cited: { value: Frac; why: string }) => string;
+      let fmt: (x: Frac) => string;
+      let params: GrowthParams;
+      if (kind === 'compound-value') {
+        const P = rng.pick(d === 1 ? [1000, 2000, 2500, 5000] : [4000, 8000, 10000, 20000]);
+        const r = rng.pick(d === 1 ? [2, 4, 5, 10] : [3, 6, 8, 12]);
         const n = d === 3 ? 3 : 2;
         const v = grow(frac(P), r, n);
-        if (!v.mul(100).isInt()) continue;
+        const whole = (x: Frac) => x.mul(100).isInt();
+        if (!whole(v)) continue;
         correct = v;
         const simple = frac(P).mul(100 + r * n).div(100);
-        traps = [
-          { value: simple, trap: 'algw-simple-for-compound' },
-          { value: v.sub(P), trap: 'algw-interest-vs-value' },
-        ];
-        const extra = grow(frac(P), r, n + 1);
-        if (extra.mul(100).isInt()) traps.push({ value: extra, trap: 'algw-seq-off-by-one' });
-        const cents = !v.isInt() || traps.some((t) => !t.value.isInt());
+        const one = frac(P).mul(100 + r).div(100);
+        const chain = Array.from({ length: n }, (_, i) => grow(frac(P), r, i + 1));
+        cands = [
+          { value: simple, trap: 'algw-simple-for-compound', why: 'using simple interest, which ignores the interest earned on interest' },
+          { value: v.sub(P), trap: 'algw-interest-vs-value', why: 'giving only the interest earned' },
+          { value: grow(frac(P), r, n - 1), trap: 'algw-years-off-by-one', why: 'compounding for one year too few' },
+          { value: grow(frac(P), r, n + 1), trap: 'algw-years-off-by-one', why: 'compounding for one year too many' },
+          { value: one.mul(n), trap: 'algw-value-times-years', why: `multiplying the one-year value by the ${n} years` },
+          { value: simple.sub(P), trap: 'algw-interest-vs-value', why: 'giving only the simple interest' },
+        ].filter((c) => whole(c.value));
+        const cents = !v.isInt() || cands.some((c) => !c.value.isInt()) || chain.some((x) => !x.isInt());
         fmt = (x) => money(x, cents);
         params = { ...base, P, r, n, cents };
-        stem = `${nm} deposited ${money(P)} in an account that earns ${r} percent annual interest, compounded annually. If no other deposits or withdrawals are made, what will the value of the account be at the end of ${n} years?`;
-        explanation = `Each year the value is multiplied by $1 + ${dx(frac(r, 100))} = ${dx(frac(100 + r, 100))}$:
+        stem =
+          frame === 0
+            ? `${nm} deposited ${money(P)} in an account that earns ${r} percent annual interest, compounded annually. If no other deposits or withdrawals are made, what will the value of the account be at the end of ${n} years?`
+            : frame === 1
+              ? `An account opened with ${money(P)} earns ${r} percent annual interest, compounded annually, and nothing else is deposited or withdrawn. What is the value of the account, in dollars, after ${n} years?`
+              : `${nm} invests ${money(P)} at ${r} percent annual interest, compounded annually. What is the investment worth, in dollars, after ${n} years?`;
+        explanation = (c) => `Interest is compounded, so each year's interest is earned on the whole balance and the balance is multiplied by $1 + ${dx(frac(r, 100))} = ${dx(frac(100 + r, 100))}$ every year: ${chain.map((x, i) => `${money(x, cents)} after year ${i + 1}`).join(', ')}.
 
-$$${num(P)} \\times ${dx(frac(100 + r, 100))}^{${n}} = ${dx(v)}$$
+Check: the one-step product $${num(P)}${mult(r, n)} = ${money(v, cents)}$ agrees with the last yearly balance.
 
-So the account holds ${money(v, cents)}. Simple interest would give only ${money(simple, cents)}, because it ignores the interest earned on interest; ${money(v.sub(P), cents)} is the interest alone, not the value.`;
-        break;
-      }
-    } else if (kind === 'principal') {
-      for (;;) {
-        const r = rng.pick([2, 3, 4, 5, 6, 8]);
+Trap: ${money(c.value, cents)} comes from ${c.why}, which is ${money(c.value.sub(v).abs(), cents)} away from the true balance. Rule: after $n$ years the balance is $P(1 + r)^n$, not $P(1 + nr)$.`;
+      } else if (kind === 'principal') {
+        const r = rng.pick(d === 1 ? [2, 4, 5] : [3, 6, 8]);
         const n = rng.int(2, 6);
         const P = rng.int(2, 40) * 500;
         const I = frac(P * r * n, 100);
         if (!I.isInt()) continue;
         correct = frac(P);
-        const noYears = I.mul(100).div(r);
-        traps = [
-          { value: noYears, trap: 'algw-interest-years' },
-          { value: I.mul(100).div(r * n).add(I), trap: 'algw-interest-vs-value' },
-        ];
+        const earn = (x: Frac) => x.mul(r * n).div(100);
+        const whole = (x: Frac) => x.mul(100).isInt();
+        cands = [
+          { value: I.mul(100).div(r), trap: 'algw-interest-years', why: 'leaving out the number of years' },
+          { value: frac(P).add(I), trap: 'algw-interest-vs-value', why: 'adding the interest to the principal' },
+          { value: frac(P, 100), trap: 'algw-percent-not-decimal', why: `using ${r} instead of ${dx(frac(r, 100))} as the rate` },
+          { value: I.div(n), trap: 'algw-yearly-interest', why: 'stopping at the interest of one year' },
+          { value: I.mul(100 * n).div(r), trap: 'algw-rate-divided-by-years', why: 'dividing the rate by the number of years instead of multiplying' },
+          { value: I.mul(100).div(r * (n - 1)), trap: 'algw-years-off-by-one', why: `using ${n - 1} years instead of ${n}` },
+          { value: I.mul(100).div(r * (n + 1)), trap: 'algw-years-off-by-one', why: `using ${n + 1} years instead of ${n}` },
+        ].filter((c) => whole(c.value));
         fmt = (x) => money(x);
         params = { ...base, P, r, n, I: I.toNumber() };
-        stem = `How many dollars must be invested at ${r} percent simple annual interest to earn ${money(I)} in interest in ${n} years?`;
-        explanation = `Simple interest is $I = Prt$: $${num(I)} = P \\times ${dx(frac(r, 100))} \\times ${n} = ${dx(frac(r * n, 100))}P$.
+        stem =
+          frame === 0
+            ? `How many dollars must be invested at ${r} percent simple annual interest to earn ${money(I)} in interest in ${n} years?`
+            : frame === 1
+              ? `${nm} wants to earn ${money(I)} in interest over ${n} years from an account that pays ${r} percent simple annual interest. How many dollars must ${nm} deposit?`
+              : `An account pays ${r} percent simple annual interest. What principal, in dollars, earns ${money(I)} in interest in ${n} years?`;
+        explanation = (c) => `The interest, the rate and the time are known and the starting sum is not. Simple interest repeats the same share of the original sum every year: $I = Prt$, so $${num(I)} = P \\times ${dx(frac(r, 100))} \\times ${n} = ${dx(frac(r * n, 100))}P$, and $P = \\frac{${num(I)}}{${dx(frac(r * n, 100))}} = ${num(P)}$.
 
-So $P = \\frac{${num(I)}}{${dx(frac(r * n, 100))}} = ${num(P)}$, that is, ${money(P)}. Leaving out the ${n} years gives ${money(noYears)}, the amount that would earn ${money(I)} in a single year.`;
-        break;
+Check: ${money(P)} earns ${money(frac(P * r, 100))} a year, and ${n} years give ${money(I)}.
+
+Trap: ${money(c.value)} comes from ${c.why}; it would earn ${money(earn(c.value), !earn(c.value).isInt())} in ${n} years, not ${money(I)}. Rule: principal = interest $\\div$ (rate $\\times$ years).`;
+      } else {
+        // quarterly: closest value after 1 year
+        const P = rng.pick([10000, 20000, 40000]);
+        const r = rng.pick([8, 12]);
+        const exact = grow(frac(P), r, 1, 4);
+        const round = (x: Frac) => frac(Math.round(x.toNumber()));
+        correct = round(exact);
+        cands = [
+          { value: round(frac(P).mul(100 + r).div(100)), trap: 'algw-simple-for-compound', why: 'applying the yearly rate once, with no quarterly compounding' },
+          { value: round(grow(frac(P), r, 1, 2)), trap: 'algw-compounding-frequency', why: 'compounding only twice a year' },
+          { value: round(grow(frac(P), r, 4, 1)), trap: 'algw-compound-rate-split', why: `using the full ${r} percent in each of the 4 quarters` },
+          { value: frac(Math.round(P * (1 + r / 1200) ** 12)), trap: 'algw-compounding-frequency', why: 'compounding monthly' },
+          { value: round(grow(frac(P), r / 4, 3)), trap: 'algw-periods-off-by-one', why: 'compounding for 3 quarters only' },
+          { value: round(grow(frac(P), r / 4, 5)), trap: 'algw-periods-off-by-one', why: 'compounding for 5 quarters' },
+        ];
+        fmt = (x) => money(x);
+        params = { ...base, P, r, n: 1, k: 4 };
+        stem =
+          frame === 0
+            ? `${nm} deposits ${money(P)} in an account that earns ${r} percent annual interest, compounded quarterly. If no other deposits or withdrawals are made, which of the following is closest to the value of the account at the end of 1 year?`
+            : frame === 1
+              ? `An account opened with ${money(P)} earns ${r} percent annual interest, compounded quarterly, with no other deposits or withdrawals. Which of the following is closest to the value of the account after 1 year?`
+              : `${nm} invests ${money(P)} at ${r} percent annual interest, compounded quarterly. Which of the following is closest to the investment's value, in dollars, after 1 year?`;
+        explanation = (c) => `Quarterly compounding at ${r} percent a year means ${r / 4} percent per quarter, applied 4 times: $${num(P)}(${dx(frac(400 + r, 400))})^4 \\approx ${dx(frac(Math.round(exact.toNumber() * 100), 100))}$, so the closest choice is ${money(correct)}.
+
+Check: the first quarter alone adds ${money(frac(P * r, 400))}, and each later quarter adds ${r / 4} percent of a larger balance, so the total beats ${money(frac(P).mul(100 + r).div(100))}.
+
+Trap: ${money(c.value)} comes from ${c.why}. Rule: split the annual rate by the number of periods and compound each period.`;
       }
-    } else {
-      // quarterly: closest value after 1 year
-      const P = rng.pick([5000, 10000, 20000, 40000]);
-      const r = rng.pick([4, 8, 12]);
-      const exact = grow(frac(P), r, 1, 4);
-      const round = (x: Frac) => frac(Math.round(x.toNumber()));
-      correct = round(exact);
-      const simple = frac(P).mul(100 + r).div(100);
-      const semi = grow(frac(P), r, 1, 2);
-      const unsplit = grow(frac(P), r, 4, 1);
-      traps = [
-        { value: round(simple), trap: 'algw-simple-for-compound' },
-        { value: round(semi), trap: 'algw-compounding-frequency' },
-        { value: round(unsplit), trap: 'algw-compound-rate-split' },
-      ];
-      fmt = (x) => money(x);
-      params = { ...base, P, r, n: 1, k: 4 };
-      stem = `${nm} deposits ${money(P)} in an account that earns ${r} percent annual interest, compounded quarterly. If no other deposits or withdrawals are made, which of the following is closest to the value of the account at the end of 1 year?`;
-      explanation = `Quarterly compounding at ${r} percent per year means ${r / 4} percent per quarter, applied 4 times:
-
-$$${num(P)}(${dx(frac(400 + r, 400))})^4 \\approx ${dx(frac(Math.round(exact.toNumber() * 100), 100))}$$
-
-The closest choice is ${money(correct)}. Simple interest gives ${money(round(simple))} and semiannual compounding ${money(round(semi))}; using ${r} percent each quarter gives a far larger ${money(round(unsplit))}.`;
+      const res = trapChoices(rng, correct!, cands, fmt!);
+      if (!res) continue;
+      params!.values = res.values;
+      return { params: params!, q: { format: 'mcs', stem: stem!, choices: res.choices, answer: res.answer, explanation: explanation!(res.kept[0]) } };
     }
-    // Plain distractors on one side, rounded like the answer.
-    const dir = rng.sign();
-    const step = frac(Math.max(1, Math.round(correct!.toNumber() / 50 / 10) * 10));
-    const fillers = [correct!.add(step.mul(dir)), correct!.add(step.mul(2 * dir)), correct!.sub(step.mul(dir))].filter((v) => v.sign() > 0 && v.mul(100).isInt());
-    const { choices, answer, values } = valuedChoices(rng, { correct: correct!, traps: traps!, fillers, format: fmt!, unit: step, positive: true });
-    params!.values = values;
-    return { params: params!, q: { format: 'mcs', stem: stem!, choices, answer, explanation: explanation! } };
   },
   check(q, prm) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -542,11 +687,11 @@ The closest choice is ${money(correct)}. Simple interest gives ${money(round(sim
       for (let y = 1; y <= prm.n * prm.k; y++) if (y % prm.k === 0) v *= 2;
       return expectMcs(
         q,
-        uniqueIndex(prm.forms, (f) => (f.pow === 1 ? f.coef * P : P ** f.pow) === v),
+        uniqueIndex(prm.forms, (f) => f.coef * P ** f.pow === v),
       );
     }
     const fmt = (x: Frac) => money(x, prm.cents);
-    const err = choiceValuesMatch(q, prm.values, fmt);
+    const err = choiceValuesMatch(q, prm.values, prm.kind === 'compound-value' ? fmt : (x) => money(x));
     if (err) return err;
     if (prm.kind === 'compound-value') {
       let v = frac(prm.P);
@@ -618,7 +763,7 @@ const possibleConcentration: Template<RangeParams> = {
     addC(mean, ok(mean) ? undefined : 'algw-average-percents');
     addC(p, 'algw-weighted-range');
     addC(q, 'algw-weighted-range');
-    addC(cond === 'more-high' ? rng.int(p + 1, Math.floor(mean) - 1) : Math.min(99, Math.ceil(mean) + rng.int(1, 4)));
+    addC(cond === 'more-high' ? rng.int(p + 1, Math.floor(mean) - 1) : Math.min(99, Math.ceil(mean) + rng.int(1, 4)), 'algw-condition-reversed');
     addC(Math.max(1, p - rng.int(2, 5)), 'algw-weighted-range');
     addC(Math.min(99, q + rng.int(2, 6)), 'algw-weighted-range');
     const all = [...cands.entries()].map(([c, trap]) => ({ c, trap: ok(c) ? undefined : trap, correct: ok(c) }));
@@ -640,6 +785,17 @@ const possibleConcentration: Template<RangeParams> = {
         : cond === 'more-high'
           ? `between the plain average ${num(mean)} and ${q}, not including either`
           : `greater than ${p} and at most $${num(frac(2 * p + q, 3))}$ (the value for exactly twice as much A as B)`;
+    const example = items.find((it) => it.correct)!;
+    const wrongEx = items.find((it) => !it.correct && it.trap)!;
+    const condShort = cond === 'more-low' ? '$x > y$, more of solution A' : cond === 'more-high' ? '$y > x$, more of solution B' : '$x \\ge 2y$, at least twice as much A';
+    const wrongWhy =
+      wrongEx.trap === 'algw-average-percents'
+        ? 'the plain average needs $x = y$, which the condition rules out'
+        : wrongEx.trap === 'algw-condition-reversed'
+          ? `it needs ${wrongEx.c < mean ? 'more of solution A' : 'more of solution B'}, the opposite of the condition`
+          : wrongEx.c <= p
+            ? `a mixture cannot reach or go below the weaker solution, ${p} percent`
+            : `a mixture cannot reach or go above the stronger solution, ${q} percent`;
     return {
       params: { p, q, cond, values: items.map((it) => it.c) },
       q: {
@@ -648,11 +804,13 @@ const possibleConcentration: Template<RangeParams> = {
         instruction: 'Indicate all such percents.',
         choices,
         answer,
-        explanation: `The mixture's percent is a weighted average of ${p} and ${q}: $\\frac{${p}x + ${q}y}{x + y}$. It is always strictly between ${p} and ${q}, and it equals the plain average ${num(mean)} only when $x = y$. More of solution ${cond === 'more-high' ? 'B pulls it above' : 'A pulls it below'} ${num(mean)}${
+        explanation: `The mixture's percent is a weighted average of ${p} and ${q}: $\\frac{${p}x + ${q}y}{x + y}$. It is strictly between ${p} and ${q}, and it equals the plain average ${num(mean)} only when $x = y$. More of solution ${cond === 'more-high' ? 'B pulls it above' : 'A pulls it below'} ${num(mean)}${
           cond === 'twice-low' ? `; with $x = 2y$ it is $\\frac{2(${p}) + ${q}}{3} = ${num(frac(2 * p + q, 3))}$, and with even more A it is lower still` : ''
-        }.
+        }. So the possible percents are ${range}.
 
-So the possible percents are ${range}. ${p} and ${q} themselves would need one of the amounts to be 0.`,
+Check: ${num(example.c)} percent needs $x : y = ${q - example.c} : ${example.c - p}$, which meets the condition (${condShort}).
+
+Trap: ${num(wrongEx.c)} percent is not possible, because ${wrongWhy}. Rule: a mixture lands strictly between the two percents, nearer the one used more.`,
       },
     };
   },
