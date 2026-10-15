@@ -65,7 +65,7 @@ const fractional: Template<Params> = {
           stem: `${frame} $${num(B)}^{${expTex(m, q, neg)}}$?`,
           answer,
           fractionBoxes: neg,
-          traps,
+          traps: traps.filter((t) => !t.value.eq(answer)),
           explanation: `A fractional exponent is a root and a power: $a^{m/q} = (\\sqrt[q]{a})^m$, with $q$ the index of the root.
 
 Here $${rt(q, B)} = ${r}$ because $${r}^{${q}} = ${num(B)}$. So $${num(B)}^{${m}/${q}} = ${pw(r, m)}${r ** m === r ? '' : ` = ${num(r ** m)}`}$${
