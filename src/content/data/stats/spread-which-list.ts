@@ -81,6 +81,7 @@ const whichListMcs: Template<Params> = {
       const lists = devs.map((v) => v.map((x) => mean + x).sort((a, b) => a - b));
       if (new Set(lists.map((l) => l.join(','))).size < 5) continue;
       const key = ss.indexOf(ask === 'greatest' ? order[4] : order[0]);
+      if (d < 3 && fams[key] === 'two-point') continue; // vary the winning shape across levels
       const spans = lists.map(spanOf);
       const dist = lists.map(distinct);
       const tops = lists.map((l) => l[5]);
