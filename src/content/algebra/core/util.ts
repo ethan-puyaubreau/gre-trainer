@@ -2,9 +2,9 @@
 // evaluated numerically, so check() functions can test equivalence by plugging in numbers),
 // sampling helpers for QC checks, and small text helpers.
 
-import { Frac } from '../../../engine/frac';
+import { Frac, type FracLike } from '../../../engine/frac';
 import { num } from '../../../engine/tex';
-import type { QCChoice } from '../../../engine/types';
+import type { Choice, QCChoice } from '../../../engine/types';
 import type { Rng } from '../../../engine/rng';
 
 export const QC_WORDS: Record<QCChoice, string> = {
@@ -271,3 +271,40 @@ export function someTraps<T>(_rng: Rng, traps: T[]): T[] {
 export const times = (m: number, inner: string) => (m === 1 ? inner : m === -1 ? `-(${inner})` : `${m}(${inner})`);
 /** b^e without a visible exponent 1. */
 export const powT = (b: number | string, e: number | string) => (e === 1 || e === '1' ? `${b}` : `${b}^{${e}}`);
+
+/**
+ * Numeric choices where EVERY wrong choice is a named trap (no made-up neighbours). Traps are given in
+ * priority order; values equal to the key or to an earlier trap are dropped. The key lands at a random
+ * position when the traps allow it. Returns null when fewer than count - 1 distinct traps remain, so the
+ * generator can draw other parameters. `kept` lists the traps that became choices (cite only those in
+ * the explanation, most important first); `values` is the exact value behind each displayed choice.
+ */
+export function trapChoices<T extends { value: FracLike; trap: string }>(
+  rng: Rng,
+  correct: FracLike,
+  traps: T[],
+  format: (v: Frac) => string,
+  count = 5,
+): { choices: Choice[]; answer: number; values: Frac[]; kept: (T & { value: Frac })[] } | null {
+  const c = correct instanceof Frac ? correct : new Frac(correct);
+  const uniq: (T & { value: Frac })[] = []; // in priority order
+  for (const t of traps) {
+    const v = t.value instanceof Frac ? t.value : new Frac(t.value);
+    if (v.eq(c) || uniq.some((u) => u.value.eq(v))) continue;
+    uniq.push({ ...t, value: v });
+  }
+  const below = uniq.filter((u) => u.value.lt(c));
+  const above = uniq.filter((u) => u.value.gt(c));
+  if (below.length + above.length < count - 1) return null;
+  const target = Math.max(count - 1 - above.length, Math.min(rng.int(0, count - 1), below.length));
+  const kept = [...below.slice(0, target), ...above.slice(0, count - 1 - target)];
+  const items = [{ value: c, trap: '', ok: true }, ...kept.map((k) => ({ value: k.value, trap: k.trap, ok: false }))].sort((a, b) => a.value.cmp(b.value));
+  const texts = items.map((it) => format(it.value));
+  if (new Set(texts).size !== texts.length) return null;
+  return {
+    choices: items.map((it, i) => ({ text: texts[i], ...(it.trap ? { trap: it.trap } : {}) })),
+    answer: items.findIndex((it) => it.ok),
+    values: items.map((it) => it.value),
+    kept: kept.sort((a, b) => uniq.indexOf(a) - uniq.indexOf(b)), // priority order: cite kept[0]
+  };
+}

@@ -216,3 +216,4 @@ export type Flagged = Choice & { correct: boolean };
 
 /** Proper-case names for word problems. */
 export const NAMES = ['Ana', 'Ben', 'Carla', 'Dev', 'Elena', 'Femi', 'Grace', 'Hiro', 'Ines', 'Jamal', 'Kara', 'Luis', 'Maya', 'Noah', 'Omar', 'Priya', 'Quinn', 'Rosa', 'Sam', 'Tara'];
+export { trapChoices } from '../core/util';

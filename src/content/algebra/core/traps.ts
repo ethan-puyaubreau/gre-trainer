@@ -107,6 +107,10 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Moved a term across the equals sign without changing its sign',
     fix: 'Moving a term to the other side means subtracting it from (or adding it to) both sides: $5x + 3 = 2x - 9$ becomes $5x - 2x = -9 - 3$.',
   },
+  'alg-dropped-term': {
+    label: 'Dropped a term while collecting',
+    fix: 'Every term of the equation must appear after each step. When you finish, substitute your answer in the ORIGINAL equation.',
+  },
   'alg-lcd-partial': {
     label: 'Multiplied only some terms by the common denominator',
     fix: 'Clearing fractions multiplies EVERY term of both sides, including the whole numbers on the right.',

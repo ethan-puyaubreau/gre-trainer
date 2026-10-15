@@ -1,9 +1,9 @@
-import { numericChoices, qcCompare, textChoices } from '../../../engine/build';
+import { qcCompare, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd, lcm } from '../../../engine/math';
 import { lin, num } from '../../../engine/tex';
 import type { QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, close, intExcept, sideFill, someTraps, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, type Ex } from './util';
+import { N, V, add, close, intExcept, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, trapChoices, type Ex } from './util';
 
 /* ================================================================== 1. Solve a linear equation (MCS) */
 
@@ -15,18 +15,27 @@ interface SolveParams {
   values: [number, number][];
 }
 
-function residual(kind: SolveParams['kind'], k: number[], x: Frac): Frac {
+/** Left and right side of the equation at x. */
+function sides(kind: SolveParams['kind'], k: number[], x: Frac): [Frac, Frac] {
   if (kind === 'collect') {
     const [a, b, c, d] = k;
-    return x.mul(a).add(b).sub(new Frac(c).sub(x.mul(d)));
+    return [x.mul(a).add(b), new Frac(c).sub(x.mul(d))];
   }
   if (kind === 'distribute') {
     const [a, b, c, dd, e, f] = k;
-    return x.mul(b).sub(c).mul(a).add(dd).sub(x.mul(e).add(f));
+    return [x.mul(b).sub(c).mul(a).add(dd), x.mul(e).add(f)];
   }
   const [p, m, q, n, r] = k;
-  return x.add(p).div(m).sub(x.sub(q).div(n)).sub(r);
+  return [x.add(p).div(m).sub(x.sub(q).div(n)), new Frac(r)];
 }
+
+function residual(kind: SolveParams['kind'], k: number[], x: Frac): Frac {
+  const [l, r] = sides(kind, k, x);
+  return l.sub(r);
+}
+
+/** "add 5 to" / "subtract 5 from" both sides, for moving the constant b away from the left. */
+const removeConst = (b: number) => (b > 0 ? `subtract ${b} from` : `add ${-b} to`);
 
 const solveLinearMCS: Template<SolveParams> = {
   id: 'alg.linear-equations.solve-mcs',
@@ -34,96 +43,112 @@ const solveLinearMCS: Template<SolveParams> = {
   format: 'mcs',
   style: 'solve a one-variable equation',
   generate(rng, d) {
-    const kind: SolveParams['kind'] = d === 1 ? 'collect' : d === 2 ? rng.pick(['distribute', 'collect', 'distribute']) : rng.pick(['fractions', 'distribute', 'fractions']);
-    let x0: number;
-    do x0 = rng.int(-12, 12);
-    while (x0 === 0);
-    let k: number[];
-    let stem: string;
-    let explanation: string;
-    const traps: { value: Frac; trap: string }[] = [];
-    if (kind === 'collect') {
-      const a = rng.int(2, 9);
-      let dd: number;
-      do dd = rng.int(1, 7);
-      while (dd === a);
-      let b: number;
-      do b = rng.int(-15, 15);
-      while (b === 0);
-      const c = (a + dd) * x0 + b;
-      k = [a, b, c, dd];
-      stem = `If $${lin([[a, 'x'], [b, '']])} = ${lin([[c, ''], [-dd, 'x']])}$, what is the value of $x$?`;
-      explanation = `Add $${lin([[dd, 'x']])}$ to both sides and ${b > 0 ? `subtract ${b} from` : `add ${-b} to`} both sides: $${a + dd}x = ${num(c)} ${b < 0 ? '+' : '-'} ${Math.abs(b)} = ${num(c - b)}$.
+    for (;;) {
+      const kind: SolveParams['kind'] = d === 1 ? 'collect' : d === 2 ? rng.pick(['distribute', 'collect', 'distribute']) : rng.pick(['fractions', 'distribute', 'fractions']);
+      let x0: number;
+      do x0 = rng.int(-12, 12);
+      while (Math.abs(x0) <= 1);
+      let k: number[];
+      let stem: string;
+      let recognize: string;
+      let steps: string;
+      let rule: string;
+      const traps: { value: Frac; trap: string; why: string }[] = [];
+      if (kind === 'collect') {
+        const a = rng.int(2, 9);
+        let dd: number;
+        do dd = rng.int(1, 7);
+        while (dd === a);
+        let b: number;
+        do b = rng.int(-15, 15);
+        while (b === 0);
+        const c = (a + dd) * x0 + b;
+        k = [a, b, c, dd];
+        stem = `If $${lin([[a, 'x'], [b, '']])} = ${lin([[c, ''], [-dd, 'x']])}$, what is the value of $x$?`;
+        recognize = `The unknown appears on both sides, so gather the $x$ terms on one side by doing the same thing to both sides.`;
+        steps = `Add $${lin([[dd, 'x']])}$ to both sides (it cancels the $-${lin([[dd, 'x']])}$ on the right) and ${removeConst(b)} both sides: $${a + dd}x = ${num(c - b)}$. Divide both sides by ${a + dd}: $x = ${num(x0)}$.
 
-So $x = \\frac{${num(c - b)}}{${a + dd}} = ${num(x0)}$. Check: $${a}(${num(x0)}) ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${num(a * x0 + b)}$ and $${num(c)} - ${dd === 1 ? `(${num(x0)})` : `${dd}(${num(x0)})`} = ${num(c - dd * x0)}$.
+Check: $${a}(${num(x0)}) ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${num(a * x0 + b)}$ and $${num(c)} - ${dd === 1 ? '' : dd}(${num(x0)}) = ${num(c - dd * x0)}$.`;
+        rule = `Whatever you add or subtract on one side, do on the other.`;
+        traps.push({ value: new Frac(c - b, a - dd), trap: 'alg-move-term-sign', why: `moving $${lin([[dd, 'x']])}$ across by subtracting it from the left` });
+        traps.push({ value: new Frac(c + b, a + dd), trap: 'alg-move-term-sign', why: `moving the constant $${num(b)}$ across with the wrong operation` });
+        traps.push({ value: new Frac(c + b, a - dd), trap: 'alg-move-term-sign', why: `moving both terms across with the wrong operations` });
+        traps.push({ value: new Frac(c - b, a), trap: 'alg-dropped-term', why: `forgetting the $x$ term on the right` });
+        traps.push({ value: new Frac(c, a + dd), trap: 'alg-dropped-term', why: `forgetting to move the constant $${num(b)}$ at all` });
+        traps.push({ value: frac(-x0), trap: 'alg-sign-slip', why: `subtracting in the wrong order` });
+      } else if (kind === 'distribute') {
+        const a = rng.int(2, 5);
+        const b = rng.int(1, 4);
+        const c = rng.int(1, 9);
+        let e: number;
+        do e = rng.int(1, 7);
+        while (e === a * b || e === a * b * 2);
+        const dd = rng.int(-9, 9);
+        const f = a * (b * x0 - c) + dd - e * x0;
+        k = [a, b, c, dd, e, f];
+        const lhs = `${a}(${lin([[b, 'x'], [-c, '']])})${dd === 0 ? '' : dd > 0 ? ` + ${dd}` : ` - ${-dd}`}`;
+        stem = `If $${lhs} = ${lin([[e, 'x'], [f, '']])}$, what is the value of $x$?`;
+        const left = lin([[a * b, 'x'], [-a * c + dd, '']]);
+        recognize = `A number multiplies a parenthesis, so distribute first, then collect.`;
+        steps = `The ${a} multiplies both terms inside: $${a}(${lin([[b, 'x'], [-c, '']])}) = ${lin([[a * b, 'x'], [-a * c, '']])}$, so the left side is $${left}$. Then $${left} = ${lin([[e, 'x'], [f, '']])}$ gives $${lin([[a * b - e, 'x']])} = ${num(f + a * c - dd)}$, so $x = ${num(x0)}$.
 
-When a term moves to the other side its sign changes: $-${lin([[dd, 'x']])}$ on the right becomes $+${lin([[dd, 'x']])}$ on the left.`;
-      traps.push({ value: new Frac(c - b, a - dd), trap: 'alg-move-term-sign' });
-      traps.push({ value: new Frac(c + b, a + dd), trap: 'alg-move-term-sign' });
-    } else if (kind === 'distribute') {
-      const a = rng.int(2, 5);
-      const b = rng.int(1, 4);
-      const c = rng.int(1, 9);
-      let e: number;
-      do e = rng.int(1, 7);
-      while (e === a * b || e === a * b * 2);
-      const dd = rng.int(-9, 9);
-      const f = a * (b * x0 - c) + dd - e * x0;
-      k = [a, b, c, dd, e, f];
-      const lhs = `${a}(${lin([[b, 'x'], [-c, '']])})${dd === 0 ? '' : dd > 0 ? ` + ${dd}` : ` - ${-dd}`}`;
-      stem = `If $${lhs} = ${lin([[e, 'x'], [f, '']])}$, what is the value of $x$?`;
-      const left = lin([[a * b, 'x'], [-a * c + dd, '']]);
-      explanation = `Distribute the ${a} to both terms in the parentheses: $${a}(${lin([[b, 'x'], [-c, '']])}) = ${lin([[a * b, 'x'], [-a * c, '']])}$, so the left side is $${left}$.
-
-Then $${left} = ${lin([[e, 'x'], [f, '']])}$ gives $${lin([[a * b - e, 'x']])} = ${num(f + a * c - dd)}$ and $x = ${num(x0)}$.
-
-The usual slip is to multiply only the first term: $${a}(${lin([[b, 'x'], [-c, '']])})$ is not $${lin([[a * b, 'x'], [-c, '']])}$.`;
-      traps.push({ value: new Frac(f + c - dd, a * b - e), trap: 'alg-distribute-partial' });
-      traps.push({ value: new Frac(f - dd + a * c, a * b + e), trap: 'alg-move-term-sign' });
-    } else {
-      let m: number;
-      let n: number;
-      do [m, n] = rng.sample([2, 3, 4, 5, 6], 2);
-      while (lcm(m, n) > 20);
-      // choose p, q so that x0 + p is a multiple of m and x0 - q a multiple of n
-      const p = (() => {
-        const opts = [];
-        for (let t = -9; t <= 9; t++) if (t !== 0 && (x0 + t) % m === 0) opts.push(t);
-        return rng.pick(opts);
-      })();
-      const q = (() => {
-        const opts = [];
-        for (let t = -9; t <= 9; t++) if (t !== 0 && (x0 - t) % n === 0) opts.push(t);
-        return rng.pick(opts);
-      })();
-      const r = (x0 + p) / m - (x0 - q) / n;
-      k = [p, m, q, n, r];
-      const L = lcm(m, n);
-      const A = L / m;
-      const B = L / n;
-      stem = `If $\\dfrac{${lin([[1, 'x'], [p, '']])}}{${m}} - \\dfrac{${lin([[1, 'x'], [-q, '']])}}{${n}} = ${num(r)}$, what is the value of $x$?`;
-      explanation = `Multiply every term by ${L}, the least common denominator: $${A === 1 ? '' : A}(${lin([[1, 'x'], [p, '']])}) - ${B === 1 ? '' : B}(${lin([[1, 'x'], [-q, '']])}) = ${num(r * L)}$.
-
-Distribute (the minus sign applies to both terms of the second parentheses): $${lin([[A - B, 'x'], [A * p + B * q, '']])} = ${num(r * L)}$, ${A - B === 1 ? `so $x = ${num(x0)}$` : `so $${A - B === -1 ? '-' : A - B}x = ${num(r * L - A * p - B * q)}$ and $x = ${num(x0)}$`}.
-
-The right side must be multiplied by ${L} too.`;
-      if (A !== B) {
-        traps.push({ value: new Frac(r - A * p - B * q, A - B), trap: 'alg-lcd-partial' });
-        traps.push({ value: new Frac(r * L - A * p + B * q, A - B), trap: 'alg-distribute-minus' });
+Check: both sides equal $${num(e * x0 + f)}$.`;
+        rule = `A factor outside parentheses multiplies every term inside.`;
+        traps.push({ value: new Frac(f + c - dd, a * b - e), trap: 'alg-distribute-partial', why: `multiplying only the first term, $${a}(${lin([[b, 'x'], [-c, '']])}) \\to ${lin([[a * b, 'x'], [-c, '']])}$` });
+        traps.push({ value: new Frac(f - dd + a * c, a * b + e), trap: 'alg-move-term-sign', why: `moving $${lin([[e, 'x']])}$ across with the wrong operation` });
+        traps.push({ value: new Frac(f + a * c + dd, a * b - e), trap: 'alg-move-term-sign', why: `moving the constant $${num(dd)}$ across with the wrong operation` });
+        if (dd !== 0) traps.push({ value: new Frac(f + a * c, a * b - e), trap: 'alg-dropped-term', why: `dropping the ${dd > 0 ? '+' : '-'} ${Math.abs(dd)} after the parentheses` });
+        traps.push({ value: new Frac(f - a * c - dd, a * b - e), trap: 'alg-move-term-sign', why: `moving the product $${num(a * c)}$ across with the wrong operation` });
+        traps.push({ value: frac(-x0), trap: 'alg-sign-slip', why: `subtracting in the wrong order` });
+      } else {
+        let m: number;
+        let n: number;
+        do [m, n] = rng.sample([2, 3, 4, 5, 6], 2);
+        while (lcm(m, n) > 20);
+        // choose p, q so that x0 + p is a multiple of m and x0 - q a multiple of n
+        const p = (() => {
+          const opts = [];
+          for (let t = -9; t <= 9; t++) if (t !== 0 && (x0 + t) % m === 0) opts.push(t);
+          return rng.pick(opts);
+        })();
+        const q = (() => {
+          const opts = [];
+          for (let t = -9; t <= 9; t++) if (t !== 0 && (x0 - t) % n === 0) opts.push(t);
+          return rng.pick(opts);
+        })();
+        const r = (x0 + p) / m - (x0 - q) / n;
+        if (r === 0) continue; // the right side must need scaling too
+        k = [p, m, q, n, r];
+        const L = lcm(m, n);
+        const A = L / m;
+        const B = L / n;
+        stem = `If $\\dfrac{${lin([[1, 'x'], [p, '']])}}{${m}} - \\dfrac{${lin([[1, 'x'], [-q, '']])}}{${n}} = ${num(r)}$, what is the value of $x$?`;
+        recognize = `Fractions with different denominators: multiply the whole equation by their least common denominator to clear them.`;
+        steps = `Multiply both sides by ${L}, so every term is scaled, including $${num(r)}$: $${A === 1 ? '' : A}(${lin([[1, 'x'], [p, '']])}) - ${B === 1 ? '' : B}(${lin([[1, 'x'], [-q, '']])}) = ${num(r * L)}$. The minus sign applies to both terms of the second parenthesis, giving $${lin([[A - B, 'x'], [A * p + B * q, '']])} = ${num(r * L)}$. So ${A - B === 1 ? '' : `$${lin([[A - B, 'x']])} = ${num(r * L - A * p - B * q)}$ and `}$x = ${num(x0)}$.`;
+        rule = `Multiply every term by the same number, then watch the minus sign in front of a parenthesis.`;
+        traps.push({ value: new Frac(r - A * p - B * q, A - B), trap: 'alg-lcd-partial', why: `leaving the right side $${num(r)}$ unmultiplied` });
+        traps.push({ value: new Frac(r * L - A * p + B * q, A - B), trap: 'alg-distribute-minus', why: `letting the minus sign act on $x$ only, not on $${num(-q)}$` });
+        traps.push({ value: new Frac(r * L - p - q, A - B), trap: 'alg-distribute-partial', why: `scaling only the $x$ in each numerator` });
+        traps.push({ value: new Frac(r * L - A * p + B * q, A + B), trap: 'alg-distribute-minus', why: `treating the subtraction as an addition` });
+        traps.push({ value: new Frac(r * L - A * p - B * q, A), trap: 'alg-dropped-term', why: `forgetting the $x$ of the second fraction` });
+        traps.push({ value: frac(-x0), trap: 'alg-sign-slip', why: `losing the sign of the answer` });
       }
+      const res = trapChoices(rng, x0, traps, (v) => `$${v.toTex()}$`);
+      if (!res) continue;
+      const t = res.kept[0];
+      const [lv, rv] = sides(kind, k!, t.value);
+      const explanation = `${recognize}
+
+${steps}
+
+Trap: $x = ${t.value.toTex()}$ comes from ${t.why}. Test it: the left side is $${lv.toTex()}$ but the right side is $${rv.toTex()}$, so it is not a solution.
+
+${rule}`;
+      return {
+        params: { kind, k: k!, values: res.values.map((v) => [v.n, v.d] as [number, number]) },
+        q: { format: 'mcs', stem, choices: res.choices, answer: res.answer, explanation },
+      };
     }
-    const answer = frac(x0);
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: someTraps(rng, traps.filter((t) => !t.value.eq(answer))),
-      fillers: [...sideFill(rng, x0), frac(-x0)],
-      format: (v) => `$${v.toTex()}$`,
-    });
-    const values = choices.map((c) => {
-      const f = parseTexFrac(c.text);
-      return [f.n, f.d] as [number, number];
-    });
-    return { params: { kind, k: k!, values }, q: { format: 'mcs', stem, choices, answer: idx, explanation } };
   },
   check(q, { kind, k, values }) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -133,14 +158,6 @@ The right side must be multiplied by ${L} too.`;
     return sols[0] === q.answer ? null : `expected ${sols[0]}`;
   },
 };
-
-/** Parse "$-\frac{3}{4}$" or "$12$" back into a Frac. */
-function parseTexFrac(t: string): Frac {
-  const s = t.replace(/\$/g, '').replace(/\{,\}/g, '');
-  const m = /^(-?)\\frac\{(\d+)\}\{(\d+)\}$/.exec(s);
-  if (m) return new Frac((m[1] ? -1 : 1) * Number(m[2]), Number(m[3]));
-  return new Frac(Number(s));
-}
 
 /* ================================================================== 2. Solve an equation with fractions, compare (QC) */
 
