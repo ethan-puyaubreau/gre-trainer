@@ -243,6 +243,7 @@ const special: Template<SpecialParams> = {
       if (given === 'long') gv = rng.chance(0.5) ? surd(3 * rng.int(1, 4), 1) : surd(n, 3);
       else gv = surd(given === 'hyp' && d === 1 ? 2 * rng.int(1, 6) : n, 1);
       const via = (r: Record<Side3, Surd>, side: Side3) => surdMul(surdDiv(gv, r[given]), r[side]);
+      const inv = (side: Side3 | 'area'): Surd => (side === 'area' ? gv : surdMul(gv, surdDiv(ratio[given], ratio[side])));
       const value = (r: Record<Side3, Surd>): Surd =>
         ask === 'area' ? surdMul(surdMul(via(r, 'short'), via(r, 'long')), surd(new Frac(1, 2), 1)) : via(r, ask);
       const correct = value(ratio);
@@ -250,8 +251,13 @@ const special: Template<SpecialParams> = {
         { v: value(swapR), trap: 'geo-rt-306090-swap' },
         { v: value(wrongR), trap: 'geo-rt-wrong-special' },
         ...(ask === 'area' ? [{ v: surdMul(via(ratio, 'short'), via(ratio, 'long')), trap: 'geo-tri-no-half' }] : []),
+        // dividing where one should multiply (and the reverse)
+        { v: ask === 'area' ? surdMul(surdMul(inv('short'), inv('long')), surd(new Frac(1, 2), 1)) : inv(ask), trap: 'geo-rt-ratio-inverse' },
+        // another side of the same triangle
+        ...(['short', 'long', 'hyp'] as Side3[]).filter((x) => x !== ask && x !== given).map((x) => ({ v: via(ratio, x), trap: 'geo-ang-wrong-unknown' })),
+        ...(ask === 'area' ? [{ v: surdMul(gv, gv), trap: 'geo-ang-wrong-unknown' }] : [{ v: gv, trap: 'geo-ang-wrong-unknown' }]),
       ];
-      const fillers = [surdMul(correct, TWO), surdMul(correct, surd(new Frac(1, 2))), surd(correct.c, 1), surdMul(correct, R3)];
+      const fillers: Surd[] = [];
       const { choices, answer, values } = surdChoices(rng, correct, traps, fillers);
       // figure: angle 30 at A, right angle at C, 60 at B. short = BC, long = AC, hyp = AB
       const mirror = rng.chance(0.5);
@@ -280,7 +286,10 @@ const special: Template<SpecialParams> = {
           answer,
           explanation: `Triangle $ABC$ is a $30^\\circ$-$60^\\circ$-$90^\\circ$ triangle${label30 ? '' : ' (the third angle is $30^\\circ$)'}. Its sides are in the ratio $1 : \\sqrt{3} : 2$: the shortest side $BC$ faces the $30^\\circ$ angle, $AC$ faces the $60^\\circ$ angle, and the hypotenuse $AB$ is twice $BC$.
 
-From $${nameOf[given]} = ${surdTex(gv)}$: $BC = ${surdTex(short)}$, $AC = ${surdTex(long)}$, $AB = ${surdTex(hyp)}$.${
+From $${nameOf[given]} = ${surdTex(gv)}$: ${(['short', 'long', 'hyp'] as Side3[])
+  .filter((x) => x !== given)
+  .map((x) => `$${nameOf[x]} = ${surdTex(x === 'short' ? short : x === 'long' ? long : hyp)}$`)
+  .join(' and ')}.${
             ask === 'area' ? `\n\nArea $= \\frac{1}{2}(BC)(AC) = \\frac{1}{2}(${surdTex(short)})(${surdTex(long)}) = ${surdTex(correct)}$.` : ''
           }
 
@@ -302,6 +311,7 @@ Mixing up which side gets the $\\sqrt{3}$ and which gets the $2$ (or using the $
           { v: surd(2 * n, 1), trap: 'geo-rt-add-legs' },
           { v: surd(new Frac(n, 2), 2), trap: 'geo-rt-ratio-inverse' },
           { v: surd(n, 3), trap: 'geo-rt-wrong-special' },
+          { v: surd(n, 1), trap: 'geo-ang-wrong-unknown' },
         ];
       } else if (mode === 'diag-to-side') {
         given = rng.chance(0.5) ? surd(n, 2) : surd(n, 1);
@@ -310,6 +320,7 @@ Mixing up which side gets the $\\sqrt{3}$ and which gets the $2$ (or using the $
           { v: surdMul(given, R2), trap: 'geo-rt-ratio-inverse' },
           { v: surdMul(given, surd(new Frac(1, 2))), trap: 'geo-rt-add-legs' },
           { v: surdDiv(given, R3), trap: 'geo-rt-wrong-special' },
+          { v: given, trap: 'geo-rt-diag-as-side' },
         ];
       } else {
         given = rng.chance(0.5) ? surd(n, 1) : surd(n, 2);
@@ -318,9 +329,11 @@ Mixing up which side gets the $\\sqrt{3}$ and which gets the $2$ (or using the $
         traps = [
           { v: g2, trap: 'geo-rt-diag-area' },
           { v: surdMul(g2, surd(new Frac(1, 4))), trap: 'geo-rt-add-legs' },
+          { v: surdMul(g2, surd(2, 1)), trap: 'geo-rt-ratio-inverse' },
+          { v: surdDiv(given, R2), trap: 'geo-ang-wrong-unknown' },
         ];
       }
-      const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surdMul(correct, R2), surd(correct.c.add(1), correct.r)]);
+      const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surdMul(correct, R2)]);
       const fb = new FigBuilder().pt('A', [0, 3]).pt('B', [3, 3]).pt('C', [3, 0]).pt('D', [0, 0]).poly('A', 'B', 'C', 'D').seg('A', 'C');
       fb.right('A', 'D', 'C');
       if (mode === 'side-to-diag') fb.side('D', 'C', 'A', `$${surdTex(given)}$`);
@@ -362,6 +375,8 @@ Squaring the diagonal gives twice the area, not the area.`;
         { v: surdMul(given, R3), trap: 'geo-rt-equi-half' },
         { v: surdMul(given, half), trap: 'geo-rt-306090-swap' },
         { v: surdMul(surdMul(given, R2), half), trap: 'geo-rt-wrong-special' },
+        { v: given, trap: 'geo-ang-wrong-unknown' },
+        { v: surdDiv(given, R3), trap: 'geo-rt-ratio-inverse' },
       ];
     } else if (mode === 'alt-to-side') {
       given = rng.chance(0.5) ? surd(n, 3) : surd(3 * rng.int(1, 4), 1);
@@ -370,6 +385,8 @@ Squaring the diagonal gives twice the area, not the area.`;
         { v: surdDiv(given, R3), trap: 'geo-rt-equi-half' },
         { v: surdMul(given, TWO), trap: 'geo-rt-306090-swap' },
         { v: surdMul(given, R3), trap: 'geo-rt-ratio-inverse' },
+        { v: given, trap: 'geo-ang-wrong-unknown' },
+        { v: surdMul(surdMul(given, R3), half), trap: 'geo-rt-306090-swap' },
       ];
     } else {
       given = surd(2 * rng.int(1, 6), 1);
@@ -378,9 +395,11 @@ Squaring the diagonal gives twice the area, not the area.`;
       traps = [
         { v: surdMul(surdMul(s2, R3), half), trap: 'geo-tri-no-half' },
         { v: surdMul(s2, half), trap: 'geo-tri-slant-height' },
+        { v: surdMul(s2, R3), trap: 'geo-rt-equi-half' },
+        { v: s2, trap: 'geo-ang-wrong-unknown' },
       ];
     }
-    const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surd(correct.c, 1), surdMul(correct, half)]);
+    const { choices, answer, values } = surdChoices(rng, correct, traps, [surdMul(correct, TWO), surdMul(correct, half)]);
     const fb = new FigBuilder().pt('P', [2, 2 * Math.sqrt(3)]).pt('Q', [0, 0]).pt('R', [4, 0]).pt('S', [2, 0], [0, -1]).poly('P', 'Q', 'R');
     fb.seg('P', 'S', undefined, true).right('P', 'S', 'R');
     if (mode === 'alt-to-side') fb.text([2.42 + 0.12 * surdTex(given).length / 4, 1.25], `$${surdTex(given)}$`);

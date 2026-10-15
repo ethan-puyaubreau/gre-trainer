@@ -5,7 +5,7 @@ import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, dist, pathLength, shoelace, unitCircle } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
-import { Redraw, retryAll } from '../redraw';
+import { noClash, Redraw, retryAll } from '../redraw';
 import { trapNotes } from '../notes';
 import { positioned } from '../shapes/util';
 
@@ -649,12 +649,6 @@ const TAN_TRIPLES: [number, number, number][] = [
   [7, 24, 25],
   [12, 9, 15],
 ];
-
-/** A trap that equals the answer would be a wrong choice that is right: draw again. */
-function noClash<T extends { value: Frac }>(traps: T[], answer: Frac): T[] {
-  if (traps.some((t) => t.value.eq(answer))) throw new Redraw('a trap equals the answer');
-  return traps;
-}
 
 const lengths: Template<LengthParams> = {
   id: 'geo.circles.lengths',

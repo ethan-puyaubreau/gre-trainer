@@ -34,10 +34,10 @@ const pointOnSide: Template<PSParams> = {
   generate(rng, d) {
     const kind: PSKind = rng.pick(
       d === 1
-        ? (['iso-top', 'iso-left', 'midpoint', 'numbers', 'iso-alt'] as const)
+        ? (['iso-top', 'midpoint', 'numbers', 'numbers', 'numbers'] as const)
         : d === 2
-          ? (['iso-top', 'iso-left', 'iso-alt', 'iso-bis', 'alt-only', 'numbers', 'alt-longer'] as const)
-          : (['iso-left', 'bis-only', 'alt-only', 'iso-bis', 'iso-alt', 'alt-longer', 'alt-longer'] as const),
+          ? (['iso-left', 'iso-alt', 'numbers', 'numbers', 'alt-longer', 'alt-longer'] as const)
+          : (['alt-only', 'bis-only', 'iso-bis', 'alt-longer', 'alt-longer', 'numbers', 'alt-longer'] as const),
     );
     const [nV, nL, nR, nS] = rng.pick(LETTERS);
     const swap = rng.chance(0.5);
@@ -223,10 +223,10 @@ const linesLookQC: Template<LParams> = {
   generate(rng, d) {
     const kind: LKind = rng.pick(
       d === 1
-        ? (['par-none', 'par-given', 'right-none', 'right-solved', 'tri-sum'] as const)
+        ? (['par-given', 'par-none', 'right-solved', 'tri-sum', 'right-solved'] as const)
         : d === 2
-          ? (['par-none', 'par-numbers', 'right-none', 'right-solved', 'tri-sum', 'par-given'] as const)
-          : (['par-forced', 'par-numbers', 'par-none', 'right-solved', 'tri-sum', 'right-none'] as const),
+          ? (['par-none', 'par-numbers', 'right-solved', 'tri-sum', 'par-given', 'par-numbers'] as const)
+          : (['par-forced', 'par-numbers', 'par-none', 'right-solved', 'tri-sum', 'par-numbers', 'right-solved', 'right-none'] as const),
     );
     if (kind.startsWith('par')) {
       const theta = rng.int(10, 15) * 5;
@@ -352,7 +352,7 @@ So ${QC_SAY[answer]}. (${answer}) The ray only looks perpendicular; the equation
     }
     // tri-sum: triangle with one known angle z, the other two x and y
     const z = rng.int(6, 16) * 5;
-    const cmp: 'x-y' | 'sum' = rng.chance(0.6) ? 'x-y' : 'sum';
+    const cmp: 'x-y' | 'sum' = rng.chance(0.4) ? 'x-y' : 'sum';
     const N = cmp === 'sum' ? 180 - z + rng.pick([0, 0, 10, -10]) : 0;
     const answer: QCChoice = cmp === 'x-y' ? 'D' : 180 - z > N ? 'A' : 180 - z < N ? 'B' : 'C';
     const half = (180 - z) / 2;
@@ -650,7 +650,7 @@ const rightAngleQC: Template<RAParams> = {
     if (kind === 'alg-sides') {
       // GE-08
       const [p, q, r] = rng.pick(TRIPLES);
-      const mode = rng.pick(d === 1 ? (['free', 'zero'] as const) : (['free', 'free', 'zero', 'plus', 'minus'] as const));
+      const mode = rng.pick(d === 1 ? (['free', 'zero', 'zero'] as const) : (['free', 'zero', 'plus', 'minus', 'zero'] as const));
       const s1 = mode === 'minus' ? `${p} - y` : `${p} + y`;
       const s2 = mode === 'plus' ? `${q} + y` : `${q} - y`;
       const info = mode === 'free' ? undefined : mode === 'zero' ? '$y = 0$' : mode === 'plus' ? '$y > 0$' : '$0 < y < 1$';
@@ -687,7 +687,7 @@ The figure looks like a right triangle, but no right angle is marked.`
     const a = rng.int(3, 12);
     let b = rng.int(3, 12);
     while (b === a) b = rng.int(3, 12);
-    const right = rng.chance(d === 1 ? 0.4 : 0.3);
+    const right = rng.chance(d === 1 ? 0.5 : 0.45);
     const C: Pt = [0, 0];
     const B: Pt = [4.2, 0];
     const tilt = right ? 0 : rng.pick([-3, 3]);

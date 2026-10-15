@@ -5,7 +5,7 @@ import { lin, num, paren, plain } from '../../../engine/tex';
 import type { Choice, MCSQuestion, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, type ExData } from './ex';
 import { Fig, onCircle, type P2 } from './fig';
-import { Redraw, retryAll } from '../redraw';
+import { noClash, Redraw, retryAll } from '../redraw';
 import { trapNotes } from '../notes';
 
 const deg = (v: number | string) => `${v}^\\circ`;
@@ -1122,7 +1122,7 @@ Equal areas do not mean equal perimeters: for a given area, the square has the s
         figure: fig.build(false),
         fractionBoxes: true,
         answer: answer!,
-        traps: traps.filter((x) => !x.value.eq(answer!)),
+        traps: noClash(traps, answer!),
         explanation,
       },
     };

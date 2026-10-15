@@ -25,7 +25,7 @@ import {
 } from './fig';
 import { mulberry } from './lines';
 import { angleLabel, checkMcm, checkMcs, evalTex, exprTex, intChoices, linTex, qcTraps, QC_SAY } from './util';
-import { retryAll } from '../redraw';
+import { noClash, retryAll } from '../redraw';
 
 const SKILL = 'geo.triangles';
 /** Exact value for display: integers with commas, other terminating fractions as decimals. */
@@ -1000,11 +1000,14 @@ const triangleArea: Template<AreaParams> = {
       fb.seg(D, nB, undefined, true).seg(D, nA, `$${h}$`, true).right(nA, D, nB);
       fb.side(nB, nC, nA, `$${b}$`);
       if (withSlant) fb.side(nA, nB, nC, `$${s}$`, 12);
-      const traps = [
-        ...(withSlant ? [{ value: new Frac(b * s, 2), trap: 'geo-tri-slant-height' }] : []),
-        { value: new Frac((b + p) * h, 2), trap: 'geo-tri-extended-base' },
-        { value: new Frac(b * h), trap: 'geo-tri-no-half' },
-      ].filter((x) => !x.value.eq(area));
+      const traps = noClash(
+        [
+          ...(withSlant ? [{ value: new Frac(b * s, 2), trap: 'geo-tri-slant-height' }] : []),
+          { value: new Frac((b + p) * h, 2), trap: 'geo-tri-extended-base' },
+          { value: new Frac(b * h), trap: 'geo-tri-no-half' },
+        ],
+        area,
+      );
       return {
         params: { v, p, h, b },
         q: {
@@ -1047,10 +1050,13 @@ ${withSlant ? `$${nA}${nB} = ${s}$ is a slanted side, not a height. ` : ''}The b
           format: 'ne',
           stem: `In right triangle $${nA}${nB}${nC}$ above, $${nC}D$ is perpendicular to $${nA}${nB}$. What is the length of $${nC}D$?`,
           answer: h,
-          traps: [
-            { value: new Frac(x * y, 2), trap: 'geo-ang-wrong-unknown' },
-            { value: new Frac(c, 2), trap: 'geo-tri-hyp-midpoint' },
-          ].filter((t) => !t.value.eq(h)),
+          traps: noClash(
+            [
+              { value: new Frac(x * y, 2), trap: 'geo-ang-wrong-unknown' },
+              { value: new Frac(c, 2), trap: 'geo-tri-hyp-midpoint' },
+            ],
+            h,
+          ),
           figure: fb.build(),
           explanation: `Compute the area two ways. With the legs as base and height: $\\frac{1}{2}(${x})(${y}) = ${dec(new Frac(x * y, 2))}$.
 
@@ -1076,10 +1082,13 @@ So $${nC}D = \\frac{${x} \\cdot ${y}}{${c}} = ${dec(h)}$. (The area, $${dec(new 
     const Ap: Pt = [m * 0.35, Math.max(h, (m + n) * 0.35)];
     const fb = new FigBuilder().pt(nA, Ap).pt(nB, [0, 0]).pt(nC, [m, 0]).pt(Dn, [m + n, 0]).poly(nA, nB, Dn);
     fb.seg(nA, nC).side(nB, nC, nA, `$${m}$`).side(nC, Dn, nA, `$${n}$`);
-    const okTraps = [
-      { value: new Frac(S), trap: 'geo-tri-same-area' },
-      ...(ask === 'ACD' ? [{ value: new Frac(S * m, n), trap: 'geo-tri-ratio-flip' }] : [{ value: new Frac(n * h, 2), trap: 'geo-ang-wrong-unknown' }]),
-    ].filter((t) => !t.value.eq(ans) && t.value.isTerminating());
+    const okTraps = noClash(
+      [
+        { value: new Frac(S), trap: 'geo-tri-same-area' },
+        ...(ask === 'ACD' ? [{ value: new Frac(S * m, n), trap: 'geo-tri-ratio-flip' }] : [{ value: new Frac(n * h, 2), trap: 'geo-ang-wrong-unknown' }]),
+      ],
+      ans,
+    ).filter((t) => t.value.isTerminating());
     return {
       params: { v: 'shared', m, n, h, ask },
       q: {
