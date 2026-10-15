@@ -4,7 +4,7 @@ import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import { num, paren, poly } from '../../../engine/tex';
 import type { GeometryFigure, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, dots, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dots, expectMcm, expectMcs, expectNe, expectQc, lineTex, ptTex, qcEnd, trapChoices, uniqueIndex } from './util';
 
 type Pt = [number, number];
 
@@ -423,6 +423,7 @@ const perpendicularLine: Template<PerpParams> = {
       bk = frac(q).sub(s.mul(p));
       answer = frac(x0);
     }
+    if (answer.eq(0)) return perpendicularLine.generate(rng, d); // a line through the origin makes the intercept trivial
     // Given line.
     let b = frac(0);
     if (form === 'slope') {
@@ -435,9 +436,21 @@ const perpendicularLine: Template<PerpParams> = {
     }
     const yInt = (slope: Frac, sign = 1) => frac(q).sub(slope.mul(p).mul(sign)); // q - slope*p (sign error with -1)
     const xInt = (slope: Frac, intercept: Frac) => (slope.n === 0 ? null : intercept.neg().div(slope));
-    const traps: { value: Frac; trap: string }[] = [];
+    const traps: { value: Frac; trap: string; why: string }[] = [];
+    const WHY: Record<string, string> = {
+      'algw-kept-intercept': 'giving the intercept of the given line',
+      'algw-perp-no-sign': 'taking the reciprocal slope but not changing its sign',
+      'algw-perp-no-reciprocal': 'changing the sign of the slope but not taking the reciprocal',
+      'algw-parallel-perp': rel === 'perp' ? 'using the slope of a parallel line' : 'using the slope of a perpendicular line',
+      'algw-standard-form-slope': 'reading the slope off the standard form without solving for y',
+      'algw-intercept-sign': 'a sign error when finding the intercept',
+      'algw-x-vs-y-intercept': 'giving the y-intercept instead of the x-intercept',
+      'algw-point-as-intercept': 'giving a coordinate of the point itself',
+      'alg-sign-slip': 'losing the sign of the answer',
+      'algw-forgot-point-y': 'forgetting the y-coordinate of the point when finding the intercept',
+    };
     const push = (v: Frac | null, trap: string) => {
-      if (v && !v.eq(answer) && Math.abs(v.toNumber()) < 100) traps.push({ value: v, trap });
+      if (v && !v.eq(answer) && Math.abs(v.toNumber()) < 100) traps.push({ value: v, trap, why: WHY[trap] });
     };
     const wrongSlopes: { slope: Frac; trap: string }[] =
       rel === 'perp'
@@ -459,9 +472,13 @@ const perpendicularLine: Template<PerpParams> = {
       push(bk.div(s), 'algw-intercept-sign');
       for (const w of wrongSlopes) push(xInt(w.slope, yInt(w.slope)), w.trap);
     }
-    const dir = rng.sign();
-    const fillers = [answer.add(dir), answer.add(2 * dir), answer.sub(dir), answer.add(3 * dir), answer.sub(2 * dir)];
-    const { choices, answer: idx, values } = valuedChoices(rng, { correct: answer, traps: traps.slice(0, 3), fillers, format: fmtChoice });
+    push(frac(ask === 'y' ? q : p), 'algw-point-as-intercept');
+    push(answer.neg(), 'alg-sign-slip');
+    if (ask === 'y') push(s.mul(p).neg(), 'algw-forgot-point-y');
+    const res = trapChoices(rng, answer, traps, fmtChoice);
+    if (!res) return perpendicularLine.generate(rng, d);
+    const { choices, answer: idx, values } = res;
+    const cited = res.kept[0];
 
     const givenTex = form === 'slope' ? lineTex(m, b) : `${A === 1 ? '' : A}x ${B < 0 ? '-' : '+'} ${Math.abs(B)}y = ${num(C)}`;
     const relWord = rel === 'parallel' ? 'parallel' : 'perpendicular';
@@ -482,12 +499,7 @@ const perpendicularLine: Template<PerpParams> = {
       ask === 'y'
         ? `The $y$-intercept is $${num(answer)}$.`
         : `Its $x$-intercept is where $y = 0$: $0 = ${num(s)}x ${bk.sign() < 0 ? '-' : '+'} ${num(bk.abs())}$, so $x = ${num(answer)}$.`;
-    const trapNote =
-      rel === 'perp'
-        ? `Using $${num(m.inv())}$ (reciprocal without the sign change) or $${num(m.neg())}$ (sign change without the reciprocal) gives a wrong line.`
-        : ask === 'y'
-          ? `The intercept of the given line, $${num(b)}$, is not the answer: $k$ has the same slope but passes through a different point.`
-          : `Do not stop at the $y$-intercept $${num(bk)}$: the question asks where $k$ crosses the $x$-axis.`;
+    const trapNote = `Trap: $${cited.value.toTex()}$ comes from ${cited.why}. It is not the ${ask === 'y' ? '$y$' : '$x$'}-intercept of the line through $${ptTex(p, q)}$ with slope $${num(s)}$.`;
     return {
       params: { rel, form, m, b, A, B, C, p, q, ask, values },
       q: {
@@ -719,8 +731,8 @@ const pointsOnLine: Template<OnLineParams> = {
     for (const c of rng.shuffle(correct)) addWrong([c[1], c[0]], 'algw-swap-coordinates');
     for (const k of ks.slice(0, 2)) addWrong([A0[0] + k * Math.abs(rise), A0[1] + k * Math.sign(rise) * run], 'algw-slope-inverted');
     for (const k of ks.slice(2, 4)) addWrong([A0[0] + k * run, A0[1] - k * rise], 'algw-slope-sign');
-    for (const c of correct) addWrong([c[0], c[1] + rng.sign()]);
-    for (const k of ks) addWrong([A0[0] + k * run + 1, A0[1] + k * rise]);
+    for (const c of correct) addWrong([c[0], c[1] + rng.sign()], 'algw-near-miss');
+    for (const k of ks) addWrong([A0[0] + k * run + 1, A0[1] + k * rise], 'algw-near-miss');
     const total = d === 1 ? 5 : 6;
     const pickedWrong = rng.shuffle(wrong.slice(0, 6)).slice(0, total - correct.length);
     const items = [...correct.map((p) => ({ p, correct: true as const })), ...pickedWrong.map((w) => ({ p: w.p, correct: false as const, trap: w.trap }))].sort(
@@ -758,7 +770,7 @@ const pointsOnLine: Template<OnLineParams> = {
         instruction: 'Indicate all such points.',
         choices,
         answer,
-        explanation: `The marked points of $\\ell$ are $${ptTex(A0[0], A0[1])}$ and $${ptTex(A1[0], A1[1])}$, so the slope is $\\frac{\\text{rise}}{\\text{run}} = \\frac{${rise}}{${run}}${m.isInt() || rise < 0 ? ` = ${num(m)}` : ''}$ and the equation of $\\ell$ is $${lineTex(m, b)}$.
+        explanation: `The marked points of $\\ell$ are $${ptTex(A0[0], A0[1])}$ and $${ptTex(A1[0], A1[1])}$, so the slope is $\\frac{\\text{rise}}{\\text{run}} = ${run === 1 ? num(m) : `\\frac{${rise}}{${run}}${m.isInt() || rise < 0 ? ` = ${num(m)}` : ''}`}$ and the equation of $\\ell$ is $${lineTex(m, b)}$.
 
 A point lies on $\\ell$ when its $y$-coordinate equals $${poly([m, b])}$:
 ${checks}

@@ -1,11 +1,4 @@
 {
-  "alg.coordinate.parallel-perpendicular": {
-    "distractors.trapped": "baseline"
-  },
-  "alg.coordinate.points-on-line": {
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
   "alg.graphs.intersection": {
     "distractors.trapped": "baseline"
   },

@@ -62,6 +62,18 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Used run over rise for the slope',
     fix: 'Slope is rise over run: $\\frac{y_2 - y_1}{x_2 - x_1}$ (change in $y$ divided by change in $x$).',
   },
+  'algw-point-as-intercept': {
+    label: 'Gave a coordinate of the given point instead of the intercept',
+    fix: 'The point is on the line, but it is not where the line meets an axis. Find the equation first, then set $x = 0$ or $y = 0$.',
+  },
+  'algw-forgot-point-y': {
+    label: 'Forgot the $y$-coordinate of the point',
+    fix: 'Substitute BOTH coordinates of the point into $y = mx + b$, then solve for $b$.',
+  },
+  'algw-near-miss': {
+    label: 'Accepted a point that is close to the line',
+    fix: 'A point is on the line only if its coordinates satisfy the equation exactly. Substitute: $y$ must equal $mx + b$, not nearly.',
+  },
   'algw-quadrant-sign-slip': {
     label: 'Misread a sign and placed the line in a quadrant it does not reach',
     fix: 'Mark the intercepts first: the sign of the y-intercept says where the line meets the y-axis, the sign of the slope says which way it tilts. Then follow it through the axes.',
