@@ -16,20 +16,5 @@
   },
   "alg.rate-work.meet-catch": {
     "distractors.trapped": "baseline"
-  },
-  "alg.sequences.compare-qc": {
-    "artifacts.coef-1": "baseline",
-    "artifacts.exp-1": "baseline"
-  },
-  "alg.sequences.nth-term": {
-    "artifacts.frac-1": "baseline",
-    "artifacts.exp-1": "baseline"
-  },
-  "alg.sequences.sum": {
-    "distractors.trapped": "baseline"
-  },
-  "alg.sequences.terms-mcm": {
-    "artifacts.sign": "baseline",
-    "distractors.trapped": "baseline"
   }
 }

@@ -192,6 +192,38 @@ export const appliedTrapMap: Record<string, Trap> = {
     label: 'Ignored the sign pattern of a negative ratio',
     fix: 'With a negative ratio the terms alternate in sign: $a_n$ has the sign of $a_1$ when $n$ is odd and the opposite sign when $n$ is even.',
   },
+  'algw-seq-near-term': {
+    label: 'Accepted a number that is close to a term',
+    fix: 'A number is a term only if it is EXACTLY on the list. Check the difference from the first term (or run the rule), not just the size.',
+  },
+  'algw-recursion-sign': {
+    label: 'Undid the subtraction with the wrong sign',
+    fix: 'To undo "minus $c$" you ADD $c$; to undo "plus $c$" you subtract $c$. Then undo the multiplication by dividing.',
+  },
+  'algw-seq-average': {
+    label: 'Gave the average of the first and last terms instead of the sum',
+    fix: 'The average is only one step: the sum is the average times the number of terms.',
+  },
+  'algw-answered-single-term': {
+    label: 'Gave a single term instead of the sum',
+    fix: 'The question asks for the sum of many terms, not for one of them.',
+  },
+  'algw-seq-forgot-half': {
+    label: 'Forgot to divide by 2 in the sum of an arithmetic sequence',
+    fix: 'The sum of evenly spaced terms is (number of terms) times (first + last) divided by 2.',
+  },
+  'algw-seq-first-times-n': {
+    label: 'Multiplied the first term by the number of terms',
+    fix: 'Only a sequence with equal terms has a sum equal to (first term) times (number of terms). Use the average of the first and last terms.',
+  },
+  'algw-seq-from-start': {
+    label: 'Summed from the first term instead of from the stated start',
+    fix: 'Add only the terms from the stated first index to the stated last index; there are $b - a + 1$ of them.',
+  },
+  'algw-geo-formula-slip': {
+    label: 'Slipped in the formula for a geometric sum',
+    fix: 'The sum of $n$ terms starting at $a$ with ratio $r$ is $a\\,\\frac{r^n - 1}{r - 1}$: do not forget to divide by $r - 1$, or to subtract 1.',
+  },
   'algw-seq-before-start': {
     label: 'Counted a value before the first term',
     fix: 'The sequence starts at $a_1$. A value that fits the pattern but comes before $a_1$ is not a term.',

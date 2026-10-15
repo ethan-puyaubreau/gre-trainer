@@ -1,8 +1,9 @@
 import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { num, ordinal } from '../../../engine/tex';
+import { term } from '../../../engine/text';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { choiceValuesMatch, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, expectMcm, expectMcs, expectNe, expectQc, qcEnd, trapChoices, uniqueIndex } from './util';
 
 const sub = (i: number | string) => `a_{${i}}`;
 const diffWords = (d: number) => (d >= 0 ? `${d} more than` : `${-d} less than`);
@@ -124,9 +125,9 @@ Count steps (differences of positions), not terms: dividing by ${n - m + 1} inst
         stem: `In the sequence $a_1, a_2, a_3, \\ldots$, each term after the first is equal to the preceding term multiplied by a constant $r$.${cond} If $${sub(m)} = ${num(am)}$ and $${sub(n)} = ${num(an)}$, what is the value of $${sub(k)}$?`,
         answer: ak,
         traps: traps.filter((t) => !t.value.eq(ak)),
-        explanation: `From $${sub(m)}$ to $${sub(n)}$ the term is multiplied by $r$ ${steps} times: $r^{${steps}} = \\frac{${num(an)}}{${num(am)}} = ${num(an.div(am))}$, so $r = ${num(r)}$${evenSteps ? ' (the sign is fixed by the given condition)' : ''}.
+        explanation: `From $${sub(m)}$ to $${sub(n)}$ the term is multiplied by $r$ ${steps} times: $r^{${steps}} = ${am.eq(1) ? '' : `\\frac{${num(an)}}{${num(am)}} = `}${num(an.div(am))}$, so $r = ${num(r)}$${evenSteps ? ' (the sign is fixed by the given condition)' : ''}.
 
-Then $${sub(k)} = ${sub(n)} \\cdot r^{${k - n}} = ${num(an)} \\cdot ${r.sign() < 0 || !r.isInt() ? `\\left(${num(r)}\\right)` : num(r)}^{${k - n}} = ${num(ak)}$.
+Then $${sub(k)} = ${sub(n)} \\cdot ${k - n === 1 ? 'r' : `r^{${k - n}}`} = ${num(an)} \\cdot ${(r.sign() < 0 || !r.isInt() ? `\\left(${num(r)}\\right)` : num(r)) + (k - n === 1 ? '' : `^{${k - n}}`)} = ${num(ak)}$.
 
 The terms are multiplied, not increased by a constant, so do not use differences.`,
       },
@@ -482,8 +483,8 @@ Doubling the position does not double the term: the first term gets in the way.`
           answer,
           traps,
           explanation: off
-            ? `Let the constant be $d$. Then $${sub(lo)} = ${num(V)} - ${j}d$ and $${sub(hi)} = ${num(V)} + ${j + 1}d$, so $${sub(lo)} + ${sub(hi)} = ${num(2 * V)} + d$, which depends on $d$: it equals $${num(2 * V)}$ only if $d = 0$. ${qcEnd('D')}`
-            : `Let the constant be $d$. Terms equally far from $${sub(k)}$ balance: $${sub(lo)} = ${num(V)} - ${j}d$ and $${sub(hi)} = ${num(V)} + ${j}d$, so $${sub(lo)} + ${sub(hi)} = 2(${num(V)}) = ${num(2 * V)}$ whatever $d$ is.
+            ? `Let the constant be $d$. Then $${sub(lo)} = ${num(V)} - ${term(j, 'd')}$ and $${sub(hi)} = ${num(V)} + ${term(j + 1, 'd')}$, so $${sub(lo)} + ${sub(hi)} = ${num(2 * V)} + d$, which depends on $d$: it equals $${num(2 * V)}$ only if $d = 0$. ${qcEnd('D')}`
+            : `Let the constant be $d$. Terms equally far from $${sub(k)}$ balance: $${sub(lo)} = ${num(V)} - ${term(j, 'd')}$ and $${sub(hi)} = ${num(V)} + ${term(j, 'd')}$, so $${sub(lo)} + ${sub(hi)} = 2(${num(V)}) = ${num(2 * V)}$ whatever $d$ is.
 
 Compare $${num(2 * V)}$ with $${num(N)}$. ${qcEnd(answer)}`,
         },
@@ -533,7 +534,7 @@ Compare $${num(exact)}$ with $${num(N)}$. ${qcEnd(answer)}`,
         quantityB: `$${sub(n)}$`,
         answer,
         traps,
-        explanation: `$${sub(m)} = ${r}^{${m - n}} \\cdot ${sub(n)} = ${r ** (m - n)}${sub(n)}$, and every term has the same sign as $a_1$.
+        explanation: `$${sub(m)} = ${m - n === 1 ? r : `${r}^{${m - n}}`} \\cdot ${sub(n)} = ${r ** (m - n)}${sub(n)}$, and every term has the same sign as $a_1$.
 
 ${
           cons === 'none'
@@ -624,7 +625,7 @@ const termsOfSequence: Template<TermsParams> = {
       if (kind === 'arith') a1 = rng.int(1, 30);
       else {
         do e = rng.int(-8, 8);
-        while (e === 0 || Math.abs(e) % dd === 0);
+        while (e === 0 || Math.abs(e) % dd === 0 || dd + e < 1);
         a1 = dd + e;
       }
       const isTerm = (v: number) => v >= a1 && (v - a1) % dd === 0;
@@ -643,7 +644,7 @@ const termsOfSequence: Template<TermsParams> = {
       }
       for (const k of rng.shuffle([5, 8, 11, 14, 17, 20, 23, 28])) {
         const v = a1 + k * dd + rng.pick([1, -1, 2]);
-        if (!isTerm(v)) cands.push({ v });
+        if (!isTerm(v)) cands.push({ v, trap: 'algw-seq-near-term' });
       }
       const seen = new Set(correct);
       wrong = [];
@@ -693,9 +694,9 @@ ${[...correct.map((v) => ({ v, ok: true })), ...wrong.map((w) => ({ v: w.v, ok: 
         if (Number.isInteger(wrongOrder) && wrongOrder > 0 && !isTerm(wrongOrder)) cands.push({ v: wrongOrder, trap: 'algw-recursion-order' });
         // Undoing the subtraction with the wrong sign.
         const wrongSign = (seq[i] + qq) / p;
-        if (Number.isInteger(wrongSign) && wrongSign > 0 && !isTerm(wrongSign)) cands.push({ v: wrongSign });
+        if (Number.isInteger(wrongSign) && wrongSign > 0 && !isTerm(wrongSign)) cands.push({ v: wrongSign, trap: 'algw-recursion-sign' });
       }
-      for (const v of [seq[0] - 1, seq[1] + 1, seq[2] - 1, seq[4] + 2, seq[3] + p]) if (!isTerm(v) && v > 0) cands.push({ v });
+      for (const v of [seq[0] - 1, seq[1] + 1, seq[2] - 1, seq[4] + 2, seq[3] + p]) if (!isTerm(v) && v > 0) cands.push({ v, trap: 'algw-seq-near-term' });
       const seen = new Set([...correct, ag]);
       wrong = [];
       for (const c of rng.shuffle(cands)) {
@@ -719,7 +720,7 @@ After $${sub(6)}$ the terms only grow. So the terms among the choices are ${[...
       correct = idxs.map((i) => seq[i]);
       const cands: { v: number; trap?: string }[] = [];
       for (const i of rng.shuffle([2, 3, 4, 5, 6, 7, 8])) cands.push({ v: -seq[i], trap: 'algw-geo-sign' });
-      cands.push({ v: a1 * Math.abs(r) * 5 * Math.sign(r) });
+      cands.push({ v: a1 * Math.abs(r) * 5 * Math.sign(r), trap: 'algw-seq-near-term' });
       const seen = new Set(correct);
       wrong = [];
       for (const c of cands) {
@@ -810,15 +811,19 @@ const sequenceSum: Template<SumParams> = {
         { value: frac(n * last), trap: 'algw-seq-sum-last-times-n' },
         { value: frac((n - 1) * (a1 + a1 + (n - 2) * dd), 2), trap: 'algw-seq-count-terms' },
         { value: frac(n * (a1 + a1 + n * dd), 2), trap: 'algw-seq-off-by-one' },
+        { value: frac(n * (a1 + last)), trap: 'algw-seq-forgot-half' },
+        { value: frac(n * a1), trap: 'algw-seq-first-times-n' },
+        { value: frac(correct + last + dd), trap: 'algw-seq-count-terms' },
+        { value: frac(correct - a1), trap: 'algw-seq-count-terms' },
+        { value: frac(a1 + last, 2), trap: 'algw-seq-average' },
+        { value: frac(last), trap: 'algw-answered-single-term' },
       ].filter((t) => t.value.isInt());
       params = { ...base, a1, d: dd, from: 1, to: n };
       const shown = [0, 1, 2, 3].map((i) => num(a1 + i * dd)).join(', ');
       stem = `What is the sum of the first ${n} terms of the sequence $${shown}, \\ldots$, in which each term after the first is ${dd} more than the preceding term?`;
       explanation = `The ${ordinal(n)} term is $${a1} + ${n - 1}(${dd}) = ${last}$. The terms are evenly spaced, so their average is the average of the first and last terms, $\\frac{${a1} + ${last}}{2} = ${num(frac(a1 + last, 2))}$.
 
-Sum $= ${n} \\times ${num(frac(a1 + last, 2))} = ${num(correct)}$.
-
-Multiplying the last term by ${n} (${num(n * last)}) treats every term as the largest one.`;
+Sum $= ${n} \\times ${num(frac(a1 + last, 2))} = ${num(correct)}$.`;
     } else if (kind === 'range') {
       const p = rng.int(2, 6);
       const c = rng.int(-9, 9) || 1;
@@ -830,14 +835,19 @@ Multiplying the last term by ${n} (${num(n * last)}) treats every term as the la
       traps = [
         { value: frac((count - 1) * (term(from) + term(to)), 2), trap: 'algw-seq-count-terms' },
         { value: frac(count * term(to)), trap: 'algw-seq-sum-last-times-n' },
+        { value: frac(count * (term(from) + term(to))), trap: 'algw-seq-forgot-half' },
+        { value: frac(count * term(from)), trap: 'algw-seq-first-times-n' },
+        { value: frac(to * (term(1) + term(to)), 2), trap: 'algw-seq-from-start' },
+        { value: frac(correct + term(to + 1)), trap: 'algw-seq-count-terms' },
+        { value: frac(correct - term(from)), trap: 'algw-seq-count-terms' },
+        { value: frac(term(from) + term(to), 2), trap: 'algw-seq-average' },
+        { value: frac(term(to)), trap: 'algw-answered-single-term' },
       ].filter((t) => t.value.isInt());
       params = { ...base, p, c, from, to };
       stem = `The sequence $a_1, a_2, a_3, \\ldots$ is defined by $a_k = ${p}k ${c < 0 ? '-' : '+'} ${Math.abs(c)}$ for all positive integers $k$. What is the sum of the terms from $${sub(from)}$ to $${sub(to)}$, inclusive?`;
       explanation = `$${sub(from)} = ${term(from)}$ and $${sub(to)} = ${term(to)}$. From term ${from} to term ${to} there are $${to} - ${from} + 1 = ${count}$ terms, evenly spaced (each ${p} more than the one before).
 
-Sum $= ${count} \\times \\frac{${term(from)} + ${term(to)}}{2} = ${num(correct)}$.
-
-Using $${to} - ${from} = ${count - 1}$ terms leaves one term out.`;
+Sum $= ${count} \\times \\frac{${term(from)} + ${term(to)}}{2} = ${num(correct)}$.`;
     } else {
       const r = rng.pick([2, 3]);
       const a1 = rng.int(1, 5) * (r === 3 ? 1 : rng.pick([1, 3]));
@@ -850,23 +860,36 @@ Using $${to} - ${from} = ${count - 1}$ terms leaves one term out.`;
         { value: frac(correct - last), trap: 'algw-seq-count-terms' },
         { value: frac(correct + last * r), trap: 'algw-seq-count-terms' },
         { value: frac(n * last), trap: 'algw-seq-sum-last-times-n' },
-      ];
+        { value: frac(a1 * (r ** n - 1)), trap: 'algw-geo-formula-slip' },
+        { value: frac(n * a1), trap: 'algw-seq-first-times-n' },
+        { value: frac(a1 * r ** n, r - 1), trap: 'algw-geo-formula-slip' },
+        { value: frac(last), trap: 'algw-answered-single-term' },
+        { value: frac(correct - a1), trap: 'algw-seq-count-terms' },
+      ].filter((t) => t.value.isInt());
       params = { ...base, a1, r, from: 1, to: n };
       stem = `In the sum $${seq.slice(0, 3).map((x) => num(x)).join(' + ')} + \\cdots + ${num(last)}$, each term after the first is ${r} times the preceding term. What is the value of the sum?`;
       explanation = `First count the terms: $${num(last)} = ${a1 === 1 ? '' : `${a1} \\cdot `}${r}^{${n - 1}}$, so there are ${n} terms: $${seq.map((x) => num(x)).join(' + ')}$.
 
-Adding them gives $${num(correct)}$. (Shortcut: $${a1 === 1 ? '' : a1}${a1 === 1 ? '' : '\\cdot'}\\frac{${r}^{${n}} - 1}{${r} - 1} = ${num(correct)}$.)
-
-Miscounting the terms by one adds or drops a whole term.`;
+Adding them gives $${num(correct)}$. (Shortcut: $${a1 === 1 ? '' : a1}${a1 === 1 ? '' : '\\cdot'}\\frac{${r}^{${n}} - 1}{${r} - 1} = ${num(correct)}$.)`;
     }
-    // Keep one or two traps and put the plain distractors on one side, so the answer's position varies.
-    traps = rng.sample(traps, Math.min(traps.length, rng.int(1, 2)));
-    const dir = rng.sign();
-    const step = Math.max(1, Math.round(correct / 20));
-    const fillers = [correct + dir * step, correct + 2 * dir * step, correct + 3 * dir * step, correct - dir * step].map((x) => frac(x));
-    const { choices, answer, values } = valuedChoices(rng, { correct, traps, fillers, format: fmtN, unit: step, positive: correct > 0 });
-    params.values = values;
-    return { params, q: { format: 'mcs', stem, choices, answer, explanation } };
+    const WHY: Record<string, string> = {
+      'algw-seq-sum-last-times-n': 'multiplying the last term by the number of terms, as if every term were the largest',
+      'algw-seq-count-terms': 'miscounting the terms by one',
+      'algw-seq-off-by-one': 'going one step too far',
+      'algw-seq-forgot-half': 'forgetting to divide by 2',
+      'algw-seq-first-times-n': 'multiplying the first term by the number of terms',
+      'algw-seq-from-start': 'adding from the first term instead of from the stated start',
+      'algw-geo-formula-slip': 'a slip in the formula for a geometric sum',
+      'algw-seq-average': 'giving the average of the first and last terms instead of the sum',
+      'algw-answered-single-term': 'giving a single term instead of the sum',
+    };
+    const res = trapChoices(rng, correct, traps.filter((t) => t.value.sign() > 0 || correct <= 0), fmtN);
+    if (!res) return sequenceSum.generate(rng, d);
+    const cited = res.kept[0];
+    params.values = res.values;
+    return { params, q: { format: 'mcs', stem, choices: res.choices, answer: res.answer, explanation: `${explanation}
+
+Trap: $${num(cited.value)}$ comes from ${WHY[cited.trap]}.` } };
   },
   check(q, prm) {
     const err = choiceValuesMatch(q, prm.values, fmtN);
