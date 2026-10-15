@@ -5,6 +5,7 @@ import { rightTemplates } from './right';
 import { similarTemplates } from './similar';
 import { triangleTemplates } from './triangles';
 import { bisectorTemplates, bisectorTraps } from './bisector';
+import { coordDistanceTemplates, coordDistanceTraps } from './coord-distance';
 import { ladderTemplates, ladderTraps } from './ladder';
 import { hypBoundTemplates, hypBoundTraps } from './hyp-bound';
 import { isoChainTemplates, isoChainTraps } from './isosceles-chain';
@@ -18,5 +19,5 @@ import { shapesSkillList } from './skills';
 import { shapesTraps as traps } from './traps';
 
 export const shapesSkills: Skill[] = shapesSkillList;
-export const shapesTemplates: Template<any>[] = [...linesTemplates, ...triangleTemplates, ...rightTemplates, ...similarTemplates, ...readingTemplates, ...tripleSetTemplates, ...longestSegmentTemplates, ...bisectorTemplates, ...apexParallelTemplates, ...parallelQcTemplates, ...clockHandsTemplates, ...cevianTemplates, ...isoChainTemplates, ...hypBoundTemplates, ...ladderTemplates];
-export const shapesTraps: Record<string, Trap> = { ...traps, ...tripleSetTraps, ...longestSegmentTraps, ...bisectorTraps, ...apexParallelTraps, ...parallelQcTraps, ...clockHandsTraps, ...cevianTraps, ...isoChainTraps, ...hypBoundTraps, ...ladderTraps };
+export const shapesTemplates: Template<any>[] = [...linesTemplates, ...triangleTemplates, ...rightTemplates, ...similarTemplates, ...readingTemplates, ...tripleSetTemplates, ...longestSegmentTemplates, ...bisectorTemplates, ...apexParallelTemplates, ...parallelQcTemplates, ...clockHandsTemplates, ...cevianTemplates, ...isoChainTemplates, ...hypBoundTemplates, ...ladderTemplates, ...coordDistanceTemplates];
+export const shapesTraps: Record<string, Trap> = { ...traps, ...tripleSetTraps, ...longestSegmentTraps, ...bisectorTraps, ...apexParallelTraps, ...parallelQcTraps, ...clockHandsTraps, ...cevianTraps, ...isoChainTraps, ...hypBoundTraps, ...ladderTraps, ...coordDistanceTraps };
