@@ -321,6 +321,18 @@ export const probTraps: Record<string, Trap> = {
     label: 'Used the wrong fraction in the comparison',
     fix: 'Compare with exactly the fraction stated in the question, for example one fifth of the other column.',
   },
+  'prob-di-weights-swapped': {
+    label: 'Gave each year the count of the other year as its weight',
+    fix: 'Each mean is weighted by its own count: multiply the mean of a year by the number of items of that same year.',
+  },
+  'prob-di-forgot-rate': {
+    label: 'Gave the total instead of the percent of it',
+    fix: 'After finding the total, take the stated percent of it: multiply by the rate divided by 100.',
+  },
+  'prob-di-forgot-count': {
+    label: 'Forgot to multiply by the number of items',
+    fix: 'The tax on every item sold is the rate times the total of the prices: mean times the number of items.',
+  },
   'prob-di-sign': {
     label: 'Applied the change in the wrong direction',
     fix: 'A $+$ entry is an increase (multiply by $1 + p$), a $-$ entry a decrease (multiply by $1 - p$).',

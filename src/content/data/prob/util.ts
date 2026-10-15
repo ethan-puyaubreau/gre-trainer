@@ -273,3 +273,21 @@ export function trapOnlyChoices<T extends { value: Frac | number; trap: string; 
     values: all.map((x) => x.v),
   };
 }
+
+/**
+ * trapOnlyChoices for whole numbers, with a last resort: when `pad` is set and the mistakes of this
+ * dataset are too few or too close together, the missing choices are made up around the right value,
+ * as spacedChoices does. Without `pad` the result is null in that case, so the caller draws again.
+ */
+export function trapChoicesOrPad<T extends { value: number; trap: string }>(
+  rng: Rng,
+  correct: number,
+  traps: T[],
+  opts: { step: number; minGap: number; min?: number; max?: number; pad: boolean; format: (v: number) => string },
+): { choices: Choice[]; answer: number; used: T[]; values: number[] } | null {
+  const named = trapOnlyChoices(rng, correct, traps, (v) => opts.format(v.toNumber()), 5, opts.minGap);
+  if (named) return { choices: named.choices, answer: named.answer, used: named.used, values: named.values.map((v) => v.toNumber()) };
+  if (!opts.pad) return null;
+  const sc = spacedChoices(rng, correct, traps.map((t) => ({ v: t.value, trap: t.trap })), opts);
+  return { choices: sc.choices, answer: sc.answer, used: traps.filter((t) => sc.choices.some((c) => c.trap === t.trap)), values: sc.values };
+}

@@ -1,13 +1,4 @@
 {
-  "data.interpretation.homes-combined-mean": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.homes-median-change": {
-    "distractors.trapped": "baseline"
-  },
-  "data.interpretation.homes-tax": {
-    "distractors.trapped": "baseline"
-  },
   "data.interpretation.mixed-growth": {
     "distractors.trapped": "baseline"
   },
