@@ -1,4 +1,5 @@
 import type { Template, Trap } from '../../../engine/types';
+import { compoundGrowthTemplates, compoundGrowthTraps } from './compoundGrowth';
 import { decimalTemplates } from './decimals';
 import { decimalExtraTemplates } from './decimalsMore';
 import { fractionTemplates } from './fractions';
@@ -12,5 +13,5 @@ import { stackedDiscountTemplates } from './stackedDiscount';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
-export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps };
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...stackedDiscountTemplates, ...compoundGrowthTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
+export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...compoundGrowthTraps };
