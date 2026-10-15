@@ -19,7 +19,8 @@ import { systemTemplates as ineqSystemTemplates, systemTraps as ineqSystemTraps 
 import { oddPartTemplates, oddPartTraps } from './fnOddPart';
 import { inverseTemplates, inverseTraps } from './fnInverse';
 import { recursiveTemplates, recursiveTraps } from './fnRecursive';
+import { shiftTemplates, shiftTraps } from './qcShift';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates, ...boundsTemplates, ...ineqSystemTemplates, ...oddPartTemplates, ...inverseTemplates, ...recursiveTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps, ...boundsTraps, ...ineqSystemTraps, ...oddPartTraps, ...inverseTraps, ...recursiveTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates, ...boundsTemplates, ...ineqSystemTemplates, ...oddPartTemplates, ...inverseTemplates, ...recursiveTemplates, ...shiftTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps, ...boundsTraps, ...ineqSystemTraps, ...oddPartTraps, ...inverseTraps, ...recursiveTraps, ...shiftTraps };
