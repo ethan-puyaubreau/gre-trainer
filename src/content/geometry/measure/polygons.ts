@@ -5,7 +5,8 @@ import { lin, num, paren, plain } from '../../../engine/tex';
 import type { Choice, MCSQuestion, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { angleAt, checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, type ExData } from './ex';
 import { Fig, onCircle, type P2 } from './fig';
-import { retryAll } from '../redraw';
+import { Redraw, retryAll } from '../redraw';
+import { trapNotes } from '../notes';
 
 const deg = (v: number | string) => `${v}^\\circ`;
 const relText = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -47,6 +48,17 @@ function polygonWithAngles(rng: Rng, angles: number[]): P2[] | null {
   return null;
 }
 
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const polyNotes = (n: number): Record<string, (vs: string) => string> => ({
+  'geom-poly-sum-n180': (vs) => `multiplying ${n} by $180^\\circ$ gives ${vs}, which forgets the $-2$: the polygon splits into ${n - 2} triangles, not ${n}`,
+  'geom-poly-triangle-count': (vs) => `counting one triangle too many or too few gives ${vs}`,
+  'geom-poly-sum-360': (vs) => `${vs} is the sum of the exterior angles; only a quadrilateral has $360^\\circ$ for its interior angles`,
+  'geom-poly-side-count': (vs) => `miscounting the sides by one gives ${vs}`,
+  'geom-poly-exterior-angle': (vs) => `${vs} is the exterior angle, not the interior one`,
+  'geom-poly-diagonal-bisects': (vs) => `half the interior angle, ${vs}, assumes the diagonal bisects the angle, but it cuts off an isosceles triangle`,
+  'geom-poly-answered-other': (vs) => `${vs} answers a different question than the one asked`,
+});
+
 const regularPolygon = (n: number, R = 5, rot = -90 - 180 / n): P2[] => Array.from({ length: n }, (_, i) => onCircle([0, 0], R, rot + (360 * i) / n));
 
 interface AngleSumParams {
@@ -83,8 +95,12 @@ const angleSum: Template<AngleSumParams> = {
         correct: S,
         traps: [
           { value: n * 180, trap: 'geom-poly-sum-n180' },
+          { value: (n - 1) * 180, trap: 'geom-poly-triangle-count' },
+          { value: (n - 3) * 180, trap: 'geom-poly-triangle-count' },
+          { value: 360, trap: 'geom-poly-sum-360' },
+          { value: (n + 1) * 180, trap: 'geom-poly-side-count' },
         ],
-        fillers: rng.shuffle([(n - 1) * 180, (n - 3) * 180, (n + 1) * 180, 360, (n - 4) * 180]),
+        fillers: [],
         format: (v) => `$${num(v)}^\\circ$`,
       });
       const values = choicesValues(choices);
@@ -99,7 +115,7 @@ const angleSum: Template<AngleSumParams> = {
 
 The interior angles then add up to $(${n} - 2) \\cdot 180^\\circ = ${num(S)}^\\circ$ (check: $${n} \\cdot ${I} = ${num(S)}$).
 
-Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$: the polygon splits into $${n} - 2$ triangles, not ${n}.`,
+${trapNotes(choices, polyNotes(n))}`,
         },
       };
     }
@@ -117,8 +133,10 @@ Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$: the po
         traps: [
           { value: 360 / n, trap: 'geom-poly-exterior-angle' },
           { value: S, trap: 'geom-poly-answered-other' },
+          { value: 180 - 360 / (n + 1), trap: 'geom-poly-side-count' },
+          { value: 180 - 360 / (n - 1), trap: 'geom-poly-side-count' },
         ],
-        fillers: rng.shuffle([5, 6, 8, 9, 10, 12].filter((m) => m !== n).map((m) => 180 - 360 / m)),
+        fillers: [],
         format: (v) => `$${num(v)}$`,
       });
       return {
@@ -131,7 +149,9 @@ Using $${n} \\cdot 180^\\circ = ${num(n * 180)}^\\circ$ forgets the $-2$: the po
           answer,
           explanation: `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} has ${n} sides, so its interior angles add up to $(${n} - 2) \\cdot 180^\\circ = ${num(S)}^\\circ$. In a regular polygon all ${n} angles are equal: $x = \\frac{${num(S)}}{${n}} = ${num(I)}$.
 
-Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$, so $x = 180 - ${num(360 / n)} = ${num(I)}$. Answering ${plain(360 / n)} gives the exterior angle, not the interior one.`,
+Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$, so $x = 180 - ${num(360 / n)} = ${num(I)}$.
+
+${trapNotes(choices, polyNotes(n))}`,
         },
       };
     }
@@ -146,8 +166,10 @@ Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$
         { value: new Frac(I, 2), trap: 'geom-poly-diagonal-bisects' },
         { value: new Frac(360, n), trap: 'geom-poly-exterior-angle' },
         { value: I, trap: 'geom-poly-answered-other' },
+        { value: new Frac(180, n - 1), trap: 'geom-poly-side-count' },
+        { value: new Frac(180, n + 1), trap: 'geom-poly-side-count' },
       ],
-      fillers: rng.shuffle([x.add(10), x.sub(5), new Frac(I).sub(x), x.add(15), x.mul(2).add(5)]),
+      fillers: [],
       format: (v) => `$${v.isInt() ? num(v.n) : v.toDecimalString()}$`,
     });
     return {
@@ -162,7 +184,7 @@ Faster: each exterior angle is $\\frac{360^\\circ}{${n}} = ${deg(num(360 / n))}$
 
 Triangle $${names[0]}${names[1]}${names[2]}$ is isosceles ($${names[0]}${names[1]} = ${names[1]}${names[2]}$, two sides of the regular polygon), so its base angles are equal: $x = \\frac{180 - ${num(I)}}{2} = ${x.isInt() ? x.n : x.toDecimalString()}$.
 
-The diagonal does not bisect the angle at $${names[0]}$: $\\frac{${num(I)}}{2}$ is a trap.`,
+${trapNotes(choices, polyNotes(n))}`,
       },
     };
   },
@@ -206,11 +228,16 @@ function numChoices(
   rng: Rng,
   o: { correct: FracLike; traps?: { value: FracLike; trap: string }[]; fillers?: FracLike[]; format: (v: Frac) => string; step: number },
 ): { choices: Choice[]; answer: number } {
+  // values with more than two decimals (180 / 7...) cannot be shown as choices
+  const clean = (v: FracLike) => {
+    const r = Ex.of(v).rational()!;
+    return (r.n * 100) % r.d === 0;
+  };
   const r = exChoices(
     rng,
     Ex.of(o.correct),
-    (o.traps ?? []).map((t) => ({ v: Ex.of(t.value), trap: t.trap })),
-    (o.fillers ?? []).map((f) => Ex.of(f)),
+    (o.traps ?? []).filter((t) => clean(t.value)).map((t) => ({ v: Ex.of(t.value), trap: t.trap })),
+    (o.fillers ?? []).filter(clean).map((f) => Ex.of(f)),
     { step: Ex.of(o.step), fmt: (v) => o.format(v.rational()!), scales: false },
   );
   return { choices: r.choices, answer: r.answer };
@@ -273,26 +300,34 @@ function irregularAngles(rng: Rng, n: number, d: number): { q: MCSQuestion; para
     const ask: 'x' | 'largest' = d === 1 || !largestOk ? 'x' : d === 3 || rng.chance(0.5) ? 'largest' : 'x';
 
     const xWith = (total: number) => (total - sumQ) / sumP;
-    const xN180 = xWith(n * 180);
-    const x360 = xWith(360);
-    const good = (v: number) => Number.isInteger(v) && v > 0;
+    const good = (v: number) => Number.isInteger(v) && v > 0 && v < 400;
     let correct: number;
     const traps: { value: number; trap: string }[] = [];
     let fillers: number[];
+    // wrong angle sums, each a named slip
+    const wrongSums = [
+      { T: n * 180, trap: 'geom-poly-sum-n180' },
+      { T: (n - 1) * 180, trap: 'geom-poly-triangle-count' },
+      { T: (n - 3) * 180, trap: 'geom-poly-triangle-count' },
+      ...(n >= 5 ? [{ T: 360, trap: 'geom-poly-sum-360' }] : []),
+    ];
     if (ask === 'x') {
       correct = x;
-      if (good(xN180) && xN180 < 200) traps.push({ value: xN180, trap: 'geom-poly-sum-n180' });
-      if (n >= 5 && good(x360)) traps.push({ value: x360, trap: 'geom-poly-sum-360' });
-      fillers = rng.shuffle([x + 10, x - 10, x + 5, x + 20, x - 5, x - 15, x + 15, x - 20]);
+      for (const w of wrongSums) if (good(xWith(w.T))) traps.push({ value: xWith(w.T), trap: w.trap });
+      for (const v of new Set(values)) if (v !== x) traps.push({ value: v, trap: 'geom-poly-answered-other' });
     } else {
       const big = exprs[maxIdx];
       correct = maxV;
       traps.push({ value: x, trap: 'geom-poly-answered-other' });
-      if (good(xN180) && angleVal(big, xN180) < 400) traps.push({ value: angleVal(big, xN180), trap: 'geom-poly-sum-n180' });
-      if (n >= 5 && good(x360) && angleVal(big, x360) > 0) traps.push({ value: angleVal(big, x360), trap: 'geom-poly-sum-360' });
-      const second = [...values].sort((a, b) => b - a).find((v) => v < maxV);
-      fillers = rng.shuffle([maxV + 10, maxV - 10, ...(second ? [second] : []), maxV + 20, maxV - 20, maxV + 5]);
+      for (const w of wrongSums) {
+        const xv = xWith(w.T);
+        if (good(xv) && angleVal(big, xv) > 0 && angleVal(big, xv) < 400) traps.push({ value: angleVal(big, xv), trap: w.trap });
+      }
+      for (const v of new Set(values)) if (v !== maxV) traps.push({ value: v, trap: 'geom-poly-answered-other' });
     }
+    // every wrong choice names a slip: four different values
+    if (new Set(traps.map((t) => t.value).filter((v) => v !== correct && v > 0)).size < 4) continue;
+    fillers = [];
     const { choices, answer } = numChoices(rng, {
         step: 5,
       correct,
@@ -329,7 +364,7 @@ ${
         .join(', ')}; the largest is $${angleTex(big).replace(/\^\\circ$/, '')} = ${maxV}^\\circ$. Do not stop at $x = ${x}$.`
 }
 
-The angle sum is $(n - 2) \\cdot 180^\\circ$, not $n \\cdot 180^\\circ$${n >= 5 ? ', and only a quadrilateral has $360^\\circ$' : ''}.`;
+${trapNotes(choices, polyNotes(n))}`;
     return {
       params: { mode: 'irregular', n, exprs: ordered, pts, ask, regularAngle: 0, values: choicesValues(choices) },
       q: { format: 'mcs', stem, figure: fig.build(false), choices, answer, explanation },
@@ -393,7 +428,12 @@ const rectangles: Template<RectParams> = {
       if (Number.isInteger(wP * lP) && lP > 0) traps.push({ v: Ex.of(wP * lP), trap: 'geom-rect-percent-of-perimeter' });
       traps.push({ v: Ex.of(4 * A), trap: 'geom-rect-semiperimeter' });
       if (Number.isInteger(P / 4)) traps.push({ v: Ex.of((P / 4) ** 2), trap: 'geom-rect-assumed-square' });
-      const { choices, answer, values } = exChoices(rng, Ex.of(A), rng.sample(traps, Math.min(2, traps.length)), [Ex.of(A / 2), Ex.of(2 * A), Ex.of(l * l), Ex.of(A + l), Ex.of(A - w), Ex.of(A - l), Ex.of(w * w)]);
+      // l - w = P/2 instead of l + w = P/2
+      const lSub = P / 2 / (1 - pct / 100);
+      traps.push({ v: Ex.of((pct / 100) * lSub * lSub), trap: 'geom-rect-subtracted-sides' });
+      traps.push({ v: Ex.of(P), trap: 'geom-rect-area-for-perimeter' });
+      traps.push({ v: Ex.of(P / 2), trap: 'geom-rect-half-perimeter' });
+      const { choices, answer, values } = exChoices(rng, Ex.of(A), traps, []);
       return {
         params: { mode, P, A, pct, verts: [], ask: 'area', values },
         q: {
@@ -439,13 +479,18 @@ Traps: the width is ${pct} percent of the LENGTH, not of the perimeter; and $\\e
               { v: Ex.of(2 * (Ws + H)), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(2 * (W + Hs)), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(W * H), trap: 'geom-rect-area-for-perimeter' },
+              { v: Ex.of(2 * W + H), trap: 'geom-rect-three-sides' },
+              { v: Ex.of(W + 2 * H), trap: 'geom-rect-three-sides' },
             ]
           : [
               { v: Ex.of(Ws * H), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(W * Hs), trap: 'geom-rect-coordinate-sign' },
               { v: Ex.of(2 * (W + H)), trap: 'geom-rect-area-for-perimeter' },
+              { v: Ex.of(W * W), trap: 'geom-rect-assumed-square' },
+              { v: Ex.of(H * H), trap: 'geom-rect-assumed-square' },
+              { v: Ex.of(W + H), trap: 'geom-rect-half-perimeter' },
             ];
-      const { choices, answer, values } = exChoices(rng, Ex.of(correct), rng.sample(traps, 2), [Ex.of(correct + 2), Ex.of(correct - 2), Ex.of(correct + 4), Ex.of(2 * correct), Ex.of(correct - 4), Ex.of(correct + 6)]);
+      const { choices, answer, values } = exChoices(rng, Ex.of(correct), traps, []);
       const pt = ([x, y]: P2) => `(${num(x)}, ${num(y)})`;
       return {
         params: { mode, P: 2 * (W + H), A: W * H, pct: 0, verts, ask, values },
@@ -474,8 +519,11 @@ Subtracting a negative coordinate adds its size: the distance from $${x1}$ to $$
         { v: Ex.of(a + b), trap: 'geom-rect-added-sides' },
         { v: Ex.sqrt(2, (a + b) / 2), trap: 'geom-rect-assumed-square' },
         { v: Ex.sqrt((a + b) ** 2 + 2 * A), trap: 'geom-rect-square-of-sum' },
+        { v: Ex.sqrt(2 * A), trap: 'geom-rect-assumed-square' },
+        { v: Ex.sqrt(A), trap: 'geom-rect-assumed-square' },
+        { v: Ex.of(Math.abs(a - b)), trap: 'geom-rect-added-sides' },
       ],
-      [Ex.sqrt(A), Ex.of(dg + 2), Ex.of(dg - 2), Ex.sqrt(2 * A)],
+      [],
     );
     return {
       params: { mode: 'diagonal', P, A, pct: 0, verts: [], ask: 'diagonal', values },
@@ -533,88 +581,127 @@ interface FenceParams {
   choices: number[];
 }
 
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const FENCE_NOTES: Record<string, (vs: string) => string> = {
+  'geom-rect-factor-only': (vs) => `a factor of the area, ${vs}, gives the right area but not the right amount of fencing`,
+  'geom-rect-half-perimeter': (vs) => `${vs} is the sum of two sides (half of the fencing in a four-sided pen), not a side`,
+  'geom-rect-assumed-square': (vs) => `${vs} would be a side if all the sides were equal, which nothing says`,
+  'geom-rect-ignored-wall': (vs) => `${vs} belongs to the solution that breaks the condition about the side along the wall`,
+};
+
+const divisors = (n: number) => Array.from({ length: n }, (_, i) => i + 1).filter((k) => n % k === 0);
+
 const fence: Template<FenceParams> = {
   id: 'geo.polygons.fence',
   skill: 'geo.polygons',
   format: 'mcm',
   style: 'which side lengths fit a fence length and an area',
   generate(rng, d) {
-    const g = rng.pick(d === 1 ? [1, 2, 5] : [5, 10, 20]);
+    const g = rng.pick(d === 1 ? [1, 2, 4, 5] : [2, 3, 4, 5, 6, 8, 10]);
+    // wrong lengths, each with the slip it comes from; distinct values only
+    const pickWrong = (ok: Set<number>, cand: { v: number; trap: string }[], count: number) => {
+      const seen = new Set(ok);
+      const uniq = cand.filter((c) => Number.isInteger(c.v) && c.v > 0 && !seen.has(c.v) && (seen.add(c.v), true));
+      // at most two factors of the area, the other slips first
+      const factors = rng.shuffle(uniq.filter((c) => c.trap === 'geom-rect-factor-only')).slice(0, 2);
+      const others = uniq.filter((c) => c.trap !== 'geom-rect-factor-only');
+      const pool = rng.shuffle([...others, ...factors]);
+      if (pool.length < count) throw new Redraw('not enough named wrong lengths');
+      return pool.slice(0, count);
+    };
     if (d === 1) {
       // fenced on all four sides: 2(x + y) = P, xy = A
       let a: number, b: number;
       do {
-        a = rng.int(1, 4);
-        b = rng.int(a + 1, 8);
-      } while (a * b * g * g > 400);
+        a = rng.int(1, 5);
+        b = rng.int(a + 1, 9);
+      } while (a * b * g * g > 600);
       const sa = a * g;
       const sb = b * g;
       const P = 2 * (sa + sb);
       const A = sa * sb;
-      const start = rng.int(1, a);
-      const choices = Array.from({ length: 8 }, (_, i) => (i + start) * g);
-      const wrongTrap = (v: number) => (A % v === 0 ? 'geom-rect-factor-only' : undefined);
-      const items = choices.map((v) => ({
-        text: `$${num(v)}$`,
-        correct: v === sa || v === sb,
-        ...(v !== sa && v !== sb && wrongTrap(v) ? { trap: wrongTrap(v)! } : {}),
-      }));
-      const { choices: cs, answer } = flaggedChoices(items);
-      const unit = 'meters';
+      const ok = new Set([sa, sb]);
+      const wrong = pickWrong(
+        ok,
+        [
+          ...divisors(A).map((v) => ({ v, trap: 'geom-rect-factor-only' })),
+          { v: sa + sb, trap: 'geom-rect-half-perimeter' },
+          { v: P / 4, trap: 'geom-rect-assumed-square' },
+        ],
+        rng.int(3, 4),
+      );
+      const items = [...[sa, sb].map((v) => ({ v, correct: true as const, trap: undefined as string | undefined })), ...wrong.map((w) => ({ v: w.v, correct: false as const, trap: w.trap as string | undefined }))].sort((x, y) => x.v - y.v);
+      const choices = items.map((x) => x.v);
+      const { choices: cs, answer } = flaggedChoices(items.map((x) => ({ text: `$${num(x.v)}$`, correct: x.correct, ...(x.trap ? { trap: x.trap } : {}) })));
+      const unit = rng.pick(['meters', 'feet', 'yards']);
+      const thing = rng.pick(['pen', 'garden', 'corral']);
+      const trapsNote = trapNotes(cs, FENCE_NOTES, 2);
       return {
         params: { sides: 4, F: P, A, longerAlongWall: false, choices },
         q: {
           format: 'mcm',
-          stem: `A rectangular pen has an area of ${plain(A)} square ${unit} and is enclosed by ${plain(P)} ${unit} of fencing along its four sides. Which of the following could be the length, in ${unit}, of a side of the pen?`,
+          stem: `A rectangular ${thing} has an area of ${plain(A)} square ${unit} and is enclosed by ${plain(P)} ${unit} of fencing along its four sides. Which of the following could be the length, in ${unit}, of a side of the ${thing}?`,
           instruction: 'Indicate all such lengths.',
           choices: cs,
           answer,
-          explanation: `Let the sides be $x$ and $y$: $2(x + y) = ${P}$ and $xy = ${num(A)}$, so $x + y = ${P / 2}$. Two numbers with sum ${P / 2} and product ${plain(A)} are ${sa} and ${sb} (check: $${sa} + ${sb} = ${P / 2}$, $${sa} \\cdot ${sb} = ${num(A)}$).
+          explanation: `Two conditions fix the sides $x$ and $y$: $2(x + y) = ${P}$, so $x + y = ${P / 2}$, and $xy = ${num(A)}$. Two numbers with sum ${P / 2} and product ${plain(A)} are ${sa} and ${sb}.
 
-The pen is ${sa} by ${sb}, so the possible side lengths are ${sa} and ${sb}.
+Check: $${sa} + ${sb} = ${P / 2}$ and $${sa} \\cdot ${sb} = ${num(A)}$. The ${thing} is ${sa} by ${sb}, so the possible side lengths are ${sa} and ${sb}.
 
-Other factors of ${plain(A)} give the right area but the wrong amount of fencing: check both conditions.`,
+${trapsNote}
+
+Rule: a side must satisfy both conditions, the area and the fencing.`,
         },
       };
     }
     const PAIRS: [number, number][] = [
+      [1, 2],
       [1, 3],
       [1, 4],
+      [1, 5],
       [2, 3],
+      [2, 5],
       [3, 4],
+      [3, 5],
+      [4, 5],
     ];
-    const [m1, m2] = rng.pick(PAIRS);
+    let [m1, m2] = rng.pick(PAIRS);
+    while (2 * (m1 + m2) * g > 120) [m1, m2] = rng.pick(PAIRS);
     const a1 = m1 * g;
     const a2 = m2 * g;
     const F = 2 * (a1 + a2);
     const A = 2 * a1 * a2;
     const longerAlongWall = d === 3;
     // x = side perpendicular to the wall, y = side along the wall (2x + y = F, xy = A)
-    const pairs: [number, number][] = [
+    const allPairs: [number, number][] = [
       [a1, 2 * a2],
       [a2, 2 * a1],
-    ].filter(([x, y]) => !longerAlongWall || y > x) as [number, number][];
+    ];
+    const pairs = allPairs.filter(([x, y]) => !longerAlongWall || y > x);
     const sides = new Set(pairs.flat());
-    const lo = Math.min(...sides) / g;
-    const hi = Math.max(...sides) / g;
-    const start = rng.int(Math.max(1, hi - 7), lo);
-    const choices = Array.from({ length: 8 }, (_, i) => (i + start) * g);
-    const trapFor = (v: number): string | undefined => (A % v === 0 ? 'geom-rect-factor-only' : undefined);
-    const items = choices.map((v) => {
-      const t = sides.has(v) ? undefined : trapFor(v);
-      return { text: `$${num(v)}$`, correct: sides.has(v), ...(t ? { trap: t } : {}) };
-    });
-    const { choices: cs, answer } = flaggedChoices(items);
-    const what = rng.pick(['garden', 'flower bed', 'storage yard']);
-    const lines = [
-      [a1, 2 * a2],
-      [a2, 2 * a1],
-    ]
+    const excluded = allPairs.filter(([x, y]) => longerAlongWall && !(y > x)).flat();
+    const wrong = pickWrong(
+      sides,
+      [
+        ...excluded.map((v) => ({ v, trap: 'geom-rect-ignored-wall' })),
+        ...divisors(A).map((v) => ({ v, trap: 'geom-rect-factor-only' })),
+        { v: F / 2, trap: 'geom-rect-half-perimeter' },
+        { v: F / 3, trap: 'geom-rect-assumed-square' },
+        { v: F / 4, trap: 'geom-rect-assumed-square' },
+      ],
+      Math.min(rng.int(4, 5), 8 - sides.size),
+    );
+    const items = [...[...sides].map((v) => ({ v, correct: true, trap: undefined as string | undefined })), ...wrong.map((w) => ({ v: w.v, correct: false, trap: w.trap as string | undefined }))].sort((x, y) => x.v - y.v);
+    const choices = items.map((x) => x.v);
+    const { choices: cs, answer } = flaggedChoices(items.map((x) => ({ text: `$${num(x.v)}$`, correct: x.correct, ...(x.trap ? { trap: x.trap } : {}) })));
+    const what = rng.pick(['garden', 'flower bed', 'storage yard', 'dog run', 'play area', 'vegetable plot']);
+    const lines = allPairs
       .map(([x, y]) => {
         const ok = !longerAlongWall || y > x;
         return `- $x = ${x}$: the side along the wall is $${F} - 2 \\cdot ${x} = ${y}$, and $${x} \\cdot ${y} = ${num(A)}$ ✓${ok ? '' : ` (but ${y} is not longer than ${x}, so this shape is excluded)`}`;
       })
       .join('\n');
+    const trapsNote = trapNotes(cs, FENCE_NOTES, 2);
     return {
       params: { sides: 3, F, A, longerAlongWall, choices },
       q: {
@@ -623,7 +710,7 @@ Other factors of ${plain(A)} give the right area but the wrong amount of fencing
         instruction: 'Indicate all such lengths.',
         choices: cs,
         answer,
-        explanation: `Let $x$ be each side perpendicular to the wall and $y$ the side opposite the wall: $2x + y = ${F}$ and $xy = ${num(A)}$. Substituting $y = ${F} - 2x$:
+        explanation: `Let $x$ be each side perpendicular to the wall and $y$ the side opposite the wall: only these three sides are fenced, so $2x + y = ${F}$, and $xy = ${num(A)}$. Substituting $y = ${F} - 2x$:
 
 $$x(${F} - 2x) = ${num(A)} \\quad\\Rightarrow\\quad x^2 - ${F / 2}x + ${num(A / 2)} = 0 \\quad\\Rightarrow\\quad x = ${a1} \\text{ or } x = ${a2}$$
 
@@ -633,7 +720,9 @@ So the possible side lengths are ${[...sides]
           .sort((u, v) => u - v)
           .join(', ')}.
 
-A factor of ${plain(A)} gives the right area but not necessarily ${F} feet of fencing, and the fence does not cover all four sides.`,
+${trapsNote}
+
+Rule: write the fencing equation for the sides that are really fenced ($2x + y$, not $2x + 2y$), then use the area.`,
       },
     };
   },

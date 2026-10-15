@@ -17,15 +17,5 @@
   },
   "geo.composite.inscribed": {
     "distractors.trapped": "baseline"
-  },
-  "geo.polygons.angle-sum": {
-    "distractors.trapped": "baseline"
-  },
-  "geo.polygons.fence": {
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline"
-  },
-  "geo.polygons.rectangles": {
-    "distractors.trapped": "baseline"
   }
 }

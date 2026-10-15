@@ -62,6 +62,22 @@ export const measureTraps: Record<string, Trap> = {
     label: 'Picked a factor of the area without checking the fence',
     fix: 'A side length must satisfy BOTH conditions: the area and the total length of fencing. Test each candidate pair in the fence equation.',
   },
+  'geom-rect-ignored-wall': {
+    label: 'Ignored the condition about the side along the wall',
+    fix: 'Both pairs of lengths satisfy the fencing and the area, but the stem adds a condition (the side along the wall is longer). Keep only the pair that respects it.',
+  },
+  'geom-poly-triangle-count': {
+    label: 'Counted the wrong number of triangles',
+    fix: 'From one vertex, the diagonals split an $n$-gon into $n - 2$ triangles, each with an angle sum of $180^\\circ$.',
+  },
+  'geom-poly-side-count': {
+    label: 'Miscounted the sides of the polygon',
+    fix: 'Count the vertices of the figure one by one. A polygon with $n$ sides has $n$ vertices, and the angle formulas depend on that exact $n$.',
+  },
+  'geom-rect-subtracted-sides': {
+    label: 'Subtracted the width from the length instead of adding it',
+    fix: 'Half the perimeter is length PLUS width: $\\ell + w = \\frac{P}{2}$.',
+  },
   'geom-rect-three-sides': {
     label: 'Perimeter of a rectangle $= 2\\ell + w$',
     fix: 'All four sides count: $2\\ell + 2w$.',
