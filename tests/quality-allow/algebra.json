@@ -60,14 +60,5 @@
     "distractors.trapped": "baseline",
     "bank.size": "baseline",
     "bank.difficulty": "baseline"
-  },
-  "alg.word-problems.setup-solve": {
-    "artifacts.plural-1": "baseline"
-  },
-  "alg.word-problems.translate-qc": {
-    "artifacts.plural-1": "baseline"
-  },
-  "alg.word-problems.two-types": {
-    "distractors.trapped": "baseline"
   }
 }

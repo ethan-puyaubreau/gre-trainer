@@ -1,9 +1,10 @@
 import { flaggedChoices, qcFromSamples, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
+import { plural } from '../../../engine/text';
 import { lin, num } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { add, div, type E, evalE, mul, N, subE, tex, V } from './expr';
-import { choiceValuesMatch, dx, valuedChoices, expectMcm, expectMcs, expectNe, expectQc, money, NAMES, qcEnd, uniqueIndex } from './util';
+import { choiceValuesMatch, dx, expectMcm, expectMcs, expectNe, expectQc, money, NAMES, qcEnd, trapChoices, uniqueIndex } from './util';
 
 const cents = (c: number) => money(frac(c, 100));
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
@@ -224,7 +225,7 @@ ${noFee.isTerminating() && !noFee.eq(ans) ? `Dividing the whole charge by the ra
           const v = ask === 'small' ? bw : p * bw + k;
           if (bw > 0 && v !== ans) traps.push({ value: frac(v), trap: 'algw-age-offset-one' });
         }
-        const rel = k === 0 ? `${na} is ${TIMES(p)} as old as ${nb}.` : `${na}'s age is ${Math.abs(k)} years ${k > 0 ? 'more' : 'less'} than ${TIMES(p)} ${nb}'s age.`;
+        const rel = k === 0 ? `${na} is ${TIMES(p)} as old as ${nb}.` : `${na}'s age is ${plural(Math.abs(k), 'year')} ${k > 0 ? 'more' : 'less'} than ${TIMES(p)} ${nb}'s age.`;
         const nW = WORDS[n] ?? String(n);
         const when = future
           ? `In ${nW} years, ${na} will be ${TIMES(q)} as old as ${nb} will be then.`
@@ -325,6 +326,8 @@ interface TwoTypesParams {
   lo: number;
   hi: number;
   askHi: boolean;
+  /** The question asks for the value of one kind (price times count) instead of the count. */
+  valueAsk: boolean;
   values: Frac[];
 }
 
@@ -347,13 +350,14 @@ const twoTypes: Template<TwoTypesParams> = {
     let names: [string, string];
     let unitTotal: string;
     const askHi = rng.chance(0.55);
+    const valueAsk = rng.chance(0.3); // ask for the value of one kind instead of how many there are
     if (ctx === 'tickets') {
       lo = rng.pick([4, 5, 6, 8]);
       hi = lo + rng.pick([2, 3, 4, 5, 6]);
       names = ['student tickets', 'adult tickets'];
       const T = x + y;
       const U = hi * x + lo * y;
-      stem = `A theater sold ${T} tickets for a show. Adult tickets cost ${money(hi)} each and student tickets cost ${money(lo)} each. If the total from ticket sales was ${money(U)}, how many ${askHi ? 'adult' : 'student'} tickets were sold?`;
+      stem = `A theater sold ${T} tickets for a show. Adult tickets cost ${money(hi)} each and student tickets cost ${money(lo)} each. If the total from ticket sales was ${money(U)}, ${valueAsk ? `how many dollars were collected from the sale of ${askHi ? 'adult' : 'student'} tickets?` : `how many ${askHi ? 'adult' : 'student'} tickets were sold?`}`;
       unitTotal = `${money(U)}`;
     } else if (ctx === 'coins') {
       lo = 10;
@@ -361,7 +365,7 @@ const twoTypes: Template<TwoTypesParams> = {
       names = ['dimes', 'quarters'];
       const T = x + y;
       const U = hi * x + lo * y;
-      stem = `A jar contains ${T} coins, all of them dimes or quarters, with a total value of ${money(frac(U, 100), true)}. How many ${askHi ? 'quarters' : 'dimes'} are in the jar?`;
+      stem = `A jar contains ${T} coins, all of them dimes or quarters, with a total value of ${money(frac(U, 100), true)}. ${valueAsk ? `What is the total value, in cents, of the ${askHi ? 'quarters' : 'dimes'} in the jar?` : `How many ${askHi ? 'quarters' : 'dimes'} are in the jar?`}`;
       unitTotal = `${num(U)} cents`;
     } else if (ctx === 'animals') {
       lo = 2;
@@ -369,7 +373,7 @@ const twoTypes: Template<TwoTypesParams> = {
       names = ['chickens', 'goats'];
       const T = x + y;
       const U = hi * x + lo * y;
-      stem = `A farm has only chickens and goats. Together the animals have ${T} heads and ${U} legs. How many ${askHi ? 'goats' : 'chickens'} are on the farm?`;
+      stem = `A farm has only chickens and goats. Together the animals have ${T} heads and ${U} legs. ${valueAsk ? `How many of the legs belong to the ${askHi ? 'goats' : 'chickens'}?` : `How many ${askHi ? 'goats' : 'chickens'} are on the farm?`}`;
       unitTotal = `${U} legs`;
     } else {
       lo = rng.pick([2, 3]);
@@ -378,41 +382,65 @@ const twoTypes: Template<TwoTypesParams> = {
       const T = x + y;
       const U = hi * x + lo * y;
       const nm = rng.pick(NAMES);
-      stem = `Each question on a quiz is worth either ${lo} points or ${hi} points. ${nm} answered ${T} questions correctly and earned a total of ${U} points. How many ${askHi ? hi : lo}-point questions did ${nm} answer correctly?`;
+      stem = `Each question on a quiz is worth either ${lo} points or ${hi} points. ${nm} answered ${T} questions correctly and earned a total of ${U} points. ${valueAsk ? `How many of ${nm}'s points came from the ${askHi ? hi : lo}-point questions?` : `How many ${askHi ? hi : lo}-point questions did ${nm} answer correctly?`}`;
       unitTotal = `${U} points`;
     }
     const T = x + y;
     const U = hi * x + lo * y;
-    const ans = askHi ? x : y;
+    const price = askHi ? hi : lo;
+    const count = askHi ? x : y;
+    const ans = valueAsk ? price * count : count;
     const other = askHi ? y : x;
-    const traps = [{ value: frac(other), trap: 'algw-answered-other-unknown' }];
-    const dir = rng.sign();
-    const fillers = [ans + dir, ans + 2 * dir, ans + 3 * dir, ans - dir, ans - 2 * dir].filter((v) => v > 0).map((v) => frac(v));
-    const { choices, answer, values } = valuedChoices(rng, { correct: ans, traps, fillers, format: (v) => `$${num(v)}$`, positive: true });
     const lowTotal = lo * T;
+    const wrongs: { value: Frac; trap: string; why: string }[] = valueAsk
+      ? [
+          { value: frac(count), trap: 'algw-answered-count-not-value', why: `giving how many ${askHi ? names[1] : names[0]} there are, not their value` },
+          { value: frac((askHi ? lo : hi) * other), trap: 'algw-answered-other-unknown', why: `giving the value of the ${askHi ? names[0] : names[1]}, the other kind` },
+          { value: frac(U), trap: 'algw-answered-total-value', why: 'giving the total value of both kinds' },
+          { value: frac(price * T), trap: 'algw-all-at-one-price', why: `valuing all ${T} items at ${price} each` },
+        ]
+      : [
+      { value: frac(other), trap: 'algw-answered-other-unknown', why: `giving the number of ${askHi ? names[0] : names[1]}, the other unknown` },
+      { value: frac(askHi ? U - lowTotal : hi * T - U), trap: 'algw-forgot-divide-difference', why: `stopping at the extra value ${num(askHi ? U - lowTotal : hi * T - U)} without dividing by the difference ${hi - lo} between the two values` },
+      { value: frac(ans * (askHi ? hi : lo)), trap: 'algw-answered-value-not-count', why: `giving the value of the ${askHi ? names[1] : names[0]}, not their number` },
+      { value: frac(T), trap: 'algw-answered-total', why: 'giving the total number of items' },
+    ];
+    if (T % 2 === 0) wrongs.push({ value: frac(T / 2), trap: 'algw-assumed-equal-split', why: 'assuming the items split evenly between the two kinds' });
+    wrongs.push({ value: frac(hi - lo), trap: 'algw-intermediate-step', why: `giving the difference ${hi - lo} between the two values, a number from the middle of the solution` });
+    wrongs.push({ value: frac(lo), trap: 'algw-intermediate-step', why: `giving the value ${lo} of one item, a number from the middle of the solution` });
+    wrongs.push({ value: frac(hi), trap: 'algw-intermediate-step', why: `giving the value ${hi} of one item, a number from the middle of the solution` });
+    const res = trapChoices(rng, ans, wrongs, (v) => `$${num(v)}$`);
+    if (!res) return twoTypes.generate(rng, d);
+    const { choices, answer } = res;
+    const values = res.values;
+    const cited = res.kept[0];
     const u = ctx === 'coins' ? ' cents' : ctx === 'tickets' ? ' dollars' : ctx === 'animals' ? ' legs' : ' points';
     return {
-      params: { T, U, lo, hi, askHi, values },
+      params: { T, U, lo, hi, askHi, valueAsk, values },
       q: {
         format: 'mcs',
         stem,
         choices,
         answer,
-        explanation: `Let $h$ be the number of ${names[1]}; then there are $${T} - h$ ${names[0]}, and
+        explanation: `Two kinds of items with a count and a total value: use the count to leave a single unknown. Let $h$ be the number of ${names[1]}; then there are $${T} - h$ ${names[0]}, and
 
 $$${hi}h + ${lo}(${T} - h) = ${num(U)}$$
 
-so $${hi - lo}h = ${num(U)} - ${num(lowTotal)} = ${num(U - lowTotal)}$ and $h = ${x}$. (Shortcut: if all ${T} were ${names[0]}, the total would be ${num(lowTotal)}${u}; each of the other kind adds ${hi - lo} more, and the extra is ${num(U - lowTotal)}.)
+so $${hi - lo}h = ${num(U)} - ${num(lowTotal)} = ${num(U - lowTotal)}$ and $h = ${x}$. (Shortcut: if all ${T} were ${names[0]}, the total would be ${num(lowTotal)}${u}; each swap to the other kind adds ${hi - lo}.) So there are ${x} ${names[1]} and ${y} ${names[0]}${valueAsk ? `. The question asks for their value: $${price} \\times ${count} = ${num(ans)}$` : askHi ? '' : `, and the question asks for ${y}`}.
 
-There are ${x} ${names[1]} and ${y} ${names[0]}${askHi ? '' : `, so the answer is ${y}`}. Check: $${hi}(${x}) + ${lo}(${y}) = ${num(U)}$ (${unitTotal}).`,
+Check: $${hi}(${x}) + ${lo}(${y}) = ${num(U)}$ (${unitTotal}) and $${x} + ${y} = ${T}$.
+
+Trap: ${num(cited.value)} comes from ${cited.why}.
+
+Rule: let one unknown be the count of one kind, write the other kind as total minus it, then use the value equation.`,
       },
     };
   },
-  check(q, { T, U, lo, hi, askHi, values }) {
+  check(q, { T, U, lo, hi, askHi, valueAsk, values }) {
     const err = choiceValuesMatch(q, values, (v) => `$${num(v)}$`);
     if (err) return err;
     const sols: number[] = [];
-    for (let h = 0; h <= T; h++) if (hi * h + lo * (T - h) === U) sols.push(askHi ? h : T - h);
+    for (let h = 0; h <= T; h++) if (hi * h + lo * (T - h) === U) sols.push(valueAsk ? (askHi ? hi * h : lo * (T - h)) : askHi ? h : T - h);
     if (sols.length !== 1) return `${sols.length} solutions`;
     return expectMcs(
       q,
@@ -524,7 +552,7 @@ Check the direction with numbers: if there were 20 ${givenBig ? g.big : g.small}
               ? `Let a ${it.s} cost $s$ dollars, so a ${it.l} costs $${Lexpr}$. Quantity A is $${n}s + ${n}(${Lexpr}) = ${n * (mult + 1)}s ${sgn < 0 ? '-' : '+'} ${n * c}$ and Quantity B is $${m}(${Lexpr}) = ${m * mult}s ${sgn < 0 ? '-' : '+'} ${m * c}$.
 
 B − A $= ${m * mult - n * (mult + 1)}s - ${(m - n) * c}$. A ${it.l} must have a positive price, so $s > ${num(frac(c, mult))}$; B − A is negative when $s < ${num(frac((m - n) * c, m * mult - n * (mult + 1)))}$ and positive when $s$ is larger, and both kinds of prices are allowed. ${qcEnd('D')}`
-              : `Let a ${it.s} cost $s$ dollars, so a ${it.l} costs $${Lexpr}$. Both quantities contain ${n} ${it.L}; remove them. What remains is ${n} ${it.S} (Quantity A) versus ${m - n} ${it.L} (Quantity B):
+              : `Let a ${it.s} cost $s$ dollars, so a ${it.l} costs $${Lexpr}$. Both quantities contain ${n} ${it.L}; remove them. What remains is ${n} ${it.S} (Quantity A) versus ${m - n} ${m - n === 1 ? it.l : it.L} (Quantity B):
 
 $$${n}s \\quad\\text{versus}\\quad ${m - n === 1 ? '' : m - n}(${Lexpr}) = ${n}s ${sgn === 0 ? '' : sgn < 0 ? `- ${(m - n) * c}` : `+ ${(m - n) * c}`}$$
 

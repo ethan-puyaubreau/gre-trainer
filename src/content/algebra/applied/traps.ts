@@ -185,6 +185,42 @@ export const appliedTrapMap: Record<string, Trap> = {
     fix: 'To go back one term, undo the steps in reverse order: if $a_n = 2a_{n-1} - 3$, then $a_{n-1} = \\frac{a_n + 3}{2}$.',
   },
   /* ------------------------------------------------------------ word problems */
+  'algw-forgot-divide-difference': {
+    label: 'Stopped before dividing by the difference of the two values',
+    fix: 'Swapping one item of the cheaper kind for one of the dearer kind adds the DIFFERENCE of the values. Divide the extra total by that difference to count the swaps.',
+  },
+  'algw-answered-value-not-count': {
+    label: 'Gave the money (or points) instead of the number of items',
+    fix: 'Reread the question: it asks how many items, not how much they are worth in total.',
+  },
+  'algw-answered-count-not-value': {
+    label: 'Gave the number of items instead of their value',
+    fix: 'The question asks for an amount of money (or points, or legs): multiply the number of items by the value of one.',
+  },
+  'algw-answered-total-value': {
+    label: 'Gave the total value of both kinds',
+    fix: 'The total is given in the problem. The question asks for the part that comes from ONE kind.',
+  },
+  'algw-all-at-one-price': {
+    label: 'Priced every item at the same rate',
+    fix: 'The two kinds of items have different values. Only the items of the asked kind are priced at its rate.',
+  },
+  'algw-intermediate-step': {
+    label: 'Gave a number from the middle of the solution',
+    fix: 'After the last step, reread the question: does your number answer it? The price, the difference of prices and the first subtraction are only stepping stones.',
+  },
+  'algw-answered-total': {
+    label: 'Gave the total number of items',
+    fix: 'The total is given in the problem; the question asks for the number of ONE of the two kinds.',
+  },
+  'algw-assumed-equal-split': {
+    label: 'Assumed the items split evenly between the two kinds',
+    fix: 'Nothing says the two kinds are equally common. Use the total value to find the split.',
+  },
+  'algw-wrong-pairing': {
+    label: 'Multiplied or divided the wrong pair of quantities',
+    fix: 'Write the rate with its units (dollars per pencil) and ask which quantities cancel; a quick numeric example checks the arrangement.',
+  },
   'algw-answered-other-unknown': {
     label: 'Answered with the other unknown',
     fix: 'Reread the question before answering: after solving for one quantity, compute the one that was actually asked for.',
