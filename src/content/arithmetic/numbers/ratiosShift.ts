@@ -115,7 +115,7 @@ const shiftQC: Template<RSParams> = {
         'C',
         `The ratio of ${n1} to ${n2} in ${grp.toLowerCase()} is ${p} to ${q}. Later, the number of ${n1} and the number of ${n2} are each multiplied by ${x}.`,
         'Recognize: both numbers are multiplied by the same factor.',
-        `Multiplying both terms by ${x} keeps the ratio: ${fr(x * p, x * q)} becomes ${fr(p, q)} after dividing top and bottom by ${x}. Adding ${x} to both would not: ${fr(p + x, q + x)} differs from ${fr(p, q)}.`,
+        `Multiplying both terms by ${x} keeps the ratio: $\\frac{${x * p}}{${x * q}}$ reduces to ${fr(p, q)} after dividing top and bottom by ${x}. Adding ${x} to both would not: ${fr(p + x, q + x)} differs from ${fr(p, q)}.`,
       );
     }
     if (mode === 'add-unknown' || mode === 'remove-unknown') {
@@ -162,7 +162,7 @@ const shiftQC: Template<RSParams> = {
         up ? 'A' : 'B',
         `The ratio of ${n1} to ${n2} in ${grp.toLowerCase()} is ${p} to ${q}. Then ${a} more ${n1} and ${b} more ${n2} ${ctx.verb[0]}.`,
         MIX,
-        `The newcomers are in the ratio ${fr(a, b)}, which is ${up ? 'greater' : 'less'} than ${fr(p, q)}, so the ratio of the whole group moves ${up ? 'up' : 'down'} toward it. Test with ${p} and ${q}: ${fr(p + a, q + b)} against ${fr(p, q)}.`,
+        `The newcomers are in the ratio ${fr(a, b)}, which is ${up ? 'greater' : 'less'} than ${fr(p, q)}, so the ratio of the whole group moves ${up ? 'up' : 'down'} toward it. Test with ${c1(p)} and ${c2(q)}: after adding ${a} and ${b} there are ${p + a} and ${q + b}, a ratio of ${fr(p + a, q + b)} against ${fr(p, q)}.`,
       );
     }
     let a: number;
