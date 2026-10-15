@@ -26,3 +26,6 @@ Object.assign(coreTraps, simplifyFractionTraps);
 import { sumProductTemplate, sumProductTraps } from './sumProduct';
 coreTemplates.push(sumProductTemplate);
 Object.assign(coreTraps, sumProductTraps);
+import { identityArithmeticTemplate, identityArithmeticTraps } from './identityArithmetic';
+coreTemplates.push(identityArithmeticTemplate);
+Object.assign(coreTraps, identityArithmeticTraps);
