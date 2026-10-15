@@ -1,9 +1,12 @@
 import { flaggedChoices, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
+import { plural } from '../../../engine/text';
 import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { checkChoiceValue, Ex, exChoices, unitCircle, type ExData } from './ex';
 import { drawBox, drawCylinder, Fig } from './fig';
+import { Redraw, retryAll } from '../redraw';
+import { trapNotes } from '../notes';
 
 type V3 = [number, number, number];
 const relText = (a: QCChoice) => (a === 'A' ? 'Quantity A is greater' : a === 'B' ? 'Quantity B is greater' : 'the two quantities are equal');
@@ -77,35 +80,58 @@ const measures: Template<MeasuresParams> = {
     let dims: number[];
     let step: Ex | undefined;
     let withFigure = true;
+    /** What the explanation says about a wrong choice that is present, by trap id (the choice text is passed in). */
+    let cite: Record<string, (vs: string) => string> = {};
+    let rule = '';
     if (mode === 'cube-diagonal') {
       const e = rng.int(2, 9);
       dims = [e];
       correct = Ex.sqrt(3, e);
-      traps.push({ v: Ex.sqrt(2, e), trap: 'geom-solid-face-diagonal' }, { v: Ex.of(3 * e), trap: 'geom-solid-added-edges' });
-      fillers = [Ex.of(e), Ex.of(2 * e), Ex.sqrt(6, e), Ex.of(e * e)];
+      traps.push(
+        { v: Ex.sqrt(2, e), trap: 'geom-solid-face-diagonal' },
+        { v: Ex.of(3 * e), trap: 'geom-solid-added-edges' },
+        { v: Ex.sqrt(2, e).add(e), trap: 'geom-solid-diag-sum-legs' },
+        { v: Ex.of(3 * e * e), trap: 'geom-solid-no-sqrt' },
+      );
+      fillers = [Ex.of(e), Ex.of(2 * e), Ex.sqrt(6, e)];
+      cite = {
+        'geom-solid-face-diagonal': (vs) => `using only two edges (a face diagonal) gives ${vs}, not the segment through the inside`,
+        'geom-solid-added-edges': (vs) => `adding the edges gives ${vs}, but a straight line is shorter than a path along the edges`,
+        'geom-solid-diag-sum-legs': (vs) => `adding the two legs of the right triangle gives ${vs}, but a hypotenuse is shorter than the sum of the legs`,
+        'geom-solid-no-sqrt': (vs) => `stopping at the sum of the squares gives ${vs}; the square root is the last step`,
+      };
       step = Ex.sqrt(3, 1);
       drawBox(fig, e, e, e, { L: `$${e}$` }, { diagonal: true });
       stem = `The figure above shows a cube with edges of length ${e}. What is the length of the dashed segment, which joins two opposite vertices of the cube?`;
       explanation = `The diagonal of the bottom face is $${e}\\sqrt{2}$ (a 45-45-90 triangle). The dashed diagonal is the hypotenuse of a right triangle with that face diagonal and a vertical edge as legs:
 
-$$\\sqrt{(${e}\\sqrt{2})^2 + ${e}^2} = \\sqrt{${2 * e * e} + ${e * e}} = \\sqrt{${3 * e * e}} = ${correct.tex()}$$
-
-$${e}\\sqrt{2}$ is only a face diagonal, and adding the three edges does not give a straight-line distance.`;
+$$\\sqrt{(${e}\\sqrt{2})^2 + ${e}^2} = \\sqrt{${2 * e * e} + ${e * e}} = \\sqrt{${3 * e * e}} = ${correct.tex()}$$`;
     } else if (mode === 'box-diagonal') {
       const [a, b, c] = rng.shuffle(rng.pick(DIAG_BOXES));
       dims = [a, b, c];
       const dg = Math.round(Math.hypot(a, b, c));
       correct = Ex.of(dg);
-      traps.push({ v: Ex.sqrt(a * a + b * b), trap: 'geom-solid-face-diagonal' }, { v: Ex.of(a + b + c), trap: 'geom-solid-added-edges' });
-      fillers = [Ex.sqrt(b * b + c * c), Ex.of(dg + 1), Ex.of(dg - 1), Ex.sqrt(a * a + b * b + c * c + 2 * a * b)];
+      traps.push(
+        { v: Ex.sqrt(a * a + b * b), trap: 'geom-solid-face-diagonal' },
+        { v: Ex.sqrt(b * b + c * c), trap: 'geom-solid-face-diagonal' },
+        { v: Ex.of(a + b + c), trap: 'geom-solid-added-edges' },
+        { v: Ex.sqrt(a * a + b * b).add(c), trap: 'geom-solid-diag-sum-legs' },
+        { v: Ex.of(dg * dg), trap: 'geom-solid-no-sqrt' },
+        { v: Ex.sqrt(a * a + c * c), trap: 'geom-solid-face-diagonal' },
+      );
+      fillers = [Ex.of(dg + 1), Ex.of(dg - 1)];
+      cite = {
+        'geom-solid-face-diagonal': (vs) => `using only two dimensions (a face diagonal) gives ${vs}`,
+        'geom-solid-added-edges': (vs) => `adding the dimensions gives ${vs}, but a straight line is shorter than a path along the edges`,
+        'geom-solid-diag-sum-legs': (vs) => `adding the two legs of the right triangle gives ${vs}, but a hypotenuse is shorter than the sum of the legs`,
+        'geom-solid-no-sqrt': (vs) => `stopping at the sum of the squares gives ${vs}; the square root is the last step`,
+      };
       step = Ex.of(1);
       drawBox(fig, a, b, c, { L: `$${a}$`, W: `$${b}$`, H: `$${c}$` }, { diagonal: true });
       stem = `The rectangular box shown above has dimensions ${a}, ${b} and ${c}. What is the length of the dashed segment, which joins two opposite vertices of the box?`;
       explanation = `The space diagonal of a box is $\\sqrt{\\ell^2 + w^2 + h^2}$ (the Pythagorean theorem used twice: first across the bottom face, then up):
 
-$$\\sqrt{${a}^2 + ${b}^2 + ${c}^2} = \\sqrt{${a * a} + ${b * b} + ${c * c}} = \\sqrt{${a * a + b * b + c * c}} = ${dg}$$
-
-$\\sqrt{${a}^2 + ${b}^2} = ${Ex.sqrt(a * a + b * b).tex()}$ is only the diagonal of the bottom face.`;
+$$\\sqrt{${a}^2 + ${b}^2 + ${c}^2} = \\sqrt{${a * a} + ${b * b} + ${c * c}} = \\sqrt{${a * a + b * b + c * c}} = ${dg}$$`;
     } else if (mode === 'surface') {
       let a: number, b: number, c: number;
       do {
@@ -114,16 +140,28 @@ $\\sqrt{${a}^2 + ${b}^2} = ${Ex.sqrt(a * a + b * b).tex()}$ is only the diagonal
       dims = [a, b, c];
       const half = a * b + a * c + b * c;
       correct = Ex.of(2 * half);
-      traps.push({ v: Ex.of(half), trap: 'geom-solid-surface-half' }, { v: Ex.of(a * b * c), trap: 'geom-solid-volume-for-surface' });
-      fillers = [Ex.of(2 * half - 2 * a * b), Ex.of(4 * half), Ex.of(2 * half + 2 * a * b), Ex.of(2 * half - 2 * b * c)];
+      traps.push(
+        { v: Ex.of(half), trap: 'geom-solid-surface-half' },
+        { v: Ex.of(a * b * c), trap: 'geom-solid-volume-for-surface' },
+        { v: Ex.of(2 * half - 2 * a * b), trap: 'geom-solid-missing-pair' },
+        { v: Ex.of(2 * half - 2 * b * c), trap: 'geom-solid-missing-pair' },
+        { v: Ex.of(4 * (a + b + c)), trap: 'geom-solid-edges-for-surface' },
+        { v: Ex.of((a + b + c) ** 2), trap: 'geom-solid-square-of-sum' },
+      );
+      fillers = [Ex.of(2 * half + 2 * a * b)];
+      cite = {
+        'geom-solid-surface-half': (vs) => `counting each pair of faces once gives ${vs}`,
+        'geom-solid-volume-for-surface': (vs) => `multiplying the three dimensions gives ${vs}, the volume in cubic units, not an area`,
+        'geom-solid-missing-pair': (vs) => `leaving out one pair of faces gives ${vs}`,
+        'geom-solid-edges-for-surface': (vs) => `adding up the edges gives ${vs}, a length, not an area`,
+        'geom-solid-square-of-sum': (vs) => `squaring the sum of the dimensions gives ${vs}, which includes squares that are not faces`,
+      };
       step = Ex.of(2 * Math.min(a, b, c));
       drawBox(fig, a, b, c, { L: `$${a}$`, W: `$${b}$`, H: `$${c}$` });
       stem = `What is the total surface area of the rectangular box shown above?`;
       explanation = `A box has 6 faces in 3 equal pairs: $${a} \\times ${b}$, $${a} \\times ${c}$ and $${b} \\times ${c}$.
 
-$$2(${a * b} + ${a * c} + ${b * c}) = 2(${half}) = ${2 * half}$$
-
-Counting each pair once gives ${half}, and $${a} \\cdot ${b} \\cdot ${c} = ${a * b * c}$ is the volume, not the surface area.`;
+$$2(${a * b} + ${a * c} + ${b * c}) = 2(${half}) = ${2 * half}$$`;
     } else if (mode === 'cube-v2s' || mode === 'cube-s2v') {
       const e = rng.int(2, d === 1 ? 6 : 9);
       dims = [e];
@@ -132,22 +170,46 @@ Counting each pair once gives ${half}, and $${a} \\cdot ${b} \\cdot ${c} = ${a *
       withFigure = false;
       if (mode === 'cube-v2s') {
         correct = Ex.of(S);
-        traps.push({ v: Ex.of(4 * e * e), trap: 'geom-solid-cube-four-faces' }, { v: Ex.of(e * e), trap: 'geom-solid-one-face' });
-        fillers = [Ex.of(V), Ex.of(8 * e * e), Ex.of(6 * e), Ex.of(12 * e)];
+        traps.push(
+          { v: Ex.of(4 * e * e), trap: 'geom-solid-cube-four-faces' },
+          { v: Ex.of(e * e), trap: 'geom-solid-one-face' },
+          { v: Ex.of(V), trap: 'geom-solid-volume-for-surface' },
+          { v: Ex.of(6 * e), trap: 'geom-solid-edge-not-squared' },
+          { v: Ex.of(12 * e), trap: 'geom-solid-edges-for-surface' },
+          { v: Ex.of(6 * V), trap: 'geom-solid-times-six' },
+        );
+        fillers = [Ex.of(8 * e * e)];
+        cite = {
+          'geom-solid-cube-four-faces': (vs) => `counting 4 faces gives ${vs}; the top and the bottom are faces too`,
+          'geom-solid-one-face': (vs) => `the area of a single face is ${vs}`,
+          'geom-solid-volume-for-surface': (vs) => `repeating the volume gives ${vs}, but the question asks for an area`,
+          'geom-solid-edge-not-squared': (vs) => `6 times the edge gives ${vs}; a face has area edge times edge`,
+          'geom-solid-edges-for-surface': (vs) => `the total length of the 12 edges is ${vs}, not an area`,
+          'geom-solid-times-six': (vs) => `multiplying the volume by 6 gives ${vs}; find the edge first`,
+        };
         step = Ex.of(e * e);
         stem = `The volume of a cube is ${plain(V)} cubic centimeters. What is the total surface area of the cube, in square centimeters?`;
-        explanation = `The edge is $\\sqrt[3]{${num(V)}} = ${e}$. Each face is a ${e}-by-${e} square of area ${e * e}, and a cube has 6 faces: $6 \\cdot ${e * e} = ${S}$.
-
-A cube has 6 faces, not 4: $4 \\cdot ${e * e} = ${4 * e * e}$ leaves out the top and bottom.`;
+        explanation = `The edge is $\\sqrt[3]{${num(V)}} = ${e}$. Each face is a ${e}-by-${e} square of area ${e * e}, and a cube has 6 faces: $6 \\cdot ${e * e} = ${S}$.`;
       } else {
         correct = Ex.of(V);
-        traps.push({ v: Ex.of(e * e), trap: 'geom-solid-one-face' }, { v: Ex.of(S), trap: 'geom-solid-volume-for-surface' });
-        fillers = [Ex.of(e), Ex.of(2 * V), Ex.of((e + 1) ** 3), Ex.of((e - 1) ** 3)];
+        traps.push(
+          { v: Ex.of(e * e), trap: 'geom-solid-one-face' },
+          { v: Ex.of(S), trap: 'geom-solid-volume-for-surface' },
+          { v: Ex.of(e), trap: 'geom-solid-edge-as-volume' },
+          { v: Ex.of(e ** 6), trap: 'geom-solid-face-cubed' },
+          { v: Ex.of(6 * V), trap: 'geom-solid-surface-as-base' },
+        );
+        fillers = [Ex.of(2 * V)];
+        cite = {
+          'geom-solid-one-face': (vs) => `the area of one face is ${vs}, not the volume`,
+          'geom-solid-volume-for-surface': (vs) => `repeating the surface area gives ${vs}, which is in square units`,
+          'geom-solid-edge-as-volume': (vs) => `stopping at the edge gives ${vs}; cube it to get the volume`,
+          'geom-solid-face-cubed': (vs) => `cubing the area of a face gives ${vs}; the volume is the cube of the edge`,
+          'geom-solid-surface-as-base': (vs) => `multiplying the whole surface area by the edge gives ${vs}; only one face is the base`,
+        };
         step = Ex.of(e * e);
         stem = `The total surface area of a cube is ${plain(S)} square inches. What is the volume of the cube, in cubic inches?`;
-        explanation = `Each of the 6 faces has area $\\frac{${num(S)}}{6} = ${e * e}$, so the edge is $\\sqrt{${e * e}} = ${e}$ and the volume is $${e}^3 = ${num(V)}$.
-
-${e * e} is the area of one face, not the volume.`;
+        explanation = `Each of the 6 faces has area $\\frac{${num(S)}}{6} = ${e * e}$, so the edge is $\\sqrt{${e * e}} = ${e}$ and the volume is $${e}^3 = ${num(V)}$.`;
       }
     } else if (mode === 'faces') {
       let a: number, b: number, c: number;
@@ -157,8 +219,22 @@ ${e * e} is the area of one face, not the volume.`;
       dims = [a, b, c];
       const [f1, f2, f3] = rng.shuffle([a * b, a * c, b * c]);
       correct = Ex.of(a * b * c);
-      traps.push({ v: Ex.of(f1 * f2 * f3), trap: 'geom-solid-face-product' }, { v: Ex.of(2 * (f1 + f2 + f3)), trap: 'geom-solid-volume-for-surface' });
-      fillers = [Ex.of(f1 + f2 + f3), Ex.of(a * b * c * 2), Ex.of(a * b * c - a * b), Ex.of(a * b * c + b * c)];
+      traps.push(
+        { v: Ex.of(f1 * f2 * f3), trap: 'geom-solid-face-product' },
+        { v: Ex.of(2 * (f1 + f2 + f3)), trap: 'geom-solid-volume-for-surface' },
+        { v: Ex.of(f1 + f2 + f3), trap: 'geom-solid-face-sum' },
+        { v: Ex.of(f1 * f2), trap: 'geom-solid-pair-product' },
+        { v: Ex.sqrt(f1 * f2), trap: 'geom-solid-pair-root' },
+        { v: Ex.sqrt(f2 * f3), trap: 'geom-solid-pair-root' },
+      );
+      fillers = [Ex.of(a * b * c * 2)];
+      cite = {
+        'geom-solid-face-product': (vs) => `multiplying the three face areas gives ${vs}, the SQUARE of the volume`,
+        'geom-solid-volume-for-surface': (vs) => `doubling the sum of the faces gives ${vs}, the total surface area, not the volume`,
+        'geom-solid-face-sum': (vs) => `adding the face areas gives ${vs}; the volume comes from their product`,
+        'geom-solid-pair-product': (vs) => `multiplying only two faces gives ${vs}; the third face is needed too`,
+        'geom-solid-pair-root': (vs) => `using only two faces gives ${vs}; all three are needed`,
+      };
       step = Ex.of(Math.min(f1, f2, f3));
       withFigure = false;
       stem = `Three faces of a rectangular box that share a vertex have areas ${f1}, ${f2} and ${f3} square inches. What is the volume of the box, in cubic inches?`;
@@ -166,58 +242,100 @@ ${e * e} is the area of one face, not the volume.`;
 
 $$(\\ell w h)^2 = ${f1} \\cdot ${f2} \\cdot ${f3} = ${num(f1 * f2 * f3)}, \\quad \\ell w h = \\sqrt{${num(f1 * f2 * f3)}} = ${a * b * c}$$
 
-(The edges are ${[a, b, c].sort((x, y) => x - y).join(', ')}.) Do not forget the square root: ${plain(f1 * f2 * f3)} is the square of the volume.`;
+(The edges are ${[a, b, c].sort((x, y) => x - y).join(', ')}.)`;
     } else if (mode === 'cylinder') {
       const r = rng.int(2, 9);
       const h = rng.int(2, 12);
       dims = [r, h];
       const k = r * r * h;
       correct = Ex.pi(2 * r);
-      traps.push({ v: Ex.pi(r), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(r * r), trap: 'geom-solid-base-area' }, { v: Ex.of(r), trap: 'geom-solid-radius-not-circ' });
-      fillers = [Ex.of(r * r), Ex.pi(4 * r), Ex.of(2 * r), Ex.pi(h)];
+      traps.push(
+        { v: Ex.pi(r * r), trap: 'geom-solid-base-area' },
+        { v: Ex.of(r), trap: 'geom-solid-radius-not-circ' },
+        { v: Ex.pi(r), trap: 'geom-circle-radius-diameter' },
+        { v: Ex.pi(2 * r * r), trap: 'geom-solid-circ-area-mix' },
+        { v: Ex.pi(2 * r * h), trap: 'geom-solid-lateral-area' },
+        { v: Ex.pi(4 * r), trap: 'geom-circle-radius-diameter' },
+      );
+      fillers = [Ex.pi(h)];
+      cite = {
+        'geom-solid-base-area': (vs) => `the area of the base is ${vs}, not its circumference`,
+        'geom-solid-radius-not-circ': (vs) => `stopping at the radius gives ${vs}; the circumference is $2\\pi r$`,
+        'geom-circle-radius-diameter': (vs) => `mixing up radius and diameter gives ${vs}`,
+        'geom-solid-circ-area-mix': (vs) => `putting $r^2$ in the circumference formula gives ${vs}; it has only one factor $r$`,
+        'geom-solid-lateral-area': (vs) => `the area of the curved side is ${vs}; it includes the height`,
+      };
       step = Ex.pi(2);
       drawCylinder(fig, 3, 3 * Math.max(0.8, Math.min(2.2, h / (2 * r))), { h: `$${h}$` });
       stem = `The volume $V$ of a right circular cylinder with radius $r$ and height $h$ is $V = \\pi r^2 h$. The cylinder shown above has volume $${num(k)}\\pi$ and height ${h}. What is the circumference of its base?`;
       explanation = `From $\\pi r^2 \\cdot ${h} = ${num(k)}\\pi$: $r^2 = \\frac{${num(k)}}{${h}} = ${r * r}$, so $r = ${r}$.
 
-The circumference of the base is $2\\pi r = ${correct.tex()}$.
-
-${r} is the radius and $${Ex.pi(r * r).tex()}$ is the area of the base, not its circumference.`;
+The circumference of the base is $2\\pi r = ${correct.tex()}$.`;
     } else {
       // tank with a liquid that expands when it freezes [GE-24]. The depth is a multiple of 5 and must not
-      // overfill, so the key rounds DOWN: the greatest multiple of 5 with depth x (100 + p) <= 100 H.
+      // overfill, so the key is the greatest multiple of 5 with depth x (100 + p) <= 100 H.
       let H = 0;
       let p = 0;
       let low = 0;
-      let wrong = 0;
+      let wrongSub = 0;
+      let wrongs: { v: number; trap: string }[] = [];
       for (;;) {
         H = 10 * rng.int(6, 30);
         p = rng.pick([10, 15, 20, 25, 30, 40, 50]);
         low = 5 * Math.floor((20 * H) / (100 + p));
-        wrong = H * (1 - p / 100);
-        if (Math.floor(wrong / 5) * 5 !== low) break;
+        wrongSub = H * (1 - p / 100);
+        const bound = (100 * H) / (100 + p);
+        const cands = [
+          { v: Math.floor(wrongSub / 5) * 5, trap: 'geom-solid-percent-subtract' },
+          { v: low + 5, trap: 'geom-solid-round-up' },
+          { v: H, trap: 'geom-solid-ignore-expansion' },
+          { v: 5 * Math.round((H * p) / 500), trap: 'geom-solid-percent-of-height' },
+          { v: H - p, trap: 'geom-solid-percent-as-cm' },
+          ...(bound === low ? [{ v: low - 5, trap: 'geom-solid-strict' }] : []),
+        ];
+        const seen = new Set([low]);
+        wrongs = cands.filter((c) => c.v > 0 && !seen.has(c.v) && (seen.add(c.v), true));
+        // the percent-subtract trap is always among the choices (the explanation cites it)
+        if (wrongs[0]?.trap === 'geom-solid-percent-subtract' && wrongs.length >= 4) break;
       }
+      wrongs = [wrongs[0], ...rng.sample(wrongs.slice(1), 3)];
       const L = 10 * rng.int(5, 20);
       const W = 10 * rng.int(3, 12);
       dims = [L, W, H, p];
       const v = (100 * H) / (100 + p);
       const exact = (100 * H) % (100 + p) === 0;
+      const factor = new Frac(100 + p, 100).toDecimalString();
+      const boundTxt = exact ? `${v}` : v.toFixed(1);
       correct = Ex.of(low);
-      traps.push({ v: Ex.of(Math.floor(wrong / 5) * 5), trap: 'geom-solid-percent-subtract' });
-      fillers = [Ex.of(low - 5), Ex.of(low + 5), Ex.of(low - 10), Ex.of(low + 10), Ex.of(low + 15), Ex.of(low - 15)];
-      step = Ex.of(5);
+      for (const w of wrongs) traps.push({ v: Ex.of(w.v), trap: w.trap });
+      fillers = [];
+      step = undefined;
       drawBox(fig, L, W, H, { L: `$${L}$`, W: `$${W}$`, H: `$${H}$` }, { waterLevel: v });
-      stem = `A rectangular tank with interior dimensions ${L} centimeters by ${W} centimeters by ${H} centimeters (height) stands on level ground. It is to be filled with a liquid that expands by ${p} percent of its volume when it freezes. The depth of the liquid is measured in multiples of 5 centimeters. What is the greatest depth to which the tank can be filled so that, once frozen, the liquid does not rise above the top of the tank?`;
-      explanation = `The base area is the same before and after freezing, so heights scale like volumes: a depth $h$ becomes $${new Frac(100 + p, 100).toDecimalString()}h$ when frozen.
+      stem = `A rectangular tank with interior dimensions ${L} centimeters by ${W} centimeters by ${H} centimeters (height) stands on level ground. It is to be filled with a liquid that expands by ${p} percent of its volume when it freezes. A gauge lets the liquid depth be set only to multiples of 5 centimeters. What is the greatest depth to which the tank can be filled so that, once frozen, the liquid does not rise above the top of the tank?`;
+      explanation = `A liquid that expands fills more height when frozen. The base does not change, so a depth $h$ becomes $${factor}h$:
 
-$$${new Frac(100 + p, 100).toDecimalString()}h \\le ${H} \\quad\\Rightarrow\\quad h \\le \\frac{${H}}{${new Frac(100 + p, 100).toDecimalString()}} ${exact ? '=' : '\\approx'} ${exact ? v : v.toFixed(1)}$$
+$$${factor}h \\le ${H} \\quad\\Rightarrow\\quad h \\le \\frac{${H}}{${factor}} ${exact ? '=' : '\\approx'} ${boundTxt}$$
 
-The depth must be a multiple of 5 that does not exceed ${exact ? v : v.toFixed(1)}, so round down: the answer is ${low}. A depth of ${low + 5} is too much, since the frozen liquid would then stand ${Number((((low + 5) * (100 + p)) / 100).toFixed(2))} centimeters high, above the top of the tank. Taking ${p} percent off the height ($${H} \\times ${new Frac(100 - p, 100).toDecimalString()} = ${Number(wrong.toFixed(2))}$) is wrong: the frozen volume is ${p} percent MORE than the liquid's volume, so divide by $${new Frac(100 + p, 100).toDecimalString()}$. The length and width are not needed.`;
+The greatest multiple of 5 not exceeding ${boundTxt} is $${low}$. Check: ${low} frozen stands ${Number(((low * (100 + p)) / 100).toFixed(2))} centimeters high, within ${H}, while ${low + 5} would stand ${Number((((low + 5) * (100 + p)) / 100).toFixed(2))}, above the top.
+
+`;
+      rule = `Rule: undo a ${p} percent increase by dividing by $${factor}$, not by subtracting ${p} percent.`;
+      cite = {
+        'geom-solid-percent-subtract': (vs) => `taking ${p} percent off the height ($${H} \\times ${new Frac(100 - p, 100).toDecimalString()} = ${Number(wrongSub.toFixed(2))}$) leads to ${vs}. But the frozen liquid is ${p} percent MORE than the liquid, so divide by $${factor}$`,
+        'geom-solid-round-up': (vs) => `rounding up gives ${vs}, and the frozen liquid would then rise above the top`,
+        'geom-solid-ignore-expansion': (vs) => `filling to the top gives ${vs}, forgetting that the liquid grows when it freezes`,
+        'geom-solid-percent-of-height': (vs) => `${p} percent of the height is about ${vs}, which is the extra height, not the depth`,
+        'geom-solid-percent-as-cm': (vs) => `subtracting ${p} as if it were centimeters gives ${vs}, but ${p} percent is a fraction of the depth`,
+        'geom-solid-strict': (vs) => `staying strictly below the bound gives ${vs}; reaching exactly the top does not rise above it`,
+      };
     }
     const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.02, ...(step ? { step } : {}), scales: mode !== 'tank' });
+    const traps2 = trapNotes(choices, cite, 2, 'geom-solid-percent-subtract');
+    if (traps2) explanation += `\n\n${traps2}`;
+    if (rule) explanation += `\n\n${rule}`;
     return {
       params: { mode, dims, values },
-      q: { format: 'mcs', stem, ...(withFigure ? { figure: fig.build(false) } : {}), choices, answer, explanation },
+      q: { format: 'mcs', stem, ...(withFigure ? { figure: fig.build() } : {}), choices, answer, explanation },
     };
   },
   check(q, p) {
@@ -313,7 +431,8 @@ const pour: Template<PourParams> = {
       b = [rB, HB];
       answer = h2;
       const lin = new Frac(rA * hA, rB);
-      if (lin.isTerminating() && !lin.eq(h2)) traps.push({ value: lin, trap: 'geom-solid-scale-linear' });
+      if (lin.eq(h2)) throw new Redraw('a trap equals the answer');
+      if (lin.isTerminating()) traps.push({ value: lin, trap: 'geom-solid-scale-linear' });
       if (useDiam) {
         const wrong = new Frac(rA * rA * hA, 4 * rB * rB);
         if (wrong.isTerminating()) traps.push({ value: wrong, trap: 'geom-circle-radius-diameter' });
@@ -373,9 +492,11 @@ The depth changes because the base area changes; only the volume stays the same.
       b = [L, W];
       answer = new Frac(Math.round(v * 10), 10);
       const noPi = new Frac(Math.round(((r * r * h) / (L * W)) * 10), 10);
-      if (!noPi.eq(answer)) traps.push({ value: noPi, trap: 'geom-solid-forgot-pi' });
+      if (noPi.eq(answer)) throw new Redraw('a trap equals the answer');
+      traps.push({ value: noPi, trap: 'geom-solid-forgot-pi' });
       const dia = new Frac(Math.round(((Math.PI * 4 * r * r * h) / (L * W)) * 10), 10);
-      if (!dia.eq(answer)) traps.push({ value: dia, trap: 'geom-circle-radius-diameter' });
+      if (dia.eq(answer)) throw new Redraw('a trap equals the answer');
+      traps.push({ value: dia, trap: 'geom-circle-radius-diameter' });
       withFigure = false;
       stem = `A right circular cylinder with an inside diameter of ${2 * r} centimeters is filled with water to a height of ${h} centimeters. The water is poured into an empty rectangular container whose base measures ${L} centimeters by ${W} centimeters. To the nearest 0.1 centimeter, what is the depth of the water in the container?`;
       suffix = 'centimeters';
@@ -428,25 +549,29 @@ Number of cubes: $${fl(L)} \\cdot ${fl(W)} \\cdot ${fl(H)} = ${count}$.${
       b = [R];
       answer = new Frac(vol, R);
       const fullT = new Frac(L * W * H, R);
-      if (!fullT.eq(answer) && fullT.isTerminating()) traps.push({ value: fullT, trap: 'geom-solid-ignored-initial' });
       const initT = new Frac(L * W * h0, R);
-      if (!initT.eq(answer) && initT.isTerminating()) traps.push({ value: initT, trap: 'geom-solid-ignored-initial' });
+      if (initT.eq(answer)) throw new Redraw('the water already in the tank equals the water to add');
+      if (fullT.isTerminating()) traps.push({ value: fullT, trap: 'geom-solid-ignored-initial' });
+      if (initT.isTerminating()) traps.push({ value: initT, trap: 'geom-solid-ignored-initial' });
       drawBox(fig, L, W, H, { L: `$${L}$`, W: `$${W}$`, H: `$${H}$` }, { waterLevel: h0 });
-      stem = `The rectangular tank shown above (dimensions in feet) contains water to a depth of ${h0} feet. Water is pumped into the tank at a constant rate of ${R} cubic feet per minute. How many minutes will it take to fill the tank to the top?`;
+      stem = `The rectangular tank shown above (dimensions in feet) contains water to a depth of ${plural(h0, 'foot', 'feet')}. Water is pumped into the tank at a constant rate of ${R} cubic feet per minute. How many minutes will it take to fill the tank to the top?`;
       suffix = 'minutes';
       explanation = `The empty part of the tank is $${L} \\cdot ${W} \\cdot (${H} - ${h0}) = ${num(vol)}$ cubic feet. At ${R} cubic feet per minute, it fills in $\\frac{${num(vol)}}{${R}} = ${answer.isInt() ? answer.n : answer.toDecimalString()}$ minutes.
 
-Only the empty part needs water: using the full volume (${plain(L * W * H)}) ignores the ${h0} feet already there.`;
+Only the empty part needs water: using the full volume (${plain(L * W * H)}) ignores the ${plural(h0, 'foot', 'feet')} already there.`;
     }
     return {
       params: { mode, a, b, extra },
       q: {
         format: 'ne',
         stem,
-        ...(withFigure ? { figure: fig.build(false) } : {}),
+        ...(withFigure ? { figure: fig.build() } : {}),
         answer: answer!,
         ...(suffix ? { suffix } : {}),
-        traps: traps.filter((t) => !t.value.eq(answer!)),
+        traps: ((): typeof traps => {
+          if (traps.some((t) => t.value.eq(answer!))) throw new Redraw('a trap equals the answer');
+          return traps;
+        })(),
         explanation,
       },
     };
@@ -530,8 +655,12 @@ const solidQC: Template<SolidQCParams> = {
         params: { ...base, mode, a, b },
         q: {
           format: 'qc',
-          figure: fig.build(false),
-          info: `Right circular cylinder $P$ has radius ${a} and height ${b}. Right circular cylinder $Q$ has radius ${b} and height ${a}.`,
+          figure: fig.build(),
+          info: rng.pick([
+            `Right circular cylinder $P$ has radius ${a} and height ${b}. Right circular cylinder $Q$ has radius ${b} and height ${a}.`,
+            `Cylinder $P$ is a right circular cylinder whose base has radius ${a} and whose height is ${b}. Cylinder $Q$ is a right circular cylinder with base radius ${b} and height ${a}.`,
+            `Two right circular cylinders are shown above. The radius of $P$ is ${a} and its height is ${b}; the radius of $Q$ is ${b} and its height is ${a}.`,
+          ]),
           quantityA: `The volume of $P$`,
           quantityB: `The volume of $Q$`,
           answer,
@@ -581,7 +710,11 @@ The volumes are equal only when $x = y$.`,
         params: { ...base, mode, a: qa, b: qb },
         q: {
           format: 'qc',
-          info: `A rectangular sheet of paper ${a} inches by ${b} inches can be rolled into the curved surface of a right circular cylinder in two ways: the ${a}-inch sides or the ${b}-inch sides can form the circumference of the base (with no overlap).`,
+          info: rng.pick([
+            `A rectangular sheet of paper ${a} inches by ${b} inches can be rolled into the curved surface of a right circular cylinder in two ways: the ${a}-inch sides or the ${b}-inch sides can form the circumference of the base (with no overlap).`,
+            `A ${a}-inch by ${b}-inch rectangle of cardboard is rolled, without overlap, into the curved side of a right circular cylinder. Either pair of parallel sides can be joined to form the circumference of the base.`,
+            `A sheet of metal measuring ${b} inches by ${a} inches is bent into a right circular cylinder (side surface only, no overlap). Its ${a}-inch edges or its ${b}-inch edges can be wrapped around to form the circumference of the base.`,
+          ]),
           quantityA: `The volume of the cylinder whose base has circumference ${qa} inches`,
           quantityB: `The volume of the cylinder whose base has circumference ${qb} inches`,
           answer,
@@ -599,13 +732,19 @@ The same sheet gives the same curved surface area both ways, but not the same vo
       const V = e ** 3;
       const S = 6 * e * e;
       const variant = rng.pick(['free-eq', 'free-less', 'free-less', 'cube', 'square-base'] as const);
+      const boxVolume = (v: number) =>
+        rng.pick([
+          `A rectangular box has a volume of ${plain(v)} cubic centimeters.`,
+          `The volume of a rectangular box is ${plain(v)} cubic centimeters.`,
+          `A rectangular box, with edges of unknown lengths, holds ${plain(v)} cubic centimeters.`,
+        ]);
       let info: string;
       let k: number;
       let answer: QCChoice;
       let traps: QCQuestion['traps'];
       let explanation: string;
       if (variant === 'free-eq') {
-        info = `A rectangular box has a volume of ${plain(V)} cubic centimeters.`;
+        info = boxVolume(V);
         k = S;
         answer = 'D';
         traps = { C: 'geom-solid-assumed-cube' };
@@ -613,7 +752,7 @@ The same sheet gives the same curved surface area both ways, but not the same vo
 
 For a given volume the cube has the smallest surface area; every other shape has more.`;
       } else if (variant === 'free-less') {
-        info = `A rectangular box has a volume of ${plain(V)} cubic centimeters.`;
+        info = boxVolume(V);
         k = S - rng.int(1, Math.max(2, e * 2));
         answer = 'A';
         traps = { D: 'geom-solid-min-surface' };
@@ -621,7 +760,7 @@ For a given volume the cube has the smallest surface area; every other shape has
 
 The shape is unknown, but the minimum is enough to decide the comparison.`;
       } else if (variant === 'cube') {
-        info = `A cube has a volume of ${plain(V)} cubic centimeters.`;
+        info = rng.pick([`A cube has a volume of ${plain(V)} cubic centimeters.`, `The volume of a cube is ${plain(V)} cubic centimeters.`]);
         k = rng.chance(0.5) ? S : S + rng.pick([-2, 2]) * e;
         answer = cmpTol(S, k);
         traps = undefined;
@@ -630,7 +769,10 @@ The shape is unknown, but the minimum is enough to decide the comparison.`;
         const s = rng.pick([1, 2].filter((x) => x < e && V % (x * x) === 0) as number[]) || 1;
         const h = V / (s * s);
         const SA = 2 * s * s + 4 * s * h;
-        info = `A rectangular box with a square base of side ${s} centimeters has a volume of ${plain(V)} cubic centimeters.`;
+        info = rng.pick([
+          `A rectangular box with a square base of side ${plural(s, 'centimeter')} has a volume of ${plain(V)} cubic centimeters.`,
+          `The base of a rectangular box is a square with side ${plural(s, 'centimeter')}, and the volume of the box is ${plain(V)} cubic centimeters.`,
+        ]);
         k = rng.pick([S, SA, SA - 2 * s, SA + 4]);
         answer = cmpTol(SA, k);
         traps = answer !== 'C' && k === S ? { C: 'geom-solid-assumed-cube' } : undefined;
@@ -664,7 +806,11 @@ The shape is unknown, but the minimum is enough to decide the comparison.`;
         params: { ...base, mode, a: p, k, variant },
         q: {
           format: 'qc',
-          info: `Each edge of a cube is increased by ${p} percent.`,
+          info: rng.pick([
+            `Each edge of a cube is increased by ${p} percent.`,
+            `A cube is enlarged so that every one of its edges is ${p} percent longer.`,
+            `The length of each edge of a cube is multiplied by ${new Frac(100 + p, 100).toDecimalString()}.`,
+          ]),
           quantityA: `The percent increase in the volume of the cube`,
           quantityB: `$${kTex}\\%$`,
           answer,
@@ -686,7 +832,11 @@ Percent changes multiply; they do not add: three increases of ${p} percent are m
       params: { ...base, mode: 'percent-cyl', a: p, variant: radiusUp ? 'up' : 'down' },
       q: {
         format: 'qc',
-        info: `The radius of a right circular cylinder is ${radiusUp ? 'increased' : 'decreased'} by ${p} percent, and its height is ${radiusUp ? 'decreased' : 'increased'} by ${p} percent.`,
+        info: rng.pick([
+          `The radius of a right circular cylinder is ${radiusUp ? 'increased' : 'decreased'} by ${p} percent, and its height is ${radiusUp ? 'decreased' : 'increased'} by ${p} percent.`,
+          `A right circular cylinder is reshaped: its height ${radiusUp ? 'shrinks' : 'grows'} by ${p} percent while its radius ${radiusUp ? 'grows' : 'shrinks'} by ${p} percent.`,
+          `A can in the shape of a right circular cylinder is replaced by one whose radius is ${p} percent ${radiusUp ? 'larger' : 'smaller'} and whose height is ${p} percent ${radiusUp ? 'smaller' : 'larger'}.`,
+        ]),
         quantityA: `The volume of the new cylinder`,
         quantityB: `The volume of the original cylinder`,
         answer,
@@ -778,6 +928,16 @@ const CYL_CHANGES: Change[] = [
   { text: 'Multiplying the radius by $\\sqrt{2}$ and doubling the height', f: [H2(2), H2(2)] },
   { text: 'Multiplying the height by 8', f: [H2(1), H2(8)] },
   { text: 'Doubling the radius and multiplying the height by 4', f: [H2(4), H2(4)] },
+  { text: 'Quadrupling the radius and halving the height', f: [H2(16), H2(1, 2)] },
+  { text: 'Tripling the radius', f: [H2(9), H2(1)] },
+  { text: 'Tripling the radius and dividing the height by 3', f: [H2(9), H2(1, 3)] },
+  { text: 'Halving the radius and doubling the height', f: [H2(1, 4), H2(2)] },
+  { text: 'Doubling the radius and dividing the height by 4', f: [H2(4), H2(1, 4)] },
+  { text: 'Doubling the radius and tripling the height', f: [H2(4), H2(3)] },
+  { text: 'Tripling both the radius and the height', f: [H2(9), H2(3)] },
+  { text: 'Multiplying the radius by $\\sqrt{3}$', f: [H2(3), H2(1)] },
+  { text: 'Multiplying the radius by $\sqrt{2}$ and the height by 4', f: [H2(2), H2(4)] },
+  { text: 'Halving the radius and quadrupling the height', f: [H2(1, 4), H2(4)] },
 ];
 const BOX_CHANGES: Change[] = [
   { text: 'Doubling the length', f: [H2(2), H2(1), H2(1)] },
@@ -792,6 +952,16 @@ const BOX_CHANGES: Change[] = [
   { text: 'Halving the length and multiplying the width by 8', f: [H2(1, 2), H2(8), H2(1)] },
   { text: 'Quadrupling the length', f: [H2(4), H2(1), H2(1)] },
   { text: 'Doubling the length and quadrupling the height', f: [H2(2), H2(1), H2(4)] },
+  { text: 'Tripling the length', f: [H2(3), H2(1), H2(1)] },
+  { text: 'Tripling the height', f: [H2(1), H2(1), H2(3)] },
+  { text: 'Doubling the width and tripling the height', f: [H2(1), H2(2), H2(3)] },
+  { text: 'Doubling the length and halving the height', f: [H2(2), H2(1), H2(1, 2)] },
+  { text: 'Tripling the length and dividing the width by 3', f: [H2(3), H2(1, 3), H2(1)] },
+  { text: 'Tripling the length, the width and the height', f: [H2(3), H2(3), H2(3)] },
+  { text: 'Doubling the length and the width and halving the height', f: [H2(2), H2(2), H2(1, 2)] },
+  { text: 'Quadrupling the length and halving the width', f: [H2(4), H2(1, 2), H2(1)] },
+  { text: 'Quadrupling the width and the height and halving the length', f: [H2(1, 2), H2(4), H2(4)] },
+  { text: 'Tripling the width and the height and dividing the length by 3', f: [H2(1, 3), H2(3), H2(3)] },
 ];
 
 const fr = ([n, d]: [number, number]) => new Frac(n, d);
@@ -807,6 +977,15 @@ const linearFactor = (shape: ScalingParams['shape'], f: [number, number][]) => {
   return Math.sqrt(r2) * fr(f[1]).toNumber();
 };
 
+/** The named mistake that would make a wrong change look right, if any. */
+const mistake = (shape: ScalingParams['shape'], f: [number, number][], target: number): string | undefined => {
+  if (linearFactor(shape, f) === target) return 'geom-solid-scale-linear';
+  const fs = f.map(fr);
+  // ignoring the dimension that gets smaller
+  if (fs.some((x) => x.lt(1)) && fs.filter((x) => !x.lt(1)).reduce((a, x) => a.mul(x), new Frac(1)).eq(target)) return 'geom-solid-ignore-shrink';
+  return undefined;
+};
+
 const scaling: Template<ScalingParams> = {
   id: 'geo.solids.scaling',
   skill: 'geo.solids',
@@ -815,7 +994,7 @@ const scaling: Template<ScalingParams> = {
   generate(rng, d) {
     const shape: ScalingParams['shape'] = d === 1 ? rng.pick(['cylinder', 'box'] as const) : rng.chance(0.65) ? 'cylinder' : 'box';
     const pool = shape === 'cylinder' ? CYL_CHANGES : BOX_CHANGES;
-    const targets = shape === 'cylinder' ? (d === 1 ? [2, 4] : [2, 4, 8]) : d === 1 ? [2, 4] : [2, 4, 8];
+    const targets = d === 1 ? [2, 3, 4] : [2, 3, 4, 8];
     let target = 0;
     let picked: Change[] = [];
     for (let tries = 0; tries < 200; tries++) {
@@ -823,19 +1002,20 @@ const scaling: Template<ScalingParams> = {
       const n = d === 1 ? 5 : 6;
       const yes = rng.shuffle(pool.filter((c) => factorOf(c.f).eq(target)));
       const no = rng.shuffle(pool.filter((c) => !factorOf(c.f).eq(target)));
-      const nYes = rng.int(1, Math.min(4, yes.length));
+      const nYes = rng.int(1, Math.min(n - 2, yes.length));
       if (yes.length < 1 || no.length < n - nYes) continue;
-      // prefer wrong changes that are traps (linear thinking gives the target)
-      const trapNo = no.filter((c) => linearFactor(shape, c.f) === target);
-      const otherNo = no.filter((c) => linearFactor(shape, c.f) !== target);
-      const wrong = [...trapNo.slice(0, 2), ...otherNo].slice(0, n - nYes);
+      // wrong changes that are traps (linear thinking gives the target) come first; at least half of the wrong ones
+      const trapNo = no.filter((c) => mistake(shape, c.f, target));
+      const otherNo = no.filter((c) => !mistake(shape, c.f, target));
+      if (trapNo.length * 2 < n - nYes) continue;
+      const wrong = [...trapNo, ...otherNo].slice(0, n - nYes);
       picked = rng.shuffle([...yes.slice(0, nYes), ...wrong]);
       // texts must be distinct
       if (new Set(picked.map((c) => c.text)).size === picked.length) break;
     }
     const items = picked.map((c) => {
       const ok = factorOf(c.f).eq(target);
-      const trap = !ok && linearFactor(shape, c.f) === target ? 'geom-solid-scale-linear' : undefined;
+      const trap = ok ? undefined : mistake(shape, c.f, target);
       return { text: c.text, correct: ok, ...(trap ? { trap } : {}) };
     });
     const { choices, answer } = flaggedChoices(items);
@@ -857,12 +1037,21 @@ const scaling: Template<ScalingParams> = {
       params: { shape, target: [target, 1], changes: picked.map((c) => c.f) },
       q: {
         format: 'mcm',
-        stem:
+        stem: rng.pick(
           shape === 'cylinder'
-            ? `The right circular cylinder shown above has radius $r$ and height $h$. Which of the following changes, each made to the original cylinder, would produce a cylinder whose volume is ${word} the volume of the original cylinder?`
-            : `The rectangular box shown above has length $\\ell$, width $w$ and height $h$. Which of the following changes, each made to the original box, would produce a box whose volume is ${word} the volume of the original box?`,
+            ? [
+                `The right circular cylinder shown above has radius $r$ and height $h$. Which of the following changes, each made to the original cylinder, would produce a cylinder whose volume is ${word} the volume of the original cylinder?`,
+                `A right circular cylinder has radius $r$ and height $h$, as shown above. Each of the following changes is made to the original cylinder. Which of them would make the volume ${word} the original volume?`,
+                `In the right circular cylinder above, $r$ is the radius and $h$ is the height. Which of the following changes to the original cylinder would result in a volume that is ${word} the original volume?`,
+              ]
+            : [
+                `The rectangular box shown above has length $\\ell$, width $w$ and height $h$. Which of the following changes, each made to the original box, would produce a box whose volume is ${word} the volume of the original box?`,
+                `A rectangular box has length $\\ell$, width $w$ and height $h$, as shown above. Each of the following changes is made to the original box. Which of them would make the volume ${word} the original volume?`,
+                `In the box above, $\\ell$, $w$ and $h$ are the length, width and height. Which of the following changes to the original box would result in a volume that is ${word} the original volume?`,
+              ],
+        ),
         instruction: 'Indicate all such changes.',
-        figure: fig.build(false),
+        figure: fig.build(),
         choices,
         answer,
         explanation: `${
@@ -898,5 +1087,5 @@ ${shape === 'cylinder' ? 'Doubling the radius multiplies the volume by 4, not 2:
   },
 };
 
-export const solidTemplates = [measures, pour, solidQC, scaling];
+export const solidTemplates = retryAll([measures, pour, solidQC, scaling]);
 

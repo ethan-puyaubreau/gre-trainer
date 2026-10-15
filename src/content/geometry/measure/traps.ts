@@ -196,6 +196,18 @@ export const measureTraps: Record<string, Trap> = {
     label: 'Used $\\pi = 3$ in a close comparison',
     fix: 'Rounding $\\pi$ down to 3 shifts a value like $9\\pi - 18$ from 10.27 to 9. When the comparison is close, use $\\pi \\approx 3.14$ (and $\\sqrt{3} \\approx 1.73$).',
   },
+  'geom-shaded-fraction-wrong': {
+    label: 'Subtracted the wrong fraction of the circle',
+    fix: 'Count the quarter circles that are really cut out of the square: one quarter circle is $\\frac{1}{4}\\pi r^2$, four of them make a whole circle.',
+  },
+  'geom-shaded-forgot-pi': {
+    label: 'Dropped the factor $\\pi$',
+    fix: 'Every circle has area $\\pi r^2$. The ring is $\\pi R^2 - \\pi r^2 = \\pi(R^2 - r^2)$, with the $\\pi$.',
+  },
+  'geom-shaded-added-areas': {
+    label: 'Added the two areas instead of subtracting',
+    fix: 'The ring is what is left of the large disk after the small disk is removed, so the areas are subtracted.',
+  },
   'geom-shaded-apex-position': {
     label: 'Thought the area depends on where the point is',
     fix: 'A triangle with a side of the rectangle as its base and its third vertex on the opposite side always has height equal to the rectangle\'s width: its area is half the rectangle.',
@@ -240,6 +252,90 @@ export const measureTraps: Record<string, Trap> = {
   'geom-solid-added-edges': {
     label: 'Added the edges instead of using the Pythagorean theorem',
     fix: 'A diagonal is a straight-line distance: $\\sqrt{\\ell^2 + w^2 + h^2}$ (for a cube, $e\\sqrt{3}$), always less than $\\ell + w + h$.',
+  },
+  'geom-solid-diag-sum-legs': {
+    label: 'Added the legs of the right triangle instead of squaring them',
+    fix: 'The space diagonal is the hypotenuse of a right triangle whose legs are the face diagonal and an edge: $\\sqrt{d^2 + c^2}$, which is less than $d + c$.',
+  },
+  'geom-solid-no-sqrt': {
+    label: 'Stopped before taking the square root',
+    fix: 'A sum of squares (or a product of three face areas) is the SQUARE of the length (or of the volume). The square root is the last step.',
+  },
+  'geom-solid-missing-pair': {
+    label: 'Left out one pair of faces',
+    fix: 'A box has three pairs of faces, $\\ell w$, $\\ell h$ and $wh$, each counted twice: $2(\\ell w + \\ell h + wh)$.',
+  },
+  'geom-solid-edges-for-surface': {
+    label: 'Used the total edge length for an area',
+    fix: 'The 12 edges of a box add up to a length ($4(\\ell + w + h)$). Surface area adds the AREAS of the faces, in square units.',
+  },
+  'geom-solid-square-of-sum': {
+    label: 'Squared the sum of the dimensions',
+    fix: '$(\\ell + w + h)^2$ also contains $\\ell^2 + w^2 + h^2$, which are not faces. Add the three face areas $\\ell w$, $\\ell h$, $wh$ and double.',
+  },
+  'geom-solid-edge-not-squared': {
+    label: 'Multiplied the edge by 6 instead of squaring it',
+    fix: 'A face is a square of side $e$, with area $e^2$. The six faces give $6e^2$, not $6e$.',
+  },
+  'geom-solid-times-six': {
+    label: 'Multiplied the volume by 6',
+    fix: 'Find the edge first ($e = \\sqrt[3]{V}$), then the area of one face $e^2$, then the six faces.',
+  },
+  'geom-solid-edge-as-volume': {
+    label: 'Stopped at the edge',
+    fix: 'After finding the edge $e$, finish the question: the volume of the cube is $e^3$.',
+  },
+  'geom-solid-face-cubed': {
+    label: 'Cubed the area of a face instead of its edge',
+    fix: 'The area of a face is $e^2$. The volume is $e^3$, so take the square root of the face area first to get $e$.',
+  },
+  'geom-solid-surface-as-base': {
+    label: 'Used the whole surface area as the base area',
+    fix: 'Volume is (area of ONE face) times the edge. The surface area counts all six faces.',
+  },
+  'geom-solid-face-sum': {
+    label: 'Added the three face areas',
+    fix: 'The faces are $\\ell w$, $\\ell h$ and $wh$; the volume is $\\ell w h$. Their product is $(\\ell w h)^2$, so the volume is the square root of that product.',
+  },
+  'geom-solid-pair-product': {
+    label: 'Multiplied only two of the face areas',
+    fix: '$(\\ell w)(\\ell h) = \\ell^2 w h$ has an extra $\\ell$. Multiply all three faces, then take the square root.',
+  },
+  'geom-solid-pair-root': {
+    label: 'Took the square root of the product of only two faces',
+    fix: 'The square root of $(\\ell w)(\\ell h)$ is $\\ell\\sqrt{wh}$, not the volume. Use all three faces: $\\sqrt{(\\ell w)(\\ell h)(wh)} = \\ell w h$.',
+  },
+  'geom-solid-circ-area-mix': {
+    label: 'Mixed the circumference formula with the area formula',
+    fix: 'The circumference is $2\\pi r$ (one factor of $r$); the area is $\\pi r^2$.',
+  },
+  'geom-solid-lateral-area': {
+    label: 'Gave the lateral area instead of the circumference of the base',
+    fix: 'The curved surface of a cylinder has area $2\\pi r h$. The circumference of the BASE is only $2\\pi r$, with no $h$.',
+  },
+  'geom-solid-round-up': {
+    label: 'Rounded the depth up when it must not overflow',
+    fix: 'When the liquid may not rise above the top, the depth is the greatest multiple of 5 that does NOT exceed the bound. Rounding up overshoots it.',
+  },
+  'geom-solid-ignore-expansion': {
+    label: 'Ignored the expansion and filled the tank to the top',
+    fix: 'Once frozen, the liquid is taller than it was. Fill to $\\frac{H}{1 + p/100}$, not to $H$.',
+  },
+  'geom-solid-percent-of-height': {
+    label: 'Took the expansion percent of the height as the depth',
+    fix: 'The depth is the height divided by $1 + \\frac{p}{100}$, which is close to $H$ for a small $p$. $p$ percent of $H$ is only the extra height.',
+  },
+  'geom-solid-percent-as-cm': {
+    label: 'Subtracted the percent as if it were centimeters',
+    fix: 'A percent is a fraction of the depth, not a length. Divide the height by $1 + \\frac{p}{100}$.',
+  },
+  'geom-solid-strict': {
+    label: 'Treated "does not rise above" as "stays strictly below"',
+    fix: 'Reaching exactly the top does not rise above it. If the bound is itself a multiple of 5, it is allowed.',
+  },
+  'geom-solid-ignore-shrink': {
+    label: 'Ignored the dimension that gets smaller',
+    fix: 'Every factor counts, including the ones below 1: doubling the radius (volume $\\times 4$) and halving the height (volume $\\times \\frac{1}{2}$) gives $4 \\times \\frac{1}{2} = 2$, not 4.',
   },
   'geom-solid-surface-half': {
     label: 'Counted each pair of faces once',

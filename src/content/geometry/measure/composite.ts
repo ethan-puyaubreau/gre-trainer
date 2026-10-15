@@ -4,6 +4,8 @@ import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, unitCircle, type ExData } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
+import { retryAll } from '../redraw';
+import { trapNotes } from '../notes';
 
 type Poly = P2[];
 const O: P2 = [0, 0];
@@ -69,6 +71,18 @@ function shadedPolys(p: { mode: ShadedParams['mode']; s: number; r: number }, st
   }
 }
 
+/** What the explanation says about the wrong choices that are present, by trap id (the choice texts are passed in). */
+const SHADED_NOTES: Record<string, (vs: string) => string> = {
+  'geom-shaded-one-piece': (vs) => `counting the wrong number of shaded pieces gives ${vs}`,
+  'geom-shaded-radius-wrong': (vs) => `taking the wrong radius for a circle gives ${vs}`,
+  'geom-shaded-circumference': (vs) => `subtracting a circumference, a length, from an area gives ${vs}`,
+  'geom-shaded-wrong-region': (vs) => `finding the unshaded part, or the whole disk, gives ${vs}`,
+  'geom-shaded-ring-difference': (vs) => `treating the ring as a disk of radius $R - r$ gives ${vs}, but the areas are subtracted, not the radii`,
+  'geom-shaded-forgot-pi': (vs) => `leaving out the factor $\\pi$ gives ${vs}`,
+  'geom-shaded-added-areas': (vs) => `adding the two areas gives ${vs}, but the ring is the larger disk with the smaller one removed`,
+  'geom-shaded-fraction-wrong': (vs) => `removing the wrong fraction of the circle gives ${vs}`,
+};
+
 const shaded: Template<ShadedParams> = {
   id: 'geo.composite.shaded',
   skill: 'geo.composite',
@@ -77,10 +91,10 @@ const shaded: Template<ShadedParams> = {
   generate(rng, d) {
     const mode = rng.pick(
       d === 1
-        ? (['corners', 'corner-one', 'quarter-out'] as const)
+        ? (['corners', 'corner-one', 'quarter-out', 'ring'] as const)
         : d === 2
-          ? (['segment-one', 'corners', 'quarter-out', 'four-quarters'] as const)
-          : (['segment-one', 'four-quarters', 'ring', 'corner-one'] as const),
+          ? (['segment-one', 'corners', 'quarter-out', 'four-quarters', 'ring'] as const)
+          : (['segment-one', 'four-quarters', 'ring', 'corner-one', 'ring'] as const),
     );
     const fig = new Fig();
     let s = 0;
@@ -97,8 +111,14 @@ const shaded: Template<ShadedParams> = {
       // circle area pi R^2 = pi S / 2; segment = (pi S/2 - S) / 4
       const circle = Ex.pi(new Frac(S, 2));
       correct = circle.sub(S).scale(new Frac(1, 4));
-      traps.push({ v: circle.sub(S), trap: 'geom-shaded-one-piece' }, { v: Ex.pi(S).sub(S).scale(new Frac(1, 4)), trap: 'geom-shaded-radius-wrong' });
-      fillers = [circle.sub(S).scale(new Frac(1, 2)), Ex.pi(new Frac(S, 8)), circle.scale(new Frac(1, 4)), Ex.pi(new Frac(S, 4)).sub(new Frac(S, 8))];
+      traps.push(
+        { v: circle.sub(S), trap: 'geom-shaded-one-piece' },
+        { v: Ex.pi(S).sub(S).scale(new Frac(1, 4)), trap: 'geom-shaded-radius-wrong' },
+        { v: circle.sub(S).scale(new Frac(1, 2)), trap: 'geom-shaded-one-piece' },
+        { v: Ex.pi(new Frac(S, 8)), trap: 'geom-shaded-wrong-region' },
+        { v: circle.sub(S).scale(new Frac(1, 8)), trap: 'geom-shaded-one-piece' },
+      );
+      fillers = [];
       const names = ['A', 'B', 'C', 'D'];
       const verts = [45, 135, 225, 315].map((t) => onCircle(O, R, t));
       for (const poly of shadedPolys({ mode, s, r }, 5)) fig.polyXY(poly, true);
@@ -110,9 +130,7 @@ const shaded: Template<ShadedParams> = {
 
 The circle minus the square leaves four equal pieces, and the shaded region is one of them:
 
-$$\\frac{${circle.tex()} - ${S}}{4} = ${correct.tex()}$$
-
-Taking the side ${s} as the diameter (or as the radius) gives the wrong circle, and forgetting to divide by 4 gives all four pieces.`;
+$$\\frac{${circle.tex()} - ${S}}{4} = ${correct.tex()}$$`;
     } else if (mode === 'corners' || mode === 'corner-one') {
       r = rng.int(2, d === 1 ? 6 : 9);
       s = 2 * r;
@@ -120,9 +138,10 @@ Taking the side ${s} as the diameter (or as the radius) gives the wrong circle, 
       const total = Ex.of(s * s).sub(Ex.pi(r * r));
       correct = one ? total.scale(new Frac(1, 4)) : total;
       traps.push({ v: Ex.of(s * s).sub(Ex.pi(2 * r)), trap: 'geom-shaded-circumference' }, { v: Ex.pi(r * r), trap: 'geom-shaded-wrong-region' });
-      if (one) traps.push({ v: total, trap: 'geom-shaded-one-piece' });
-      else traps.push({ v: total.scale(new Frac(1, 4)), trap: 'geom-shaded-one-piece' });
-      fillers = [Ex.of(s * s).add(Ex.pi(r * r)), Ex.of(s * s).sub(Ex.pi(new Frac(r * r, 2))), Ex.of(s * s), Ex.of(2 * r * r).sub(Ex.pi(new Frac(r * r, 2)))];
+      // a wrong number of corners: one, two or three of them instead of four (or two to four instead of one)
+      for (const f of one ? [4, 2, 3, new Frac(1, 2)] : [new Frac(1, 4), new Frac(1, 2), new Frac(3, 4)]) traps.push({ v: correct.scale(f), trap: 'geom-shaded-one-piece' });
+      traps.push({ v: Ex.of(s * s).sub(Ex.pi(new Frac(r * r, 4))).scale(one ? new Frac(1, 4) : 1), trap: 'geom-shaded-radius-wrong' });
+      fillers = [];
       const polys = shadedPolys({ mode, s, r }, 5);
       for (const poly of polys) fig.polyXY(poly, true);
       fig.pt('O', O).pt('A', [-r, -r]).pt('B', [r, -r]).pt('C', [r, r]).pt('D', [-r, r]);
@@ -135,9 +154,7 @@ ${
   one
     ? `The square minus the circle leaves four equal corner pieces, and only one is shaded: $\\frac{${total.tex()}}{4} = ${correct.tex()}$.`
     : `The shaded corners are the square minus the circle: $${correct.tex()}$.`
-}
-
-Subtract the circle's AREA ($\\pi r^2$), not its circumference.`;
+}`;
     } else if (mode === 'quarter-out') {
       s = rng.int(2, d === 1 ? 8 : 12);
       if (s % 2) s++;
@@ -146,8 +163,10 @@ Subtract the circle's AREA ($\\pi r^2$), not its circumference.`;
         { v: Ex.pi(new Frac(s * s, 4)), trap: 'geom-shaded-wrong-region' },
         { v: Ex.of(s * s).sub(Ex.pi(new Frac(s * s, 16))), trap: 'geom-shaded-radius-wrong' },
         { v: Ex.of(s * s).sub(Ex.pi(new Frac(s, 2))), trap: 'geom-shaded-circumference' },
+        { v: Ex.of(s * s).sub(Ex.pi(new Frac(s * s, 8))), trap: 'geom-shaded-fraction-wrong' },
+        { v: Ex.of(s * s).sub(Ex.pi(new Frac(s * s, 2))), trap: 'geom-shaded-fraction-wrong' },
       );
-      fillers = [Ex.of(s * s).sub(Ex.pi(new Frac(s * s, 8))), Ex.of(s * s).add(Ex.pi(new Frac(s * s, 4))), Ex.of(s * s), Ex.pi(new Frac(s * s, 2))];
+      fillers = [];
       fig.polyXY(outsideQuarter(s, 5), true);
       fig.pt('A', [0, 0]).pt('B', [s, 0]).pt('C', [s, s]).pt('D', [0, s]);
       fig.poly(['A', 'B', 'C', 'D']).seg('A', 'B', `$${s}$`);
@@ -157,7 +176,7 @@ Subtract the circle's AREA ($\\pi r^2$), not its circumference.`;
 
 Shaded = square − quarter circle $= ${correct.tex()}$.
 
-The radius of the arc is the whole side ${s}, not half of it, and $${Ex.pi(new Frac(s * s, 4)).tex()}$ is the unshaded part.`;
+The radius of the arc is the whole side ${s}, not half of it.`;
     } else if (mode === 'four-quarters') {
       s = 2 * rng.int(2, d === 2 ? 5 : 8);
       const h = s / 2;
@@ -166,8 +185,10 @@ The radius of the arc is the whole side ${s}, not half of it, and $${Ex.pi(new F
         { v: Ex.pi(h * h), trap: 'geom-shaded-wrong-region' },
         { v: Ex.of(s * s).sub(Ex.pi(new Frac(h * h, 4))), trap: 'geom-shaded-one-piece' },
         { v: Ex.of(s * s).sub(Ex.pi(2 * h)), trap: 'geom-shaded-circumference' },
+        { v: Ex.of(s * s).sub(Ex.pi(new Frac(h * h, 2))), trap: 'geom-shaded-fraction-wrong' },
+        { v: Ex.of(s * s).sub(Ex.pi(new Frac(3 * h * h, 4))), trap: 'geom-shaded-one-piece' },
       );
-      fillers = [Ex.of(s * s).sub(Ex.pi(new Frac(h * h, 2))), Ex.of(s * s).add(Ex.pi(h * h)), Ex.of(s * s), Ex.pi(new Frac(h * h, 2))];
+      fillers = [];
       fig.polyXY(centralRegion(s, 5), true);
       fig.pt('A', [0, 0]).pt('B', [s, 0]).pt('C', [s, s]).pt('D', [0, s]);
       fig.poly(['A', 'B', 'C', 'D']).seg('A', 'B', `$${s}$`);
@@ -176,15 +197,22 @@ The radius of the arc is the whole side ${s}, not half of it, and $${Ex.pi(new F
 
 Shaded = square − one full circle $= ${correct.tex()}$.
 
-All four quarter circles must be subtracted, and $${Ex.pi(h * h).tex()}$ is the unshaded part.`;
+All four quarter circles must be subtracted.`;
     } else {
       r = rng.int(2, 6);
       const w = rng.int(1, 4);
       s = w;
       const R = r + w;
       correct = Ex.pi(R * R - r * r);
-      traps.push({ v: Ex.pi(w * w), trap: 'geom-shaded-ring-difference' }, { v: Ex.pi(R * R), trap: 'geom-shaded-wrong-region' }, { v: Ex.pi(2 * w), trap: 'geom-shaded-circumference' });
-      fillers = [Ex.pi(R * R + r * r), Ex.pi(r * r), Ex.pi((R + r) * w * 2), Ex.pi(R * R - r * r + 2)];
+      traps.push(
+        { v: Ex.pi(w * w), trap: 'geom-shaded-ring-difference' },
+        { v: Ex.pi(R * R), trap: 'geom-shaded-wrong-region' },
+        { v: Ex.pi(2 * w), trap: 'geom-shaded-circumference' },
+        { v: Ex.of(R * R - r * r), trap: 'geom-shaded-forgot-pi' },
+        { v: Ex.pi(R * R + r * r), trap: 'geom-shaded-added-areas' },
+        { v: Ex.pi(w), trap: 'geom-shaded-ring-difference' },
+      );
+      fillers = [];
       fig.polyXY(ringKeyhole(R, r, 5), true);
       fig.pt('O', O).circle('O', R).circle('O', r);
       fig.pt('P', onCircle(O, r, 140)).hide('P').seg('O', 'P', `$${r}$`);
@@ -194,14 +222,14 @@ All four quarter circles must be subtracted, and $${Ex.pi(h * h).tex()}$ is the 
 
 $$\\pi(${R})^2 - \\pi(${r})^2 = ${num(R * R)}\\pi - ${num(r * r)}\\pi = ${correct.tex()}$$
 
-The ring is not $\\pi(${R} - ${r})^2 = ${Ex.pi(w * w).tex()}$: subtract the areas, not the radii.`;
+Subtract the areas of the two disks, not their radii.`;
     }
-    // scaled copies of the answer give plausible-looking values on both sides of it
-    const whole = (v: Ex) => v.data().every(([, den]) => den === 1);
-    fillers.push(...[correct.scale(new Frac(1, 2)), correct.scale(new Frac(3, 2)), correct.scale(2), correct.scale(3)].filter(whole));
-    // step along the pi coefficient (or the constant) so that both sides of the answer have candidates
+    // scaled copies of the answer, then steps along the pi coefficient (or the constant), only if the traps do not suffice
     const step = mode === 'segment-one' ? Ex.of(1) : mode === 'corner-one' ? Ex.pi(new Frac(1, 4)) : Ex.pi(1);
     const { choices, answer, values } = exChoices(rng, correct, traps, fillers, { minGap: 0.03, step });
+    // name the mistakes that are actually among the choices (never one that is absent)
+    const traps2 = trapNotes(choices, SHADED_NOTES);
+    if (traps2) explanation += `\n\n${traps2}`;
     return {
       params: { mode, s, r, values },
       q: { format: 'mcs', stem, figure: fig.build(false), choices, answer, explanation },
@@ -893,4 +921,4 @@ Area $= ${W * H} + ${Ex.pi(new Frac(rr * rr, 2)).tex()} \\approx ${val.toFixed(2
   },
 };
 
-export const compositeTemplates = [shaded, regionQC, inscribed, combined];
+export const compositeTemplates = retryAll([shaded, regionQC, inscribed, combined]);
