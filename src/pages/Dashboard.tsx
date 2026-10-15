@@ -4,7 +4,7 @@ import { Rich, RichInline } from '../components/Rich';
 import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
 import { LESSONS } from '../content/lessons';
-import type { Skill } from '../engine/types';
+import type { Area, Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
 import { dayStreak, DEFAULT_DAILY_GOAL, daysUntil, tomorrowDue } from '../mastery/habit';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextCriteria, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
@@ -18,6 +18,9 @@ const POINTS: Record<Level, number> = { 0: 0, 1: 0, 2: 50, 3: 80, 4: 100 };
 const DIFF_NAMES = ['easy', 'medium', 'hard'];
 
 const SEEN_KEY = 'gre-trainer-dashboard-seen';
+const AREAS_KEY = 'gre-trainer-dashboard-areas';
+/** Same breakpoint as the small-screen rules in fx-dashboard.css. */
+const PHONE = '(max-width: 640px)';
 const COUNT_MS = 600;
 const RAISED_MS = 2600;
 interface Seen {
@@ -32,6 +35,24 @@ function readSeen(): Seen | null {
     return typeof v?.mastery === 'number' && v.levels ? v : null;
   } catch {
     return null;
+  }
+}
+
+/** The areas the user opened or folded by hand; every other area follows the default. */
+function readAreaChoices(): Record<string, boolean> {
+  try {
+    const v = JSON.parse(localStorage.getItem(AREAS_KEY) ?? 'null');
+    return v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter((e): e is [string, boolean] => typeof e[1] === 'boolean')) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAreaChoices(choices: Record<string, boolean>) {
+  try {
+    localStorage.setItem(AREAS_KEY, JSON.stringify(choices));
+  } catch {
+    // Storage blocked: the choice holds until the page is left.
   }
 }
 
@@ -118,6 +139,19 @@ export function Dashboard() {
   const { from, raised } = useSinceLastVisit(stats.mastery, levels);
   const shown = useCountUp(stats.mastery, from);
 
+  // Areas fold. With no choice stored, a wide screen shows every area; a phone folds them, except an area holding a skill that
+  // rose since the last visit, so its glow is seen. The default is decided once, on arrival.
+  const [choices, setChoices] = useState(readAreaChoices);
+  const [phoneOpen] = useState(() =>
+    window.matchMedia?.(PHONE).matches ? new Set<Area>(AREAS.filter((a) => a.skills.some((s) => raised.has(s.id))).map((a) => a.area)) : null,
+  );
+  const areaOpen = (a: Area) => choices[a] ?? (phoneOpen ? phoneOpen.has(a) : true);
+  const toggleArea = (a: Area, wasOpen: boolean) => {
+    const next = { ...choices, [a]: !wasOpen };
+    setChoices(next);
+    saveAreaChoices(next);
+  };
+
   const calib = useMemo(() => calibrate(history, sections, (id) => skillById.get(id)?.area), [history, sections]);
   const diffRows = [
     ['All areas', calib.overall],
@@ -127,7 +161,7 @@ export function Dashboard() {
   return (
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="row" style={{ alignItems: 'flex-end' }}>
+        <div className="row dash-top" style={{ alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 260px' }}>
             <div className="muted small">Course mastery</div>
             <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1 }}>{Math.round(shown)}%</div>
@@ -222,17 +256,23 @@ export function Dashboard() {
         if (!skills.length) return null;
         const units = [...new Set(skills.map((s) => s.unit))];
         const pts = skills.reduce((s, sk) => s + POINTS[(states[sk.id]?.level ?? 0) as Level], 0);
+        const isOpen = areaOpen(area.area);
+        const bodyId = `area-${area.area}`;
         return (
-          <section key={area.area}>
-            <div className="row">
-              <h2 style={{ marginBottom: 8 }}>{AREA_NAMES[area.area]}</h2>
-              <span className="chip">{Math.round(pts / skills.length)}% mastery</span>
-              <span className="spacer" />
+          <section key={area.area} className={isOpen ? 'area' : 'area folded'}>
+            <div className="row area-head">
+              <h2 className="area-title">
+                <button type="button" className="area-toggle" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => toggleArea(area.area, isOpen)}>
+                  <span className="area-chevron" aria-hidden="true" />
+                  {AREA_NAMES[area.area]}
+                  <span className="chip">{Math.round(pts / skills.length)}% mastery</span>
+                </button>
+              </h2>
               <a className="btn" href={href('practice', 'area', area.area)}>
                 Practice {AREA_NAMES[area.area]}
               </a>
             </div>
-            <div className="grid grid-3">
+            <div id={bodyId} className="grid grid-3 area-body" hidden={!isOpen}>
               {units.map((u) => (
                 <div key={u} className="card unit-block" style={{ padding: 14 }}>
                   <div className="row" style={{ marginBottom: 8 }}>
