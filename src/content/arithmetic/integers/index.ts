@@ -10,6 +10,7 @@ import { gcdLcmPairTemplates, gcdLcmPairTraps } from './gcdLcmPair';
 import { lcmGcdTemplates } from './lcm-gcd';
 import { missingDigitTemplates, missingDigitTraps } from './missingDigit';
 import { populationTemplates, populationTraps } from './populationTotals';
+import { primeExpressionTemplates, primeExpressionTraps } from './primeExpressions';
 import { primesTemplates } from './primes';
 import { remainderCycleTemplates, remainderCycleTraps } from './remainderCycle';
 import { integerTraps } from './traps';
@@ -28,5 +29,6 @@ export const integersTemplates: Template<any>[] = [
   ...evaluateTemplates,
   ...missingDigitTemplates,
   ...countMultiplesTemplates,
+  ...primeExpressionTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps };
