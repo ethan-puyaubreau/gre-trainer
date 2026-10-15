@@ -1,7 +1,8 @@
-import { numericChoices, qcCompare, textChoices } from '../../engine/build';
+import { qcCompare, valuedChoices } from '../../engine/build';
 import { frac, Frac } from '../../engine/frac';
 import { decimalDigits, gcd, mod, range, sum } from '../../engine/math';
 import { num, ordinal } from '../../engine/tex';
+import { plural } from '../../engine/text';
 import type { Difficulty, QCChoice, QCQuestion, Template } from '../../engine/types';
 
 /* ---------------------------------------------------------------------------------------------
@@ -108,9 +109,23 @@ const decimalDigitQC: Template<DigitParams> = {
         quantityB: `$${k}$`,
         answer,
         traps,
-        explanation: `$${frac(p, q).toTex()} = ${decimalTex(prefix, cycle)}$: a repeating block of ${L} digits. ${where}
+        explanation: `A repeating decimal: the ${ordinal(n)} digit depends only on its place inside the repeating block.
 
-Compare ${digit} with ${k}: ${answer === 'C' ? 'they are equal' : answer === 'A' ? 'Quantity A is greater' : 'Quantity B is greater'}. (${answer})`,
+$${frac(p, q).toTex()} = ${decimalTex(prefix, cycle)}$, so the block has ${L} digits. ${where}
+
+Compare ${digit} with ${k}: ${answer === 'C' ? 'they are equal' : answer === 'A' ? 'Quantity A is greater' : 'Quantity B is greater'}. (${answer})
+
+Check: the expansion begins $0.${prefix.join('')}${cycle.join('')}${cycle.slice(0, 3).join('')}\\ldots$, and each pass through the block adds ${L} digits.${
+          traps
+            ? ` Trap: ${
+                trapId === 'cycle-wrong-start'
+                  ? `counting the block from the first digit after the point ignores the ${plural(L1, 'digit')} before it and reads ${trapDigit}`
+                  : n % L === 0
+                    ? `a remainder of 0 means the last digit of the block, not the first (${trapDigit})`
+                    : `the remainder ${n % L} is the place in the block, so the digit is number ${n % L}, not number ${(n % L) + 1} (${trapDigit})`
+              }.`
+            : ''
+        }`,
       },
     };
   },
@@ -227,69 +242,107 @@ function unitsDigitByCycle(base: number, exp: number): number {
   return c[mod(exp - 1, c.length)];
 }
 
+const UNITS_BASES: Record<Difficulty, number[]> = {
+  1: [2, 3, 7, 8],
+  2: [12, 13, 17, 18, 22, 23, 27, 28, 32, 33, 37, 38, 42, 43, 47, 48, 53, 57, 62, 63, 67, 68],
+  3: [2, 3, 4, 7, 8, 9],
+};
+const UNITS_EXP: Record<Difficulty, [number, number]> = { 1: [12, 99], 2: [30, 199], 3: [20, 99] };
+
 const unitsDigitPower: Template<UnitsParams> = {
   id: 'arith.cycles.units-digit',
   skill: 'arith.cycles',
   format: 'mcs',
   style: 'units digit of a large power',
   generate(rng, d) {
-    let terms: { base: number; exp: number }[];
-    let op: UnitsParams['op'] = 'single';
-    if (d === 1) terms = [{ base: rng.pick([2, 3, 7, 8]), exp: rng.int(20, 60) }];
-    else if (d === 2) terms = [{ base: rng.pick([12, 13, 17, 18, 22, 23, 27, 28, 33, 37, 43, 47, 53, 57]), exp: rng.int(30, 150) }];
-    else {
-      op = rng.pick(['+', '×'] as const);
-      const [b1, b2] = rng.sample([2, 3, 4, 7, 8, 9], 2);
-      terms = [
-        { base: b1, exp: rng.int(20, 99) },
-        { base: b2, exp: rng.int(20, 99) },
-      ];
-    }
-    const digits = terms.map((t) => unitsDigitByCycle(t.base, t.exp));
-    const combine = (a: number[]) => (op === '+' ? (a[0] + a[1]) % 10 : op === '×' ? (a[0] * a[1]) % 10 : a[0]);
-    const answer = combine(digits);
+    for (;;) {
+      let terms: { base: number; exp: number }[];
+      let op: UnitsParams['op'] = 'single';
+      if (d === 3) {
+        op = rng.pick(['+', '×'] as const);
+        const [b1, b2] = rng.sample(UNITS_BASES[3], 2);
+        terms = [
+          { base: b1, exp: rng.int(...UNITS_EXP[3]) },
+          { base: b2, exp: rng.int(...UNITS_EXP[3]) },
+        ];
+      } else terms = [{ base: rng.pick(UNITS_BASES[d]), exp: rng.int(...UNITS_EXP[d]) }];
+      const combine = (a: number[]) => (op === '+' ? (a[0] + a[1]) % 10 : op === '×' ? (a[0] * a[1]) % 10 : a[0]);
+      const digits = terms.map((t) => unitsDigitByCycle(t.base, t.exp));
+      const answer = combine(digits);
+      if (answer <= 1) continue; // 0 and 1 would make the key too easy to guess
 
-    // remainder-0 / off-by-one slip on every term
-    const slip = terms.map((t) => {
-      const c = unitsCycle(t.base);
-      return t.exp % c.length === 0 ? c[0] : c[t.exp % c.length];
-    });
-    const product = terms.map((t) => (t.base * t.exp) % 10);
-    const traps = [
-      { value: combine(slip), trap: 'cycle-off-by-one' },
-      { value: combine(product), trap: 'power-as-product' },
-    ];
-    const fillers = rng.shuffle([...unitsCycle(terms[0].base), ...range(0, 9)]);
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps,
-      fillers,
-      format: (v) => `$${v.toString()}$`,
-    });
-    const expr = terms.map((t) => `${t.base}^{${t.exp}}`).join(op === '+' ? ' + ' : op === '×' ? ' \\times ' : '');
-    const lines = terms
-      .map((t, i) => {
-        const c = unitsCycle(t.base);
-        const r = t.exp % c.length;
-        return `The units digits of powers of ${t.base} repeat in the cycle ${c.join(', ')} (length ${c.length}). Since $${t.exp} = ${c.length} \\cdot ${Math.floor(
-          t.exp / c.length,
-        )} + ${r}$, the units digit of $${t.base}^{${t.exp}}$ is ${r === 0 ? 'the last element of the cycle' : `element number ${r}`}: ${digits[i]}.`;
-      })
-      .join('\n\n');
-    const tail =
-      op === 'single'
-        ? ''
-        : `\n\nOnly units digits matter: ${digits[0]} ${op === '+' ? '+' : '×'} ${digits[1]} ends in ${answer}.`;
-    return {
-      params: { terms, op },
-      q: {
-        format: 'mcs',
-        stem: `What is the units digit of $${expr}$?`,
-        choices,
-        answer: idx,
-        explanation: lines + tail,
-      },
-    };
+      // One wrong digit per real slip, each applied to every term.
+      const cycles = terms.map((t) => unitsCycle(t.base));
+      const at = (i: number, pos: number) => cycles[i][mod(pos, cycles[i].length)]; // pos 0 = first element of the cycle
+      const slips = [
+        // one place too far in the cycle
+        { value: combine(terms.map((t, i) => at(i, t.exp))), trap: 'cycle-off-by-one' },
+        // one place short
+        { value: combine(terms.map((t, i) => at(i, t.exp - 2))), trap: 'cycle-off-by-one' },
+        // base times exponent
+        { value: combine(terms.map((t) => (t.base * t.exp) % 10)), trap: 'power-as-product' },
+        // the exponent ignored
+        { value: combine(terms.map((t) => t.base % 10)), trap: 'units-base-digit' },
+        // only the last digit of the exponent used
+        { value: combine(terms.map((t) => unitsDigitByCycle(t.base, t.exp % 10 === 0 ? 10 : t.exp % 10))), trap: 'units-exponent-last-digit' },
+        // the number of whole cycles used as the position
+        { value: combine(terms.map((t, i) => at(i, Math.floor(t.exp / cycles[i].length) - 1))), trap: 'cycle-quotient-for-remainder' },
+        // the opposite element of a cycle of 4 (neither neighbour of the key)
+        { value: combine(terms.map((t, i) => at(i, t.exp + 1))), trap: 'cycle-wrong-position' },
+        ...(op === 'single' ? [] : [{ value: op === '+' ? (digits[0] * digits[1]) % 10 : (digits[0] + digits[1]) % 10, trap: 'units-wrong-operation' }]),
+      ];
+      const wrong = slips.filter((s, i) => s.value !== answer && slips.findIndex((u) => u.value === s.value) === i);
+      if (wrong.length < 4) continue;
+
+      const picked = valuedChoices(
+        rng,
+        { text: `$${answer}$`, value: answer },
+        rng.shuffle(wrong).map((s) => ({ text: `$${s.value}$`, value: s.value, trap: s.trap })),
+      );
+      // The key is a high digit most of the time, so an ascending list would put it last: shuffle instead.
+      const choices = rng.shuffle(picked.choices);
+      const idx = choices.findIndex((c) => c.text === `$${answer}$`);
+      const shown = new Map(choices.filter((c) => c.trap).map((c) => [c.trap!, c.text] as const));
+
+      const expr = terms.map((t) => `${t.base}^{${t.exp}}`).join(op === '+' ? ' + ' : op === '×' ? ' \\times ' : '');
+      const lines = terms
+        .map((t, i) => {
+          const c = cycles[i];
+          const r = t.exp % c.length;
+          return `Powers of ${t.base % 10} end in ${c.join(', ')}, a cycle of ${c.length}. As $${t.exp} = ${c.length} \\cdot ${Math.floor(t.exp / c.length)} + ${r}$, $${t.base}^{${t.exp}}$ ends in ${
+            r === 0 ? 'the last element' : `element number ${r}`
+          }: ${digits[i]}.`;
+        })
+        .join('\n\n');
+      const tail = op === 'single' ? '' : ` So the units digit of the ${op === '+' ? 'sum' : 'product'} is that of $${digits[0]} ${op === '+' ? '+' : '\\times'} ${digits[1]}$, which is ${answer}.`;
+      const t0 = terms[0];
+      const L0 = cycles[0].length;
+      const e0 = t0.exp % L0 === 0 ? L0 : (t0.exp % L0) + L0;
+      const check = `Check: $${t0.base % 10}^{${e0}} = ${num((t0.base % 10) ** e0)}$ ends in ${unitsDigitByCycle(t0.base, e0)}, and ${e0} has the same remainder on division by ${L0} as ${t0.exp}.`;
+      const say: string[] = [];
+      const digit = (id: string) => shown.get(id);
+      if (digit('power-as-product'))
+        say.push(`${digit('power-as-product')} comes from ${op === 'single' ? 'base times exponent' : 'base times exponent in each term'}, but $3^4 = 81$, not $3 \\times 4 = 12$`);
+      if (digit('cycle-off-by-one')) say.push(`${digit('cycle-off-by-one')} is one place off in the cycle`);
+      else if (digit('units-base-digit')) say.push(`${digit('units-base-digit')} keeps the units digit of the base, as if the exponent did nothing`);
+      else if (digit('units-exponent-last-digit')) say.push(`${digit('units-exponent-last-digit')} uses only the last digit of the exponent`);
+      else if (digit('units-wrong-operation')) say.push(`${digit('units-wrong-operation')} ${op === '+' ? 'multiplies' : 'adds'} the two digits instead of ${op === '+' ? 'adding' : 'multiplying'} them`);
+      const trap = say.length ? `\n\nTrap: ${say.join('. ')}.` : '';
+      return {
+        params: { terms, op },
+        q: {
+          format: 'mcs',
+          stem: [
+            `What is the units digit of $${expr}$?`,
+            `When $${expr}$ is written out in full, what is its units digit?`,
+            `If $N = ${expr}$, what is the units digit of $N$?`,
+          ][rng.int(0, 2)],
+          choices,
+          answer: idx,
+          explanation: `Units digits of big powers repeat in a cycle, so only the position in the cycle matters.\n\n${lines}${tail}\n\n${check}${trap}\n\nRule: divide the exponent by the cycle length and use the remainder as the position (0 means the last element).`,
+        },
+      };
+    }
   },
   check(q, { terms, op }) {
     const pw = (b: number, e: number) => {
@@ -310,9 +363,9 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 
 interface DayParams {
   start: number;
-  /** Number of days to move forward. */
+  /** Number of days to move: forward for 'after', backward for 'ago'. */
   shift: number;
-  mode: 'after' | 'day-of-year';
+  mode: 'after' | 'ago' | 'day-of-year';
   n: number;
 }
 
@@ -322,44 +375,72 @@ const dayOfWeek: Template<DayParams> = {
   format: 'mcs',
   style: 'day of the week far in the future',
   generate(rng, d) {
-    const start = rng.int(0, 6);
-    const mode: DayParams['mode'] = d === 3 ? 'day-of-year' : 'after';
-    const n = d === 1 ? rng.int(15, 60) : d === 2 ? rng.int(80, 400) : rng.int(100, 365);
-    const shift = mode === 'after' ? n : n - 1;
-    const answer = (start + shift) % 7;
-    const slip = mode === 'after' ? (start + shift + 1) % 7 : (start + n) % 7;
-    const others = rng.sample(
-      range(0, 6).filter((x) => x !== answer && x !== slip),
-      3,
-    );
-    const picked = [answer, slip, ...others].sort((a, b) => a - b);
-    const wrong = picked.filter((x) => x !== answer).map((x) => ({ text: DAYS[x], ...(x === slip ? { trap: 'cycle-off-by-one' } : {}) }));
-    const { choices, answer: idx } = textChoices(rng, DAYS[answer], wrong, 'random');
-    // Keep the choices in week order (the way the GRE lists them).
-    const order = choices.map((c, i) => ({ c, i, k: DAYS.indexOf(c.text) })).sort((a, b) => a.k - b.k);
-    const stem =
-      mode === 'after'
-        ? `If today is a ${DAYS[start]}, what day of the week will it be ${n} days from today?`
-        : `In a certain year, January 1 is a ${DAYS[start]}. On what day of the week is the ${ordinal(n)} day of that year?`;
-    const explanation =
-      mode === 'after'
-        ? `The days of the week repeat every 7 days. Since $${n} = 7 \\cdot ${Math.floor(n / 7)} + ${n % 7}$, moving ${n} days ahead lands on the same day as moving ${n % 7} day${n % 7 === 1 ? '' : 's'} ahead: ${DAYS[answer]}.`
-        : `Day 1 is a ${DAYS[start]}, so day ${n} is $${n} - 1 = ${shift}$ days later (not ${n}). Since $${shift} = 7 \\cdot ${Math.floor(shift / 7)} + ${shift % 7}$, it is ${shift % 7} day${shift % 7 === 1 ? '' : 's'} after ${DAYS[start]}: ${DAYS[answer]}.`;
-    return {
-      params: { start, shift, mode, n },
-      q: {
-        format: 'mcs',
-        stem,
-        choices: order.map((o) => o.c),
-        answer: order.findIndex((o) => o.i === idx),
-        explanation,
-      },
-    };
+    for (;;) {
+      const start = rng.int(0, 6);
+      const mode: DayParams['mode'] = d === 3 ? 'day-of-year' : d === 2 && rng.chance(0.4) ? 'ago' : 'after';
+      const n = d === 1 ? rng.int(15, 60) : d === 2 ? rng.int(80, 400) : rng.int(100, 365);
+      if (n % 7 === 0) continue; // a multiple of 7 would make the answer "the same day"
+      const shift = mode === 'ago' ? -n : mode === 'after' ? n : n - 1;
+      const answer = mod(start + shift, 7);
+      const cands: { day: number; trap: string }[] = [
+        // one day too many / too few in the count
+        { day: mod(answer + 1, 7), trap: mode === 'day-of-year' ? 'cycle-count-terms' : 'cycle-off-by-one' },
+        { day: mod(answer - 1, 7), trap: 'cycle-off-by-one' },
+        // the number of whole weeks used in place of the leftover days
+        { day: mod(start + Math.floor(n / 7) * (mode === 'ago' ? -1 : 1), 7), trap: 'cycle-quotient-for-remainder' },
+        // moved the wrong way along the week
+        { day: mod(start - shift, 7), trap: 'cycle-direction' },
+      ].filter((c, i, arr) => c.day !== answer && arr.findIndex((u) => u.day === c.day) === i);
+      const wrong = [...cands];
+      for (const x of rng.shuffle(range(0, 6))) if (wrong.length < 4 && x !== answer && !wrong.some((w) => w.day === x)) wrong.push({ day: x, trap: '' });
+      const picked = rng.shuffle(wrong).slice(0, 4);
+      if (picked.filter((c) => c.trap).length < 3) continue;
+      const choices = [...picked, { day: answer, trap: '' }]
+        .sort((a, b) => a.day - b.day)
+        .map((c) => ({ text: DAYS[c.day], ...(c.trap && c.day !== answer ? { trap: c.trap } : {}) }));
+      const idx = choices.findIndex((c) => c.text === DAYS[answer]);
+      const shown = new Set(choices.map((c) => c.trap));
+
+      const q7 = Math.floor(n / 7);
+      const r7 = n % 7;
+      const stem =
+        mode === 'after'
+          ? `If today is a ${DAYS[start]}, what day of the week will it be ${plural(n, 'day')} from today?`
+          : mode === 'ago'
+            ? `If today is a ${DAYS[start]}, what day of the week was it ${plural(n, 'day')} ago?`
+            : `In a certain year, January 1 is a ${DAYS[start]}. On what day of the week is the ${ordinal(n)} day of that year?`;
+      const steps =
+        mode === 'after'
+          ? `Since $${n} = 7 \\cdot ${q7} + ${r7}$, moving ${n} days ahead lands where ${plural(r7, 'day')} ahead does, because the ${q7} whole weeks bring back the same day: ${DAYS[answer]}.`
+          : mode === 'ago'
+            ? `Since $${n} = 7 \\cdot ${q7} + ${r7}$, going back ${n} days ends where going back ${plural(r7, 'day')} does, because the ${q7} whole weeks bring back the same day: ${DAYS[answer]}.`
+            : `Day 1 is a ${DAYS[start]}, so day ${n} comes $${n} - 1 = ${shift}$ days later (not ${n}). Since $${shift} = 7 \\cdot ${Math.floor(shift / 7)} + ${shift % 7}$, it is ${plural(shift % 7, 'day')} after ${DAYS[start]}: ${DAYS[answer]}.`;
+      const check =
+        mode === 'day-of-year'
+          ? `Check: day 8 is ${DAYS[start]} again (7 days after day 1), so days 1, 8, 15, ... all share that weekday.`
+          : `Check: ${plural(7 * q7, 'day')} is exactly ${plural(q7, 'week')}, which keeps the weekday, so ${r7} more ${mode === 'after' ? 'forward' : 'back'} is all that is left.`;
+      const say: string[] = [];
+      if (shown.has('cycle-off-by-one') || shown.has('cycle-count-terms'))
+        say.push(mode === 'day-of-year' ? `counting ${n} days instead of ${n - 1} lands one day late` : 'being one day off in the count');
+      if (shown.has('cycle-quotient-for-remainder')) say.push(`using the ${q7} weeks instead of the ${r7} leftover days`);
+      if (shown.has('cycle-direction')) say.push(`moving ${mode === 'ago' ? 'forward' : 'backward'} instead of ${mode === 'ago' ? 'backward' : 'forward'}`);
+      const trap = say.length ? `\n\nTrap: wrong days come from ${say.join('; ')}.` : '';
+      return {
+        params: { start, shift, mode, n },
+        q: {
+          format: 'mcs',
+          stem,
+          choices,
+          answer: idx,
+          explanation: `Days of the week repeat every 7 days, so only the remainder of ${n} divided by 7 matters.\n\n${steps}\n\n${check}${trap}\n\nRule: divide by the length of the cycle and keep the remainder.`,
+        },
+      };
+    }
   },
   check(q, { start, mode, n }) {
     let day = start;
-    const steps = mode === 'after' ? n : n - 1;
-    for (let i = 0; i < steps; i++) day = (day + 1) % 7;
+    const steps = mode === 'day-of-year' ? n - 1 : n;
+    for (let i = 0; i < steps; i++) day = mode === 'ago' ? (day + 6) % 7 : (day + 1) % 7;
     if (q.format !== 'mcs') return 'wrong format';
     return q.choices[q.answer].text === DAYS[day] ? null : `expected ${DAYS[day]}`;
   },

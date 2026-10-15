@@ -12,15 +12,8 @@
   "arith.consecutive.sum-function": {
     "distractors.trapped": "baseline"
   },
-  "arith.cycles.day-of-week": {
-    "distractors.trapped": "baseline"
-  },
   "arith.cycles.decimal-digit": {
-    "qc.never-d": "baseline"
-  },
-  "arith.cycles.units-digit": {
-    "distractors.trapped": "baseline",
-    "degenerate.trivial": "baseline"
+    "qc.never-d": "Both quantities are fixed numbers (a digit and a given digit), so D is impossible."
   },
   "arith.decimals.percent-power-ten": {
     "artifacts.exp-1": "baseline",

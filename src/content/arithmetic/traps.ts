@@ -5,6 +5,10 @@ export const arithmeticTraps: Record<string, Trap> = {
     label: 'Off by one inside the cycle',
     fix: 'Position $n$ in a cycle of length $L$ is element number ($n \\bmod L$) of the cycle, and a remainder of 0 means the LAST element, not the first.',
   },
+  'cycle-wrong-position': {
+    label: 'Picked the wrong element of the cycle',
+    fix: 'Divide the exponent by the cycle length and use the remainder as the position: remainder 1 is the first element, remainder 0 the last.',
+  },
   'cycle-count-terms': {
     label: 'Wrong number of terms',
     fix: 'From term $a$ to term $b$ inclusive there are $b - a + 1$ terms, not $b - a$.',
@@ -12,6 +16,26 @@ export const arithmeticTraps: Record<string, Trap> = {
   'cycle-wrong-start': {
     label: 'Started the cycle at the wrong element',
     fix: 'Find which element of the cycle the first term of the range is (use its position mod the cycle length) instead of assuming the range starts at the beginning of the cycle.',
+  },
+  'cycle-quotient-for-remainder': {
+    label: 'Used the number of whole cycles instead of the leftover',
+    fix: 'Divide, then keep the REMAINDER: after $100 = 7 \\cdot 14 + 2$ only the 2 leftover days move the weekday, not the 14 weeks.',
+  },
+  'cycle-direction': {
+    label: 'Moved the wrong way around the cycle',
+    fix: 'Read whether the question goes forward ("from today") or backward ("ago"), and move the leftover days in that direction.',
+  },
+  'units-base-digit': {
+    label: 'Kept the units digit of the base',
+    fix: 'The exponent changes the units digit: $7^2 = 49$ ends in 9, not 7. Follow the cycle of units digits.',
+  },
+  'units-exponent-last-digit': {
+    label: 'Used only the last digit of the exponent',
+    fix: 'The cycle length divides the whole exponent, not its last digit: for a cycle of 4, $58 = 4 \\cdot 14 + 2$ gives position 2, but the last digit 8 would give position 4.',
+  },
+  'units-wrong-operation': {
+    label: 'Added the units digits of a product (or multiplied those of a sum)',
+    fix: 'Combine the units digits with the same operation as the numbers: add for a sum, multiply for a product, then keep the units digit.',
   },
   'power-as-product': {
     label: 'Multiplied instead of raising to a power',
