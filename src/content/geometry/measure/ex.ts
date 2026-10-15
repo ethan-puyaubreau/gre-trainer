@@ -6,6 +6,8 @@ import { Frac, type FracLike } from '../../../engine/frac';
 import { squareOut } from '../../../engine/math';
 import { num } from '../../../engine/tex';
 import type { Choice } from '../../../engine/types';
+import { Redraw } from '../redraw';
+import { pickPosition } from '../shapes/util';
 import type { P2 } from './fig';
 
 /** Unit of a term: '1' (rational), 'pi', or 'r<n>' for the square root of a squarefree n > 1. */
@@ -101,13 +103,14 @@ function termTex(a: Frac, u: Unit): string {
  * answer ± k·step. Non-positive values, duplicates and values too close to another choice are dropped.
  * The correct answer goes to a uniformly random position (A–E) as far as the candidates on each side
  * allow; within a side, earlier candidates (traps first) are preferred. Ascending order.
+ * The first `must` traps are always among the choices (the explanation cites them); one that cannot be shown redraws.
  */
 export function exChoices(
   rng: Rng,
   correct: Ex,
   traps: { v: Ex; trap: string }[],
   fillers: Ex[],
-  opts: { count?: number; minGap?: number; step?: Ex; fmt?: (v: Ex) => string; allowZero?: boolean; scales?: boolean } = {},
+  opts: { count?: number; minGap?: number; step?: Ex; fmt?: (v: Ex) => string; allowZero?: boolean; scales?: boolean; must?: number } = {},
 ): { choices: Choice[]; answer: number; values: ExData[] } {
   const count = opts.count ?? 5;
   const minGap = opts.minGap ?? 0.01;
@@ -116,7 +119,8 @@ export function exChoices(
   // integer answers get integer look-alikes; answers with pi or radicals may get halves (e.g. 18 - 9pi/2)
   const intOnly = correct.rational() !== null && maxDen === 1;
   const tidy = (v: Ex) => v.data().every(([, d]) => d <= (intOnly ? 1 : 2 * maxDen));
-  const pool: { v: Ex; trap?: string }[] = [...traps.map((t) => ({ v: t.v, trap: t.trap })), ...rng.shuffle(fillers).map((v) => ({ v }))];
+  const must = opts.must ?? 0;
+  const pool: { v: Ex; trap?: string; must?: boolean }[] = [...traps.map((t, i) => ({ v: t.v, trap: t.trap, must: i < must })), ...rng.shuffle(fillers).map((v) => ({ v }))];
   if (opts.scales !== false)
     for (const k of rng.shuffle([new Frac(1, 2), new Frac(3, 4), new Frac(3, 2), new Frac(2), new Frac(1, 4), new Frac(3), new Frac(2, 3), new Frac(4, 3)])) {
       const v = correct.scale(k);
@@ -126,21 +130,31 @@ export function exChoices(
   const ok = (x: number) => (opts.allowZero ? x >= 0 : x > 0);
   const near = (x: number, y: number) => Math.abs(x - y) <= minGap * Math.max(1, Math.abs(x), Math.abs(y));
   // Greedy de-duplication in priority order: every kept value is far enough from the answer and from each other.
-  const kept: { v: Ex; trap?: string; x: number; t: string }[] = [];
+  const kept: { v: Ex; trap?: string; must?: boolean; x: number; t: string }[] = [];
   const ct = correct.tex();
   for (const it of pool) {
     const x = it.v.value();
-    if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x))) continue;
     const t = it.v.tex();
-    if (t === ct || kept.some((k) => k.t === t)) continue;
+    if (it.trap && ok(x) && (near(x, c) || t === ct)) throw new Redraw('a trap equals the answer');
+    if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x)) || t === ct || kept.some((k) => k.t === t)) {
+      if (it.must) throw new Redraw('a trap cited in the explanation cannot be shown');
+      continue;
+    }
     kept.push({ ...it, x, t });
   }
   const below = kept.filter((k) => k.x < c);
   const above = kept.filter((k) => k.x > c);
   if (below.length + above.length < count - 1) throw new Error(`exChoices: only ${below.length + above.length} wrong choices for ${correct.tex()}`);
-  let target = rng.int(0, count - 1);
-  target = Math.min(target, below.length);
-  target = Math.max(target, count - 1 - above.length);
+  // Position of the correct value: keep as many named traps as possible, at random among the best positions.
+  const tb = below.filter((k) => k.trap).length;
+  const ta = above.filter((k) => k.trap).length;
+  const mb = below.filter((k) => k.must).length;
+  const ma = above.filter((k) => k.must).length;
+  const plan = Array.from({ length: count }, (_, K) => ({ K, kept: Math.min(tb, K) + Math.min(ta, count - 1 - K) })).filter(
+    (p) => p.K <= below.length && count - 1 - p.K <= above.length && p.K >= mb && count - 1 - p.K >= ma,
+  );
+  if (!plan.length) throw new Redraw('no position keeps every cited trap');
+  const target = pickPosition(rng, plan, (p) => p.kept, count - 1).K;
   const items: { v: Ex; trap?: string; ok?: boolean; x: number }[] = [{ v: correct, ok: true, x: c }, ...below.slice(0, target), ...above.slice(0, count - 1 - target)];
   items.sort((a, b) => a.x - b.x);
   const fmt = opts.fmt ?? ((v: Ex) => `$${v.tex()}$`);
