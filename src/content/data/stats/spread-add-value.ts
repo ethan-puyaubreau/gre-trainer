@@ -43,7 +43,7 @@ const addValueQC: Template<Params> = {
       const list = [...devs, last].map((x) => m + x).sort((a, b) => a - b);
       const kind: Kind =
         stat === 'range'
-          ? rng.pick<Kind>(d === 1 ? ['inside', 'inside', 'outside', 'outside', 'outside', 'straddle'] : ['inside', 'outside', 'straddle'])
+          ? rng.pick<Kind>(d === 1 ? ['inside', 'inside', 'outside', 'outside', 'outside', 'straddle'] : ['inside', 'straddle', 'straddle', 'outside'])
           : rng.pick<Kind>(d === 2 ? ['near', 'near', 'far', 'far', 'straddle'] : ['near', 'far', 'straddle', 'straddle']);
       const sigma = popSD(list);
       const mn = list[0];
