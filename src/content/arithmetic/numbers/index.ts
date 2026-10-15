@@ -1,4 +1,5 @@
 import type { Template, Trap } from '../../../engine/types';
+import { complexFractionTemplates, complexFractionTraps } from './complexFraction';
 import { decimalTemplates } from './decimals';
 import { decimalExprTemplates, decimalExprTraps } from './decimalExpr';
 import { decimalExtraTemplates } from './decimalsMore';
@@ -14,5 +15,5 @@ import { realNumberTemplates } from './realNumbers';
 import { successiveTemplates } from './successive';
 import { numbersTraps as traps } from './traps';
 
-export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
-export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps };
+export const numbersTemplates: Template<any>[] = [...fractionTemplates, ...fractionsQcTemplates, ...partToWholeTemplates, ...complexFractionTemplates, ...decimalTemplates, ...decimalExtraTemplates, ...decimalExprTemplates, ...numberLineTemplates, ...realNumberTemplates, ...percentTemplates, ...successiveTemplates, ...ratioTemplates, ...ratioTotalTemplates, ...rateTemplates];
+export const numbersTraps: Record<string, Trap> = { ...traps, ...ratioTotalTraps, ...decimalExprTraps, ...partToWholeTraps, ...complexFractionTraps };
