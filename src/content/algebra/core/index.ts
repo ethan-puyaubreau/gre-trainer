@@ -9,7 +9,8 @@ import { quadraticTemplates } from './quadratics';
 import { systemTemplates } from './systems';
 import { coreAlgebraSkills } from './skills';
 import { coreAlgebraTraps } from './traps';
+import { hiddenTemplates, hiddenTraps } from './hidden';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates];
-export const coreTraps: Record<string, Trap> = coreAlgebraTraps;
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps };
