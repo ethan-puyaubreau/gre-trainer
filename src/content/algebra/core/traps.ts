@@ -254,6 +254,10 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Did not flip the inequality after dividing by a negative',
     fix: 'Multiplying or dividing both sides by a negative number reverses the inequality: $-3x > 12$ gives $x < -4$.',
   },
+  'alg-compound-partial': {
+    label: 'Applied a step to only some parts of the chain',
+    fix: 'In $L < px + q < R$ every step (subtract $q$, divide by $p$) must be done to all three parts, not only the middle one.',
+  },
   'alg-strict-endpoint': {
     label: 'Mixed up strict and non-strict inequalities',
     fix: '$<$ and $>$ exclude the endpoint; $\\le$ and $\\ge$ include it. For integers, $x < 5$ means $x \\le 4$.',
@@ -265,6 +269,22 @@ export const coreAlgebraTraps: Record<string, Trap> = {
   'alg-count-forgot-zero': {
     label: 'Forgot to count 0',
     fix: 'Zero is an integer. Between $-3$ and $3$ inclusive there are 7 integers, not 6.',
+  },
+  'alg-count-zero-twice': {
+    label: 'Counted 0 twice',
+    fix: 'List the integers: $-3, -2, -1, 0, 1, 2, 3$ has 3 negative ones, 3 positive ones and a single 0.',
+  },
+  'alg-sqrt-rounded-up': {
+    label: 'Rounded the square root up',
+    fix: 'If $x^2 < 22$, then $x < \\sqrt{22} \\approx 4.7$, so the largest integer is 4, not 5: $5^2 = 25$ is already too big.',
+  },
+  'alg-abs-one-side': {
+    label: 'Kept only one of the two cases of the absolute value',
+    fix: '$|u| < c$ means $-c < u < c$: values on both sides of the middle count.',
+  },
+  'alg-abs-no-divide': {
+    label: 'Forgot to divide the ends by the coefficient of $x$',
+    fix: 'From $-6 \\le 3x - 3 \\le 6$ you get $-3 \\le 3x \\le 9$, then divide EVERY part by 3: $-1 \\le x \\le 3$.',
   },
   'alg-count-to-k': {
     label: 'Counted up to $k$ instead of $\\sqrt{k}$',

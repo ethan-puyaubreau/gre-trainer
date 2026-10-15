@@ -1,8 +1,8 @@
-import { flaggedChoices, numericChoices } from '../../../engine/build';
+import { flaggedChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num, paren } from '../../../engine/tex';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, countWord, wordCount, sideFill, someTraps, div, evalEx, intExcept, mul, pow, qcEnd, qcSamples, texEx, add, type Ex } from './util';
+import { N, V, div, evalEx, intExcept, mul, pow, qcEnd, qcSamples, texEx, add, trapChoices, type Ex } from './util';
 
 type Op = '<' | '<=' | '>' | '>=';
 const OP_TEX: Record<Op, string> = { '<': '<', '<=': '\\le', '>': '>', '>=': '\\ge' };
@@ -32,111 +32,151 @@ function ineqHolds(kind: SolveIneqParams['kind'], k: number[], ops: Op[], x: Fra
   return holds(new Frac(L), ops[0], mid) && holds(mid, ops[1], new Frac(R));
 }
 
+/** A wrong solution set (a named slip) with the clause that says what the student did. */
+interface WrongSet {
+  trap: string;
+  why: string;
+  has: (x: Frac) => boolean;
+}
+
 const solveIneqMCM: Template<SolveIneqParams> = {
   id: 'alg.inequalities.solve-mcm',
   skill: 'alg.inequalities',
   format: 'mcm',
   style: 'which values satisfy a linear or compound inequality',
   generate(rng, d) {
-    const kind: SolveIneqParams['kind'] = d === 1 ? 'linear' : rng.pick(d === 2 ? ['linear', 'compound'] : ['compound', 'compound', 'linear']);
-    let k: number[];
-    let ops: Op[];
-    let stem: string;
-    let explanation: string;
-    let candidates: number[];
-    let noFlip: (x: number) => boolean;
-    if (kind === 'linear') {
-      const t = rng.int(-6, 8);
-      let a: number;
-      let c: number;
-      do {
-        a = rng.int(-6, 7);
-        c = rng.int(-6, 7);
-      } while (a === c || a === 0 || c === 0 || (d === 1 ? false : a - c > 0 && rng.chance(0.6)));
-      const b = rng.int(-12, 12);
-      const dd = (a - c) * t + b; // equality at x = t
-      const op: Op = rng.pick(['<', '<=', '>', '>=']);
-      k = [a, b, c, dd];
-      ops = [op];
-      const coef = a - c;
-      const resOp = coef > 0 ? op : flip(op);
-      stem = `Which of the following values of $x$ satisfy the inequality $${lin([[a, 'x'], [b, '']])} ${OP_TEX[op]} ${lin([[c, 'x'], [dd, '']])}$?`;
-      explanation = `Collect the $x$ terms on the left and the numbers on the right: $${lin([[coef, 'x']])} ${OP_TEX[op]} ${num(dd - b)}$.
-
-${coef < 0 ? `Divide by $${coef}$, a negative number, so the inequality sign flips: $x ${OP_TEX[resOp]} ${num(t)}$.` : coef === 1 ? `So $x ${OP_TEX[resOp]} ${num(t)}$.` : `Divide by ${coef}: $x ${OP_TEX[resOp]} ${num(t)}$.`}${
-        op === '<' || op === '>' ? ` The value $${num(t)}$ itself is not included.` : ` The value $${num(t)}$ itself is included.`
-      }`;
-      candidates = [t - 3, t - 2, t - 1, t, t + 1, t + 2, t + 3, t + 5, t - 5];
-      noFlip = (x) => holds(frac(x), coef > 0 ? flip(op) : op, frac(t));
-    } else {
-      // L op1 p x + q op2 R with integer endpoints for x
-      let p: number;
-      do p = rng.pick(d === 3 ? [-4, -3, -2, 2, 3, -1] : [-3, -2, 2, 3, 4]);
-      while (p === 0);
-      let x1: number;
-      let x2: number;
-      do {
-        x1 = rng.int(-7, 6);
-        x2 = rng.int(-6, 9);
-      } while (x2 - x1 < 2 || x2 - x1 > 7);
-      const q = rng.int(-9, 9);
-      // L and R are p*x + q at the endpoints, ordered so that L < R.
-      const v1 = p * x1 + q;
-      const v2 = p * x2 + q;
-      const L = Math.min(v1, v2);
-      const R = Math.max(v1, v2);
-      const op1: Op = rng.pick(['<', '<=']);
-      const op2: Op = rng.pick(['<', '<=']);
-      k = [L, p, q, R];
-      ops = [op1, op2];
-      stem = `Which of the following values of $x$ satisfy $${num(L)} ${OP_TEX[op1]} ${lin([[p, 'x'], [q, '']])} ${OP_TEX[op2]} ${num(R)}$?`;
-      const lo = (L - q) / p;
-      const hi = (R - q) / p;
-      const [a1, a2] = p > 0 ? [lo, hi] : [hi, lo];
-      const [o1, o2] = p > 0 ? [op1, op2] : [op2, op1];
-      explanation = `Do the same step to all three parts. ${q === 0 ? '' : `${q > 0 ? `Subtract ${q}` : `Add ${-q}`}: $${num(L - q)} ${OP_TEX[op1]} ${lin([[p, 'x']])} ${OP_TEX[op2]} ${num(R - q)}$. `}${
-        p < 0
-          ? `Divide by $${p}$, which is negative, so both signs flip: $${num(lo)} ${OP_TEX[flip(op1)]} x ${OP_TEX[flip(op2)]} ${num(hi)}$, that is, $${num(a1)} ${OP_TEX[o1]} x ${OP_TEX[o2]} ${num(a2)}$.`
-          : `Divide by ${p}: $${num(a1)} ${OP_TEX[o1]} x ${OP_TEX[o2]} ${num(a2)}$.`
+    for (;;) {
+      const kind: SolveIneqParams['kind'] = d === 1 ? 'linear' : rng.pick(d === 2 ? ['linear', 'compound'] : ['compound', 'compound', 'linear']);
+      let k: number[];
+      let ops: Op[];
+      let stem: string;
+      let steps: string;
+      const wrongSets: WrongSet[] = [];
+      let center: number[]; // values around which candidates are drawn
+      const between = (u: Frac, v: Frac) => (x: Frac) => (u.lte(v) ? x.gte(u) && x.lte(v) : x.gte(v) && x.lte(u));
+      if (kind === 'linear') {
+        const t = rng.int(-6, 8);
+        let a: number;
+        let c: number;
+        do {
+          a = rng.int(-6, 7);
+          c = rng.int(-6, 7);
+        } while (a === c || a === 0 || c === 0 || (d === 1 ? false : a - c > 0 && rng.chance(0.6)));
+        const b = intExcept(rng, -12, 12, 0);
+        const dd = (a - c) * t + b; // equality at x = t
+        const op: Op = rng.pick(['<', '<=', '>', '>=']);
+        k = [a, b, c, dd];
+        ops = [op];
+        const coef = a - c;
+        const resOp = coef > 0 ? op : flip(op);
+        stem = `Which of the following values of $x$ satisfy the inequality $${lin([[a, 'x'], [b, '']])} ${OP_TEX[op]} ${lin([[c, 'x'], [dd, '']])}$?`;
+        const strict = op === '<' || op === '>';
+        steps = `Collect the $x$ terms on one side and the numbers on the other: $${lin([[coef, 'x']])} ${OP_TEX[op]} ${num(dd - b)}$. ${
+          coef < 0
+            ? `Divide by $${coef}$: a negative divisor reverses the inequality ($2 < 3$ but $-2 > -3$), so $x ${OP_TEX[resOp]} ${num(t)}$.`
+            : coef === 1
+              ? `So $x ${OP_TEX[resOp]} ${num(t)}$.`
+              : `Divide by ${coef} (positive, so the sign stays): $x ${OP_TEX[resOp]} ${num(t)}$.`
+        } The value $${num(t)}$ is ${strict ? 'not ' : ''}included.`;
+        if (coef < 0) wrongSets.push({ trap: 'alg-no-flip', why: `dividing by $${coef}$ without reversing the sign`, has: (x) => holds(x, op, new Frac(t)) });
+        if (strict) wrongSets.push({ trap: 'alg-strict-endpoint', why: `including $${num(t)}$ although the inequality is strict`, has: (x) => x.eq(t) });
+        const t2 = new Frac(dd + b, coef);
+        wrongSets.push({ trap: 'alg-move-term-sign', why: `moving the constant $${num(b)}$ across without changing its sign`, has: (x) => holds(x, resOp, t2) });
+        if (a + c !== 0) {
+          const t3 = new Frac(dd - b, a + c);
+          const res3 = a + c > 0 ? op : flip(op);
+          wrongSets.push({ trap: 'alg-move-term-sign', why: `moving $${lin([[c, 'x']])}$ across without changing its sign`, has: (x) => holds(x, res3, t3) });
+        }
+        center = [t, Math.round(t2.toNumber()), a + c !== 0 ? Math.round((dd - b) / (a + c)) : t];
+      } else {
+        // L op1 p x + q op2 R with integer endpoints for x
+        let p: number;
+        do p = rng.pick(d === 3 ? [-4, -3, -2, 2, 3, -1] : [-3, -2, 2, 3, 4]);
+        while (p === 0);
+        let x1: number;
+        let x2: number;
+        do {
+          x1 = rng.int(-7, 6);
+          x2 = rng.int(-6, 9);
+        } while (x2 - x1 < 2 || x2 - x1 > 7);
+        const q = intExcept(rng, -9, 9, 0);
+        // L and R are p*x + q at the endpoints, ordered so that L < R.
+        const v1 = p * x1 + q;
+        const v2 = p * x2 + q;
+        const L = Math.min(v1, v2);
+        const R = Math.max(v1, v2);
+        const op1: Op = rng.pick(['<', '<=']);
+        const op2: Op = rng.pick(['<', '<=']);
+        k = [L, p, q, R];
+        ops = [op1, op2];
+        stem = `Which of the following values of $x$ satisfy $${num(L)} ${OP_TEX[op1]} ${lin([[p, 'x'], [q, '']])} ${OP_TEX[op2]} ${num(R)}$?`;
+        const lo = (L - q) / p;
+        const hi = (R - q) / p;
+        const [a1, a2] = p > 0 ? [lo, hi] : [hi, lo];
+        const [o1, o2] = p > 0 ? [op1, op2] : [op2, op1];
+        steps = `Do the same step to all three parts of the chain. ${q > 0 ? `Subtract ${q}` : `Add ${-q}`}: $${num(L - q)} ${OP_TEX[op1]} ${lin([[p, 'x']])} ${OP_TEX[op2]} ${num(R - q)}$. ${
+          p < 0
+            ? `Divide by $${p}$, a negative number: both signs flip and the ends swap, $${num(a1)} ${OP_TEX[o1]} x ${OP_TEX[o2]} ${num(a2)}$.`
+            : `Divide by ${p}: $${num(a1)} ${OP_TEX[o1]} x ${OP_TEX[o2]} ${num(a2)}$.`
+        }`;
+        const strictEnds = [o1 === '<' ? a1 : null, o2 === '<' ? a2 : null].filter((v): v is number => v !== null);
+        if (strictEnds.length) wrongSets.push({ trap: 'alg-strict-endpoint', why: `counting an endpoint although its sign is strict`, has: (x) => strictEnds.some((e) => x.eq(e)) });
+        if (Math.abs(p) !== 1) wrongSets.push({ trap: 'alg-compound-partial', why: `dividing only the middle part by ${Math.abs(p)}`, has: between(new Frac(L - q), new Frac(R - q)) });
+        wrongSets.push({ trap: 'alg-compound-partial', why: `${q > 0 ? 'subtracting' : 'adding'} ${Math.abs(q)} in the middle part only`, has: between(new Frac(L, p), new Frac(R, p)) });
+        wrongSets.push({ trap: 'alg-move-term-sign', why: `${q > 0 ? 'adding' : 'subtracting'} ${Math.abs(q)} in each part instead of ${q > 0 ? 'subtracting' : 'adding'} it`, has: between(new Frac(L + q, p), new Frac(R + q, p)) });
+        center = [lo, hi, Math.round((L + q) / p), Math.round((R + q) / p), Math.round(L / p), Math.round(R / p), L - q, R - q].filter((v) => Math.abs(v) <= 30 || v === lo || v === hi);
       }
+      // Candidates: every integer near the interesting numbers; a wrong one must be explained by one of the slips.
+      const lowest = Math.min(...center) - 2;
+      const highest = Math.max(...center) + 2;
+      const cands: { x: number; ok: boolean; wrong?: WrongSet }[] = [];
+      for (let x = Math.max(lowest, -30); x <= Math.min(highest, 30); x++) {
+        const ok = ineqHolds(kind, k!, ops!, frac(x));
+        const wrong = ok ? undefined : wrongSets.find((w) => w.has(frac(x)));
+        if (ok || wrong) cands.push({ x, ok, wrong });
+      }
+      const total = rng.pick([5, 6, 7]);
+      const good = cands.filter((c) => c.ok);
+      const nGood = Math.max(1, Math.min(good.length, rng.int(1, Math.min(4, total - 2))));
+      // Values are drawn apart from each other (no runs of consecutive integers) and, among the wrong ones, one slip at a time.
+      const near = (list: { x: number }[], x: number) => list.some((c) => Math.abs(c.x - x) <= 1);
+      const pickedGood: typeof cands = [];
+      for (const c of rng.shuffle(good)) if (pickedGood.length < nGood && !near(pickedGood, c.x)) pickedGood.push(c);
+      for (const c of rng.shuffle(good)) if (pickedGood.length < nGood && !pickedGood.includes(c)) pickedGood.push(c);
+      const groups = rng.shuffle([...new Set(wrongSets.filter((w) => cands.some((c) => c.wrong === w)))]).map((w) => rng.shuffle(cands.filter((c) => c.wrong === w)));
+      const pickedBad: typeof cands = [];
+      for (let round = 0; round < 8 && pickedBad.length < total - nGood; round++)
+        for (const g of groups) {
+          const free = g.filter((c) => !pickedBad.includes(c) && !near(pickedBad, c.x) && !near(pickedGood, c.x));
+          if (free.length && pickedBad.length < total - nGood) pickedBad.push(free[0]);
+        }
+      if (pickedBad.length < 2 || nGood + pickedBad.length < 5) continue;
+      const picked = [...pickedGood, ...pickedBad].sort((u, v) => u.x - v.x);
+      // no evenly spaced run of three choices (such a run looks like a ladder)
+      if (picked.some((c, i) => i + 2 < picked.length && picked[i + 1].x - c.x === picked[i + 2].x - picked[i + 1].x && picked[i + 1].x - c.x <= 3)) continue;
+      const { choices, answer } = flaggedChoices(picked.map((c) => ({ text: `$${num(c.x)}$`, correct: c.ok, ...(c.wrong ? { trap: c.wrong.trap } : {}) })));
+      // Check a solution in the original inequality; refute the first wrong choice the same way.
+      const sides = (x: number) => ({ l: k![0] * x + k![1], r: k![2] * x + k![3], m: k![1] * x + k![2] });
+      const describe = (x: number, ok: boolean) => {
+        const s = sides(x);
+        return kind === 'linear'
+          ? `$${num(s.l)}$ on the left and $${num(s.r)}$ on the right, and $${num(s.l)} ${OP_TEX[ops![0]]} ${num(s.r)}$ is ${ok ? 'true' : 'false'}`
+          : `$${num(s.m)}$ in the middle, which ${ok ? 'lies' : 'does not lie'} between $${num(k![0])}$ and $${num(k![3])}$`;
+      };
+      const g = pickedGood[0];
+      const w = pickedBad.find((c) => c.wrong)!;
+      const explanation = `${steps}
 
-Check each choice against this interval, paying attention to which endpoints are included.`;
-      candidates = [a1 - 2, a1 - 1, a1, a1 + 1, Math.round((a1 + a2) / 2), a2 - 1, a2, a2 + 1, a2 + 2, -a1, -a2];
-      noFlip = (x) => {
-        if (p > 0) return false;
-        // the inequality written without flipping: lo op1 x op2 hi
-        return holds(frac(lo), op1, frac(x)) && holds(frac(x), op2, frac(hi));
+Check: $x = ${num(g.x)}$ gives ${describe(g.x, true)}.
+
+Trap: $${num(w.x)}$ comes from ${w.wrong!.why}. It gives ${describe(w.x, false)}.
+
+Rule: reverse the sign when you multiply or divide by a negative number, and treat every part of a chain alike.`;
+      return {
+        params: { kind, k: k!, ops: ops!, values: picked.map((c) => c.x) },
+        q: { format: 'mcm', stem: stem!, instruction: 'Indicate all such values.', choices, answer, explanation },
       };
     }
-    const uniq = [...new Set(candidates!)];
-    const flags = uniq.map((x) => ({ x, ok: ineqHolds(kind, k!, ops!, frac(x)) }));
-    const good = rng.shuffle(flags.filter((f) => f.ok));
-    const bad = rng.shuffle(flags.filter((f) => !f.ok));
-    const total = rng.pick([5, 6, 7]);
-    const nGood = Math.max(1, Math.min(good.length, rng.int(1, Math.min(4, total - 2))));
-    const picked = [...good.slice(0, nGood), ...bad.slice(0, total - nGood)].sort((u, v) => u.x - v.x);
-    const items = picked.map((f) => {
-      let trap: string | undefined;
-      if (!f.ok && noFlip!(f.x)) trap = 'alg-no-flip';
-      else if (!f.ok && kind === 'linear' && f.x === (k![3] - k![1]) / (k![0] - k![2])) trap = 'alg-strict-endpoint';
-      else if (!f.ok && kind === 'compound') {
-        const [L, p, q, R] = k!;
-        if (f.x === (L - q) / p || f.x === (R - q) / p) trap = 'alg-strict-endpoint';
-      }
-      return { text: `$${num(f.x)}$`, correct: f.ok, ...(trap ? { trap } : {}) };
-    });
-    const { choices, answer } = flaggedChoices(items);
-    return {
-      params: { kind, k: k!, ops: ops!, values: picked.map((f) => f.x) },
-      q: {
-        format: 'mcm',
-        stem: stem!,
-        instruction: 'Indicate all such values.',
-        choices,
-        answer,
-        explanation: explanation!,
-      },
-    };
   },
   check(q, { kind, k, ops, values }) {
     if (q.format !== 'mcm') return 'wrong format';
@@ -158,10 +198,18 @@ Check each choice against this interval, paying attention to which endpoints are
 
 interface CountParams {
   kind: 'square' | 'abs' | 'product';
-  /** square: x^2 (op) k -> [k]; abs: |a x - b| (op) c -> [a, b, c]; product: (x - a)(x - b) < 0 -> [a, b] */
+  /** square: x^2 (op) k -> [k]; abs: |a x - b| (op) c -> [a, b, c]; product: (x - a)(x - b) (op) 0 -> [a, b] */
   k: number[];
   op: Op;
   values: number[];
+}
+
+/** A wrong count with the slip that gives it and a sentence that refutes it. */
+interface WrongCount {
+  value: number;
+  trap: string;
+  why: string;
+  refute: string;
 }
 
 const countIntegersMCS: Template<CountParams> = {
@@ -170,79 +218,114 @@ const countIntegersMCS: Template<CountParams> = {
   format: 'mcs',
   style: 'count the integers in a solution set',
   generate(rng, d) {
-    const kind: CountParams['kind'] = rng.pick(d === 1 ? ['square', 'product'] : d === 2 ? ['square', 'abs', 'product'] : ['abs', 'square', 'abs']);
-    let k: number[];
-    let op: Op;
-    let stem: string;
-    let explanation: string;
-    let answer: number;
-    const traps: { value: number; trap: string }[] = [];
-    if (kind === 'square') {
-      const perfect = rng.chance(0.3);
-      const m0 = rng.int(2, d === 1 ? 4 : 7);
-      const K = perfect ? m0 * m0 : m0 * m0 + rng.int(1, 2 * m0);
-      op = perfect && rng.chance(0.5) ? '<=' : '<';
-      k = [K];
-      let m = 0;
-      while ((m + 1) * (m + 1) < K || (op === '<=' && (m + 1) * (m + 1) <= K)) m++;
-      answer = 2 * m + 1;
-      const form = rng.chance(0.5) ? `x^2 - ${K} ${OP_TEX[op]} 0` : `x^2 ${OP_TEX[op]} ${K}`;
-      stem = `How many integers $x$ satisfy the inequality $${form}$?`;
-      explanation = `$x^2 ${OP_TEX[op]} ${K}$ means $-${perfect ? m0 : `\\sqrt{${K}}`} ${OP_TEX[op]} x ${OP_TEX[op]} ${perfect ? m0 : `\\sqrt{${K}}`}$${perfect ? '' : `, and $${m}^2 = ${m * m} < ${K} < ${(m + 1) ** 2} = ${m + 1}^2$`}.
+    for (;;) {
+      const kind: CountParams['kind'] = rng.pick(d === 1 ? ['square', 'product'] : d === 2 ? ['square', 'abs', 'product'] : ['abs', 'square', 'abs']);
+      let k: number[];
+      let op: Op;
+      let stem: string;
+      let method: string;
+      let rule: string;
+      let answer: number;
+      const wrongs: WrongCount[] = [];
+      if (kind === 'square') {
+        const perfect = rng.chance(0.3);
+        const m0 = d === 1 ? rng.int(2, 4) : d === 2 ? rng.int(5, 7) : rng.int(8, 10);
+        const K = perfect ? m0 * m0 : m0 * m0 + rng.int(1, 2 * m0);
+        op = perfect && rng.chance(0.5) ? '<=' : '<';
+        k = [K];
+        let m = 0;
+        while ((m + 1) * (m + 1) < K || (op === '<=' && (m + 1) * (m + 1) <= K)) m++;
+        answer = 2 * m + 1;
+        const form = rng.chance(0.5) ? `x^2 - ${K} ${OP_TEX[op]} 0` : `x^2 ${OP_TEX[op]} ${K}`;
+        stem = `How many integers $x$ satisfy the inequality $${form}$?`;
+        method = `A square is below $${K}$ when $x$ is within $\\sqrt{${K}}$ of 0 on either side: $-${perfect ? m0 : `\\sqrt{${K}}`} ${OP_TEX[op]} x ${OP_TEX[op]} ${perfect ? m0 : `\\sqrt{${K}}`}$${perfect ? '' : `, and $${m}^2 = ${m * m} < ${K} < ${(m + 1) ** 2} = ${m + 1}^2$`}.
 
-The integers are $${m <= 3 ? Array.from({ length: 2 * m + 1 }, (_, i) => i - m).join(', ') : `-${m}, -${m - 1}, \\ldots, ${m - 1}, ${m}`}$: ${m} negative, ${m} positive, and 0, for a total of ${answer}.`;
-      traps.push({ value: m, trap: 'alg-count-positive-only' }, { value: 2 * m, trap: 'alg-count-forgot-zero' });
-      if (perfect && op === '<') traps.push({ value: 2 * m0 + 1, trap: 'counted-endpoint' });
-      if (!perfect && K <= 20) traps.push({ value: K, trap: 'alg-count-to-k' });
-    } else if (kind === 'abs') {
-      const a = d === 3 ? rng.pick([1, 2, 3]) : 1;
-      const b = intExcept(rng, -9, 9, 0);
-      const c = rng.int(2, 8);
-      op = rng.pick(['<', '<=']);
-      k = [a, b, c];
-      // -c op a x - b op c  ->  (b - c)/a op x op (b + c)/a
-      const lo = new Frac(b - c, a);
-      const hi = new Frac(b + c, a);
-      const ints: number[] = [];
-      for (let x = Math.floor(lo.toNumber()) - 1; x <= Math.ceil(hi.toNumber()) + 1; x++) if (holds(lo, op, frac(x)) && holds(frac(x), op, hi)) ints.push(x);
-      answer = ints.length;
-      const inside = a === 1 ? `x ${b > 0 ? '-' : '+'} ${Math.abs(b)}` : `${a}x ${b > 0 ? '-' : '+'} ${Math.abs(b)}`;
-      stem = `How many integers $x$ satisfy $|${inside}| ${OP_TEX[op]} ${c}$?`;
-      explanation = `$|${inside}| ${OP_TEX[op]} ${c}$ means $-${c} ${OP_TEX[op]} ${inside} ${OP_TEX[op]} ${c}$. ${b > 0 ? `Add ${b}` : `Subtract ${-b}`}: $${num(b - c)} ${OP_TEX[op]} ${a === 1 ? 'x' : `${a}x`} ${OP_TEX[op]} ${num(b + c)}$${a === 1 ? '' : `, then divide by ${a}: $${lo.toTex()} ${OP_TEX[op]} x ${OP_TEX[op]} ${hi.toTex()}$`}.
+The integers are $${m <= 3 ? Array.from({ length: 2 * m + 1 }, (_, i) => i - m).join(', ') : `-${m}, -${m - 1}, \\ldots, ${m - 1}, ${m}`}$: ${m} negative, ${m} positive and 0, so ${answer}.`;
+        rule = 'A negative number squared is positive too, so a bound on $x^2$ allows negative $x$: count both signs and zero.';
+        wrongs.push({ value: m, trap: 'alg-count-positive-only', why: 'counting only the positive integers', refute: `But $(-1)^2 = 1 < ${K}$, so negative integers count too.` });
+        wrongs.push({ value: 2 * m, trap: 'alg-count-forgot-zero', why: 'forgetting $x = 0$', refute: `But $0^2 = 0 ${OP_TEX[op]} ${K}$, so $0$ is a solution.` });
+        wrongs.push({ value: m + 1, trap: 'alg-count-positive-only', why: 'counting zero and the positive integers only', refute: `But $(-1)^2 = 1 < ${K}$, so negative integers count too.` });
+        if (!perfect) wrongs.push({ value: 2 * m + 3, trap: 'alg-sqrt-rounded-up', why: `rounding $\\sqrt{${K}}$ up to ${m + 1}`, refute: `But $${m + 1}^2 = ${(m + 1) ** 2}$ is already above ${K}.` });
+        if (!perfect) wrongs.push({ value: K, trap: 'alg-count-to-k', why: `counting up to ${K} instead of $\\sqrt{${K}}$`, refute: `But $${m + 1}^2 = ${(m + 1) ** 2}$ already exceeds ${K}.` });
+        wrongs.push({ value: 2 * m + 2, trap: 'alg-count-zero-twice', why: 'counting 0 once among the positive and once among the negative integers', refute: `But $0$ is a single number: the list is ${m} negative, 0, ${m} positive.` });
+        if (!perfect) wrongs.push({ value: 2 * K - 1, trap: 'alg-count-to-k', why: `reading $x^2 < ${K}$ as $-${K} < x < ${K}$`, refute: `But $${m + 1}^2 = ${(m + 1) ** 2}$ already exceeds ${K}, so $x$ stops near $\\sqrt{${K}}$.` });
+        if (perfect && op === '<') wrongs.push({ value: answer + 2, trap: 'counted-endpoint', why: `counting $-${m0}$ and ${m0}$`, refute: `But $${m0}^2 = ${K}$ is not less than ${K}.` });
+        if (perfect && op === '<=') wrongs.push({ value: answer - 2, trap: 'alg-strict-endpoint', why: `leaving out $-${m0}$ and ${m0}$`, refute: `But $${m0}^2 = ${K}$ satisfies $\\le ${K}$.` });
+      } else if (kind === 'abs') {
+        const a = d === 3 ? 3 : 2;
+        const b = intExcept(rng, -9, 9, 0);
+        const c = rng.int(2, 8);
+        op = rng.pick(['<', '<=']);
+        k = [a, b, c];
+        // -c op a x - b op c  ->  (b - c)/a op x op (b + c)/a
+        const lo = new Frac(b - c, a);
+        const hi = new Frac(b + c, a);
+        const countIn = (l: Frac, h: Frac, o: Op) => {
+          let n = 0;
+          for (let x = Math.floor(l.toNumber()) - 1; x <= Math.ceil(h.toNumber()) + 1; x++) if (holds(l, o, frac(x)) && holds(frac(x), o, h)) n++;
+          return n;
+        };
+        const ints: number[] = [];
+        for (let x = Math.floor(lo.toNumber()) - 1; x <= Math.ceil(hi.toNumber()) + 1; x++) if (holds(lo, op, frac(x)) && holds(frac(x), op, hi)) ints.push(x);
+        answer = ints.length;
+        const inside = `${a}x ${b > 0 ? '-' : '+'} ${Math.abs(b)}`;
+        stem = `How many integers $x$ satisfy $|${inside}| ${OP_TEX[op]} ${c}$?`;
+        method = `$|${inside}| ${OP_TEX[op]} ${c}$ means the inside is within ${c} of 0 on either side: $-${c} ${OP_TEX[op]} ${inside} ${OP_TEX[op]} ${c}$. ${b > 0 ? `Add ${b}` : `Subtract ${-b}`} in each part: $${num(b - c)} ${OP_TEX[op]} ${a}x ${OP_TEX[op]} ${num(b + c)}$; divide by ${a}: $${lo.toTex()} ${OP_TEX[op]} x ${OP_TEX[op]} ${hi.toTex()}$.
 
-The integers in this interval are $${num(ints[0])}$ through $${num(ints[ints.length - 1])}$: there are $${num(ints[ints.length - 1])} - ${paren(ints[0])} + 1 = ${answer}$ of them.${op === '<' && (lo.isInt() || hi.isInt()) ? ' The endpoints themselves are excluded because the inequality is strict.' : ''}`;
-      const strictOther = op === '<' ? answer + (lo.isInt() ? 1 : 0) + (hi.isInt() ? 1 : 0) : answer - (lo.isInt() ? 1 : 0) - (hi.isInt() ? 1 : 0);
-      if (op === '<') traps.push({ value: strictOther, trap: 'counted-endpoint' });
-      traps.push({ value: answer - 1, trap: 'alg-count-off-by-one' });
-    } else {
-      const a = rng.int(-8, 4);
-      const b = a + rng.int(3, 9);
-      op = '<';
-      k = [a, b];
-      answer = b - a - 1;
-      const f = (r: number) => (r === 0 ? 'x' : `(x ${r > 0 ? '-' : '+'} ${Math.abs(r)})`);
-      stem = `How many integers $x$ satisfy $${f(a)}${f(b)} < 0$?`;
-      explanation = `A product of two factors is negative when the factors have opposite signs. That happens between the two roots: $${num(a)} < x < ${num(b)}$ (for $x$ outside, both factors have the same sign).
+The integers run from $${num(ints[0])}$ to $${num(ints[ints.length - 1])}$: $${num(ints[ints.length - 1])} - ${paren(ints[0])} + 1 = ${answer}$ of them.${op === '<' && (lo.isInt() || hi.isInt()) ? ' A strict sign excludes the endpoints.' : ''}`;
+        rule = 'Split |u| < c into -c < u < c, solve the chain, then count the whole numbers inside.';
+        const endpoints = (lo.isInt() ? 1 : 0) + (hi.isInt() ? 1 : 0);
+        if (op === '<' && endpoints > 0) wrongs.push({ value: answer + endpoints, trap: 'counted-endpoint', why: 'counting the endpoints of a strict inequality', refute: `But at an endpoint the inside equals ${c} exactly, which is not less than ${c}.` });
+        if (op === '<=' && endpoints > 0) wrongs.push({ value: answer - endpoints, trap: 'alg-strict-endpoint', why: 'leaving out the endpoints of a non-strict inequality', refute: `But at an endpoint the inside equals ${c} exactly, which the sign allows.` });
+        wrongs.push({ value: op === '<' ? answer + 1 : answer - 1, trap: 'alg-count-off-by-one', why: 'subtracting the end values and stopping there', refute: `The run $${num(ints[0])}$ to $${num(ints[ints.length - 1])}$ has exactly ${answer} numbers on the list.` });
+        if (a > 1) wrongs.push({ value: countIn(new Frac(b - c), new Frac(b + c), op), trap: 'alg-abs-no-divide', why: `forgetting to divide the ends by ${a}`, refute: `The ends $${num(b - c)}$ and $${num(b + c)}$ bound $${a}x$, not $x$.` });
+        if (a > 1) wrongs.push({ value: countIn(new Frac(-b - c, a), new Frac(-b + c, a), op), trap: 'alg-move-term-sign', why: `moving ${Math.abs(b)} across with the wrong sign`, refute: `The ends then move to $${new Frac(-b - c, a).toTex()}$ and $${new Frac(-b + c, a).toTex()}$.` });
+        wrongs.push({ value: c, trap: 'alg-abs-one-side', why: 'keeping only one of the two cases of the absolute value', refute: `The inequality also holds on the other side of the middle value.` });
+      } else {
+        const a = d === 1 ? -rng.int(1, 4) : -rng.int(5, 8);
+        const b = d === 1 ? rng.int(1, 5) : rng.int(6, 9);
+        op = rng.pick(['<', '<=']);
+        k = [a, b];
+        answer = op === '<' ? b - a - 1 : b - a + 1;
+        const f = (r: number) => `(x ${r > 0 ? '-' : '+'} ${Math.abs(r)})`;
+        stem = `How many integers $x$ satisfy $${f(a)}${f(b)} ${OP_TEX[op]} 0$?`;
+        method = `A product of two factors is ${op === '<' ? 'negative' : 'negative or zero'} when the factors have opposite signs${op === '<' ? '' : ' or one factor is 0'}. That happens between the roots: $${num(a)} ${OP_TEX[op]} x ${OP_TEX[op]} ${num(b)}$ (outside, both factors have the same sign).
 
-The integers strictly between $${num(a)}$ and $${num(b)}$ number $${b} - ${paren(a)} - 1 = ${answer}$.`;
-      traps.push({ value: b - a + 1, trap: 'counted-endpoint' }, { value: b - a, trap: 'alg-count-off-by-one' });
+The integers ${op === '<' ? 'strictly between' : 'from'} $${num(a)}$ ${op === '<' ? 'and' : 'to'} $${num(b)}$ number $${b} - ${paren(a)} ${op === '<' ? '- 1' : '+ 1'} = ${answer}$, and $0$ is among them.`;
+        rule = 'A product is negative between its roots; count the integers there and keep the endpoint rule in mind.';
+        if (op === '<') {
+          wrongs.push({ value: b - a + 1, trap: 'counted-endpoint', why: `counting the roots $${num(a)}$ and $${b}$`, refute: `At a root the product is $0$, not negative.` });
+          wrongs.push({ value: b - a, trap: 'alg-count-off-by-one', why: 'subtracting the roots without removing the endpoints', refute: `That count still includes one of the roots.` });
+          wrongs.push({ value: b - a - 2, trap: 'alg-count-forgot-zero', why: 'forgetting $x = 0$', refute: `At $x = 0$ the product is $${a * b}$, which is negative.` });
+        } else {
+          wrongs.push({ value: b - a - 1, trap: 'alg-strict-endpoint', why: `leaving out the roots $${num(a)}$ and $${b}$`, refute: `At a root the product is $0$, which the sign allows.` });
+          wrongs.push({ value: b - a, trap: 'alg-count-off-by-one', why: 'subtracting the roots without adding 1', refute: `The run includes both roots, so the count is the difference plus 1.` });
+          wrongs.push({ value: b - a - 2, trap: 'alg-count-forgot-zero', why: 'forgetting $x = 0$', refute: `At $x = 0$ the product is $${a * b}$, which is negative.` });
+        }
+        wrongs.push({ value: b - 1, trap: 'alg-count-positive-only', why: 'counting only the positive side of the interval', refute: `Negative integers down to $${num(a)}$ also work.` });
+        if (b - a < 4) continue;
+      }
+      const res = trapChoices(rng, answer, wrongs.filter((w) => w.value >= 0), (v) => `${v.n}`);
+      if (!res) continue;
+      const cited = res.kept[0];
+      const explanation = `${method}
+
+Trap: ${cited.value.n} comes from ${cited.why}. ${cited.refute}
+
+Rule: ${rule}`;
+      return {
+        params: { kind, k: k!, op: op!, values: res.values.map((v) => v.n) },
+        q: { format: 'mcs', stem: stem!, choices: res.choices, answer: res.answer, explanation },
+      };
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer!,
-      traps: someTraps(rng, traps.filter((t) => t.value !== answer && t.value >= 0)),
-      fillers: [...sideFill(rng, answer!).filter((v) => v.sign() >= 0), frac(answer! + 1), frac(answer! + 2), frac(answer! * 2)],
-      format: (v) => countWord(v.toNumber()),
-    });
-    const values = choices.map((c) => wordCount(c.text));
-    return { params: { kind, k: k!, op: op!, values }, q: { format: 'mcs', stem: stem!, choices, answer: idx, explanation: explanation! } };
   },
   check(q, { kind, k, op, values }) {
     if (q.format !== 'mcs') return 'wrong format';
-    if (values.some((v, i) => v < 0 || q.choices[i].text !== countWord(v))) return 'choice text mismatch';
+    if (values.some((v, i) => v < 0 || q.choices[i].text !== `${v}`)) return 'choice text mismatch';
     const cmp = (l: number, r: number) => (op === '<' ? l < r : l <= r);
     let count = 0;
     for (let x = -300; x <= 300; x++) {
-      const ok = kind === 'square' ? cmp(x * x, k[0]) : kind === 'abs' ? cmp(Math.abs(k[0] * x - k[1]), k[2]) : (x - k[0]) * (x - k[1]) < 0;
+      const ok = kind === 'square' ? cmp(x * x, k[0]) : kind === 'abs' ? cmp(Math.abs(k[0] * x - k[1]), k[2]) : cmp((x - k[0]) * (x - k[1]), 0);
       if (ok) count++;
     }
     const hits = values.flatMap((v, i) => (v === count ? [i] : []));

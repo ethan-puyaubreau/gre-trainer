@@ -27,9 +27,6 @@
   "alg.graphs.read-graph": {
     "degenerate.trivial": "baseline"
   },
-  "alg.inequalities.integer-count-mcs": {
-    "distractors.trapped": "baseline"
-  },
   "alg.inequalities.order-mcs": {
     "distractors.trapped": "baseline",
     "bank.size": "baseline",
@@ -37,9 +34,6 @@
   },
   "alg.inequalities.range-ne": {
     "degenerate.trivial": "baseline"
-  },
-  "alg.inequalities.solve-mcm": {
-    "distractors.trapped": "baseline"
   },
   "alg.mixtures-interest.growth": {
     "distractors.trapped": "baseline"
