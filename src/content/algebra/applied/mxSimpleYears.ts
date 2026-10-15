@@ -86,9 +86,9 @@ export const mxSimpleYears: Template<YearsParams> = {
           { value: 100 / r, trap: 'algw-one-principal-only', why: `earns the principal only once, not ${k - 1} times` },
         ];
         p = { ...base, kind, P, r, k };
-        checkText = `${correct} years � ${money(frac(P * r, 100))} a year = ${money(correct * P * r / 100)}, which is ${k - 1 === 1 ? 'the deposit' : `${k - 1} times the deposit`}.`;
+        checkText = `${correct} years × ${money(frac(P * r, 100))} a year = ${money(correct * P * r / 100)}, which is ${k - 1 === 1 ? 'the deposit' : `${k - 1} times the deposit`}.`;
         stem = `${nm} deposits ${money(P)} in an account that pays ${r} percent simple annual interest. If no deposits or withdrawals are made, in how many years will the balance of the account be ${k === 2 ? 'double' : k === 3 ? 'triple' : 'four times'} the original deposit?`;
-        body = `Simple interest adds the same amount every year: ${r} percent of ${money(P)} is ${money(frac(P * r, 100))}. To ${MULT[k].slice(0, -1)} the deposit, the balance must grow by ${k === 2 ? 'the whole deposit' : `${k - 1} times the deposit`}, so the interest needed is ${money((k - 1) * P)}. Each year brings ${r} percent of the deposit, so $n = \\frac{${(k - 1) * 100}}{${r}} = ${correct}$ years.`;
+        body = `Simple interest adds the same amount every year: ${r} percent of ${money(P)} is ${money(frac(P * r, 100))}. To ${MULT[k].slice(0, -1)} the deposit, the balance must grow by ${k === 2 ? 'the whole deposit' : `${k - 1} times the deposit`}, so the interest needed is ${money((k - 1) * P)}. Each year brings ${r} percent of the deposit, so $n = \\frac{${num((k - 1) * P)}}{${num(frac(P * r, 100))}} = ${correct}$ years.`;
       } else if (kind === 'target') {
         const r = rng.int(2, 10);
         const n = rng.int(3, 25);
@@ -105,7 +105,7 @@ export const mxSimpleYears: Template<YearsParams> = {
           { value: r, trap: 'algw-gave-rate', why: 'is the rate, a number already in the problem' },
         ];
         p = { ...base, kind, P, r, B, n };
-        checkText = `${n} years � ${money(frac(P * r, 100))} a year = ${money(B - P)}, and ${money(P)} + ${money(B - P)} = ${money(B)}.`;
+        checkText = `${n} years × ${money(frac(P * r, 100))} a year = ${money(B - P)}, and ${money(P)} + ${money(B - P)} = ${money(B)}.`;
         stem = `${nm} opens an account with ${money(P)} at ${r} percent simple annual interest and makes no deposits or withdrawals. After how many years will the balance reach ${money(B)}?`;
         body = `The account must earn ${money(B)} − ${money(P)} = ${money(B - P)} in interest. Each year it earns ${r} percent of ${money(P)}, which is ${money(frac(P * r, 100))}. The number of years is $${num(B - P)} \\div ${num(frac(P * r, 100))} = ${n}$.`;
       } else {
