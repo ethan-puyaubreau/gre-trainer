@@ -22,6 +22,7 @@ import { lcmGcdTemplates } from './lcm-gcd';
 import { missingDigitTemplates, missingDigitTraps } from './missingDigit';
 import { populationTemplates, populationTraps } from './populationTotals';
 import { primeExpressionTemplates, primeExpressionTraps } from './primeExpressions';
+import { productRemainderTemplates, productRemainderTraps } from './productRemainderQc';
 import { primesTemplates } from './primes';
 import { remainderLcmTemplates, remainderLcmTraps } from './remainderLcm';
 import { remainderCycleTemplates, remainderCycleTraps } from './remainderCycle';
@@ -37,6 +38,7 @@ export const integersTemplates: Template<any>[] = [
   ...populationTemplates,
   ...remainderCycleTemplates,
   ...consecutiveTemplates,
+  ...productRemainderTemplates,
   ...exponentTemplates,
   ...exponentsConvertTemplates,
   ...exponentsFactorSumTemplates,
@@ -55,4 +57,4 @@ export const integersTemplates: Template<any>[] = [
   ...patternCountTemplates,
   ...recurrenceTemplates,
 ];
-export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps};
+export const integersTraps: Record<string, Trap> = {...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...groupingCompareTraps, ...barEntryTraps, ...chainEvalTraps, ...functionEvalTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps, ...missingDigitTraps, ...countMultiplesTraps, ...primeExpressionTraps, ...divisorKindsTraps, ...remainderLcmTraps, ...cycleUnitsCompareTraps, ...cycleCountTraps, ...productRemainderTraps};
