@@ -26,7 +26,7 @@ export const algebraLessons: Record<string, Lesson> = {
         'Write $4 = 2^2$ and $8 = 2^3$, because exponents can be compared only when the bases are the same.',
         'Then $2^{2x} = 2^{3(x - 2)}$, because a power of a power multiplies the exponents, and the 3 multiplies the whole $x - 2$.',
         'Set the exponents equal: $2x = 3x - 6$, because equal powers of 2 have equal exponents.',
-        'Subtract $2x$ from both sides: $0 = x - 6$, so $x = 6$, because that leaves the variable alone.',
+        'Subtract $2x$ from both sides to get $0 = x - 6$, then add 6 to both sides to get $x = 6$, because the same step on both sides keeps the equation true.',
       ],
       answer: '$x = 6$ (check: $4^6 = 4096 = 8^4$).',
     },
@@ -56,7 +56,7 @@ export const algebraLessons: Record<string, Lesson> = {
       steps: [
         'Add the equations: $7x + 7y = 56$, because the coefficients of $x$ and $y$ become equal, which is the combination asked for.',
         'Divide by 7: $x + y = 8$, because $7x + 7y = 7(x + y)$.',
-        'To check, subtract instead: $x - y = 2$, so $x = 5$ and $y = 3$, because these values must satisfy both original equations.',
+        'Subtracting instead gives $x - y = 29 - 27 = 2$, so $x = 5$ and $y = 3$. Check in both originals: $4 \\cdot 5 + 3 \\cdot 3 = 29$ and $3 \\cdot 5 + 4 \\cdot 3 = 27$, because a solution must satisfy both equations.',
       ],
       answer: '$8$',
     },
@@ -65,13 +65,13 @@ export const algebraLessons: Record<string, Lesson> = {
   'alg.quadratics': {
     idea: 'Get 0 on one side, factor, and set each factor equal to 0. A product is zero only when one of its factors is zero, so the rule works only after the other side has been cleared to 0.',
     recognize:
-      'If you see $x^2$ together with an $x$ term, think: move everything to one side and factor. If you see $x(x - 2) = 15$, think: the right side is not 0, so expand first.',
+      'If you see $x^2$ together with an $x$ term, think: move everything to one side and factor, and never divide by $x$, which would lose $x = 0$. If you see $x(x + 3) = 28$, think: the right side is not 0, so expand and move 28 across first.',
     example: {
       problem: 'What are all the solutions of $x^2 - 3x = 10$?',
       steps: [
         'Subtract 10 from both sides: $x^2 - 3x - 10 = 0$, because the zero-product rule needs 0 on one side.',
         'Factor: $(x - 5)(x + 2) = 0$, because $-5$ and $2$ multiply to $-10$ and add to $-3$.',
-        'Set each factor to 0: $x = 5$ or $x = -2$, because a product is 0 only when a factor is 0, and each root has the opposite sign of the number in its factor.',
+        'Set each factor to 0: $x - 5 = 0$ gives $x = 5$, and $x + 2 = 0$ gives $x = -2$, because a product is 0 only when a factor is 0.',
       ],
       answer: '$x = 5$ or $x = -2$ (check: $25 - 15 = 10$ and $4 + 6 = 10$).',
     },
@@ -85,7 +85,7 @@ export const algebraLessons: Record<string, Lesson> = {
       problem: 'How many integers $x$ satisfy $-7 < 5 - 2x \\le 3$?',
       steps: [
         'Subtract 5 from all three parts: $-12 < -2x \\le -2$, because every step must be applied to every part.',
-        'Divide all parts by $-2$ and reverse both signs: $6 > x \\ge 1$, because dividing by a negative flips the inequality.',
+        'Divide all parts by $-2$ and reverse both inequality symbols: $6 > x \\ge 1$, because dividing by a negative flips the inequality.',
         'Read it as $1 \\le x < 6$: the integers are 1, 2, 3, 4 and 5, because 1 is included but 6 is not.',
       ],
       answer: '$5$ integers.',
@@ -109,7 +109,7 @@ export const algebraLessons: Record<string, Lesson> = {
   'alg.qc-algebra': {
     idea: 'Simplify the comparison by applying the same step to both quantities, then use the condition to decide. The answer is D only when the condition leaves the result open.',
     recognize:
-      'If you see two expressions with a variable and a condition, think: cancel what they share, then compare what remains with the values the condition allows. If the variable cancels completely, think: A, B or C, never D.',
+      'If you see two expressions and a condition on a variable, cancel what they share, then compare what remains with the values the condition allows. If the variable cancels, think: A, B or C, never D. With a square, do not assume it is larger: $(x - h)^2$ is 0 at $x = h$, so test the equal case. Equal for one value and greater for others means D.',
     example: {
       problem: 'Given that $x > 2$, compare Quantity A, $2x + 9$, with Quantity B, $x + 11$.',
       steps: [
@@ -143,7 +143,7 @@ export const algebraLessons: Record<string, Lesson> = {
     example: {
       problem: 'What is the greatest value of $y = -x^2 + 6x + 1$?',
       steps: [
-        'Since $a = -1 < 0$, the parabola opens downward, because then the vertex is the highest point.',
+        'Since $a = -1 < 0$, the parabola opens downward, so its vertex is the highest point, because the graph only falls away on both sides of it.',
         'Find the axis: $x = -\\frac{b}{2a} = -\\frac{6}{2(-1)} = 3$, because the vertex lies on the axis of symmetry.',
         'Substitute $x = 3$: $y = -9 + 18 + 1 = 10$, because the height at the vertex is the value of the function there.',
       ],
@@ -172,7 +172,7 @@ export const algebraLessons: Record<string, Lesson> = {
       'If you see "$k$ more than twice $y$", think: $2y + k$. If you see two kinds of items with a total count and a total value, think: one count equation and one value equation.',
     example: {
       problem:
-        'A school sells 40 tickets: student tickets cost 5 dollars and adult tickets cost 8 dollars. The sales total 230 dollars. How many adult tickets were sold?',
+        'A school sells 40 tickets: student tickets cost \\$5 and adult tickets cost \\$8. The sales total \\$230. How many adult tickets were sold?',
       steps: [
         'Let $a$ be the number of adult tickets, so $40 - a$ are student tickets, because the two counts add up to 40.',
         'Write the value equation: $5(40 - a) + 8a = 230$, because the money from both kinds adds up to 230.',
