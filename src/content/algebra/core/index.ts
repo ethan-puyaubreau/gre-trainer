@@ -16,7 +16,8 @@ import { mustTemplates, mustTraps } from './mustbe';
 import { scaleTemplates, scaleTraps } from './ineqScale';
 import { boundsTemplates, boundsTraps } from './ineqBounds';
 import { systemTemplates as ineqSystemTemplates, systemTraps as ineqSystemTraps } from './ineqSystem';
+import { oddPartTemplates, oddPartTraps } from './fnOddPart';
 
 export const coreSkills: Skill[] = coreAlgebraSkills;
-export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates, ...boundsTemplates, ...ineqSystemTemplates];
-export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps, ...boundsTraps, ...ineqSystemTraps };
+export const coreTemplates: Template<any>[] = [...expressionTemplates, ...exponentTemplates, ...linearTemplates, ...systemTemplates, ...quadraticTemplates, ...inequalityTemplates, ...functionTemplates, ...comparisonTemplates, ...hiddenTemplates, ...chainTemplates, ...sameTemplates, ...mustTemplates, ...scaleTemplates, ...boundsTemplates, ...ineqSystemTemplates, ...oddPartTemplates];
+export const coreTraps: Record<string, Trap> = { ...coreAlgebraTraps, ...hiddenTraps, ...chainTraps, ...sameTraps, ...mustTraps, ...scaleTraps, ...boundsTraps, ...ineqSystemTraps, ...oddPartTraps };
