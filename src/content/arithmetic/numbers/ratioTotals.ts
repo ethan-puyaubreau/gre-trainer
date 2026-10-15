@@ -131,6 +131,8 @@ ${lot} So every possible total is a multiple of ${S}.
 
 Check: $${good1} = ${good1 / S} \\cdot ${S}$, so the kinds number ${parts.map((x) => (x * good1) / S).join(', ')}.
 
+Test each choice against ${S}: ${items.map((x) => (x.correct ? `${x.v} = ${x.v / S} × ${S} works` : `${x.v} = ${Math.floor(x.v / S)} × ${S} + ${x.v % S} does not`)).join('; ')}.
+
 Trap: ${trapLine[w.trap!]}. Add all the parts, then take multiples of that sum.`;
       return {
         params: { pairs, vals: items.map((x) => x.v) },
