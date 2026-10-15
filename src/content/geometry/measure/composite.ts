@@ -1,10 +1,11 @@
 import { flaggedChoices, qcFromSamples, QC_TEXT } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
+import { plural } from '../../../engine/text';
 import { num, plain } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { checkChoiceValue, dist, Ex, exChoices, pathLength, shoelace, unitCircle, type ExData } from './ex';
 import { arcPts, Fig, onCircle, type P2 } from './fig';
-import { retryAll } from '../redraw';
+import { Redraw, retryAll } from '../redraw';
 import { trapNotes } from '../notes';
 
 type Poly = P2[];
@@ -245,7 +246,7 @@ Subtract the areas of the two disks, not their radii.`;
 /* ================================================================== 2. Comparisons (QC) */
 
 interface RegionQCParams {
-  mode: 'segment90' | 'segment60' | 'vs-unshaded' | 'perimeter';
+  mode: 'segment90' | 'segment60' | 'vs-unshaded' | 'perimeter' | 'rect-circle';
   config: string;
   r: number;
   L: number;
@@ -329,6 +330,15 @@ const CONFIG_TEXT: Record<string, { info: (r: number) => string; region: string;
   },
 };
 
+const QC_SAY_REL: Record<QCChoice, string> = { A: 'Quantity A is greater', B: 'Quantity B is greater', C: 'the quantities are equal', D: 'that the relationship cannot be determined' };
+
+/** Drop the trap on the correct QC letter. */
+function qcTraps2(answer: QCChoice, t: Partial<Record<QCChoice, string>>): QCQuestion['traps'] {
+  const out: Partial<Record<QCChoice, string>> = {};
+  for (const [k, v] of Object.entries(t)) if (k !== answer && v) out[k as QCChoice] = v;
+  return Object.keys(out).length ? out : undefined;
+}
+
 const regionQC: Template<RegionQCParams> = {
   id: 'geo.composite.compare-qc',
   skill: 'geo.composite',
@@ -337,11 +347,51 @@ const regionQC: Template<RegionQCParams> = {
   generate(rng, d) {
     const base: RegionQCParams = { mode: 'segment90', config: '', r: 0, L: 0, k: 0, shadeInner: false };
     const x = rng.next();
-    const mode: RegionQCParams['mode'] = x < 0.35 ? (d === 3 && rng.chance(0.5) ? 'segment60' : 'segment90') : x < 0.7 ? 'vs-unshaded' : 'perimeter';
+    const mode: RegionQCParams['mode'] =
+      x < 0.27 ? (d === 3 && rng.chance(0.5) ? 'segment60' : 'segment90') : x < 0.55 ? 'vs-unshaded' : x < 0.75 ? 'perimeter' : 'rect-circle';
     const fig = new Fig();
+    if (mode === 'rect-circle') {
+      // a circle tangent to the top, bottom and left sides of a rectangle that is longer than it is tall: the length is free
+      const r = d === 1 ? rng.int(2, 4) : d === 2 ? rng.int(5, 7) : rng.int(8, 10);
+      const least = (4 - Math.PI) * r * r; // the shaded area approaches this as the rectangle shrinks to a square
+      const wantD = rng.chance(0.55);
+      const k = wantD ? Math.ceil(least) + rng.int(1, 14) : Math.max(1, Math.floor(least) - rng.int(0, 3));
+      if (!wantD && k > least - 0.05) throw new Redraw('the number is too close to the least area');
+      const answer: QCChoice = wantD ? 'D' : 'A';
+      const Ld = 3.4 * r;
+      fig.pt('A', [0, 0]).pt('B', [Ld, 0]).pt('C', [Ld, 2 * r]).pt('D', [0, 2 * r]).poly(['A', 'B', 'C', 'D']);
+      const C0: P2 = [r, r];
+      const at = (a0: number, a1: number) => arcPts(C0, r, a0, a1, 5);
+      fig.polyXY([[0, r], [0, 2 * r], [r, 2 * r], ...at(90, 180).slice(1, -1)], true);
+      fig.polyXY([[0, r], [0, 0], [r, 0], ...at(270, 180).slice(1, -1)], true);
+      fig.polyXY([[r, 0], [Ld, 0], [Ld, 2 * r], [r, 2 * r], ...at(450, 270).slice(1, -1)], true);
+      fig.pt('P', C0).hide('P').circle('P', r).seg('P', 'P2', `$${r}$`);
+      fig.pt('P2', [r + r * Math.cos(-0.5), r + r * Math.sin(-0.5)]).hide('P2');
+      return {
+        params: { ...base, mode, r, k },
+        q: {
+          format: 'qc',
+          figure: fig.build(true),
+          info: `In rectangle $ABCD$ above, a circle with radius ${r} is tangent to sides $AB$, $CD$ and $AD$. The circle does not touch side $BC$.`,
+          quantityA: 'The area of the shaded region',
+          quantityB: `$${k}$`,
+          answer,
+          traps: qcTraps2(answer, wantD ? { A: 'geom-shaded-assumed-length', B: 'geom-shaded-assumed-length' } : { D: 'geom-shaded-assumed-length' }),
+          explanation: `The circle touches the top and the bottom, so the rectangle is $${2 * r}$ tall. Its length $L$ is more than $${2 * r}$ (the circle does not reach $BC$), and nothing else fixes it. The shaded area is $${2 * r}L - \\pi(${r})^2 = ${2 * r}L - ${Ex.pi(r * r).tex()}$.
+
+${
+            wantD
+              ? `Just above $L = ${2 * r}$ the area is about $${(4 * r * r - Math.PI * r * r).toFixed(2)}$, which is less than $${k}$. For a long rectangle, say $L = ${Math.ceil((k + Math.PI * r * r) / (2 * r)) + 2}$, it is greater than $${k}$. Both happen, so the comparison cannot be determined. (D)`
+              : `Since $L > ${2 * r}$, the area is greater than $${4 * r * r} - ${Ex.pi(r * r).tex()} \\approx ${least.toFixed(2)}$, and $${k}$ is below that. Quantity A is greater. (A)`
+          }
+
+Rule: when a length is not given, test its smallest allowed value and a large one before choosing.`,
+        },
+      };
+    }
     if (mode === 'segment90' || mode === 'segment60') {
       const theta = mode === 'segment90' ? 90 : 60;
-      const r = mode === 'segment90' ? 2 * rng.int(2, 6) : rng.pick([6, 12]);
+      const r = mode === 'segment90' ? (d === 1 ? 2 * rng.int(2, 3) : d === 2 ? 2 * rng.int(4, 5) : 2 * rng.int(3, 6)) : rng.pick([6, 12]);
       const val = mode === 'segment90' ? Ex.pi(new Frac(r * r, 4)).sub(new Frac(r * r, 2)) : Ex.pi(new Frac(r * r, 6)).sub(Ex.sqrt(3, new Frac(r * r, 4)));
       const crude = mode === 'segment90' ? (r * r) / 4 : (r * r) / 2 - (1.7 * r * r) / 4; // pi = 3 (and sqrt 3 = 1.7)
       const v = val.value();
@@ -376,16 +426,27 @@ const regionQC: Template<RegionQCParams> = {
 
 So the shaded area is $${val.tex()} \\approx ${v.toFixed(2)}$ (using $\\pi \\approx 3.14$${theta === 60 ? ' and $\\sqrt{3} \\approx 1.73$' : ''}), ${answer === 'A' ? 'greater' : 'less'} than ${k}. (${answer})
 
-The numbers are close: rounding $\\pi$ to 3${theta === 60 ? ' (and $\\sqrt{3}$ to 1.7)' : ''} gives about ${crude.toFixed(1).replace(/\.0$/, '')}, which ${crudeAns === answer ? 'happens to give the same answer' : 'gives the wrong comparison'}.`,
+${
+            crudeAns !== answer
+              ? `Trap: rounding $\\pi$ to 3${theta === 60 ? ' (and $\\sqrt{3}$ to 1.7)' : ''} gives about ${crude.toFixed(1).replace(/\.0$/, '')}, which suggests ${QC_SAY_REL[crudeAns]}: the wrong comparison. Keep $\\pi \\approx 3.14$ when the area is within a unit of the number.`
+              : Math.abs(v - k) < 1
+                ? `Check: the area $${v.toFixed(2)}$ is within 1 of ${k}, so keep two decimals for $\\pi$.`
+                : `Check: the gap between $${v.toFixed(2)}$ and ${k} is wide enough that a rough $\\pi$ would not change the answer.`
+          }`,
         },
       };
     }
     if (mode === 'vs-unshaded') {
-      const configs = ['circle-in-square', 'square-in-circle', 'quarter', 'semicircle', 'ring', 'triangle', 'triangle'];
+      const configs =
+        d === 1
+          ? ['circle-in-square', 'square-in-circle', 'quarter', 'triangle']
+          : d === 2
+            ? ['semicircle', 'ring', 'quarter', 'circle-in-square', 'triangle']
+            : ['semicircle', 'ring', 'square-in-circle', 'quarter', 'triangle'];
       const config = rng.pick(configs);
       if (config === 'triangle') {
-        const L = rng.int(6, 14);
-        const H = rng.int(3, 8);
+        const L = d === 1 ? rng.int(6, 9) : d === 2 ? rng.int(10, 12) : rng.int(12, 16);
+        const H = d === 1 ? rng.int(3, 5) : d === 2 ? rng.int(5, 7) : rng.int(6, 9);
         const px = rng.int(1, L - 1);
         fig.polyXY([[0, 0], [L, 0], [px, H]], true);
         fig.pt('A', [0, 0]).pt('B', [L, 0]).pt('C', [L, H]).pt('D', [0, H]).pt('P', [px, H], [0, 1]);
@@ -408,7 +469,8 @@ The position of $P$ does not matter, so the answer is not D.`,
           },
         };
       }
-      const r = config === 'semicircle' || config === 'quarter' ? 2 * rng.int(2, 6) : rng.int(2, 8);
+      const r =
+        config === 'semicircle' || config === 'quarter' ? (d === 1 ? 2 * rng.int(2, 3) : d === 2 ? 2 * rng.int(4, 5) : 2 * rng.int(3, 6)) : d === 1 ? rng.int(2, 4) : d === 2 ? rng.int(5, 7) : rng.int(6, 9);
       const shadeInner = rng.chance(0.5);
       const t = CONFIG_TEXT[config];
       const { shaded: sh } = splitRegions(config, r, shadeInner, 5);
@@ -448,8 +510,8 @@ Shaded: $${approx(qa)}$. Unshaded: $${approx(qb)}$. ${relText(answer)[0].toUpper
       };
     }
     // perimeter of a rectangle with a semicircle on one end
-    const w = 2 * rng.int(2, 6);
-    const L = rng.int(w, 16);
+    const w = d === 1 ? 2 * rng.int(2, 3) : d === 2 ? 2 * rng.int(4, 5) : 2 * rng.int(3, 6);
+    const L = rng.int(w, d === 1 ? 12 : 18);
     const P = Ex.of(2 * L + w).add(Ex.pi(w / 2));
     const withDiam = P.add(w);
     const pv = P.value();
@@ -491,7 +553,12 @@ ${relText(answer)[0].toUpperCase() + relText(answer).slice(1)}. (${answer}) Addi
   check(q, p, rng) {
     if (q.format !== 'qc') return 'wrong format';
     let expected: QCChoice;
-    if (p.mode === 'segment90' || p.mode === 'segment60') {
+    if (p.mode === 'rect-circle') {
+      // rectangle of length L > 2r minus the circle, measured with a fine polygon, for short and long rectangles
+      const disk = shoelace(arcPts(O, p.r, 0, 360, 0.5));
+      const samples: [number, number][] = [0.001, 0.5, 1, 3, 20, 400].map((e) => [2 * p.r * (2 * p.r + e) - disk, p.k]);
+      expected = qcFromSamples(samples);
+    } else if (p.mode === 'segment90' || p.mode === 'segment60') {
       const theta = p.mode === 'segment90' ? 90 : 60;
       expected = cmpTol(shoelace(arcPts(O, p.r, 10, 10 + theta, 0.5)), p.k);
     } else if (p.mode === 'vs-unshaded') {
@@ -594,12 +661,12 @@ const inscribed: Template<InscribedParams> = {
       given = `Square $ABCD$ is inscribed in a circle with center $O$ and radius ${r}.`;
       explanationIntro = `The diagonal of the inscribed square is a diameter: $${2 * r}$. So the side is $\\frac{${2 * r}}{\\sqrt{2}} = ${Ex.sqrt(2, r).tex()}$ and the area is $(${Ex.sqrt(2, r).tex()})^2 = ${2 * r * r}$.`;
       pool.push(
-        { q: 'side', ok: Ex.sqrt(2, r), bad: [{ v: Ex.of(2 * r), trap: 'geom-shaded-side-diameter' }, { v: Ex.of(r) }], text: 'The length of a side of the square is' },
-        { q: 'squareArea', ok: Ex.of(2 * r * r), bad: [{ v: Ex.of(4 * r * r), trap: 'geom-shaded-side-diameter' }, { v: Ex.of(r * r) }], text: 'The area of the square is' },
+        { q: 'side', ok: Ex.sqrt(2, r), bad: [{ v: Ex.of(2 * r), trap: 'geom-shaded-side-diameter' }, { v: Ex.of(r), trap: 'geom-shaded-radius-as-side' }], text: 'The length of a side of the square is' },
+        { q: 'squareArea', ok: Ex.of(2 * r * r), bad: [{ v: Ex.of(4 * r * r), trap: 'geom-shaded-side-diameter' }, { v: Ex.of(r * r), trap: 'geom-shaded-radius-as-side' }], text: 'The area of the square is' },
         { q: 'diagonal', ok: Ex.of(2 * r), bad: [{ v: Ex.sqrt(2, 2 * r), trap: 'geom-shaded-side-diameter' }], text: 'The length of diagonal $AC$ is' },
         { q: 'perimeter', ok: Ex.sqrt(2, 4 * r), bad: [{ v: Ex.of(8 * r), trap: 'geom-shaded-side-diameter' }], text: 'The perimeter of the square is' },
         { q: 'circleArea', ok: Ex.pi(r * r), bad: [{ v: Ex.pi(2 * r), trap: 'geom-circle-arc-sector-mixed' }, { v: Ex.pi(4 * r * r), trap: 'geom-circle-radius-diameter' }], text: 'The area of the circle is' },
-        { q: 'outside', ok: Ex.pi(r * r).sub(2 * r * r), bad: [{ v: Ex.pi(r * r).sub(r * r) }], text: 'The area of the region inside the circle and outside the square is' },
+        { q: 'outside', ok: Ex.pi(r * r).sub(2 * r * r), bad: [{ v: Ex.pi(r * r).sub(r * r), trap: 'geom-shaded-radius-as-side' }], text: 'The area of the region inside the circle and outside the square is' },
       );
       const verts = [225, 315, 45, 135].map((t) => onCircle(O, r, t));
       ['A', 'B', 'C', 'D'].forEach((n, i) => fig.pt(n, verts[i]));
@@ -613,7 +680,7 @@ const inscribed: Template<InscribedParams> = {
       pool.push(
         { q: 'radius', ok: Ex.of(r), bad: [{ v: Ex.sqrt(2, r), trap: 'geom-shaded-diagonal-diameter' }, { v: Ex.of(s), trap: 'geom-circle-radius-diameter' }], text: 'The radius of the circle is' },
         { q: 'circleArea', ok: Ex.pi(r * r), bad: [{ v: Ex.pi(s * s), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(2 * r * r), trap: 'geom-shaded-diagonal-diameter' }], text: 'The area of the circle is' },
-        { q: 'circumference', ok: Ex.pi(s), bad: [{ v: Ex.pi(2 * s), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(r * r) }], text: 'The circumference of the circle is' },
+        { q: 'circumference', ok: Ex.pi(s), bad: [{ v: Ex.pi(2 * s), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(r * r), trap: 'geom-solid-base-area' }], text: 'The circumference of the circle is' },
         { q: 'outside', ok: Ex.of(s * s).sub(Ex.pi(r * r)), bad: [{ v: Ex.of(s * s).sub(Ex.pi(s)), trap: 'geom-shaded-circumference' }], text: 'The area of the region inside the square and outside the circle is' },
         { q: 'diagonal', ok: Ex.sqrt(2, s), bad: [{ v: Ex.of(s), trap: 'geom-shaded-diagonal-diameter' }], text: 'The length of diagonal $AC$ is' },
       );
@@ -640,7 +707,7 @@ const inscribed: Template<InscribedParams> = {
         { q: 'circleArea', ok: Ex.pi(R2), bad: [{ v: Ex.pi(dgl * dgl), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(dgl), trap: 'geom-circle-arc-sector-mixed' }], text: 'The area of the circle is' },
         { q: 'circumference', ok: Ex.pi(dgl), bad: [{ v: Ex.pi(2 * dgl), trap: 'geom-circle-radius-diameter' }], text: 'The circumference of the circle is' },
         { q: 'outside', ok: Ex.pi(R2).sub(a * b), bad: [{ v: Ex.pi(R2).sub(2 * (a + b)), trap: 'geom-shaded-circumference' }], text: 'The area of the region inside the circle and outside the rectangle is' },
-        { q: 'rectArea', ok: Ex.of(a * b), bad: [{ v: Ex.of(2 * (a + b)) }], text: 'The area of the rectangle is' },
+        { q: 'rectArea', ok: Ex.of(a * b), bad: [{ v: Ex.of(2 * (a + b)), trap: 'geom-rect-area-for-perimeter' }], text: 'The area of the rectangle is' },
       );
       const half: P2 = [a / 2, b / 2];
       ['A', 'B', 'C', 'D'].forEach((n, i) => fig.pt(n, [[-half[0], -half[1]], [half[0], -half[1]], half, [-half[0], half[1]]][i] as P2));
@@ -651,11 +718,11 @@ const inscribed: Template<InscribedParams> = {
       given = `Regular hexagon $ABCDEF$ is inscribed in a circle with center $O$ and radius ${r}.`;
       explanationIntro = `The radii to the six vertices cut the hexagon into six equilateral triangles with side ${r}, so each side of the hexagon is ${r}.`;
       pool.push(
-        { q: 'side', ok: Ex.of(r), bad: [{ v: Ex.of(2 * r), trap: 'geom-circle-radius-diameter' }, { v: Ex.sqrt(3, r) }], text: 'The length of a side of the hexagon is' },
+        { q: 'side', ok: Ex.of(r), bad: [{ v: Ex.of(2 * r), trap: 'geom-circle-radius-diameter' }, { v: Ex.sqrt(3, r), trap: 'geom-shaded-apothem-as-side' }], text: 'The length of a side of the hexagon is' },
         { q: 'perimeter', ok: Ex.of(6 * r), bad: [{ v: Ex.of(12 * r), trap: 'geom-circle-radius-diameter' }, { v: Ex.pi(2 * r), trap: 'geom-shaded-circumference' }], text: 'The perimeter of the hexagon is' },
-        { q: 'squareArea', ok: Ex.sqrt(3, new Frac(3 * r * r, 2)), bad: [{ v: Ex.sqrt(3, new Frac(3 * r * r, 4)) }, { v: Ex.of(6 * r * r) }], text: 'The area of the hexagon is' },
-        { q: 'diagonal', ok: Ex.sqrt(3, r), bad: [{ v: Ex.of(2 * r) }], text: 'The length of diagonal $AC$ is' },
-        { q: 'circumference', ok: Ex.pi(2 * r), bad: [{ v: Ex.pi(r) }], text: 'The circumference of the circle is' },
+        { q: 'squareArea', ok: Ex.sqrt(3, new Frac(3 * r * r, 2)), bad: [{ v: Ex.sqrt(3, new Frac(3 * r * r, 4)), trap: 'geom-shaded-one-piece' }, { v: Ex.of(6 * r * r), trap: 'geom-shaded-one-piece' }], text: 'The area of the hexagon is' },
+        { q: 'diagonal', ok: Ex.sqrt(3, r), bad: [{ v: Ex.of(2 * r), trap: 'geom-shaded-wrong-diagonal' }], text: 'The length of diagonal $AC$ is' },
+        { q: 'circumference', ok: Ex.pi(2 * r), bad: [{ v: Ex.pi(r), trap: 'geom-circle-radius-diameter' }], text: 'The circumference of the circle is' },
       );
       const verts = [240, 300, 0, 60, 120, 180].map((t) => onCircle(O, r, t));
       const names = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -835,7 +902,7 @@ Area $= ${W * H} - ${w * h} = ${W * H - w * h}$.`;
       fig.pt('A', inner[0]).pt('B', inner[1]).pt('C', inner[2]).pt('D', inner[3]).hide('A', 'B', 'C', 'D');
       fig.seg('A', 'B', `$${W}$`).seg('B', 'C', `$${H}$`);
       const unit = rng.pick(['inches', 'centimeters']);
-      stem = `A rectangular picture ${W} ${unit} long and ${H} ${unit} wide is surrounded by a frame of uniform width ${w} ${unit === 'inches' ? (w === 1 ? 'inch' : 'inches') : unit}, shown shaded in the figure above. What is the area of the frame, in square ${unit}?`;
+      stem = `A rectangular picture ${W} ${unit} long and ${H} ${unit} wide is surrounded by a frame of uniform width ${plural(w, unit === 'inches' ? 'inch' : 'centimeter')}, shown shaded in the figure above. What is the area of the frame, in square ${unit}?`;
       suffix = `square ${unit}`;
       explanation = `With the frame, each dimension grows by ${w} on BOTH sides: the outer rectangle is $(${W} + ${2 * w})$ by $(${H} + ${2 * w})$, that is, ${W + 2 * w} by ${H + 2 * w}, with area $${(W + 2 * w) * (H + 2 * w)}$.
 
@@ -905,7 +972,10 @@ Area $= ${W * H} + ${Ex.pi(new Frac(rr * rr, 2)).tex()} \\approx ${val.toFixed(2
         figure: fig.build(false),
         answer,
         ...(suffix ? { suffix } : {}),
-        traps: traps.filter((t) => !t.value.eq(answer)),
+        traps: ((): typeof traps => {
+          if (traps.some((t) => t.value.eq(answer))) throw new Redraw('a trap equals the answer');
+          return traps;
+        })(),
         explanation,
       },
     };

@@ -216,6 +216,22 @@ export const measureTraps: Record<string, Trap> = {
     label: 'Used $\\pi = 3$ in a close comparison',
     fix: 'Rounding $\\pi$ down to 3 shifts a value like $9\\pi - 18$ from 10.27 to 9. When the comparison is close, use $\\pi \\approx 3.14$ (and $\\sqrt{3} \\approx 1.73$).',
   },
+  'geom-shaded-assumed-length': {
+    label: 'Assumed a particular length for the side that is not given',
+    fix: 'A length that is not given can take many values. Test the smallest allowed value and a large one: if the comparison flips, the answer is D.',
+  },
+  'geom-shaded-radius-as-side': {
+    label: 'Took the radius for the side of the inscribed square',
+    fix: 'The diagonal of an inscribed square is a diameter, $2r$. The side is $\\frac{2r}{\\sqrt{2}} = r\\sqrt{2}$, not $r$.',
+  },
+  'geom-shaded-apothem-as-side': {
+    label: 'Took the distance to a side for the side of the hexagon',
+    fix: 'The side of a regular hexagon equals the radius of its circle. $r\\sqrt{3}$ is the distance across two sides (a short diagonal).',
+  },
+  'geom-shaded-wrong-diagonal': {
+    label: 'Took the longest diagonal for the diagonal asked',
+    fix: 'A regular hexagon has long diagonals ($2r$, through the center) and short diagonals ($r\\sqrt{3}$, across two sides). Check which vertices the diagonal joins.',
+  },
   'geom-shaded-fraction-wrong': {
     label: 'Subtracted the wrong fraction of the circle',
     fix: 'Count the quarter circles that are really cut out of the square: one quarter circle is $\\frac{1}{4}\\pi r^2$, four of them make a whole circle.',

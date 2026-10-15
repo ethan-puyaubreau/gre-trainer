@@ -1,12 +1,1 @@
-{
-  "geo.composite.combined": {
-    "artifacts.plural-1": "baseline"
-  },
-  "geo.composite.compare-qc": {
-    "bank.difficulty": "baseline",
-    "qc.never-d": "baseline"
-  },
-  "geo.composite.inscribed": {
-    "distractors.trapped": "baseline"
-  }
-}
+{}
