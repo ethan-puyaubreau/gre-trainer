@@ -62,6 +62,26 @@ export function Settings() {
           Show the timer while answering
         </label>
 
+        <h3>Lessons before new skills</h3>
+        <div className="tabs">
+          {(
+            [
+              [true, 'On'],
+              [false, 'Off'],
+            ] as const
+          ).map(([v, label]) => {
+            const on = (settings.lessons !== false) === v;
+            return (
+              <button key={label} className={on ? 'on' : ''} aria-pressed={on} onClick={() => updateSettings({ lessons: v })}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          A short lesson comes before the first question of a new skill. You can reopen any lesson from Strategies or from a skill on the dashboard.
+        </p>
+
         <h3>Theme</h3>
         <div className="tabs">
           {(['system', 'light', 'dark'] as const).map((t) => (
