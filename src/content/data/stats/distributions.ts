@@ -690,7 +690,7 @@ function regionPercent(z1: number, z2: number): number {
 }
 
 /** The standard normal curve with the six region percents. */
-function normalFigure(): GeometryFigure {
+export function normalFigure(): GeometryFigure {
   const H = 3.2;
   const f = (z: number) => H * Math.exp((-z * z) / 2);
   const pts: [number, number][] = [];
@@ -716,7 +716,7 @@ function normalFigure(): GeometryFigure {
   return { kind: 'geometry', points, hideLabels: Object.keys(points), segments, curves: [{ pts }], labels };
 }
 
-const NORMAL_CTX = [
+export const NORMAL_CTX = [
   { what: 'the heights of the adult men in a certain city', unit: 'centimeters', mu: [165, 185], sd: [5, 9], who: 'men', noun: 'heights' },
   { what: 'the weights of the apples harvested at an orchard', unit: 'grams', mu: [140, 220], sd: [8, 20], who: 'apples', noun: 'weights' },
   { what: 'the scores on a national examination', unit: 'points', mu: [450, 550], sd: [40, 100], who: 'test takers', noun: 'scores' },
