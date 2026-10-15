@@ -91,6 +91,25 @@ export function Settings() {
           The ring on the dashboard fills as you answer. Choose between {MIN_DAILY_GOAL} and {MAX_DAILY_GOAL}.
         </p>
 
+        <h3>Exam date</h3>
+        <div className="row">
+          <input
+            type="date"
+            style={fieldStyle}
+            value={settings.examDate ?? ''}
+            onChange={(e) => updateSettings({ examDate: e.target.value || undefined })}
+            aria-label="Exam date"
+          />
+          {settings.examDate && (
+            <button className="btn btn-ghost" onClick={() => updateSettings({ examDate: undefined })}>
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          Optional. The dashboard counts the days down to it.
+        </p>
+
         <h3>Lessons before new skills</h3>
         <div className="tabs">
           {(

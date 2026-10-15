@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayStreak, todayCount, tomorrowDue } from '../src/mastery/habit';
+import { dayStreak, daysUntil, isExamDate, todayCount, tomorrowDue } from '../src/mastery/habit';
 import { newSkillState, type SkillState } from '../src/mastery/model';
 
 /** Local time: month is 1-based. */
@@ -73,5 +73,42 @@ describe('tomorrowDue', () => {
     };
     expect(tomorrowDue(states, NOW)).toBe(3);
     expect(tomorrowDue({}, NOW)).toBe(0);
+  });
+});
+
+describe('daysUntil', () => {
+  it('counts local days, 0 on the day itself whatever the hour', () => {
+    expect(daysUntil('2026-10-15', NOW)).toBe(0);
+    expect(daysUntil('2026-10-15', at(2026, 10, 15, 23, 59))).toBe(0);
+    expect(daysUntil('2026-10-16', at(2026, 10, 15, 23, 59))).toBe(1);
+    expect(daysUntil('2026-10-31', NOW)).toBe(16);
+    expect(daysUntil('2027-01-01', NOW)).toBe(78);
+  });
+
+  it('counts whole days across a clock change', () => {
+    expect(daysUntil('2026-11-15', NOW)).toBe(31);
+    expect(daysUntil('2026-04-15', at(2026, 3, 15))).toBe(31);
+  });
+
+  it('is null for a date already past', () => {
+    expect(daysUntil('2026-10-14', NOW)).toBeNull();
+    expect(daysUntil('2020-01-01', NOW)).toBeNull();
+  });
+
+  it('is null for text that is not a real date', () => {
+    for (const bad of ['', 'tomorrow', '2026-1-5', '2026-13-01', '2026-02-31', '2026-10-32', '0050-01-01', '2026-10-15T00:00']) {
+      expect(daysUntil(bad, NOW)).toBeNull();
+    }
+  });
+});
+
+describe('isExamDate', () => {
+  it('accepts a real YYYY-MM-DD date only', () => {
+    expect(isExamDate('2026-12-05')).toBe(true);
+    expect(isExamDate('2028-02-29')).toBe(true);
+    expect(isExamDate('2027-02-29')).toBe(false);
+    expect(isExamDate('')).toBe(false);
+    expect(isExamDate(20261205)).toBe(false);
+    expect(isExamDate(null)).toBe(false);
   });
 });

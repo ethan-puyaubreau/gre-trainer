@@ -1,6 +1,6 @@
 // Study habit: today's count against the daily goal, the day streak and what comes back tomorrow. Days are local days.
 
-import { dayKey, type SkillState } from './model';
+import { DAY, dayKey, type SkillState } from './model';
 
 export const DEFAULT_DAILY_GOAL = 20;
 export const MIN_DAILY_GOAL = 1;
@@ -37,4 +37,23 @@ export function dayStreak(history: { at: number }[], now: number, minPerDay = 1)
 export function tomorrowDue(states: Record<string, SkillState>, now: number): number {
   const end = dayStart(now, 2);
   return Object.values(states).filter((s) => s.dueAt !== undefined && s.dueAt < end).length;
+}
+
+/** A date as the date input writes it (YYYY-MM-DD), as a local date; null if it is not a real day. */
+function parseDay(s: unknown): Date | null {
+  const m = typeof s === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(s) : null;
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const day = new Date(y, mo - 1, d);
+  return day.getFullYear() === y && day.getMonth() === mo - 1 && day.getDate() === d ? day : null;
+}
+
+export const isExamDate = (s: unknown): s is string => parseDay(s) !== null;
+
+/** Whole local days from today to `examDate` (0 on the day itself); null if the date is not valid or already past. */
+export function daysUntil(examDate: string, now: number): number | null {
+  const day = parseDay(examDate);
+  if (!day) return null;
+  const n = Math.round((day.getTime() - dayStart(now)) / DAY); // rounded: a clock change makes a day 23 or 25 h
+  return n < 0 ? null : n;
 }

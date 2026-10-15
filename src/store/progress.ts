@@ -4,7 +4,7 @@ import type { Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Difficulty, Question } from '../engine/types';
 import { templatesBySkill } from '../content';
-import { MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
+import { isExamDate, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, requirementsFor, type AttemptInput, type AttemptOutcome, type SkillState } from '../mastery/model';
 import { scheduleRepair, type Remediation } from '../mastery/scheduler';
 import { dropWeakFlags, migrateProgress, migrateStyleCredits } from './migrate';
@@ -52,6 +52,8 @@ export interface Settings {
   lessons?: boolean;
   /** Answers a day to aim for (undefined = 20). */
   dailyGoal?: number;
+  /** The GRE date as YYYY-MM-DD, local (undefined = not set). */
+  examDate?: string;
 }
 
 export interface ProgressData {
@@ -122,7 +124,8 @@ const isNum = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
 /** The optional settings, checked when present: a bad value would reach the pages unguarded. */
 function validSettings(s: Record<string, unknown>): boolean {
   const g = s.dailyGoal;
-  return g === undefined || (typeof g === 'number' && Number.isInteger(g) && g >= MIN_DAILY_GOAL && g <= MAX_DAILY_GOAL);
+  const goalOk = g === undefined || (typeof g === 'number' && Number.isInteger(g) && g >= MIN_DAILY_GOAL && g <= MAX_DAILY_GOAL);
+  return goalOk && (s.examDate === undefined || isExamDate(s.examDate));
 }
 
 /** Shape check for an imported file: every field the pages read without a guard must be there. */

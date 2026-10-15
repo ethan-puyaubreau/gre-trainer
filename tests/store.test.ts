@@ -155,6 +155,17 @@ describe('lessons seen', () => {
     for (const bad of [0, 201, -5, 2.5, NaN, '20', null]) expect(isProgressData(withGoal(bad))).toBe(false);
   });
 
+  it('accepts an exam date that is a real YYYY-MM-DD day and rejects anything else', () => {
+    const withDate = (examDate: unknown) => ({ ...initialData(), settings: { ...initialData().settings, examDate } });
+    for (const ok of [undefined, '2026-12-05', '2028-02-29']) expect(isProgressData(withDate(ok))).toBe(true);
+    for (const bad of ['', '2027-02-29', '2026-13-01', '12/05/2026', 20261205, null]) expect(isProgressData(withDate(bad))).toBe(false);
+  });
+
+  it('keeps the exam date through an import', () => {
+    useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, examDate: '2026-12-05' } });
+    expect(useProgress.getState().settings.examDate).toBe('2026-12-05');
+  });
+
   it('keeps the daily goal through an import', () => {
     useProgress.getState().importData({ ...initialData(), settings: { ...initialData().settings, dailyGoal: 35 } });
     expect(useProgress.getState().settings.dailyGoal).toBe(35);

@@ -6,7 +6,7 @@ import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '.
 import { LESSONS } from '../content/lessons';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
-import { dayStreak, DEFAULT_DAILY_GOAL, tomorrowDue } from '../mastery/habit';
+import { dayStreak, DEFAULT_DAILY_GOAL, daysUntil, tomorrowDue } from '../mastery/habit';
 import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextCriteria, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
 import { reducedMotion } from '../motion';
 import { href } from '../router';
@@ -109,9 +109,10 @@ export function Dashboard() {
       due,
       tomorrow: tomorrowDue(tried, now),
       streak: dayStreak(history, now),
+      examDays: settings.examDate ? daysUntil(settings.examDate, now) : null,
       traps,
     };
-  }, [history, states, now, playable]);
+  }, [history, states, now, playable, settings.examDate]);
 
   const levels = Object.fromEntries(playable.map((sk) => [sk.id, states[sk.id]?.level ?? 0]));
   const { from, raised } = useSinceLastVisit(stats.mastery, levels);
@@ -165,6 +166,17 @@ export function Dashboard() {
           </div>
         </div>
         <p className="habit-line muted small">
+          {stats.examDays !== null && (
+            <span>
+              {stats.examDays === 0 ? (
+                <strong>Exam day is today</strong>
+              ) : (
+                <>
+                  <strong>{stats.examDays}</strong> day{stats.examDays === 1 ? '' : 's'} to the GRE
+                </>
+              )}
+            </span>
+          )}
           <span>Tomorrow: {stats.tomorrow === 0 ? 'nothing to review' : `${stats.tomorrow} skill${stats.tomorrow === 1 ? '' : 's'} to review`}</span>
         </p>
       </div>
