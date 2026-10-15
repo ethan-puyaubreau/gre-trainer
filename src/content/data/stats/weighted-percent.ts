@@ -21,6 +21,14 @@ export const weightedPercentTraps: Record<string, Trap> = {
     label: 'Left out the group that was described as the rest',
     fix: 'Percents add to 100. Find the share of the remaining group by subtraction and include it.',
   },
+  'stat-pct-reversed': {
+    label: 'Paired the percents with the wrong averages',
+    fix: 'Each average takes the percent of its own group. Match them carefully before multiplying.',
+  },
+  'stat-pct-dropped-share': {
+    label: 'Weighted the first two groups by their percents and left out the last group',
+    fix: 'The weighted sum needs all three groups. Divide by 100 only after adding the third product.',
+  },
   'stat-pct-fraction-of-whole': {
     label: 'Took a fraction of the rest as a fraction of everyone',
     fix: '"Of the other employees" means the fraction applies to the rest, so multiply it by the remaining percent.',
@@ -122,6 +130,10 @@ const percentMcs: Template<Params> = {
         { value: frac(avgs[biggest]), trap: 'stat-pct-largest-group' },
         { value: new Frac(Math.max(...avgs) + Math.min(...avgs), 2), trap: 'stat-pct-midrange' },
       ];
+      cand.push(
+        { value: new Frac(shares[0] * avgs[2] + shares[1] * avgs[1] + shares[2] * avgs[0], 100), trap: 'stat-pct-reversed' },
+        { value: new Frac(shares[0] * avgs[0] + shares[1] * avgs[1], 100), trap: 'stat-pct-dropped-share' },
+      );
       if (mode !== 'all')
         cand.push({
           value: new Frac(shares[0] * avgs[0] + shares[1] * avgs[1], shares[0] + shares[1]),
@@ -158,6 +170,8 @@ const percentMcs: Template<Params> = {
         'stat-pct-largest-group': `The largest group alone gives $${fTex(frac(avgs[biggest]))}$, but the other groups still count.`,
         'stat-pct-midrange': `The midpoint of the highest and lowest averages gives $${fTex(trapV('stat-pct-midrange'))}$, which treats two groups as equal in size.`,
         'stat-pct-remainder-ignored': mode === 'all' ? '' : `Leaving out the last group gives $${fTex(trapV('stat-pct-remainder-ignored'))}$, yet it holds ${shares[2]}% of the ${ctx.who}.`,
+        'stat-pct-reversed': `Swapping the first and last averages gives $${fTex(trapV('stat-pct-reversed'))}$, but each percent belongs to its own group.`,
+        'stat-pct-dropped-share': `Adding only the first two products and dividing by 100 gives $${fTex(trapV('stat-pct-dropped-share'))}$, but the last group holds ${shares[2]}% of the ${ctx.who}.`,
         'stat-pct-fraction-of-whole': mode === 'chain' ? `Taking the fraction of everyone gives $${fTex(trapV('stat-pct-fraction-of-whole'))}$, but it applies to the other ${100 - first}% only.` : '',
       };
       const setup =
