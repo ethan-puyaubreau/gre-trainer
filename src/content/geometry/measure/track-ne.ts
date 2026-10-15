@@ -114,7 +114,8 @@ const track: Template<Params> = {
     const given1 =
       given === 'perimeter'
         ? `The distance around the whole ${whole} is $${expr}$ meters.`
-        : `The area of the whole ${whole}, rectangle and semicircles together, is $${expr}$ square meters.`;
+        : `The area of the whole ${whole}, ${shape === 'stadium' ? 'rectangle and semicircles together' : 'rectangle and semicircle together'}, is $${expr}$ square meters.`;
+    const ints = dif === 1 ? '' : ' Both $w$ and $L$ are positive integers.';
     const question = ask === 'L' ? `What is $L$, in meters?` : `What is the area, in square meters, of the rectangular part?`;
     // explanation
     const bound = shape === 'stadium' ? '2L + \\pi w' : 'w + 2L + \\frac{\\pi w}{2}';
@@ -125,7 +126,7 @@ const track: Template<Params> = {
     if (given === 'perimeter') {
       const pieces = shape === 'stadium' ? 'two straight sides $L$ and the circle $\\pi w$' : 'the bottom $w$, two sides $L$, and the arc $\\frac{\\pi w}{2}$';
       const plain = shape === 'stadium' ? `$2L = ${a}$, so $L = ${L}$` : `$w + 2L = ${a}$, so $2L = ${a - w}$ and $L = ${L}$`;
-      explanation = `${semis} The distance around is made of ${pieces}: $${bound}$. Because $\\pi$ is irrational, the $\\pi$ terms and the plain terms of $${expr}$ must match separately. The $\\pi$ part gives $${coefp} = ${b}$, so $w = ${w}$. The plain part gives ${plain}.
+      explanation = `${semis} The distance around is made of ${pieces}: $${bound}$. ${dif === 1 ? `With $w = ${w}$ given, the plain part of the distance must equal the plain part of $${expr}$: ${plain}.` : `Because $\\pi$ is irrational and $w$, $L$ are integers, the $\\pi$ terms and the plain terms of $${expr}$ must match separately. The $\\pi$ part gives $${coefp} = ${b}$, so $w = ${w}$. The plain part gives ${plain}.`}
 
 ${ask === 'L' ? `The answer is $L = ${L}$.` : `The rectangle measures $${w}$ by $${L}$, so its area is $${w} \\cdot ${L} = ${answer}$.`}
 
@@ -135,7 +136,7 @@ Trap: ${shape === 'stadium' ? `taking the plain part, ${a}, as $L$; it is $2L$` 
 
 Rule: match the $\\pi$ part and the plain part separately.`;
     } else {
-      explanation = `${semis} The area is the rectangle $Lw$ plus ${shape === 'stadium' ? '$\\frac{\\pi w^2}{4}$' : '$\\frac{\\pi w^2}{8}$'}. Because $\\pi$ is irrational, match the $\\pi$ part of $${expr}$ first: $${coefa} = ${b}$, so $w^2 = ${shape === 'stadium' ? 4 * b : 8 * b}$ and $w = ${w}$. The plain part gives $Lw = ${a}$, so $L = \\frac{${a}}{${w}} = ${L}$.
+      explanation = `${semis} The area is the rectangle $Lw$ plus ${shape === 'stadium' ? '$\\frac{\\pi w^2}{4}$' : '$\\frac{\\pi w^2}{8}$'}. Because $\\pi$ is irrational and $w$, $L$ are integers, match the $\\pi$ part of $${expr}$ first: $${coefa} = ${b}$, so $w^2 = ${shape === 'stadium' ? 4 * b : 8 * b}$ and $w = ${w}$. The plain part gives $Lw = ${a}$, so $L = \\frac{${a}}{${w}} = ${L}$.
 
 Check: $${L} \\cdot ${w} + ${piTex(b)}$ is the given area.
 
@@ -145,7 +146,7 @@ Rule: the $\\pi$ part of an area gives the radius squared.`;
     }
     const q: NEQuestion = {
       format: 'ne',
-      stem: `${body} ${given1} ${question}`,
+      stem: `${body} ${given1}${ints} ${question}`,
       figure: fig.build(true),
       answer: Frac.of(answer),
       traps: noClash(traps, Frac.of(answer)),
