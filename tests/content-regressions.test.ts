@@ -186,3 +186,121 @@ describe('alg.inequalities.abs-qc', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('arith.real-numbers.order-qc', () => {
+  // The allowed ranges and expressions, re-implemented here with plain floats (independent of the generator).
+  const RANGE: Record<string, (x: number) => boolean> = {
+    '0 < x < 1': (x) => x > 0 && x < 1,
+    '-1 < x < 0': (x) => x > -1 && x < 0,
+    'x > 1': (x) => x > 1,
+    'x < -1': (x) => x < -1,
+    'x < 0': (x) => x < 0,
+    '-1 \\le x \\le 0': (x) => x >= -1 && x <= 0,
+    '0 \\le x \\le 1': (x) => x >= 0 && x <= 1,
+    '0 < x \\le 1': (x) => x > 0 && x <= 1,
+    '-1 < x < 1': (x) => x > -1 && x < 1,
+    'x > 0': (x) => x > 0,
+    '0 < |x| < 1': (x) => x !== 0 && Math.abs(x) < 1,
+    '|x| \\ge 1': (x) => Math.abs(x) >= 1,
+    '|x| > 1': (x) => Math.abs(x) > 1,
+    'x \\le -1': (x) => x <= -1,
+  };
+  const FN: Record<string, (x: number) => number> = {
+    x: (x) => x,
+    '-x': (x) => -x,
+    'x^2': (x) => x ** 2,
+    'x^3': (x) => x ** 3,
+    'x^4': (x) => x ** 4,
+    'x^5': (x) => x ** 5,
+    '\\frac{1}{x}': (x) => 1 / x,
+    '\\frac{1}{x^2}': (x) => 1 / x ** 2,
+    '|x|': (x) => Math.abs(x),
+    '\\sqrt{x}': (x) => Math.sqrt(x),
+    '-x^3': (x) => -(x ** 3),
+    '0': () => 0,
+    '1': () => 1,
+  };
+  const texNum = (s: string) => {
+    const m = /^(-?)(?:(\d+)|\\frac\{(\d+)\}\{(\d+)\})$/.exec(s)!;
+    const v = m[2] !== undefined ? Number(m[2]) : Number(m[3]) / Number(m[4]);
+    return m[1] ? -v : v;
+  };
+  const rel = (u: number, v: number) => (Math.abs(u - v) <= 1e-13 * Math.max(1, Math.abs(u), Math.abs(v)) ? 'C' : u > v ? 'A' : 'B');
+  const GRID = [...Array.from({ length: 481 }, (_, i) => -30 + i * 0.125), -1.01, -0.99, -0.01, 0.01, 0.99, 1.01];
+
+  it('every value tried is allowed, and the conclusion follows from the cases and the equality points it states', () => {
+    const bad: string[] = [];
+    let counts = { A: 0, B: 0, C: 0, D: 0 };
+    for (const { seed, d, q, params } of bodies('arith.real-numbers.order-qc')) {
+      if (q.format !== 'qc') continue;
+      counts[q.answer]++;
+      const { a, b } = params as { a: string; b: string };
+      const info = (q.info ?? '').slice(1, -1);
+      const inRange = RANGE[info];
+      const ex = q.explanation ?? '';
+      const where = `seed ${seed} d${d} (${info}; ${a} vs ${b})`;
+      const rows = [...ex.matchAll(/^- \$x = (.+?)\$(?: \(endpoint\))?: Quantity A is \$.+?\$ and Quantity B is \$.+?\$, so A \$(.)\$ B$/gm)].map((m) => ({ x: texNum(m[1]), sym: m[2] }));
+      const concl = ex.split('\n\n').pop()!;
+      if (!inRange || !FN[a] || !FN[b]) {
+        bad.push(`${where}: unknown condition or expression`);
+        continue;
+      }
+      if (rows.length === 0) bad.push(`${where}: no value tried`);
+      for (const r of rows) {
+        if (!inRange(r.x)) bad.push(`${where}: tries x = ${r.x}, outside the range`);
+        const want = { '>': 'A', '<': 'B', '=': 'C' }[r.sym];
+        if (rel(FN[a](r.x), FN[b](r.x)) !== want) bad.push(`${where}: x = ${r.x} is shown as A ${r.sym} B`);
+      }
+      // what dense sampling of the whole range says
+      const seen = new Set(GRID.filter((x) => inRange(x) && Number.isFinite(FN[a](x)) && Number.isFinite(FN[b](x))).map((x) => rel(FN[a](x), FN[b](x))));
+      const shown = new Set(rows.map((r) => ({ '>': 'A', '<': 'B', '=': 'C' })[r.sym]));
+      if (q.answer === 'D') {
+        if (shown.size < 2) bad.push(`${where}: answer D but the cases shown agree`);
+        if (!/at \$x = .+\$.* at \$x = /.test(concl)) bad.push(`${where}: answer D without two cited cases`);
+      } else {
+        if (seen.size !== 1 || !seen.has(q.answer)) bad.push(`${where}: answer ${q.answer} but the range gives ${[...seen]}`);
+        if (shown.size !== 1 || !shown.has(q.answer)) bad.push(`${where}: the cases shown do not all give ${q.answer}`);
+      }
+      if (q.answer === 'A' || q.answer === 'B') {
+        // the equality points are stated, correctly: the comparison can only change there
+        const absPair = (a === '|x|' && (b === 'x' || b === '-x')) || (b === '|x|' && (a === 'x' || a === '-x'));
+        if (absPair) {
+          // |x| = x exactly when x >= 0 and |x| = -x exactly when x <= 0: no allowed x may satisfy it
+          if (!/exactly when/.test(concl)) bad.push(`${where}: abs pair without the exact equality set`);
+          const other = a === '|x|' ? b : a;
+          if (GRID.some((x) => inRange(x) && (other === 'x' ? x >= 0 : x <= 0))) bad.push(`${where}: an allowed x makes the quantities equal yet the answer is ${q.answer}`);
+        } else {
+          const eq = [-1, 0, 1].filter((x) => Number.isFinite(FN[a](x)) && Number.isFinite(FN[b](x)) && FN[a](x) === FN[b](x));
+          if (eq.length === 0 ? !/never equal/.test(concl) : /never equal/.test(concl)) bad.push(`${where}: equality statement wrong (equal at ${eq})`);
+          for (const p of [-1, 0, 1]) if (concl.includes(`$x = ${p}$`) !== eq.includes(p)) bad.push(`${where}: conclusion ${eq.includes(p) ? 'omits' : 'wrongly states'} x = ${p}`);
+          if (eq.some((p) => inRange(p))) bad.push(`${where}: an equality point is allowed yet the answer is ${q.answer}`);
+        }
+      }
+      if (q.answer === 'C' && !/\|x\| = /.test(concl)) bad.push(`${where}: answer C without the absolute value identity`);
+      if (/one test value per region/.test(ex)) bad.push(`${where}: still concludes from a bare test value`);
+    }
+    expect(counts.A).toBeGreaterThan(50);
+    expect(counts.C).toBeGreaterThan(20);
+    expect(counts.D).toBeGreaterThan(20);
+    expect(bad.slice(0, 20)).toEqual([]);
+  });
+
+  it('"equal only at -1, 0 or 1" holds for every pair of expressions the questions use (on the whole line)', () => {
+    const pairs = new Set(bodies('arith.real-numbers.order-qc').map(({ params }) => `${(params as { a: string }).a} ~ ${(params as { b: string }).b}`));
+    const sorted = [...new Set(GRID)].sort((p, q) => p - q);
+    const bad: string[] = [];
+    for (const pair of pairs) {
+      const [a, b] = pair.split(' ~ ');
+      const absPair = (a === '|x|' && (b === 'x' || b === '-x')) || (b === '|x|' && (a === 'x' || a === '-x'));
+      if (absPair) continue; // equal on a whole half-line, stated separately
+      for (let i = 0; i + 1 < sorted.length; i++) {
+        const [g, h] = [sorted[i], sorted[i + 1]];
+        const vals = [g, h].map((x) => [FN[a](x), FN[b](x)]);
+        if (!vals.flat().every(Number.isFinite)) continue;
+        if (rel(vals[0][0], vals[0][1]) !== rel(vals[1][0], vals[1][1]) && ![-1, 0, 1].some((p) => p >= g && p <= h)) bad.push(`${a} vs ${b}: the comparison changes between ${g} and ${h}`);
+      }
+    }
+    expect(pairs.size).toBeGreaterThan(80);
+    expect(bad).toEqual([]);
+  });
+});

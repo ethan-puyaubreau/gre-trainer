@@ -393,14 +393,36 @@ const orderQC: Template<OrderParams> = {
             `- $x = ${r.x.toTex()}$${r.endpoint ? ' (endpoint)' : ''}: Quantity A is $${r.va.toTex()}$ and Quantity B is $${r.vb.toTex()}$, so A $${sym(r.rel)}$ B`,
         )
         .join('\n');
+      // The conclusion must follow from what is shown. D: two cited cases that disagree. C: the identity |x| = +-x on the range.
+      // A or B: the quantities can only be equal at the points of {-1, 0, 1} listed (and where |x| = +-x), none of them allowed,
+      // so the comparison cannot change inside the range and the tested values decide it.
+      const nonneg = cond.set.every((I) => I.lo && !I.lo.lt(0));
+      const nonpos = cond.set.every((I) => I.hi && !I.hi.gt(0));
+      const absPair = [A, B].some((e) => e.tex === '|x|') ? [A, B].find((e) => e.tex === 'x' || e.tex === '-x') : undefined;
+      const eqPts = [F(-1), F(0), F(1)].filter((p) => {
+        const u = A.f(p);
+        const v = B.f(p);
+        return u !== null && v !== null && u.eq(v);
+      });
+      const at = (r: (typeof rows)[number]) => `A $${sym(r.rel)}$ B at $x = ${r.x.toTex()}$`;
+      const other = rows.find((r) => r.rel !== rows[0].rel);
+      const ptTex = eqPts.map((p) => `$x = ${p.toTex()}$`);
       const reason =
         answer === 'D'
-          ? 'The comparison changes with $x$.'
-          : answer === 'C'
-            ? 'The two quantities are equal for every allowed $x$.'
-            : `Powers, reciprocals and absolute values of $x$ can only trade places at $x = -1$, $0$ or $1$, so one test value per region settles the comparison${
-                rows.some((r) => r.endpoint) ? ', and the included endpoints agree' : ''
-              }.`;
+          ? other
+            ? `${at(rows[0])}, but ${at(other)}, so the comparison changes with $x$.`
+            : 'The comparison changes with $x$.'
+          : answer === 'C' && absPair && (nonneg || nonpos)
+            ? `The absolute value of a number that is ${nonneg ? 'not negative' : 'not positive'} is ${nonneg ? 'the number itself' : 'its opposite'}, so $|x| = ${nonneg ? 'x' : '-x'}$ for every allowed $x$ and the two quantities are the same number.`
+            : answer === 'A' || answer === 'B'
+              ? `${
+                  absPair
+                    ? `$|x| = ${absPair.tex}$ exactly when $x ${absPair.tex === 'x' ? '\\ge' : '\\le'} 0$, and no allowed $x$ does that`
+                    : eqPts.length === 0
+                      ? 'Quantity A and Quantity B are never equal'
+                      : `Quantity A and Quantity B are equal only when ${ptTex.length > 1 ? `${ptTex.slice(0, -1).join(', ')} or ${ptTex[ptTex.length - 1]}` : ptTex[0]}, and ${ptTex.length > 1 ? 'none of these values is' : 'this value is not'} allowed here`
+                }, so the comparison cannot change inside the allowed range and ${rows.length > 1 ? 'the values' : 'the value'} above ${rows.length > 1 ? 'decide' : 'decides'} it for every allowed $x$.`
+              : 'The two quantities are equal for every allowed $x$.';
       return {
         params: { cond: ci, a: A.tex, b: B.tex },
         q: {
