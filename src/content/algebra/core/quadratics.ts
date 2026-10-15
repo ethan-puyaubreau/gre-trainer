@@ -1,8 +1,8 @@
-import { flaggedChoices, numericChoices } from '../../../engine/build';
+import { flaggedChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num, poly } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { close, intExcept, qcEnd, qcSamples, sideFill, someTraps } from './util';
+import { close, intExcept, qcEnd, qcSamples, trapChoices } from './util';
 
 /** "(x - 3)" / "(x + 2)" / "x" for a root r. */
 const factorTex = (r: number) => (r === 0 ? 'x' : `(x ${r > 0 ? '-' : '+'} ${Math.abs(r)})`);
@@ -75,23 +75,44 @@ const rootExpressionNE: Template<RootParams> = {
     const p = r1.mul(r2);
     const coefs: [number, number, number] = [lead, s.mul(-lead).toNumber(), p.mul(lead).toNumber()];
     const answer = rootTargetValue(target, s, p);
+    const direct = (() => {
+      switch (target) {
+        case 'reciprocal-product':
+          return r1.add(1).div(r1).mul(r2.add(1).div(r2));
+        case 'reciprocal-sum':
+          return r1.inv().add(r2.inv());
+        case 'sum-squares':
+          return r1.mul(r1).add(r2.mul(r2));
+        case 'diff-square':
+          return r1.sub(r2).pow(2);
+        case 'shifted-product':
+          return r1.add(1).mul(r2.add(1));
+        case 'ratio-sum':
+          return r1.div(r2).add(r2.div(r1));
+      }
+    })();
     const fractionBoxes = !answer.isTerminating();
     const traps: { value: Frac; trap: string }[] = [];
-    const push = (v: Frac, t: string) => {
-      if (!v.eq(answer) && (fractionBoxes || v.isTerminating())) traps.push({ value: v, trap: t });
+    const whys: string[] = [];
+    const push = (v: Frac, t: string, why: string) => {
+      if (!v.eq(answer) && (fractionBoxes || v.isTerminating())) {
+        traps.push({ value: v, trap: t });
+        whys.push(`${why} gives $${v.toTex()}$`);
+      }
     };
-    push(rootTargetValue(target, s.neg(), p), 'alg-vieta-sign');
-    if (target === 'sum-squares') push(s.mul(s), 'square-of-sum');
-    if (target === 'diff-square') push(s.mul(s).sub(p.mul(2)), 'alg-middle-term-half');
+    push(rootTargetValue(target, s.neg(), p), 'alg-vieta-sign', `taking the sum of the solutions as $${s.neg().toTex()}$ instead of $${s.toTex()}$`);
+    if (target === 'sum-squares') push(s.mul(s), 'square-of-sum', `treating $(a + b)^2$ as $a^2 + b^2$`);
+    if (target === 'diff-square') push(s.mul(s).sub(p.mul(2)), 'alg-middle-term-half', `subtracting $2ab$ instead of $4ab$`);
     const eq = `${poly(coefs)} = 0`;
     const sTex = s.toTex();
     const pTex = p.toTex();
     const pP = p.n < 0 ? `(${pTex})` : pTex;
+    const times = (k: number) => (p.n < 0 ? `${k}(${pTex})` : `${k} \\cdot ${pTex}`);
     const work: Record<RootTarget, string> = {
       'reciprocal-product': `$\\dfrac{(1 + a)(1 + b)}{ab} = \\dfrac{1 + (a + b) + ab}{ab} = \\dfrac{1 + ${s.n < 0 ? `(${sTex})` : sTex} + ${pP}}{${pTex}}$`,
       'reciprocal-sum': `$\\dfrac{1}{a} + \\dfrac{1}{b} = \\dfrac{a + b}{ab} = ${s.toTex()} \\div ${p.n < 0 ? `(${pTex})` : pTex}$`,
-      'sum-squares': `$a^2 + b^2 = (a + b)^2 - 2ab = ${s.n < 0 ? `(${sTex})` : sTex}^2 - 2${pP}$`,
-      'diff-square': `$(a - b)^2 = (a + b)^2 - 4ab = ${s.n < 0 ? `(${sTex})` : sTex}^2 - 4${pP}$`,
+      'sum-squares': `$a^2 + b^2 = (a + b)^2 - 2ab = ${s.n < 0 ? `(${sTex})` : sTex}^2 - ${times(2)}$`,
+      'diff-square': `$(a - b)^2 = (a + b)^2 - 4ab = ${s.n < 0 ? `(${sTex})` : sTex}^2 - ${times(4)}$`,
       'shifted-product': `$(a + 1)(b + 1) = ab + (a + b) + 1 = ${pTex} + ${s.n < 0 ? `(${sTex})` : sTex} + 1$`,
       'ratio-sum': `$\\dfrac{a}{b} + \\dfrac{b}{a} = \\dfrac{a^2 + b^2}{ab} = \\dfrac{(a + b)^2 - 2ab}{ab}$`,
     };
@@ -111,7 +132,11 @@ const rootExpressionNE: Template<RootParams> = {
 
 ${work[target]}${target === 'ratio-sum' ? ` $= \\dfrac{${num(s.mul(s).sub(p.mul(2)))}}{${pTex}}$` : ''}, which equals $${answer.toTex()}$.
 
-You can also substitute the two roots directly; the order of $a$ and $b$ does not matter.`,
+Check: putting $a = ${r1.toTex()}$ and $b = ${r2.toTex()}$ straight into the expression gives $${direct.toTex()}$ as well.${
+          whys.length ? `\n\nTrap: ${whys[0]}, but that does not match the direct substitution.` : ''
+        }
+
+Rule: rewrite the expression with $a + b$ and $ab$, which the equation gives without solving for the roots.`,
       },
     };
   },
@@ -300,93 +325,142 @@ function solResidual(form: SolForm, [u, v]: [number, number], x: Frac): Frac {
   }
 }
 
+/** The two sides of the equation at x (their difference is solResidual). */
+function solSides(form: SolForm, [u, v]: [number, number], x: Frac): [Frac, Frac] {
+  switch (form) {
+    case 'standard':
+      return [x.mul(x).add(x.mul(u)).add(v), new Frac(0)];
+    case 'moved':
+      return [x.mul(x), x.mul(u).add(v)];
+    case 'product-const':
+      return [x.mul(x.sub(u)), new Frac(v)];
+    case 'common-x':
+      return [x.mul(x).mul(u), x.mul(v)];
+    case 'square':
+      return [x.sub(u).mul(x.sub(u)), new Frac(v)];
+  }
+}
+
 const solutionsMCM: Template<SolParams> = {
   id: 'alg.quadratics.solutions-mcm',
   skill: 'alg.quadratics',
   format: 'mcm',
   style: 'which numbers could be a solution',
   generate(rng, d) {
-    const form: SolForm = rng.pick(d === 1 ? ['standard', 'common-x', 'moved'] : d === 2 ? ['moved', 'product-const', 'common-x', 'square'] : ['product-const', 'square', 'moved', 'common-x']);
-    let r1: Frac;
-    let r2: Frac;
-    let k: [number, number];
-    let eq: string;
-    let solve: string;
-    const wrong: { v: Frac; trap?: string }[] = [];
-    if (form === 'common-x') {
-      const a = rng.pick(d === 1 ? [1, 2, 3] : [2, 3, 4]);
-      const m = a * intExcept(rng, -6, 8, 0, 1);
-      r1 = frac(0);
-      r2 = new Frac(m, a);
-      k = [a, m];
-      eq = `${a === 1 ? '' : a}x^2 = ${lin([[m, 'x']])}`;
-      solve = `Do not divide by $x$. Move everything to one side and factor: $${lin([[a, 'x^2'], [-m, 'x']])} = ${a === 1 ? '' : a}x(x ${r2.n > 0 ? '-' : '+'} ${num(r2.abs())}) = 0$, so $x = 0$ or $x = ${r2.toTex()}$.`;
-      wrong.push({ v: r2.neg(), trap: 'alg-root-sign' }, { v: frac(m), trap: 'alg-dropped-factor' }, { v: frac(a) }, { v: r2.add(1) });
-    } else if (form === 'square') {
-      const h = intExcept(rng, -6, 6, 0);
-      const rt = rng.int(2, 6);
-      const s = rt * rt;
-      r1 = frac(h - rt);
-      r2 = frac(h + rt);
-      k = [h, s];
-      eq = `(x ${h > 0 ? '-' : '+'} ${Math.abs(h)})^2 = ${s}`;
-      solve = `Take square roots, keeping both signs: $x ${h > 0 ? '-' : '+'} ${Math.abs(h)} = ${rt}$ or $x ${h > 0 ? '-' : '+'} ${Math.abs(h)} = -${rt}$, so $x = ${num(h + rt)}$ or $x = ${num(h - rt)}$.`;
-      wrong.push({ v: frac(-h + rt), trap: 'alg-root-sign' }, { v: frac(-h - rt), trap: 'alg-root-sign' }, { v: frac(h + s), trap: 'alg-forgot-root' }, { v: frac(rt) });
-    } else {
-      const a = intExcept(rng, -8, 9, 0);
-      const b = intExcept(rng, -8, 9, 0, a, -a);
-      r1 = frac(a);
-      r2 = frac(b);
-      const sum = a + b;
-      const prod = a * b;
-      if (form === 'standard') {
-        k = [-sum, prod];
-        eq = `${poly([1, -sum, prod])} = 0`;
-        solve = `Factor: $${poly([1, -sum, prod])} = ${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
-        wrong.push({ v: frac(-a), trap: 'alg-root-sign' }, { v: frac(-b), trap: 'alg-root-sign' }, { v: frac(prod) }, { v: frac(sum) });
-      } else if (form === 'moved') {
-        k = [sum, -prod];
-        eq = `x^2 = ${poly([sum, -prod])}`;
-        solve = `Move every term to the left: $${poly([1, -sum, prod])} = 0$. Factor: $${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
-        wrong.push({ v: frac(-a), trap: 'alg-root-sign' }, { v: frac(-b), trap: 'alg-root-sign' }, { v: frac(-prod) }, { v: frac(sum) });
+    for (;;) {
+      const form: SolForm = rng.pick(d === 1 ? ['standard', 'common-x', 'moved'] : d === 2 ? ['moved', 'product-const', 'common-x', 'square'] : ['product-const', 'square', 'moved', 'common-x']);
+      let r1: Frac;
+      let r2: Frac;
+      let k: [number, number];
+      let eq: string;
+      let solve: string;
+      const wrong: { v: Frac; trap: string; why: string }[] = [];
+      if (form === 'common-x') {
+        const a = rng.pick(d === 1 ? [2, 3] : [2, 3, 4]);
+        const m = a * intExcept(rng, -6, 8, 0, 1);
+        r1 = frac(0);
+        r2 = new Frac(m, a);
+        k = [a, m];
+        eq = `${a}x^2 = ${lin([[m, 'x']])}`;
+        solve = `Do not divide by $x$ (that loses the solution $x = 0$). Move everything to one side and factor: $${lin([[a, 'x^2'], [-m, 'x']])} = ${a}x(x ${r2.n > 0 ? '-' : '+'} ${num(r2.abs())}) = 0$, so $x = 0$ or $x = ${r2.toTex()}$.`;
+        wrong.push({ v: r2.neg(), trap: 'alg-root-sign', why: 'reading the root of the factor with the wrong sign' });
+        wrong.push({ v: frac(m), trap: 'alg-dropped-factor', why: `forgetting to divide $${num(m)}$ by ${a}` });
+        wrong.push({ v: frac(a), trap: 'alg-coefficient-as-root', why: `taking the coefficient ${a} as a solution` });
+        wrong.push({ v: frac(m * a), trap: 'alg-operation-swapped', why: `multiplying $${num(m)}$ by ${a} where it should be divided` });
+      } else if (form === 'square') {
+        const h = intExcept(rng, -6, 6, 0);
+        const rt = rng.int(2, 6);
+        const s = rt * rt;
+        r1 = frac(h - rt);
+        r2 = frac(h + rt);
+        k = [h, s];
+        eq = `(x ${h > 0 ? '-' : '+'} ${Math.abs(h)})^2 = ${s}`;
+        solve = `Take square roots, keeping both signs: $x ${h > 0 ? '-' : '+'} ${Math.abs(h)} = ${rt}$ or $x ${h > 0 ? '-' : '+'} ${Math.abs(h)} = -${rt}$, so $x = ${num(h + rt)}$ or $x = ${num(h - rt)}$.`;
+        wrong.push({ v: frac(-h + rt), trap: 'alg-root-sign', why: `moving $${num(h)}$ to the other side with the wrong sign` });
+        wrong.push({ v: frac(-h - rt), trap: 'alg-root-sign', why: `moving $${num(h)}$ to the other side with the wrong sign` });
+        wrong.push({ v: frac(h + s), trap: 'alg-forgot-root', why: `not taking the square root of ${s}` });
+        wrong.push({ v: frac(rt), trap: 'alg-dropped-term', why: `forgetting to add $${num(h)}$` });
+        wrong.push({ v: frac(h), trap: 'alg-coefficient-as-root', why: `taking the number $${num(h)}$ inside the parentheses as a solution` });
       } else {
-        // x(x - m) = n with roots a, b: x^2 - m x - n = 0 -> m = a + b, n = -a b
-        const m = sum;
-        const n = -prod;
-        if (m === 0 || n === 0) return solutionsMCM.generate(rng, d);
-        k = [m, n];
-        eq = `x(x ${m > 0 ? '-' : '+'} ${Math.abs(m)}) = ${num(n)}`;
-        solve = `The zero-product rule needs 0 on one side, so first expand: $${poly([1, -m, -n])} = 0$. Factor: $${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
-        wrong.push({ v: frac(n), trap: 'alg-zero-product-nonzero' }, { v: frac(n + m), trap: 'alg-zero-product-nonzero' }, { v: frac(-a), trap: 'alg-root-sign' }, { v: frac(-b), trap: 'alg-root-sign' });
+        const a = intExcept(rng, -8, 9, 0);
+        const b = intExcept(rng, -8, 9, 0, a, -a);
+        r1 = frac(a);
+        r2 = frac(b);
+        const sum = a + b;
+        const prod = a * b;
+        if (form === 'standard') {
+          k = [-sum, prod];
+          eq = `${poly([1, -sum, prod])} = 0`;
+          solve = `Factor: $${poly([1, -sum, prod])} = ${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
+          wrong.push({ v: frac(-a), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(a)}$ with the wrong sign` });
+          wrong.push({ v: frac(-b), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(b)}$ with the wrong sign` });
+          wrong.push({ v: frac(prod), trap: 'alg-coefficient-as-root', why: `taking the constant term $${num(prod)}$ as a solution` });
+          wrong.push({ v: frac(-sum), trap: 'alg-coefficient-as-root', why: `taking the coefficient $${num(-sum)}$ of $x$ as a solution` });
+          wrong.push({ v: frac(sum), trap: 'alg-vieta-sign', why: 'confusing the sum of the solutions with the coefficient of $x$' });
+        } else if (form === 'moved') {
+          k = [sum, -prod];
+          eq = `x^2 = ${poly([sum, -prod])}`;
+          solve = `Move every term to the left: $${poly([1, -sum, prod])} = 0$. Factor: $${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
+          wrong.push({ v: frac(-a), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(a)}$ with the wrong sign` });
+          wrong.push({ v: frac(-b), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(b)}$ with the wrong sign` });
+          wrong.push({ v: frac(-prod), trap: 'alg-coefficient-as-root', why: `taking the constant term $${num(-prod)}$ as a solution` });
+          wrong.push({ v: frac(sum), trap: 'alg-coefficient-as-root', why: `taking the coefficient $${num(sum)}$ of $x$ as a solution` });
+          wrong.push({ v: frac(prod), trap: 'alg-move-term-sign', why: 'moving the constant to the left without changing its sign' });
+        } else {
+          // x(x - m) = n with roots a, b: x^2 - m x - n = 0 -> m = a + b, n = -a b
+          const m = sum;
+          const n = -prod;
+          if (m === 0 || n === 0) continue;
+          k = [m, n];
+          eq = `x(x ${m > 0 ? '-' : '+'} ${Math.abs(m)}) = ${num(n)}`;
+          solve = `The zero-product rule needs 0 on one side, so first expand: $${poly([1, -m, -n])} = 0$. Factor: $${factorTex(a)}${factorTex(b)} = 0$, so $x = ${num(a)}$ or $x = ${num(b)}$.`;
+          wrong.push({ v: frac(n), trap: 'alg-zero-product-nonzero', why: `setting the factor $x$ equal to $${num(n)}$, as if a product equal to $${num(n)}$ forced a factor to equal it` });
+          wrong.push({ v: frac(n + m), trap: 'alg-zero-product-nonzero', why: `setting the factor $x ${m > 0 ? '-' : '+'} ${Math.abs(m)}$ equal to $${num(n)}$` });
+          wrong.push({ v: frac(-a), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(a)}$ with the wrong sign` });
+          wrong.push({ v: frac(-b), trap: 'alg-root-sign', why: `reading the root of the factor $${factorTex(b)}$ with the wrong sign` });
+          wrong.push({ v: frac(m), trap: 'alg-coefficient-as-root', why: `taking the number $${num(m)}$ in the parentheses as a solution` });
+        }
       }
-    }
-    const both = rng.chance(0.7);
-    const goods = both ? [r1, r2] : [rng.pick([r1, r2])];
-    const total = rng.pick([5, 6]);
-    const items: { v: Frac; ok: boolean; trap?: string }[] = goods.map((v) => ({ v, ok: true }));
-    for (const w of [...wrong, { v: r1.add(r2) }, { v: r1.sub(1) }, { v: r2.add(2) }, { v: r1.neg().add(1) }]) {
-      if (items.length >= total) break;
-      if ([r1, r2].some((r) => r.eq(w.v)) || items.some((it) => it.v.eq(w.v))) continue;
-      items.push({ v: w.v, ok: false, ...(w.trap ? { trap: w.trap } : {}) });
-    }
-    items.sort((x, y) => x.v.cmp(y.v));
-    const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${it.v.toTex()}$`, correct: it.ok, ...(it.trap ? { trap: it.trap } : {}) })));
-    const missing = [r1, r2].filter((r) => !goods.some((g) => g.eq(r)));
-    return {
-      params: { form, k: k!, values: items.map((it) => [it.v.n, it.v.d] as [number, number]) },
-      q: {
-        format: 'mcm',
-        stem: `If $${eq!}$, which of the following could be the value of $x$?`,
-        instruction: 'Indicate all such values.',
-        choices,
-        answer,
-        explanation: `${solve!}
+      const both = rng.chance(0.7);
+      const goods = both ? [r1, r2] : [rng.pick([r1, r2])];
+      // Wrong choices: distinct values that are not solutions, one slip at a time before any slip repeats.
+      const pool = wrong.filter((w, i) => ![r1, r2].some((r) => r.eq(w.v)) && wrong.findIndex((u) => u.v.eq(w.v)) === i);
+      const byTrap = new Map<string, typeof pool>();
+      for (const w of rng.shuffle(pool)) byTrap.set(w.trap, [...(byTrap.get(w.trap) ?? []), w]);
+      const ordered: typeof pool = [];
+      for (let round = 0; ordered.length < pool.length; round++) for (const list of byTrap.values()) if (list[round]) ordered.push(list[round]);
+      const total = rng.pick([5, 6]);
+      const nWrong = Math.min(total - goods.length, ordered.length);
+      if (goods.length + nWrong < 5) continue;
+      const chosen = ordered.slice(0, nWrong);
+      const items: { v: Frac; ok: boolean; trap?: string }[] = [...goods.map((v) => ({ v, ok: true })), ...chosen.map((w) => ({ v: w.v, ok: false, trap: w.trap }))];
+      items.sort((x, y) => x.v.cmp(y.v));
+      const { choices, answer } = flaggedChoices(items.map((it) => ({ text: `$${it.v.toTex()}$`, correct: it.ok, ...(it.trap ? { trap: it.trap } : {}) })));
+      const missing = [r1, r2].filter((r) => !goods.some((g) => g.eq(r)));
+      const fmtSides = (x: Frac) => {
+        const [l, r] = solSides(form, k!, x);
+        return `the two sides are $${l.toTex()}$ and $${r.toTex()}$`;
+      };
+      const g0 = goods[0];
+      const w0 = chosen[0];
+      return {
+        params: { form, k: k!, values: items.map((it) => [it.v.n, it.v.d] as [number, number]) },
+        q: {
+          format: 'mcm',
+          stem: `If $${eq!}$, which of the following could be the value of $x$?`,
+          instruction: 'Indicate all such values.',
+          choices,
+          answer,
+          explanation: `${solve!} Both solutions work, so the correct choices are the ones that appear in the list${missing.length ? ` (the other solution, $${missing[0].toTex()}$, is not listed)` : ''}.
 
-So the correct choices are the solutions that appear in the list${missing.length ? ` (the other solution, $${missing[0].toTex()}$, is not listed)` : ''}. You can confirm each one by substituting it into the original equation.${
-          form === 'product-const' ? '\n\nSetting each factor equal to the number on the right side is a common mistake: a product equal to a nonzero number says nothing about the individual factors.' : ''
-        }`,
-      },
-    };
+Check: for $x = ${g0.toTex()}$ ${fmtSides(g0)}, which are equal.
+
+Trap: $${w0.v.toTex()}$ comes from ${w0.why}. For $x = ${w0.v.toTex()}$ ${fmtSides(w0.v)}, which differ.
+
+Rule: a solution is a number that makes both sides equal; substitute to be sure.`,
+        },
+      };
+    }
   },
   check(q, { form, k, values }) {
     if (q.format !== 'mcm') return 'wrong format';
@@ -411,63 +485,86 @@ const factorMCS: Template<FactorParams> = {
   format: 'mcs',
   style: 'use a known root or a factorization to find a coefficient',
   generate(rng, d) {
-    const kind: FactorParams['kind'] = rng.pick(d === 1 ? ['find-k', 'identity'] : ['find-k', 'other-root', 'identity']);
-    let r1: number;
-    let r2: number;
-    do {
-      r1 = intExcept(rng, -9, 9, 0);
-      r2 = intExcept(rng, -9, 9, 0);
-    } while (r1 === r2 || r1 + r2 === 0);
-    const c = r1 * r2;
-    const kk = -(r1 + r2);
-    let stem: string;
-    let explanation: string;
-    let answer: number;
-    let k: [number, number];
-    const traps: { value: number; trap: string }[] = [];
-    const fillers: number[] = [];
-    if (kind === 'find-k' || kind === 'other-root') {
-      k = [c, r1];
-      const eqTex = `x^2 + kx ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0`;
-      if (kind === 'find-k') {
-        answer = kk;
-        stem = `In the equation $${eqTex}$, $k$ is a constant. If $x = ${num(r1)}$ is a solution of the equation, what is the value of $k$?`;
-        explanation = `Substitute $x = ${num(r1)}$: $${r1 < 0 ? `(${r1})` : r1}^2 + ${r1 < 0 ? `(${r1})` : r1}k ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0$, so $${r1 * r1 + c} ${r1 < 0 ? '-' : '+'} ${Math.abs(r1)}k = 0$ and $k = ${num(answer)}$.
+    for (;;) {
+      const kind: FactorParams['kind'] = rng.pick(d === 1 ? ['find-k', 'identity'] : ['find-k', 'other-root', 'identity']);
+      let r1: number;
+      let r2: number;
+      do {
+        r1 = intExcept(rng, -9, 9, 0, 1, -1);
+        r2 = intExcept(rng, -9, 9, 0, 1, -1);
+      } while (r1 === r2 || r1 + r2 === 0);
+      const c = r1 * r2;
+      const kk = -(r1 + r2);
+      let stem: string;
+      let method: string;
+      let rule: string;
+      let answer: number;
+      let k: [number, number];
+      const wrongs: { value: number; trap: string; why: string }[] = [];
+      if (kind === 'find-k' || kind === 'other-root') {
+        k = [c, r1];
+        const eqTex = `x^2 + kx ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0`;
+        if (kind === 'find-k') {
+          answer = kk;
+          stem = `In the equation $${eqTex}$, $k$ is a constant. If $x = ${num(r1)}$ is a solution of the equation, what is the value of $k$?`;
+          method = `A solution makes the equation true, so substitute it: $${r1 < 0 ? `(${r1})` : r1}^2 + ${r1 < 0 ? `(${r1})` : r1}k ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0$, so $${r1 * r1 + c} ${r1 < 0 ? '-' : '+'} ${Math.abs(r1)}k = 0$ and $k = ${num(answer)}$.
 
 Check by factoring: $${poly([1, kk, c])} = ${factorTex(r1)}${factorTex(r2)}$, which is 0 at $x = ${num(r1)}$.`;
-        traps.push({ value: -kk, trap: 'alg-vieta-sign' }, { value: r2, trap: 'alg-answered-other-variable' });
-        fillers.push(-r2, c, kk + 1, kk - 1, kk + 2);
+          rule = 'A number is a solution when substituting it makes the equation true.';
+          wrongs.push({ value: -kk, trap: 'alg-vieta-sign', why: `the wrong sign for the sum of the solutions` });
+          wrongs.push({ value: r2, trap: 'alg-answered-other-variable', why: `giving the other solution instead of $k$` });
+          wrongs.push({ value: -r2, trap: 'alg-root-sign', why: `giving the other solution with the wrong sign` });
+          wrongs.push({ value: -(r1 * r1 + c), trap: 'alg-forgot-divide', why: `not dividing by $${num(r1)}$ after substituting` });
+          wrongs.push({ value: r1 - r2, trap: 'alg-sign-slip', why: `losing a sign while substituting $${num(r1)}$` });
+        } else {
+          answer = r2;
+          stem = `In the equation $${eqTex}$, $k$ is a constant. If $x = ${num(r1)}$ is one solution of the equation, what is the other solution?`;
+          method = `The product of the two solutions of $x^2 + kx ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0$ is the constant term, $${num(c)}$. So the other solution is $\\frac{${num(c)}}{${num(r1)}} = ${num(r2)}$.
+
+Check: substituting $x = ${num(r1)}$ gives $k = ${num(kk)}$, and $${poly([1, kk, c])} = ${factorTex(r1)}${factorTex(r2)}$ has the solutions $${num(r1)}$ and $${num(r2)}$.`;
+          rule = 'The two solutions multiply to the constant term and add to minus the coefficient of x.';
+          wrongs.push({ value: -r2, trap: 'alg-root-sign', why: `giving the other solution with the wrong sign` });
+          wrongs.push({ value: kk, trap: 'alg-answered-other-variable', why: `giving $k$ instead of the other solution` });
+          wrongs.push({ value: r1 + r2, trap: 'alg-vieta-sign', why: `giving the sum of the solutions` });
+          wrongs.push({ value: c, trap: 'alg-coefficient-as-root', why: `giving the product $${num(c)}$ of the solutions` });
+          wrongs.push({ value: -2 * r1 - r2, trap: 'alg-vieta-sign', why: `using $k - ${num(r1)}$ instead of $-k - ${num(r1)}$` });
+        }
       } else {
-        answer = r2;
-        stem = `In the equation $${eqTex}$, $k$ is a constant. If $x = ${num(r1)}$ is one solution of the equation, what is the other solution?`;
-        explanation = `The product of the two solutions of $x^2 + kx ${c < 0 ? '-' : '+'} ${Math.abs(c)} = 0$ is the constant term, $${num(c)}$. So the other solution is $\\frac{${num(c)}}{${num(r1)}} = ${num(r2)}$.
+        // (x + a)(x + b) = x^2 + S x + c, given a and S, find c
+        const a = r1;
+        const b = r2;
+        const S = a + b;
+        k = [a, S];
+        answer = a * b;
+        stem = `If $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = ${poly([1, S, 0])} + c$ for all values of $x$, where $n$ and $c$ are constants, what is the value of $c$?`;
+        method = `Expand the left side: $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = x^2 + (${num(a)} + n)x + ${a < 0 ? `(${a})` : a}n$. Matching the $x$ terms: $${num(a)} + n = ${num(S)}$, so $n = ${num(b)}$. Matching the constants: $c = ${a < 0 ? `(${a})` : a}(${num(b)}) = ${num(answer)}$.
 
-Or find $k$ first: substituting $x = ${num(r1)}$ gives $k = ${num(kk)}$, and $${poly([1, kk, c])} = ${factorTex(r1)}${factorTex(r2)}$.`;
-        traps.push({ value: -r2, trap: 'alg-root-sign' }, { value: kk, trap: 'alg-answered-other-variable' });
-        fillers.push(-kk, -r1, r2 + 1, r2 - 1, c);
+Check at $x = 1$: $(1 ${a < 0 ? '-' : '+'} ${Math.abs(a)})(1 ${b < 0 ? '-' : '+'} ${Math.abs(b)}) = ${num((1 + a) * (1 + b))}$ and $1 ${S < 0 ? '-' : '+'} ${Math.abs(S)} ${answer < 0 ? '-' : '+'} ${Math.abs(answer)} = ${num(1 + S + answer)}$.`;
+        rule = 'Two polynomials equal for all x have equal coefficients: match them one power at a time.';
+        wrongs.push({ value: b, trap: 'alg-answered-other-variable', why: `giving $n$ instead of $c$` });
+        wrongs.push({ value: a * (S + a), trap: 'alg-move-term-sign', why: `solving $${num(a)} + n = ${num(S)}$ with the wrong sign for $${num(a)}$` });
+        wrongs.push({ value: S, trap: 'alg-sum-for-product', why: `giving the sum $${num(S)}$ instead of the product` });
+        wrongs.push({ value: a * S, trap: 'alg-multiplied-wrong-numbers', why: `multiplying $${num(a)}$ by $${num(S)}$ instead of by $n$` });
+        wrongs.push({ value: -answer, trap: 'alg-sign-slip', why: 'losing a sign in the product' });
       }
-    } else {
-      // (x + a)(x + b) = x^2 + S x + c, given a and S, find c
-      const a = r1;
-      const b = r2;
-      const S = a + b;
-      k = [a, S];
-      answer = a * b;
-      stem = `If $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = ${poly([1, S, 0])} + c$ for all values of $x$, where $n$ and $c$ are constants, what is the value of $c$?`;
-      explanation = `Expand the left side: $(x ${a < 0 ? '-' : '+'} ${Math.abs(a)})(x + n) = x^2 + (${num(a)} + n)x + ${a < 0 ? `(${a})` : a}n$.
+      const res = trapChoices(rng, answer, wrongs, (v) => `$${v.toTex()}$`);
+      if (!res) continue;
+      const cited = res.kept[0];
+      return {
+        params: { kind, k: k!, values: res.values.map((v) => v.n) },
+        q: {
+          format: 'mcs',
+          stem: stem!,
+          choices: res.choices,
+          answer: res.answer,
+          explanation: `${method!}
 
-Matching the $x$ terms: $${num(a)} + n = ${num(S)}$, so $n = ${num(b)}$. Matching the constants: $c = ${a === 1 ? num(b) : `${a < 0 ? `(${a})` : a}(${num(b)})`} = ${num(answer)}$.`;
-      traps.push({ value: b, trap: 'alg-answered-other-variable' }, { value: a * S, trap: 'alg-factor-pair' });
-      fillers.push(-answer, a + S, answer + a, answer - 1, S);
+Trap: $${cited.value.toTex()}$ comes from ${cited.why}.
+
+Rule: ${rule!}`,
+        },
+      };
     }
-    const { choices, answer: idx } = numericChoices(rng, {
-      correct: answer,
-      traps: someTraps(rng, traps.filter((t) => t.value !== answer)),
-      fillers: [...sideFill(rng, answer), ...rng.shuffle(fillers.filter((f) => f !== answer))],
-      format: (v) => `$${v.toTex()}$`,
-    });
-    const values = choices.map((ch) => Number(ch.text.replace(/\$|\{,\}/g, '')));
-    return { params: { kind, k: k!, values }, q: { format: 'mcs', stem: stem!, choices, answer: idx, explanation: explanation! } };
   },
   check(q, { kind, k, values }, rng) {
     if (q.format !== 'mcs') return 'wrong format';

@@ -37,14 +37,6 @@
   "alg.qc-algebra.sign-cases-qc": {
     "bank.difficulty": "baseline"
   },
-  "alg.quadratics.factor-mcs": {
-    "artifacts.coef-1": "baseline",
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "alg.quadratics.solutions-mcm": {
-    "distractors.trapped": "baseline"
-  },
   "alg.rate-work.alone-time": {
     "artifacts.frac-1": "baseline",
     "distractors.trapped": "baseline"

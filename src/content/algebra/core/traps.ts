@@ -249,6 +249,18 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Wrong sign for the sum of the roots',
     fix: 'For $x^2 - sx + p = 0$ the roots add to $s$ (the opposite of the $x$ coefficient) and multiply to $p$. Check with the factored form.',
   },
+  'alg-coefficient-as-root': {
+    label: 'Took a coefficient or a constant for a solution',
+    fix: 'A solution is a number that makes the equation true. The numbers written in the equation are not solutions unless substituting them works.',
+  },
+  'alg-sum-for-product': {
+    label: 'Gave the sum where the product was asked',
+    fix: 'Read the question twice: the constant term of $(x + a)(x + b)$ is the PRODUCT $ab$, the coefficient of $x$ is the sum $a + b$.',
+  },
+  'alg-multiplied-wrong-numbers': {
+    label: 'Multiplied the wrong pair of numbers',
+    fix: 'The constant term is the product of the two numbers inside the factors, here $a$ and $n$; find $n$ first.',
+  },
   'alg-root-sign': {
     label: 'Read the roots off the factors with the wrong sign',
     fix: '$(x - 5)(x + 3) = 0$ gives $x = 5$ or $x = -3$: each root has the opposite sign of the number in its factor.',
