@@ -87,7 +87,7 @@ const parallelQc: Template<P> = {
     if (form === 'num') {
       a = rng.pick([35, 40, 45, 50, 55, 60, 65, 70, 75, 110, 115, 120, 125, 130, 135, 140, 145]);
       ya = same ? a : 180 - a;
-      N = parallel ? ya + rng.pick([-20, -10, 0, 0, 10, 20]) : ya;
+      N = parallel ? ya + rng.pick(d === 1 ? [-20, -10, 10, 20] : [-20, -10, 0, 0, 10, 20]) : ya;
       if (N === 90 || N <= 0) throw new Redraw('N');
     }
     // answer by the angle theorems
