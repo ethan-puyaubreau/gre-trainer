@@ -188,28 +188,33 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-3">
-        <a className="card" href={href('practice')} style={{ textDecoration: 'none', color: 'inherit' }}>
+        <div className="card cta-card">
           <div className="chip chip-accent">Recommended</div>
-          <h3 style={{ marginTop: 10 }}>Smart practice</h3>
-          <p className="muted small" style={{ margin: 0 }}>
+          <h3>Smart practice</h3>
+          <p className="muted small">
             Repairs missed skills in a new style, reviews what is due, then moves you forward.
             {remediation.length > 0 && ` ${remediation.length} skill${remediation.length > 1 ? 's' : ''} waiting to come back.`}
           </p>
-        </a>
-        <a className="card" href={href('practice', 'review')} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <a className="btn btn-primary" href={href('practice')}>
+            Start practice
+          </a>
+        </div>
+        <div className="card cta-card">
           <div className={`chip ${stats.due ? 'chip-warn' : ''}`}>{stats.due} due</div>
-          <h3 style={{ marginTop: 10 }}>Spaced review</h3>
-          <p className="muted small" style={{ margin: 0 }}>
-            Skills come back 1 day after a miss, and 3, 7, 21 then 60 days after mastery.
-          </p>
-        </a>
-        <a className="card" href={href('section')} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <h3>Spaced review</h3>
+          <p className="muted small">Skills come back 1 day after a miss, and 3, 7, 21 then 60 days after mastery.</p>
+          <a className="btn" href={href('practice', 'review')}>
+            Start review
+          </a>
+        </div>
+        <div className="card cta-card">
           <div className="chip">12 q · 21 min / 15 q · 26 min</div>
-          <h3 style={{ marginTop: 10 }}>Section test</h3>
-          <p className="muted small" style={{ margin: 0 }}>
-            Timed GRE simulation with mark &amp; review, calculator and an adaptive second section.
-          </p>
-        </a>
+          <h3>Section test</h3>
+          <p className="muted small">Timed GRE simulation with mark &amp; review, calculator and an adaptive second section.</p>
+          <a className="btn" href={href('section')}>
+            Set up a test
+          </a>
+        </div>
       </div>
 
       {AREAS.map((area) => {

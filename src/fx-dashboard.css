@@ -137,3 +137,28 @@
     transform: translateY(-3px);
   }
 }
+
+/* Dashboard cards: a real button closes each card, and its link still covers the whole card. */
+.cta-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.cta-card:hover {
+  border-color: var(--accent-2);
+}
+.cta-card h3 {
+  margin: 10px 0 8px;
+}
+.cta-card p {
+  flex: 1;
+  margin: 0 0 16px;
+}
+.cta-card .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
