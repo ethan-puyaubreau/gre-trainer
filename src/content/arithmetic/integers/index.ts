@@ -4,6 +4,7 @@ import { divisibilityTemplates } from './divisibility';
 import { evaluateTemplates } from './evaluate';
 import { exponentTemplates } from './exponents';
 import { exponentsFactorSumTemplates, exponentsFactorSumTraps } from './exponentsFactorSum';
+import { exponentsFractionalTemplates, exponentsFractionalTraps } from './exponentsFractional';
 import { exponentsConvertTemplates, exponentsConvertTraps } from './exponentsConvert';
 import { factorsTemplates } from './factors';
 import { factorsSelectTemplates, factorsSelectTraps } from './factorsSelect';
@@ -27,6 +28,7 @@ export const integersTemplates: Template<any>[] = [
   ...exponentTemplates,
   ...exponentsConvertTemplates,
   ...exponentsFactorSumTemplates,
+  ...exponentsFractionalTemplates,
   ...evaluateTemplates,
 ];
-export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps };
+export const integersTraps: Record<string, Trap> = { ...integerTraps, ...populationTraps, ...remainderCycleTraps, ...factorsSelectTraps, ...gcdLcmPairTraps, ...exponentsConvertTraps, ...exponentsFactorSumTraps, ...exponentsFractionalTraps };
