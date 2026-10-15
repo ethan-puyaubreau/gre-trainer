@@ -53,9 +53,6 @@
   "alg.inequalities.solve-mcm": {
     "distractors.trapped": "baseline"
   },
-  "alg.linear-equations.fraction-qc": {
-    "qc.never-d": "baseline"
-  },
   "alg.linear-equations.literal-mcs": {
     "artifacts.coef-1": "baseline",
     "artifacts.frac-1": "baseline",

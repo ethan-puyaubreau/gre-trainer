@@ -1,8 +1,8 @@
 import { qcCompare, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { gcd, lcm } from '../../../engine/math';
-import { lin, num } from '../../../engine/tex';
-import type { QCQuestion, Template } from '../../../engine/types';
+import { lin, num, paren } from '../../../engine/tex';
+import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { N, V, add, close, intExcept, times, div, evalEx, lx, mul, qcEnd, qcSamples, texEx, trapChoices, type Ex } from './util';
 
 /* ================================================================== 1. Solve a linear equation (MCS) */
@@ -164,7 +164,9 @@ ${rule}`;
 interface FracQCParams {
   kind: 'sum' | 'proportion';
   k: number[];
+  /** Quantity B is this number, or (when y is set) the integer y between y[0] and y[1] inclusive. */
   B: number;
+  y: [number, number] | null;
 }
 
 const fractionQC: Template<FracQCParams> = {
@@ -177,9 +179,10 @@ const fractionQC: Template<FracQCParams> = {
     let k: number[];
     let x0: number;
     let info: string;
-    let explanation: string;
+    let steps: string;
     let trapVal: number | null = null;
     let trapId = '';
+    let trapRatios: Frac[] | null = null;
     if (kind === 'sum') {
       let a: number;
       let b: number;
@@ -189,11 +192,13 @@ const fractionQC: Template<FracQCParams> = {
       x0 = L * rng.int(1, d === 3 ? 6 : 4) * (d === 3 && rng.chance(0.3) ? -1 : 1);
       const sgnB = d === 3 && rng.chance(0.5) ? -1 : 1;
       const c = x0 / a + (sgnB * x0) / b;
-      if (c === 0) return fractionQC.generate(rng, d);
+      if (c === 0 || Math.abs(x0) <= 1) return fractionQC.generate(rng, d);
       k = [a, sgnB * b, c];
       info = `$\\dfrac{x}{${a}} ${sgnB > 0 ? '+' : '-'} \\dfrac{x}{${b}} = ${num(c)}$`;
       const coefNum = L / a + (sgnB * L) / b;
-      explanation = `Multiply both sides by ${L}: $${lin([[L / a, 'x'], [(sgnB * L) / b, 'x']])} = ${num(c * L)}$, ${coefNum === 1 ? `so $x = ${num(x0)}$` : `so $${coefNum === -1 ? '-' : coefNum}x = ${num(c * L)}$ and $x = ${num(x0)}$`}.`;
+      steps = `Multiply both sides by ${L}, the least common denominator, so no term is left unscaled: $${lin([[L / a, 'x']])} ${sgnB > 0 ? '+' : '-'} ${lin([[L / b, 'x']])} = ${num(c * L)}$${coefNum === 1 ? '' : `, that is $${lin([[coefNum, 'x']])} = ${num(c * L)}$`}, so $x = ${num(x0)}$.
+
+Check: $\\frac{${num(x0)}}{${a}} ${sgnB > 0 ? '+' : '-'} \\frac{${num(x0)}}{${b}} = ${num(x0 / a)} ${sgnB > 0 ? '+' : '-'} ${paren(x0 / b)} = ${num(c)}$.`;
       if (sgnB > 0) {
         trapVal = c * (a + b);
         trapId = 'alg-fraction-add-denominators';
@@ -209,55 +214,77 @@ const fractionQC: Template<FracQCParams> = {
       const p = rng.pick(opts);
       const ratio = (x0 + p) / a; // = (x0 - q)/b
       const q = x0 - b * ratio;
-      if (q === 0) return fractionQC.generate(rng, d);
+      if (q === 0 || Math.abs(x0) <= 1) return fractionQC.generate(rng, d);
       k = [p, a, q, b];
       info = `$\\dfrac{${lin([[1, 'x'], [p, '']])}}{${a}} = \\dfrac{${lin([[1, 'x'], [-q, '']])}}{${b}}$`;
-      explanation = `Cross-multiply: $${b}(${lin([[1, 'x'], [p, '']])}) = ${a}(${lin([[1, 'x'], [-q, '']])})$, that is, $${lin([[b, 'x'], [b * p, '']])} = ${lin([[a, 'x'], [-a * q, '']])}$.
+      steps = `Cross-multiply, each numerator times the OTHER denominator: $${b}(${lin([[1, 'x'], [p, '']])}) = ${a}(${lin([[1, 'x'], [-q, '']])})$, that is, $${lin([[b, 'x'], [b * p, '']])} = ${lin([[a, 'x'], [-a * q, '']])}$. So ${b - a === 1 ? '' : `$${lin([[b - a, 'x']])} = ${num(-a * q - b * p)}$ and `}$x = ${num(x0)}$.
 
-So $${lin([[b - a, 'x']])} = ${num(-a * q - b * p)}$ and $x = ${num(x0)}$.`;
+Check: both fractions equal $${num(ratio)}$.`;
       // multiplying each numerator by its own denominator
       if (a !== b) {
         const wrong = new Frac(-b * q - a * p, a - b); // a(x + p) = b(x - q)
         if (wrong.isInt()) {
           trapVal = wrong.n;
           trapId = 'alg-cross-multiply-wrong';
+          trapRatios = [new Frac(wrong.n + p, a), new Frac(wrong.n - q, b)];
         }
       }
     }
-    const rel = rng.pick(['C', 'A', 'B', 'T', 'T'] as const);
-    let B: number;
-    if (rel === 'T' && trapVal !== null && trapVal !== x0) B = trapVal;
+    const rel = rng.pick(['C', 'A', 'B', 'T', 'D'] as const);
+    let B = x0;
+    let y: [number, number] | null = null;
+    if (rel === 'D') {
+      y = [x0 - rng.int(1, 4), x0 + rng.int(1, 4)];
+      B = x0;
+    } else if (rel === 'T' && trapVal !== null && trapVal !== x0) B = trapVal;
     else if (rel === 'C') B = x0;
     else B = x0 + (rel === 'A' || (rel === 'T' && rng.chance(0.5)) ? -1 : 1) * rng.int(1, 3);
-    const answer = qcCompare(x0, B);
+    let answer: QCChoice;
+    if (y) {
+      const rels = new Set<QCChoice>();
+      for (let v = y[0]; v <= y[1]; v++) rels.add(qcCompare(x0, v));
+      answer = rels.size > 1 ? 'D' : [...rels][0];
+    } else answer = qcCompare(x0, B);
     const traps: QCQuestion['traps'] = {};
-    if (trapVal !== null) {
+    if (!y && trapVal !== null) {
       const ta = qcCompare(trapVal, B);
       if (ta !== answer) traps[ta] = trapId;
     }
-    traps.D = 'alg-qc-variable-d';
+    if (answer === 'D') for (const l of ['A', 'B', 'C'] as const) traps[l] = 'tested-one-value';
+    else traps.D = 'alg-qc-variable-d';
     const trapNote =
-      trapId === 'alg-fraction-add-denominators'
-        ? `\n\nFractions do not add by adding denominators: $\\frac{x}{${k[0]}} + \\frac{x}{${k[1]}} \\ne \\frac{x}{${k[0] + k[1]}}$ (that would give $${num(trapVal!)}$).`
-        : trapId === 'alg-cross-multiply-wrong'
-          ? `\n\nCross-multiplying means each numerator times the OTHER denominator; multiplying by its own denominator gives $${num(trapVal!)}$.`
+      !y && trapId === 'alg-fraction-add-denominators'
+        ? `\n\nTrap: adding denominators, $\\frac{x}{${k[0]}} + \\frac{x}{${k[1]}} = \\frac{x}{${k[0] + k[1]}}$, would give $x = ${num(trapVal!)}$. Test $x = ${k[0] * k[1]}$: the left side is $${k[1]} + ${k[0]} = ${k[0] + k[1]}$, but $\\frac{${k[0] * k[1]}}{${k[0] + k[1]}}$ is not that. Fractions add over a common denominator.`
+        : !y && trapId === 'alg-cross-multiply-wrong'
+          ? `\n\nTrap: multiplying each numerator by its own denominator would give $x = ${num(trapVal!)}$, which is not the solution: the two fractions are $${num(trapRatios![0])}$ and $${num(trapRatios![1])}$ there, not equal.`
           : '';
+    let verdict: string;
+    if (y) {
+      const lo = y[0];
+      const hi = y[1];
+      verdict = answer === 'D'
+        ? `The equation fixes $x = ${num(x0)}$, but $y$ is only known to be an integer from $${num(lo)}$ to $${num(hi)}$. For $y = ${num(lo)}$ Quantity A is greater; for $y = ${num(hi)}$ Quantity B is greater. Two allowed values disagree, so the relationship cannot be determined. (D)`
+        : `The equation fixes $x = ${num(x0)}$. ${qcEnd(answer)}`;
+    } else
+      verdict = `The equation has exactly one solution, so $x$ is fixed: compare $${num(x0)}$ with $${num(B)}$. ${qcEnd(answer)}`;
     return {
-      params: { kind, k: k!, B },
+      params: { kind, k: k!, B, y },
       q: {
         format: 'qc',
-        info,
+        info: y ? `${info}\n\n$y$ is an integer with $${num(y[0])} \\le y \\le ${num(y[1])}$.` : info,
         quantityA: '$x$',
-        quantityB: `$${num(B)}$`,
+        quantityB: y ? '$y$' : `$${num(B)}$`,
         answer,
         traps,
-        explanation: `${explanation}
+        explanation: `One equation with one unknown fixes $x$, so solve it before comparing.
 
-The equation has exactly one solution, so compare $${num(x0)}$ with $${num(B)}$. ${qcEnd(answer)}${trapNote}`,
+${steps}
+
+${verdict}${trapNote}`,
       },
     };
   },
-  check(q, { kind, k, B }) {
+  check(q, { kind, k, B, y }) {
     if (q.format !== 'qc') return 'wrong format';
     const f =
       kind === 'sum'
@@ -265,7 +292,10 @@ The equation has exactly one solution, so compare $${num(x0)}$ with $${num(B)}$.
         : (x: number) => (x + k[0]) / k[1] - (x - k[2]) / k[3];
     // f is linear: its root from two evaluations.
     const root = -f(0) / (f(1) - f(0));
-    const expected = qcSamples([[root, B]], 1e-9);
+    const samples: [number, number][] = [];
+    if (y) for (let v = y[0]; v <= y[1]; v++) samples.push([root, v]);
+    else samples.push([root, B]);
+    const expected = qcSamples(samples, 1e-9);
     return q.answer === expected ? null : `expected ${expected}`;
   },
 };
