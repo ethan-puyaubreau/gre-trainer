@@ -3,15 +3,18 @@ import { Frac } from '../../../engine/frac';
 import { gcd } from '../../../engine/math';
 import type { Rng } from '../../../engine/rng';
 import { decimal, num } from '../../../engine/tex';
-import type { GeometryFigure, QCChoice, Template } from '../../../engine/types';
+import type { Difficulty, GeometryFigure, QCChoice, QuestionBody, Template } from '../../../engine/types';
 import { FigBuilder, RAD, add, angleAt, bisect, dir, dist, fromSides, intersect, lerp, mul, near, rot, shoelace, sub, type Pt } from './fig';
 import { mulberry } from './lines';
 import { checkMcm, checkMcs, intChoices, positioned, qcTraps, QC_SAY } from './util';
-import { retryAll } from '../redraw';
+import { Redraw, retryAll } from '../redraw';
+import { trapNotes } from '../notes';
 
 const SKILL = 'geo.similarity';
 const dec = (f: Frac) => (f.isInt() ? num(f.n) : decimal(f));
 const ft = (f: Frac) => f.toTex();
+/** n/d in TeX without a denominator of 1: rt(3, 1) -> "3". */
+const rt = (n: number, d: number) => (d === 1 ? num(n) : `\\frac{${num(n)}}{${num(d)}}`);
 
 /** Coprime ratio pairs p : q (AD : DB). */
 const RATIOS: [number, number][] = [
@@ -30,34 +33,41 @@ const RATIOS: [number, number][] = [
 ];
 
 /**
- * Triangle ABC with D on AB, E on AC, DE parallel to BC. With `len` (AD, AB and DE) the shape is built to
- * match the numbers (then rotated so BC is horizontal); otherwise a default scalene shape is used.
+ * Triangle ABC with D on AB, E on AC, DE parallel to BC. With `len` (AD, AB and DE) or `sides` (AD, AB and AC) the
+ * shape is built to match the numbers (then rotated so BC is horizontal); otherwise a default scalene shape is used.
  */
 function dePic(
   rDraw: number,
   labels: Partial<Record<'AD' | 'DB' | 'DE' | 'BC' | 'AE' | 'EC', string>>,
   shade = false,
   len?: { AD: number; AB: number; DE: number },
+  sides?: { AD: number; AB: number; AC: number },
 ): GeometryFigure {
   let A: Pt = [1.7, 3.7];
   let B: Pt = [0, 0];
   let C: Pt = [5.2, 0];
-  let r = Math.min(0.68, Math.max(0.36, rDraw));
+  let r = Math.min(0.8, Math.max(0.2, rDraw));
+  // rotate so that BC is horizontal and A is above it, scale to about 5 units wide
+  const fit = (g: Record<'A' | 'B' | 'C', Pt>) => {
+    const ang = Math.atan2(g.C[1] - g.B[1], g.C[0] - g.B[0]) / RAD;
+    const tr = (P: Pt) => rot(sub(P, g.B), -ang);
+    let pts = [g.A, g.B, g.C].map(tr);
+    if (pts[0][1] < 0) pts = pts.map(([x, y]) => [x, -y] as Pt);
+    const span = Math.max(...pts.map((P) => P[0])) - Math.min(...pts.map((P) => P[0]));
+    const h = pts[0][1];
+    const sc = Math.min(5.2 / span, 4.2 / h);
+    [A, B, C] = pts.map((P) => mul(P, sc)) as [Pt, Pt, Pt];
+  };
   if (len) {
     const lim = len.DE >= len.AD ? 70 : Math.min(70, (Math.asin(len.DE / len.AD) / RAD) * 0.85);
     const g = buildDE(Math.max(lim, 28), len.AD, len.AB, len.DE) ?? buildDE(lim, len.AD, len.AB, len.DE);
     if (g) {
-      // rotate so that BC is horizontal and A is above it, scale to about 5 units wide
-      const ang = Math.atan2(g.C[1] - g.B[1], g.C[0] - g.B[0]) / RAD;
-      const tr = (P: Pt) => rot(sub(P, g.B), -ang);
-      let pts = [g.A, g.B, g.C].map(tr);
-      if (pts[0][1] < 0) pts = pts.map(([x, y]) => [x, -y] as Pt);
-      const span = Math.max(...pts.map((P) => P[0])) - Math.min(...pts.map((P) => P[0]));
-      const h = pts[0][1];
-      const sc = Math.min(5.2 / span, 4.2 / h);
-      [A, B, C] = pts.map((P) => mul(P, sc)) as [Pt, Pt, Pt];
+      fit(g);
       r = len.AD / len.AB;
     }
+  } else if (sides) {
+    fit({ A: [0, 0], B: [sides.AB, 0], C: mul(dir(55), sides.AC) });
+    r = sides.AD / sides.AB;
   }
   const D = lerp(A, B, r);
   const E = lerp(A, C, r);
@@ -165,7 +175,7 @@ Using $\\frac{AD}{DB}$ instead of $\\frac{AD}{AB}$ compares a part with a part; 
         traps.push({ value: Frac.of(AD + DB), trap: 'geo-sim-whole-not-part' }, { value: Frac.of(BC - DE), trap: 'geo-sim-additive' });
         labels = { AD: `$${AD}$`, DE: `$${DE}$`, BC: `$${BC}$` };
         stem = 'In the figure above, $DE$ is parallel to $BC$. What is the length of $DB$?';
-        explanation = `Triangles $ADE$ and $ABC$ are similar, so $\\frac{AB}{AD} = \\frac{BC}{DE} = \\frac{${BC}}{${DE}}$, which gives $AB = ${AD} \\cdot ${ft(new Frac(BC, DE))} = ${AD + DB}$.
+        explanation = `Triangles $ADE$ and $ABC$ are similar, so $\\frac{AB}{AD} = \\frac{BC}{DE} = ${rt(BC, DE)}$, which gives $AB = ${AD} \\cdot ${ft(new Frac(BC, DE))} = ${AD + DB}$.
 
 Then $DB = AB - AD = ${AD + DB} - ${AD} = ${DB}$.
 
@@ -177,7 +187,7 @@ The proportion gives the whole side $AB$; stopping there answers the wrong quest
         traps.push({ value: new Frac(AE * n, p), trap: 'geo-sim-whole-not-part' }, { value: new Frac(AE * p, q), trap: 'geo-sim-inverted' });
         labels = { AD: `$${AD}$`, DB: `$${DB}$`, AE: `$${AE}$` };
         stem = 'In the figure above, $DE$ is parallel to $BC$. What is the length of $EC$?';
-        explanation = `A line parallel to one side of a triangle divides the other two sides in the same ratio: $\\frac{AE}{EC} = \\frac{AD}{DB} = \\frac{${AD}}{${DB}} = ${ft(new Frac(p, q))}$.
+        explanation = `A line parallel to one side of a triangle divides the other two sides in the same ratio: $\\frac{AE}{EC} = \\frac{AD}{DB} = ${rt(AD, DB)}${gcd(AD, DB) > 1 ? ` = ${ft(new Frac(p, q))}` : ''}$.
 
 So $EC = ${AE} \\cdot ${ft(new Frac(q, p))} = ${dec(new Frac(EC))}$.
 
@@ -201,14 +211,23 @@ Scaling the area by $${ft(new Frac(n, p))}$ instead of $(${ft(new Frac(n, p))})^
         params = { ask, AD, DB, S };
       }
     }
+    // equal numbers on the figure would hand out a shortcut (DE = AD, DB = BC - DE...): redraw instead
+    const given = Object.values(labels).map((t) => Number(t!.replace(/\$/g, '')));
+    if (new Set(given).size < given.length || given.some((g) => answer.eq(g)) || traps.some((t) => t.value.eq(answer))) throw new Redraw('equal lengths hand out a shortcut');
     return {
       params,
       q: {
         format: 'ne',
         stem,
         answer,
-        traps: traps.filter((t) => !t.value.eq(answer) && t.value.sign() > 0 && t.value.isTerminating()),
-        figure: dePic(p / n, labels, ask === 'area', ask === 'BC' || ask === 'DE' || ask === 'DB' ? { AD, AB: AD + DB, DE } : undefined),
+        traps: traps.filter((t) => t.value.sign() > 0 && t.value.isTerminating()),
+        figure: dePic(
+          p / n,
+          labels,
+          ask === 'area',
+          ask === 'BC' || ask === 'DE' || ask === 'DB' ? { AD, AB: AD + DB, DE } : undefined,
+          ask === 'EC' ? { AD, AB: AD + DB, AC: AE + EC } : undefined,
+        ),
         explanation,
       },
     };
@@ -531,12 +550,22 @@ function ratioChoice(rng: Rng, correct: [number, number], wrong: { r: [number, n
   };
 }
 
-const scaleMCS: Template<ScaleParams> = {
-  id: 'geo.similarity.scale-mcs',
-  skill: SKILL,
-  format: 'mcs',
-  style: 'scale factors in words: ratio of areas, percent change, shadows',
-  generate(rng, d) {
+/** What the explanation says about the wrong choices that are present, by trap id. */
+const SCALE_NOTES: Record<string, (vs: string) => string> = {
+  'geo-sim-linear-area': (vs) => `scaling an area like a length, ${vs}, forgets that areas grow with the square`,
+  'geo-sim-inverted': (vs) => `flipping the ratio, ${vs}, answers the opposite question`,
+  'geo-sim-cubed': (vs) => `cubing the ratio, ${vs}, is for volumes`,
+  'geo-sim-perimeter-squared': (vs) => `squaring the ratio for a length, ${vs}, produces the ratio of the areas`,
+  'geo-sim-double-percent': (vs) => `doubling the percent, ${vs}, forgets the product of the two increases`,
+  'geo-sim-ratio-not-change': (vs) => `the new area as a percent of the old one, ${vs}, is not the change`,
+  'geo-sim-square-percent': (vs) => `squaring the percent itself, ${vs}, is not the area factor`,
+  'geo-sim-additive': (vs) => `adding the difference of the shadows to the height, ${vs}, treats the scale as a shift`,
+  'geo-sim-no-divide': (vs) => `multiplying the post's height by the tree's shadow, ${vs}, never divides by the post's shadow`,
+  'geo-sim-part-whole': (vs) => `comparing the shadow with the distance to the lamppost instead of the whole base, ${vs}, mixes a part with the whole`,
+  'geo-sim-whole-not-part': (vs) => `${vs} is the distance from the lamppost to the tip of the shadow, which includes the part already there`,
+};
+
+function scaleCore(rng: Rng, d: Difficulty): { params: ScaleParams; q: QuestionBody } {
     const kind: ScaleKind = rng.pick(d === 1 ? (['shadow', 'ratio'] as const) : d === 2 ? (['ratio', 'percent', 'shadow'] as const) : (['ratio', 'percent', 'lamp', 'lamp'] as const));
     if (kind === 'ratio') {
       // GE-14 style, for similar triangles
@@ -563,9 +592,7 @@ const scaleMCS: Template<ScaleParams> = {
           { r: [a ** 3, b ** 3], trap: 'geo-sim-cubed' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the length of each side of $T$ to the length of the corresponding side of $U$ is $${a}$ to $${b}$. What is the ratio of the area of $T$ to the area of $U$?`;
-        explanation = `For similar figures, every length scales by $\\frac{${a}}{${b}}$ and every area by $\\left(\\frac{${a}}{${b}}\\right)^2 = \\frac{${a * a}}{${b * b}}$. So the ratio of the areas is $${a * a}$ to $${b * b}$.
-
-$${a}$ to $${b}$ is the ratio of the sides (and perimeters), not of the areas; $${b * b}$ to $${a * a}$ answers "$U$ to $T$".`;
+        explanation = `For similar figures, every length scales by $${rt(a, b)}$ and every area by $\\left(${rt(a, b)}\\right)^2 = ${rt(a * a, b * b)}$. So the ratio of the areas is $${a * a}$ to $${b * b}$.`;
       } else {
         res = ratioChoice(rng, [a, b], [
           { r: [a * a, b * b], trap: 'geo-sim-perimeter-squared' },
@@ -573,9 +600,7 @@ $${a}$ to $${b}$ is the ratio of the sides (and perimeters), not of the areas; $
           { r: [b * b, a * a], trap: 'geo-sim-inverted' },
         ]);
         stem = `Triangles $T$ and $U$ are similar, and the ratio of the area of $T$ to the area of $U$ is $${a * a}$ to $${b * b}$. What is the ratio of the perimeter of $T$ to the perimeter of $U$?`;
-        explanation = `Areas scale by the square of the scale factor, so the scale factor for lengths is $\\sqrt{\\frac{${a * a}}{${b * b}}} = \\frac{${a}}{${b}}$. Perimeters are lengths, so their ratio is $${a}$ to $${b}$.
-
-The area ratio $${a * a}$ to $${b * b}$ is not the perimeter ratio.`;
+        explanation = `Areas scale by the square of the scale factor, so the scale factor for lengths is $\\sqrt{${rt(a * a, b * b)}} = ${rt(a, b)}$. Perimeters are lengths, so their ratio is $${a}$ to $${b}$.`;
       }
       return {
         params: { kind, dir: dirn, p: a, q: b, values: res.values },
@@ -609,9 +634,7 @@ The area ratio $${a * a}$ to $${b * b}$ is not the perimeter ratio.`;
           answer,
           explanation: `$U$ is similar to $T$ with scale factor $${decimal(fr)}$, so its area is $${decimal(fr)}^2 = ${decimal(fr.mul(fr))}$ times the area of $T$.
 
-That is ${up ? `an increase of $${decimal(fr.mul(fr))} - 1 = ${decimal(fr.mul(fr).sub(1))}$, or $${dec(areaPct)}\\%$` : `a decrease of $1 - ${decimal(fr.mul(fr))} = ${decimal(new Frac(1).sub(fr.mul(fr)))}$, or $${dec(areaPct)}\\%$`}.
-
-The area does not change by $${pct}\\%$ (that ignores the squaring) or by $${2 * pct}\\%$ (that forgets the $${pct}\\% \\times ${pct}\\%$ part).`,
+That is ${up ? `an increase of $${decimal(fr.mul(fr))} - 1 = ${decimal(fr.mul(fr).sub(1))}$, or $${dec(areaPct)}\\%$` : `a decrease of $1 - ${decimal(fr.mul(fr))} = ${decimal(new Frac(1).sub(fr.mul(fr)))}$, or $${dec(areaPct)}\\%$`}.`,
         },
       };
     }
@@ -629,6 +652,8 @@ The area does not change by $${pct}\\%$ (that ignores the squaring) or by $${2 *
         const traps = [
           { value: new Frac(s1 * s2, h1), trap: 'geo-sim-inverted' },
           { value: h1 + s2 - s1, trap: 'geo-sim-additive' },
+          { value: new Frac(h1 * s1, s2), trap: 'geo-sim-inverted' },
+          { value: h1 * s2, trap: 'geo-sim-no-divide' },
         ].filter((t) => (t.value instanceof Frac ? t.value.isTerminating() : true));
         const { choices, answer, values } = intChoices(rng, h2, traps, [h2 + 2, h2 - 3, h2 + 5, h2 - 5, h2 + 8], (v) => `$${dec(v)}$`);
         // figure: post and tree with their shadows, sun rays dashed
@@ -657,7 +682,7 @@ The area does not change by $${pct}\\%$ (that ignores the squaring) or by $${2 *
 
 $$\\frac{h}{${s2}} = \\frac{${h1}}{${s1}} \\quad\\Rightarrow\\quad h = ${s2} \\cdot \\frac{${h1}}{${s1}} = ${h2}$$
 
-Setting up $\\frac{h}{${s2}} = \\frac{${s1}}{${h1}}$ (heights over shadows mixed up) or adding the difference of the shadows to the post's height are the traps.`,
+Check: the tree's shadow is $${ft(new Frac(s2, s1))}$ times the post's shadow, and so is its height ($${ft(new Frac(s2, s1))} \\times ${h1} = ${h2}$).`,
           },
         };
       }
@@ -673,6 +698,8 @@ Setting up $\\frac{h}{${s2}} = \\frac{${s1}}{${h1}}$ (heights over shadows mixed
       const traps = [
         { value: new Frac(h * dd, H), trap: 'geo-sim-part-whole' },
         { value: new Frac(dd * (H - h), h), trap: 'geo-sim-inverted' },
+        { value: s.add(dd), trap: 'geo-sim-whole-not-part' },
+        { value: new Frac(dd * H, h), trap: 'geo-sim-inverted' },
       ].filter((t) => t.value.isTerminating());
       const { choices, answer, values } = intChoices(rng, s.toNumber(), traps, [s.add(2), s.sub(2), Frac.of(dd), s.add(1), s.sub(1)], (v) => `$${dec(v)}$`);
       const sc = 4 / (dd + s.toNumber());
@@ -685,7 +712,6 @@ Setting up $\\frac{h}{${s2}} = \\frac{${s1}}{${h1}}$ (heights over shadows mixed
       const G = fb.helper([(dd + s.toNumber()) * sc + 0.4, 0]);
       fb.seg(L0, G).seg(L0, 'L').seg(P0, 'P').seg('L', X, undefined, true).right('L', L0, P0).right('P', P0, X);
       fb.side(L0, P0, 'L', `$${dd}$`, 12).side(P0, X, 'P', '$s$', 12);
-      const m2 = new Frac(Math.round(m * 2), 2);
       return {
         params: { kind, H, h, dd, values },
         q: {
@@ -698,10 +724,27 @@ Setting up $\\frac{h}{${s2}} = \\frac{${s1}}{${h1}}$ (heights over shadows mixed
 
 $$\\frac{s}{${h}} = \\frac{${dd} + s}{${H}} \\quad\\Rightarrow\\quad ${H}s = ${h * dd} + ${h}s \\quad\\Rightarrow\\quad s = \\frac{${h * dd}}{${H - h}} = ${dec(s)}$$
 
-The base of the large triangle is $${dd} + s$, not $${dd}$: using $\\frac{s}{${h}} = \\frac{${dd}}{${H}}$ compares a part with the whole. (The lamppost is $${dec(m2)}$ times as tall as the person.)`,
+The base of the large triangle is $${dd} + s$, not $${dd}$.
+
+Check: the person is $${ft(new Frac(h, H))}$ of the lamppost's height; the shadow is the same fraction of the distance from the lamppost to the tip of the shadow, $${dec(s.add(dd))}$.`,
         },
       };
     }
+}
+
+const scaleMCS: Template<ScaleParams> = {
+  id: 'geo.similarity.scale-mcs',
+  skill: SKILL,
+  format: 'mcs',
+  style: 'scale factors in words: ratio of areas, percent change, shadows',
+  generate(rng, d) {
+    const res = scaleCore(rng, d);
+    const q = res.q;
+    if (q.format === 'mcs') {
+      const notes = trapNotes(q.choices, SCALE_NOTES);
+      if (notes) q.explanation += `\n\n${notes}`;
+    }
+    return res;
   },
   check(q, p) {
     if (q.format !== 'mcs') return 'format';
@@ -760,6 +803,8 @@ const statementsMCM: Template<StmtParams> = {
     const DB = q * k1;
     const DE = p * k2;
     const BC = n * k2;
+    // equal numbers on the figure (DE = AD...) would hand out shortcuts
+    if (new Set([AD, DB, DE]).size < 3 || [AD, DB, DE].includes(BC)) throw new Redraw('equal lengths hand out a shortcut');
     const keys: StKey[] = rng.shuffle(['BC', 'AE/EC', 'angle', 'area', 'perimeter', 'AD/DB'] as StKey[]).slice(0, d === 1 ? 4 : d === 2 ? 5 : 6);
     let stmts = keys.map((key) => ({ key, truth: rng.chance(0.5) }));
     if (stmts.every((s) => s.truth)) stmts[0].truth = false;
@@ -788,7 +833,7 @@ const statementsMCM: Template<StmtParams> = {
     };
     const { choices, answer } = flaggedChoices(stmts.map((s) => ({ text: text(s).t, correct: s.truth, ...(text(s).trap ? { trap: text(s).trap } : {}) })));
     const why: Record<StKey, string> = {
-      BC: `$\\frac{BC}{DE} = \\frac{AB}{AD} = \\frac{${AD + DB}}{${AD}}$, so $BC = ${BC}$`,
+      BC: `$\\frac{BC}{DE} = \\frac{AB}{AD} = ${rt(AD + DB, AD)}$, so $BC = ${BC}$`,
       'AE/EC': `the parallel segment splits $AC$ in the same ratio as $AB$: $\\frac{AE}{EC} = \\frac{AD}{DB} = ${ft(new Frac(p, q))}$ (it is $\\frac{AE}{AC}$ that equals $${ft(new Frac(p, n))}$)`,
       angle: 'angle $ADE$ corresponds to angle $ABC$ (corresponding angles at parallel lines); it equals angle $ACB$ only if the triangle happens to be isosceles',
       area: `areas scale by the square of $${ft(new Frac(p, n))}$, which is $${ft(new Frac(p * p, n * n))}$`,

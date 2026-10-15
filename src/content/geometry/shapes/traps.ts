@@ -264,6 +264,10 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Added a constant instead of multiplying by the scale factor',
     fix: 'Similar figures scale by a common FACTOR: every length is multiplied by the same number, not increased by the same amount.',
   },
+  'geo-sim-no-divide': {
+    label: 'Multiplied the lengths without dividing by the matching length',
+    fix: 'Similar triangles give a proportion: $\\frac{h}{s_2} = \\frac{h_1}{s_1}$. Multiply across the proportion and then divide by the remaining length.',
+  },
   'geo-sim-midpoint': {
     label: 'Assumed the parallel segment is half the base',
     fix: '$DE = \\frac{1}{2}BC$ only when $D$ is the midpoint of $AB$. Use the actual ratio $\\frac{AD}{AB}$.',

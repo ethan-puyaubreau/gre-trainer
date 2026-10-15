@@ -39,15 +39,5 @@
   },
   "geo.polygons.rectangles": {
     "distractors.trapped": "baseline"
-  },
-  "geo.similarity.parallel-segment-ne": {
-    "artifacts.frac-1": "baseline"
-  },
-  "geo.similarity.scale-mcs": {
-    "artifacts.frac-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "geo.similarity.statements-mcm": {
-    "artifacts.frac-1": "baseline"
   }
 }
