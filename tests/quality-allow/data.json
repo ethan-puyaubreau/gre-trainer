@@ -113,14 +113,5 @@
   },
   "data.sets.venn-diagram": {
     "distractors.trapped": "baseline"
-  },
-  "data.spread.percentile": {
-    "distractors.trapped": "baseline"
-  },
-  "data.spread.sd-compare-qc": {
-    "artifacts.doubled-word": "baseline"
-  },
-  "data.spread.sd-linear": {
-    "distractors.trapped": "baseline"
   }
 }

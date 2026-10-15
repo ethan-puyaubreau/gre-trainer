@@ -1,7 +1,9 @@
-import { numericChoices, qcFromSamples, textChoices } from '../../../engine/build';
+import { qcFromSamples, textChoices } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import { lin, num, ordinal, plain } from '../../../engine/tex';
-import type { BoxPlotFigure, Choice, Difficulty, QCChoice, QCQuestion, Template } from '../../../engine/types';
+import type { Rng } from '../../../engine/rng';
+import type { BoxPlotFigure, Choice, Difficulty, QCChoice, QCQuestion, QuestionBody, Template } from '../../../engine/types';
+import { trapOnlyChoices } from '../prob/util';
 import { fTex, kthByRank, listTex, popSD, QC_WORDS, quartilesF, sortAsc } from './util';
 
 const flip = (c: QCChoice): QCChoice => (c === 'A' ? 'B' : c === 'B' ? 'A' : c);
@@ -94,7 +96,7 @@ List $T$: $${showList(listT, false)}$`;
       listT = plainList(farIsS ? near : far);
       ansST = farIsS ? 'A' : 'B';
       traps = { C: 'stat-sd-range' };
-      why = `Both lists have mean $${m}$ and range $${2 * r}$. In ${farIsS ? '$S$' : '$T$'} most of the numbers are far from the mean (near $${m - r}$ and $${m + r}$), while in ${farIsS ? '$T$' : '$S$'} most of the numbers are close to $${m}$. Greater distances from the mean mean a greater standard deviation; the same range does not mean the same standard deviation.`;
+      why = `Both lists have mean $${m}$ and range $${2 * r}$. In ${farIsS ? '$S$' : '$T$'} most of the numbers are far from the mean (near $${m - r}$ and $${m + r}$), while in ${farIsS ? '$T$' : '$S$'} most of the numbers are close to $${m}$. Greater distances from the mean give a greater standard deviation; the same range does not mean the same standard deviation.`;
       info = `List $S$: $${showList(listS, false)}$
 
 List $T$: $${showList(listT, false)}$`;
@@ -274,6 +276,71 @@ interface LinParams {
   values: number[];
 }
 
+/** Value mode of sdLinear: null when the draw offers too few named mistakes (the caller draws again). */
+function sdLinearValue(rng: Rng, d: Difficulty): { params: LinParams; q: QuestionBody } | null {
+  const none = { eqs: [] as [number, number][], xMax: 0, want: 'greatest' as const, M: 0, stat: 0, k: 0, c: 0, ask: 'sd' as const, values: [] as number[] };
+  const mode = 'value' as const;
+  const ask: 'sd' | 'range' = d === 1 ? 'sd' : rng.chance(0.65) ? 'sd' : 'range';
+  const M = rng.int(20, 80);
+  const stat = ask === 'sd' ? rng.int(3, 12) : rng.int(10, 40);
+  let k: number;
+  let c: number;
+  if (d === 1) {
+    k = 1;
+    c = rng.sign() * rng.int(5, 25);
+  } else if (d === 2) {
+    k = rng.int(2, 5);
+    c = rng.chance(0.6) ? rng.sign() * rng.int(3, 20) : 0;
+  } else {
+    k = rng.sign() * rng.int(2, 5);
+    c = rng.int(5, 60) * (k < 0 ? 1 : rng.sign());
+  }
+  const statName = ask === 'sd' ? 'standard deviation' : 'range';
+  const correct = Math.abs(k) * stat;
+  const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
+  const shiftWhy = (v: string) => `${c > 0 ? 'adding' : 'subtracting'} ${Math.abs(c)} to the ${statName} as well gives $${v}$, but a constant moves every value the same way and changes no distance between them`;
+  const traps = [
+    mk(correct + c, 'stat-sd-shift', shiftWhy),
+    mk(stat + c, 'stat-sd-shift', shiftWhy),
+    mk(k * k * stat, 'stat-sd-variance', (v) => `multiplying by $${k * k}$ gives $${v}$, but every distance is multiplied by $|${k}| = ${Math.abs(k)}$, once`),
+    mk(stat, 'stat-sd-scale', (v) => `leaving the ${statName} at $${v}$ forgets that multiplying by $${k}$ stretches every distance`),
+    mk(k * M + c, 'stat-sd-is-mean', (v) => `$${v}$ is the mean of $T$, not its ${statName}`),
+    mk(M, 'stat-sd-is-mean', (v) => `$${v}$ is the mean of $S$, not the ${statName} of $T$`),
+    ...(ask === 'sd' ? [mk(stat * stat, 'stat-sd-variance', (v) => `squaring the standard deviation gives $${v}$, the variance of $S$`)] : []),
+  ].filter((t) => t.value > 0);
+  const built = trapOnlyChoices(rng, correct, rng.shuffle(traps), (v) => `$${fTex(v)}$`);
+  if (!built) return null;
+  const cite = rng.pick(built.used);
+  const op =
+    k === 1
+      ? c > 0
+        ? `adding $${c}$ to each value in $S$`
+        : `subtracting $${-c}$ from each value in $S$`
+      : `multiplying each value in $S$ by $${k}$${c === 0 ? '' : c > 0 ? ` and then adding $${c}$` : ` and then subtracting $${-c}$`}`;
+  const values = built.choices.map((ch) => Number(ch.text.replace(/\$/g, '').replace(/\{,\}/g, '')));
+  return {
+    params: { ...none, mode, M, stat, k, c, ask, values },
+    q: {
+      format: 'mcs',
+      stem: `Data set $S$ has a mean of $${M}$ and a ${statName} of $${stat}$. Data set $T$ is formed by ${op}. What is the ${statName} of data set $T$?`,
+      choices: built.choices,
+      answer: built.answer,
+      explanation: `${
+        k === 1
+          ? `Adding or subtracting the same number shifts every value, and the mean, by that amount, so the distances between values do not change: the ${statName} stays $${stat}$.`
+          : `Multiplying every value by $${k}$ multiplies every distance between values by $${Math.abs(k)}$${c === 0 ? '' : '; adding or subtracting a constant afterward shifts everything without changing those distances'}. The ${statName} of $T$ is $${Math.abs(k)} \\times ${stat} = ${correct}$.`
+      }
+
+The mean does change: it becomes $${k === 1 ? `${M} ${c < 0 ? '-' : '+'} ${Math.abs(c)}` : `${k}(${M})${c === 0 ? '' : ` ${c < 0 ? '-' : '+'} ${Math.abs(c)}`}`} = ${num(k * M + c)}$${k < 0 ? `, and a ${statName} is never negative: use $|${k}| = ${-k}$` : ''}.
+
+Trap: ${cite.why(num(cite.value))}.
+
+A ${statName} scales with $|k|$ and ignores the constant.`,
+    },
+  };
+  
+}
+
 const sdLinear: Template<LinParams> = {
   id: 'data.spread.sd-linear',
   skill: 'data.spread',
@@ -288,29 +355,36 @@ const sdLinear: Template<LinParams> = {
       for (;;) {
         const slopes = rng.sample([1, 2, 3, 4, 5, 6], 5).map((a) => (d === 3 && rng.chance(0.35) ? -a : a));
         const abs = slopes.map(Math.abs);
-        const target = want === 'greatest' ? Math.max(...abs) : Math.min(...abs);
-        const iCorrect = abs.indexOf(target);
-        const intercepts = slopes.map(() => rng.int(-20, 40));
-        // decoy: give a wrong equation the largest intercept
-        const decoy = rng.pick(slopes.map((_, i) => i).filter((i) => i !== iCorrect));
-        intercepts[decoy] = Math.max(...intercepts) + rng.int(30, 300);
-        if (want === 'greatest' && intercepts[iCorrect] === Math.max(...intercepts)) continue;
+        const iCorrect = abs.indexOf(want === 'greatest' ? Math.max(...abs) : Math.min(...abs));
+        const iOpposite = abs.indexOf(want === 'greatest' ? Math.min(...abs) : Math.max(...abs));
+        // the equation a student picks by the signed slope, when that is not the right one
+        const iSigned = slopes.indexOf(want === 'greatest' ? Math.max(...slopes) : Math.min(...slopes));
+        const intercepts = slopes.map(() => rng.int(want === 'greatest' ? -15 : 0, 120));
+        // every other equation gets a constant term that makes the values look large (or small)
+        const lures = rng.shuffle([140, 190, 250, 300, 350]);
+        const trapOf: (string | undefined)[] = slopes.map(() => undefined);
+        slopes.forEach((_, i) => {
+          if (i === iCorrect) return;
+          if (i === iOpposite) trapOf[i] = 'stat-sd-direction';
+          else if (i === iSigned) trapOf[i] = 'stat-sd-negative-slope';
+          else {
+            trapOf[i] = 'stat-sd-intercept';
+            intercepts[i] = want === 'greatest' ? lures[i] : -lures[i];
+          }
+        });
         const eqs = slopes.map((a, i) => [a, intercepts[i]] as [number, number]);
         const eqText = ([a, b]: [number, number]) => `$y = ${lin([[a, 'x'], [b, '']])}$`;
-        // traps: the largest intercept; the largest signed slope when a negative slope is the answer
-        const wrong: Choice[] = eqs
-          .map((e, i) => ({ e, i }))
-          .filter(({ i }) => i !== iCorrect)
-          .map(({ e, i }) => {
-            let trap: string | undefined;
-            if (i === decoy) trap = 'stat-sd-intercept';
-            else if (want === 'greatest' && e[0] === Math.max(...slopes) && slopes[iCorrect] < 0) trap = 'stat-sd-negative-slope';
-            else if (want === 'least' && e[0] === Math.min(...slopes) && e[0] < 0) trap = 'stat-sd-negative-slope';
-            return { text: eqText(e), ...(trap ? { trap } : {}) };
-          });
+        const wrong: Choice[] = eqs.flatMap((e, i) => (i === iCorrect ? [] : [{ text: eqText(e), trap: trapOf[i]! }]));
         const { choices, answer } = textChoices(rng, eqText(eqs[iCorrect]), wrong, 'random');
         const order = choices.map((c) => eqs.find((e) => eqText(e) === c.text)!);
         const [ca, cb] = eqs[iCorrect];
+        const j = rng.pick(slopes.map((_, i) => i).filter((i) => i !== iCorrect));
+        const [ja, jb] = eqs[j];
+        const lure: Record<string, string> = {
+          'stat-sd-direction': `$y = ${lin([[ja, 'x'], [jb, '']])}$ has the ${want === 'greatest' ? 'least' : 'greatest'} spread, the opposite of what is asked`,
+          'stat-sd-negative-slope': `$y = ${lin([[ja, 'x'], [jb, '']])}$ has the ${want} slope, but the spread depends on $|a|$, and $|${ja}| = ${Math.abs(ja)}$ against $|${ca}| = ${Math.abs(ca)}$`,
+          'stat-sd-intercept': `$y = ${lin([[ja, 'x'], [jb, '']])}$ has the ${want === 'greatest' ? 'largest' : 'smallest'} constant, but a constant only shifts the values and leaves their spread alone`,
+        };
         return {
           params: { ...none, mode, eqs: order, xMax, want },
           q: {
@@ -318,71 +392,27 @@ const sdLinear: Template<LinParams> = {
             stem: `For each of the following equations, $y$ is computed for every integer $x$ from 1 to ${xMax}. Which equation gives the ${xMax} values of $y$ with the ${want} standard deviation?`,
             choices,
             answer,
-            explanation: `Every equation transforms the same ${xMax} values of $x$ by $y = ax + b$. Adding $b$ shifts every value and does not change the standard deviation; multiplying by $a$ multiplies every distance from the mean by $|a|$. So the standard deviation of the $y$-values is $|a|$ times the standard deviation of $1, 2, \\ldots, ${xMax}$.
+            explanation: `For $y = ax + b$, the constant $b$ shifts every value without changing the distances between them, and $a$ multiplies every distance from the mean by $|a|$. So the standard deviation of the $y$-values is $|a|$ times that of $1, 2, \\ldots, ${xMax}$.
 
-The ${want} standard deviation comes from the ${want} value of $|a|$: $y = ${lin([[ca, 'x'], [cb, '']])}$, with $|a| = ${Math.abs(ca)}$.${
-              ca < 0 ? ' A negative slope reverses the order of the values but does not reduce their spread.' : ''
-            } The large constant in $y = ${lin([[eqs[decoy][0], 'x'], [eqs[decoy][1], '']])}$ makes the values large, not spread out.`,
+The ${want} standard deviation therefore goes with the ${want} $|a|$: $y = ${lin([[ca, 'x'], [cb, '']])}$, with $|a| = ${Math.abs(ca)}$ against ${slopes
+              .filter((_, i) => i !== iCorrect)
+              .map((a) => `$${Math.abs(a)}$`)
+              .sort()
+              .join(', ')
+              .replace(/, ([^,]*)$/, ' and $1')} for the others.${ca < 0 ? ' A negative slope reverses the order of the values but does not reduce their spread.' : ''}
+
+Trap: ${lure[trapOf[j]!]}.
+
+Compare the coefficients $|a|$, never the constants.`,
           },
         };
       }
     }
 
-    // value mode
-    const ask: 'sd' | 'range' = rng.chance(0.65) ? 'sd' : 'range';
-    const M = rng.int(20, 80);
-    const stat = ask === 'sd' ? rng.int(3, 12) : rng.int(10, 40);
-    let k: number;
-    let c: number;
-    if (d === 1) {
-      k = 1;
-      c = rng.sign() * rng.int(5, 25);
-    } else if (d === 2) {
-      k = rng.int(2, 5);
-      c = rng.chance(0.6) ? rng.sign() * rng.int(3, 20) : 0;
-    } else {
-      k = rng.sign() * rng.int(2, 5);
-      c = rng.int(5, 60) * (k < 0 ? 1 : rng.sign());
+    for (;;) {
+      const r = sdLinearValue(rng, d);
+      if (r) return r;
     }
-    const correct = Math.abs(k) * stat;
-    const traps = [
-      { value: Math.abs(k) * stat + c, trap: 'stat-sd-shift' },
-      { value: k * k * stat, trap: 'stat-sd-variance' },
-      { value: stat, trap: 'stat-sd-scale' },
-      { value: stat + c, trap: 'stat-sd-shift' },
-      { value: k * M + c, trap: 'stat-sd-is-mean' },
-    ].filter((t) => t.value > 0 && t.value !== correct);
-    const uniq = traps.filter((t, i) => traps.findIndex((u) => u.value === t.value) === i);
-    const { choices, answer } = numericChoices(rng, {
-      correct,
-      traps: rng.sample(uniq, Math.min(uniq.length, 4)),
-      fillers: [correct + Math.abs(k), correct * 2, correct + stat, correct - Math.abs(k)].filter((v) => v > 0),
-      format: (v) => `$${fTex(v)}$`,
-    });
-    const statName = ask === 'sd' ? 'standard deviation' : 'range';
-    const op =
-      k === 1
-        ? c > 0
-          ? `adding $${c}$ to each value in $S$`
-          : `subtracting $${-c}$ from each value in $S$`
-        : `multiplying each value in $S$ by $${k}$${c === 0 ? '' : c > 0 ? ` and then adding $${c}$` : ` and then subtracting $${-c}$`}`;
-    const values = choices.map((ch) => Number(ch.text.replace(/\$/g, '').replace(/\{,\}/g, '')));
-    return {
-      params: { ...none, mode, M, stat, k, c, ask, values },
-      q: {
-        format: 'mcs',
-        stem: `Data set $S$ has a mean of $${M}$ and a ${statName} of $${stat}$. Data set $T$ is formed by ${op}. What is the ${statName} of data set $T$?`,
-        choices,
-        answer,
-        explanation: `${
-          k === 1
-            ? `Adding or subtracting the same number shifts every value, and the mean, by that amount, so the distances between values do not change.`
-            : `Multiplying every value by $${k}$ multiplies every distance between values (and from the mean) by $${Math.abs(k)}$${c === 0 ? '' : '; adding or subtracting a constant afterward shifts everything without changing those distances'}.`
-        } The ${statName} of $T$ is $${Math.abs(k) === 1 ? `${correct}` : `${Math.abs(k)} \\times ${stat} = ${correct}`}$.
-
-The mean, by contrast, does change: the mean of $T$ is $${k === 1 ? `${M} ${c < 0 ? '-' : '+'} ${Math.abs(c)}` : `${k}(${M})${c === 0 ? '' : ` ${c < 0 ? '-' : '+'} ${Math.abs(c)}`}`} = ${num(k * M + c)}$${k < 0 ? `, and a ${statName} is never negative: use $|${k}| = ${-k}$` : ''}.`,
-      },
-    };
   },
   check(q, p) {
     if (q.format !== 'mcs') return 'wrong format';
@@ -426,6 +456,7 @@ const percentile: Template<PctParams> = {
   generate(rng, d) {
     const mode: PctParams['mode'] = d === 3 && rng.chance(0.5) ? 'between' : 'shift';
     const N = rng.pick(d === 1 ? [200, 400, 500, 1000] : [250, 400, 500, 600, 800, 1200, 1500, 2000]);
+    const mk = (value: number, trap: string, why: (v: string) => string) => ({ value, trap, why });
     if (mode === 'shift') {
       for (;;) {
         const dir: 'below' | 'above' = d === 1 || rng.chance(0.65) ? 'below' : 'above';
@@ -434,18 +465,29 @@ const percentile: Template<PctParams> = {
         const p = dir === 'below' ? ans + s : ans - s;
         if (p < 5 || p > 97 || (s * N) % 100) continue;
         const m = (s * N) / 100;
-        const start = Math.min(Math.max(5, ans - 5 * rng.int(0, 4)), 75);
-        const options = [0, 1, 2, 3, 4].map((i) => start + 5 * i);
-        if (!options.includes(ans)) continue;
         const nearest5 = (v: number) => 5 * Math.round(v / 5);
-        const trapOf = (v: number): string | undefined => {
-          if (v === ans) return undefined;
-          if (v === nearest5(dir === 'below' ? p + s : p - s)) return 'stat-percentile-direction';
-          if (v === nearest5(p)) return 'stat-percentile-no-shift';
-          if (m < 100 && v === nearest5(dir === 'below' ? p - m : p + m)) return 'stat-percentile-count';
-          return undefined;
-        };
-        const choices = options.map((v) => ({ text: `${ordinal(v)}`, ...(trapOf(v) ? { trap: trapOf(v)! } : {}) }));
+        // Each wrong choice is the result of one mistake, rounded to a multiple of 5 like the choices.
+        const traps = rng.shuffle([
+          mk(nearest5(dir === 'below' ? p + s : p - s), 'stat-percentile-direction', (v) => `moving ${dir === 'below' ? 'up' : 'down'} to the ${v} percentile puts $y$ on the wrong side of $x$`),
+          mk(nearest5(p), 'stat-percentile-no-shift', (v) => `keeping the ${v} percentile of $x$ ignores the ${m} measurements between $x$ and $y$`),
+          ...(m < 100
+            ? [dir === 'below' ? p - m : p + m, dir === 'below' ? p + m : p - m].map((to) =>
+                mk(nearest5(to), 'stat-percentile-count', (v) => `moving by the count ${m} reaches the ${v} percentile, but ${m} measurements are only ${s}% of ${plain(N)}`),
+              )
+            : []),
+          mk(nearest5(s), 'stat-percentile-shift-only', (v) => `answering about ${v} gives the ${s}-point shift instead of the new percentile, and ignores where $x$ stands`),
+          mk(100 - ans, 'stat-percentile-complement', (v) => `counting from the top gives the ${v} percentile, but a percentile counts the data below`),
+        ]).filter((t) => t.value >= 5 && t.value <= 95);
+        const built = trapOnlyChoices(
+          rng,
+          ans,
+          traps,
+          (v) => ordinal(v.n),
+        );
+        if (!built) continue;
+        const cite = rng.pick(built.used);
+        const options = built.choices.map((c) => parseInt(c.text, 10));
+        const below = (ans * N) / 100;
         return {
           params: { mode, N, p, m, dir, p2: 0, options },
           q: {
@@ -453,13 +495,17 @@ const percentile: Template<PctParams> = {
             stem: `A data set consists of ${plain(N)} different measurements. The measurement $x$ is at the ${ordinal(p)} percentile of the data. Exactly ${m} of the measurements are ${
               dir === 'below' ? 'greater than $y$ and less than $x$' : 'greater than $x$ and less than $y$'
             }. Approximately at which percentile is the measurement $y$?`,
-            choices,
-            answer: options.indexOf(ans),
+            choices: built.choices,
+            answer: built.answer,
             explanation: `A percentile measures the percent of the data below a value. The ${m} measurements between $x$ and $y$ are $\\frac{${m}}{${num(N)}} = ${s}\\%$ of the data.
 
 So $y$ is about ${s} percentile points ${dir === 'below' ? 'below' : 'above'} $x$: $${p} ${dir === 'below' ? '-' : '+'} ${s} = ${ans}$, the ${ordinal(ans)} percentile.
 
-Moving by the count ${m} itself, instead of the percent it represents, confuses measurements with percentage points.`,
+Check: $${ans}\\%$ of ${plain(N)} is ${plain(below)}; ${dir === 'below' ? 'adding' : 'taking away'} the ${m} between gives ${plain(below + (dir === 'below' ? m : -m))}, which is $${p}\\%$ of ${plain(N)}.
+
+Trap: ${cite.why(ordinal(cite.value))}.
+
+A shift of $n$ measurements moves a percentile by $n$ out of the total, in percent.`,
           },
         };
       }
@@ -471,28 +517,33 @@ Moving by the count ${m} itself, instead of the percent it represents, confuses 
       if (p2 > 95) continue;
       const ans = ((p2 - p1) * N) / 100;
       if (!Number.isInteger(ans)) continue;
-      const traps = [
-        { value: (p2 * N) / 100, trap: 'stat-percentile-no-shift' },
-        { value: ((p1 + p2) * N) / 100, trap: 'stat-percentile-direction' },
-        { value: p2 - p1, trap: 'stat-percentile-count' },
-      ].filter((t) => Number.isInteger(t.value) && t.value !== ans);
-      const { choices, answer } = numericChoices(rng, {
-        correct: ans,
-        traps,
-        fillers: [ans / 2, ans * 2, ans + N / 10].filter((v) => Number.isInteger(v)),
-        format: (v) => `$${fTex(v)}$`,
-        step: Math.max(1, Math.round(N / 20)),
-      });
+      const count = (pct: number) => (pct * N) / 100;
+      const traps = rng.shuffle([
+        mk(count(p2), 'stat-percentile-no-shift', (v) => `counting everything below $v$ gives $${v}$, which includes the data below $u$`),
+        mk(count(p1), 'stat-percentile-no-shift', (v) => `counting only what is below $u$ gives $${v}$, which is not the data between $u$ and $v$`),
+        mk(count(p1 + p2), 'stat-percentile-added', (v) => `adding the two percentiles gives $${v}$, but the data between them is their difference`),
+        mk(p2 - p1, 'stat-percentile-count', (v) => `$${v}$ is the gap in percentile points, not a number of measurements`),
+        mk(count(100 - (p2 - p1)), 'stat-percentile-complement', (v) => `$${v}$ counts the measurements outside the two values, not between them`),
+      ]).filter((t) => Number.isInteger(t.value) && t.value > 0);
+      const built = trapOnlyChoices(rng, ans, traps, (v) => `$${fTex(v)}$`);
+      if (!built) continue;
+      const cite = rng.pick(built.used);
       return {
         params: { mode, N, p: p1, m: 0, dir: 'below', p2, options: [] },
         q: {
           format: 'mcs',
           stem: `A data set consists of ${plain(N)} different measurements. The measurement $u$ is at the ${ordinal(p1)} percentile and the measurement $v$ is at the ${ordinal(p2)} percentile. Approximately how many of the measurements are greater than $u$ and less than $v$?`,
-          choices,
-          answer,
+          choices: built.choices,
+          answer: built.answer,
           explanation: `About ${p1}% of the measurements are below $u$ and about ${p2}% are below $v$, so about $${p2} - ${p1} = ${p2 - p1}$ percent of them lie between $u$ and $v$.
 
-$${p2 - p1}\\%$ of $${num(N)}$ is $${num(ans)}$.`,
+$${p2 - p1}\\%$ of $${num(N)}$ is $${num(ans)}$.
+
+Check: $${num(count(p2))} - ${num(count(p1))} = ${num(ans)}$ measurements.
+
+Trap: ${cite.why(num(cite.value))}.
+
+Between two percentiles lies the difference of the percents, applied to the total.`,
         },
       };
     }
@@ -594,7 +645,7 @@ const quartiles: Template<QuartParams> = {
         const b = boxes[which];
         answer = b.q3 - b.q1;
         traps.push({ value: frac(b.max - b.min), trap: 'stat-iqr-range' });
-        if (b.q3 - b.median !== answer) traps.push({ value: frac(b.q3 - b.median), trap: 'stat-iqr-half' });
+        traps.push({ value: frac(b.q3 - b.median), trap: 'stat-iqr-half' });
         stem = `The box plot summarizes ${two ? ctx.two : ctx.one}. What is the interquartile range of the ${two ? `${ctx.groups[which]} ` : ''}data?`;
         expl = `The box runs from the first quartile, $${b.q1}$, to the third quartile, $${b.q3}$. The interquartile range is $${b.q3} - ${b.q1} = ${answer}$.
 
@@ -621,12 +672,14 @@ The whiskers show the least and greatest values; $${b.max} - ${b.min} = ${b.max 
         answer = Math.abs(i1 - i2);
         const r1 = b1.max - b1.min;
         const r2 = b2.max - b2.min;
-        if (Math.abs(r1 - r2) !== answer) traps.push({ value: frac(Math.abs(r1 - r2)), trap: 'stat-iqr-range' });
+        traps.push({ value: frac(Math.abs(r1 - r2)), trap: 'stat-iqr-range' });
         stem = `The box plot summarizes ${ctx.two}. The interquartile range for ${ctx.groups[hi]} is how much greater than the interquartile range for ${ctx.groups[1 - hi]}?`;
         expl = `Each interquartile range is the length of the box: ${ctx.groups[0]}: $${b1.q3} - ${b1.q1} = ${i1}$; ${ctx.groups[1]}: $${b2.q3} - ${b2.q1} = ${i2}$. The difference is $${answer}$.
 
 Comparing the whiskers would compare the ranges instead.`;
       }
+      // a mistake that gives the answer is not a mistake: draw again
+      if (traps.some((t) => t.value.sign() <= 0 || t.value.eq(answer))) return quartiles.generate(rng, d);
       return {
         params: { mode, list: [], ask },
         q: {
@@ -634,7 +687,7 @@ Comparing the whiskers would compare the ranges instead.`;
           figure,
           stem,
           answer: frac(answer),
-          traps: traps.filter((t) => t.value.sign() > 0 && !t.value.eq(answer)),
+          traps,
           explanation: expl,
         },
       };
@@ -656,15 +709,17 @@ Comparing the whiskers would compare the ranges instead.`;
     else answer = q3.sub(q1);
     if (ask === 'iqr') {
       traps.push({ value: frac(range), trap: 'stat-iqr-range' });
-      if (!q3.sub(q2).eq(answer)) traps.push({ value: q3.sub(q2), trap: 'stat-iqr-half' });
+      traps.push({ value: q3.sub(q2), trap: 'stat-iqr-half' });
       if (d > 1) {
         const lowerHalf = list.slice(0, n / 2);
         const upperHalf = list.slice(n / 2);
         const mid = (xs: number[]) => (xs.length % 2 ? frac(xs[(xs.length - 1) / 2]) : new Frac(xs[xs.length / 2 - 1] + xs[xs.length / 2], 2));
         const slip = mid(upperHalf).sub(mid(lowerHalf));
-        if (!slip.eq(answer)) traps.push({ value: slip, trap: 'stat-median-unsorted' });
+        traps.push({ value: slip, trap: 'stat-median-unsorted' });
       }
     }
+    // a mistake that gives the answer is not a mistake: draw again
+    if (traps.some((t) => t.value.sign() <= 0 || t.value.eq(answer))) return quartiles.generate(rng, d);
     const h = n / 2;
     const halfMedian = (start: number) => (h % 2 ? `the ${ordinal(start + (h + 1) / 2)} value, $${num(sorted[start + (h - 1) / 2])}$` : `the average of the ${ordinal(start + h / 2)} and ${ordinal(start + h / 2 + 1)} values, $\\frac{${sorted[start + h / 2 - 1]} + ${sorted[start + h / 2]}}{2} = ${fTex(start === 0 ? q1 : q3)}$`);
     const what = ask === 'range' ? 'range' : ask === 'q1' ? 'first quartile' : ask === 'q3' ? 'third quartile' : 'interquartile range';
@@ -676,7 +731,7 @@ Comparing the whiskers would compare the ranges instead.`;
 
 What is the ${what} of the ${n} numbers listed above?`,
         answer,
-        traps: traps.filter((t, i) => t.value.sign() > 0 && !t.value.eq(answer) && traps.findIndex((u) => u.value.eq(t.value)) === i),
+        traps,
         explanation:
           ask === 'range'
             ? `In increasing order the least number is $${sorted[0]}$ and the greatest is $${sorted[n - 1]}$, so the range is $${sorted[n - 1]} - ${sorted[0]} = ${range}$.`

@@ -225,15 +225,19 @@ export const statsTraps: Record<string, Trap> = {
     fix: 'Square the distances, average the squares, then take the square root. That is at least the average distance.',
   },
   'stat-sd-variance': {
-    label: 'Multiplied the standard deviation by $k^2$',
-    fix: '$k^2$ applies to the variance (the square of the SD). The standard deviation itself is multiplied by $|k|$.',
+    label: 'Squared the standard deviation, or multiplied it by $k^2$',
+    fix: 'The square of the standard deviation is the variance, which is multiplied by $k^2$. The standard deviation itself is multiplied by $|k|$.',
   },
   'stat-sd-is-mean': {
     label: 'Transformed the mean instead of the spread',
     fix: 'The new mean is $k \\times$ mean $+ c$, but the question asks for a measure of spread, which ignores $c$.',
   },
+  'stat-sd-direction': {
+    label: 'Chose the opposite extreme',
+    fix: 'Reread whether the question asks for the greatest or the least spread, and check which end of the ranking you are choosing.',
+  },
   'stat-sd-intercept': {
-    label: 'Chose the equation with the largest constant term',
+    label: 'Chose the equation with the most extreme constant term',
     fix: 'The constant term shifts every $y$-value equally and does not affect the standard deviation; only $|a|$ in $y = ax + b$ matters.',
   },
   'stat-sd-negative-slope': {
@@ -243,6 +247,18 @@ export const statsTraps: Record<string, Trap> = {
   'stat-percentile-direction': {
     label: 'Moved the percentile the wrong way',
     fix: 'A value below $x$ has fewer data below it, so its percentile is lower; a value above $x$ has a higher percentile.',
+  },
+  'stat-percentile-complement': {
+    label: 'Counted from the top: percent above instead of percent below',
+    fix: 'The $n$th percentile has $n$ percent of the data below it. Do not subtract it from 100 unless the question asks for the percent above.',
+  },
+  'stat-percentile-shift-only': {
+    label: 'Gave the shift in percentile points instead of the new percentile',
+    fix: 'The count between the two values is a shift: add it to or subtract it from the known percentile to get the new one.',
+  },
+  'stat-percentile-added': {
+    label: 'Added the two percentiles instead of subtracting them',
+    fix: 'The data between two values is the difference of their percentiles: the $v$ percentile minus the $u$ percentile, as a percent of the total.',
   },
   'stat-percentile-no-shift': {
     label: 'Forgot to account for the values in between',
