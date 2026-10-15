@@ -41,6 +41,9 @@ const term = (e: E) => (e.c === 0 || e.k === 0 ? exprTex(e.c, e.k) : `(${exprTex
 
 type V3 = 'T' | 'L' | 'R';
 
+/** True when drawing the angles needs softening (an angle below 34 degrees is drawn larger): the figure must then say it is not to scale. */
+const soft = (...angs: number[]) => angs.some((a) => a < 34);
+
 /** Triangle drawn from its (true) angles at top T, bottom-left L, bottom-right R; base 4 units. */
 function triPts(angT: number, angL: number, angR: number): Record<V3, Pt> {
   const [, l, r] = softAngles([angT, angL, angR]);
@@ -179,7 +182,7 @@ const angleSum: Template<SumParams> = {
         q: {
           format: 'mcs',
           stem: `In triangle $${nT}${nL}${nR}$ above, ${askText}`,
-          figure: fb.build(),
+          figure: fb.build(soft(...vals)),
           choices,
           answer,
           explanation: `The angles of a triangle add up to $180^\\circ$:
@@ -246,7 +249,7 @@ Using $360^\\circ$ (the angle sum of a quadrilateral) instead of $180^\\circ$ is
         q: {
           format: 'mcs',
           stem: `In the figure above, side $${nL}${nR}$ of triangle $${nT}${nL}${nR}$ is extended. ${ask === 'x' ? 'What is the value of $x$?' : `What is the measure, in degrees, of angle $${nT}$?`}`,
-          figure: fb.build(),
+          figure: fb.build(soft(p, q, 180 - p - q)),
           choices,
           answer,
           explanation: `An exterior angle of a triangle equals the sum of the two interior angles that are not next to it (the remote interior angles), here the angles at $${nT}$ and $${nL}$:
@@ -349,7 +352,7 @@ The exterior angle is not an angle of the triangle: adding it to the other two a
       q: {
         format: 'mcs',
         stem: `In the figure above, $${caption}$${ask === 'ext' ? ` and side $${nL}${nR}$ is extended` : ''}. What is the value of $x$?`,
-        figure: fb.build(),
+        figure: fb.build(soft(ang.T, ang.L, ang.R)),
         choices,
         answer,
         explanation: `${expl}
@@ -423,13 +426,22 @@ const thirdSide: Template<ThirdParams> = {
     const hi = a + b;
     let items: { v: number; ok: boolean; trap?: string }[] = [];
     if (kind === 'iso') {
-      const cand = [2 * a + b, a + 2 * b, 3 * a, 3 * b, 2 * (a + b)];
-      items = [...new Set(cand)].map((v) => {
-        const okA = v === 2 * a + b && 2 * a > b;
-        const okB = v === a + 2 * b;
-        const trap = v === 2 * a + b && !okA ? 'geo-tri-iso-invalid' : undefined;
-        return { v, ok: okA || okB, ...(trap ? { trap } : {}) };
-      });
+      // the third side repeats a given length; every other perimeter is a slip
+      const cand: { v: number; trap?: string }[] = [
+        { v: 2 * a + b, trap: 2 * a > b ? undefined : 'geo-tri-iso-invalid' },
+        { v: a + 2 * b },
+        { v: 3 * a, trap: 'geo-tri-equilateral-assumed' },
+        { v: 3 * b, trap: 'geo-tri-equilateral-assumed' },
+        { v: 2 * (a + b), trap: 'geo-rt-rectangle-perimeter' },
+        { v: a + b, trap: 'geo-tri-forgot-third' },
+      ];
+      const seen = new Set<number>();
+      items = cand
+        .filter((x) => (seen.has(x.v) ? false : (seen.add(x.v), true)))
+        .map((x) => ({ v: x.v, ok: x.trap === undefined, ...(x.trap ? { trap: x.trap } : {}) }));
+      // five or six choices, with every correct perimeter kept
+      const wrong = rng.shuffle(items.filter((x) => !x.ok));
+      items = [...items.filter((x) => x.ok), ...wrong.slice(0, 5 - items.filter((x) => x.ok).length + (rng.chance(0.5) ? 1 : 0))];
     } else {
       const shift = kind === 'perimeter' ? a + b : 0;
       const inside: number[] = [];
@@ -454,15 +466,18 @@ const thirdSide: Template<ThirdParams> = {
     const seen = new Set<number>();
     items = items.filter((x) => (seen.has(x.v) ? false : (seen.add(x.v), true))).sort((x, y) => x.v - y.v);
     const fmt = (v: number) => `$${Number.isInteger(v) ? num(v) : v.toString()}$`;
+    const bare = (v: number) => fmt(v).replace(/\$/g, '');
     const { choices, answer } = flaggedChoices(items.map((x) => ({ text: fmt(x.v), correct: x.ok, ...(x.trap ? { trap: x.trap } : {}) })));
     const values = items.map((x) => x.v);
     let figure: GeometryFigure | undefined;
     let stem: string;
     let explanation: string;
+    const bounds = items.filter((x) => !x.ok && (kind === 'perimeter' ? x.v === lo + a + b || x.v === hi + a + b : x.v === lo || x.v === hi));
     if (kind === 'side') {
       const [nT, nL, nR] = rng.pick(TRI_NAMES);
-      // draw with a plausible third side
-      const c0 = (lo + hi) / 2;
+      // the unknown side is not drawn equal to either given side
+      const fs = [0.2, 0.3, 0.4, 0.6, 0.7, 0.8].filter((f) => Math.abs(lo + (hi - lo) * f - a) >= 1 && Math.abs(lo + (hi - lo) * f - b) >= 1);
+      const c0 = lo + (hi - lo) * rng.pick(fs.length ? fs : [0.5]);
       const Lp: Pt = [0, 0];
       const Rp: Pt = [c0, 0];
       const Tp = fromSides(Lp, Rp, b, a) ?? ([c0 / 2, a] as Pt);
@@ -474,29 +489,44 @@ const thirdSide: Template<ThirdParams> = {
         .side(nT, nL, nR, `$${b}$`)
         .side(nT, nR, nL, `$${a}$`)
         .side(nL, nR, nT, '$c$')
-        .build();
+        .build(true);
       stem = `In triangle $${nT}${nL}${nR}$ above, which of the following could be the value of $c$?`;
-      explanation = `The third side of a triangle must be greater than the difference of the other two and less than their sum:
+      explanation = `Two sides are known and the third is free, so use the triangle inequality. The third side must be longer than the difference of the other two (or the two shorter sides could not reach each other) and shorter than their sum (or they could not close the figure):
 
 $$${b} - ${a} < c < ${b} + ${a}, \\quad\\text{so}\\quad ${lo} < c < ${hi}$$
 
-${items.map((x) => `- $${fmt(x.v).replace(/\$/g, '')}$: ${x.ok ? 'between them ✓' : x.v === lo || x.v === hi ? 'equal to a bound, so the "triangle" would be flat ✗' : x.v < lo ? `too short, the sides $${a}$ and $${fmt(x.v).replace(/\$/g, '')}$ could not reach across $${b}$ ✗` : `too long, longer than $${a} + ${b}$ ✗`}`).join('\n')}`;
+${items.map((x) => `- $${bare(x.v)}$: ${x.ok ? `between $${lo}$ and $${hi}$ ✓` : x.v === lo || x.v === hi ? 'equal to a bound ✗' : x.v < lo ? `at most $${lo}$ ✗` : `at least $${hi}$ ✗`}`).join('\n')}
+
+${
+        bounds.length
+          ? `Trap: ${bounds.map((x) => fmt(x.v)).join(' and ')} ${bounds.length > 1 ? 'sit' : 'sits'} exactly on a bound. With $c = ${bare(bounds[0].v)}$ the three lengths satisfy $${bounds[0].v === hi ? `${a} + ${b} = ${hi}` : `${a} + ${lo} = ${b}`}$, so the sides lie along one line: a flat figure, not a triangle.`
+          : `Trap: a value that is too short or too long is tempting when it looks "close" to the sides, but only the range counts.`
+      }
+
+Rule: each side is less than the sum of the other two and more than their difference.`;
     } else if (kind === 'perimeter') {
       stem = `Two sides of a triangle have lengths $${a}$ and $${b}$. Which of the following could be the perimeter of the triangle?`;
-      explanation = `The third side $c$ satisfies $${lo} < c < ${hi}$, so the perimeter $${a} + ${b} + c$ is strictly between $${a + b} + ${lo} = ${a + b + lo}$ and $${a + b} + ${hi} = ${a + b + hi}$.
+      explanation = `The third side $c$ satisfies $${lo} < c < ${hi}$ (the triangle inequality), so the perimeter $${a} + ${b} + c$ lies strictly between $${a + b} + ${lo} = ${a + b + lo}$ and $${a + b} + ${hi} = ${a + b + hi}$.
 
 ${items.map((x) => `- $${x.v}$: ${x.ok ? `third side $${x.v - a - b}$ works ✓` : `third side would be $${x.v - a - b}$, ${x.v - a - b <= lo ? 'too short' : 'too long'} ✗`}`).join('\n')}
 
-The bounds themselves are not possible: a third side equal to $${lo}$ or $${hi}$ gives a flat figure.`;
+${bounds.length ? `Trap: ${bounds.map((x) => fmt(x.v)).join(' and ')} come from a third side of exactly $${lo}$ or $${hi}$, which gives a flat figure.` : 'Trap: the bounds themselves are not possible.'}
+
+Rule: the perimeter is the two known sides plus a third side that stays strictly between their difference and their sum.`;
     } else {
       stem = `An isosceles triangle has two sides of lengths $${a}$ and $${b}$. Which of the following could be the perimeter of the triangle?`;
       const okSmall = 2 * a > b;
-      explanation = `The third side must repeat one of the given lengths: the sides are either $${a}, ${a}, ${b}$ or $${a}, ${b}, ${b}$.
+      const present = (t: string) => items.filter((x) => x.trap === t).map((x) => fmt(x.v));
+      explanation = `Isosceles means two equal sides, so the third side repeats one of the given lengths: the sides are either $${a}, ${a}, ${b}$ or $${a}, ${b}, ${b}$. Each case must still obey the triangle inequality.
 
 - $${a}, ${b}, ${b}$: valid, since $${a} + ${b} > ${b}$. Perimeter $${a + 2 * b}$.
 - $${a}, ${a}, ${b}$: ${okSmall ? `valid, since $${a} + ${a} = ${2 * a} > ${b}$. Perimeter $${2 * a + b}$.` : `NOT a triangle, since $${a} + ${a} = ${2 * a}$ is not greater than $${b}$.`}
 
-So the possible perimeters are ${okSmall ? `$${2 * a + b}$ and $${a + 2 * b}$` : `only $${a + 2 * b}$`}.${okSmall ? '' : ' Checking the triangle inequality is the step that is easy to skip.'}`;
+So the possible perimeters are ${okSmall ? `$${2 * a + b}$ and $${a + 2 * b}$` : `only $${a + 2 * b}$`}.${
+        present('geo-tri-iso-invalid').length ? ` Trap: ${present('geo-tri-iso-invalid')[0]} comes from the sides $${a}, ${a}, ${b}$, which cannot close because $${2 * a} < ${b}$.` : present('geo-tri-equilateral-assumed').length ? ` Trap: ${present('geo-tri-equilateral-assumed').join(' and ')} would need all three sides equal, which the problem does not say.` : ''
+      }
+
+Rule: in an isosceles case, test the two equal sides against the third side.`;
     }
     return {
       params: { kind, a, b, values },
@@ -531,7 +561,7 @@ const sideAngleQC: Template<SAParams> = {
   style: 'compare two sides from the angles opposite them',
   generate(rng, d) {
     const v = rng.pick(
-      d === 1 ? (['angles', 'angles', 'expr'] as const) : d === 2 ? (['angles', 'expr', 'coord'] as const) : (['expr', 'one', 'coord', 'angles'] as const),
+      d === 1 ? (['angles', 'angles', 'expr', 'one'] as const) : d === 2 ? (['angles', 'expr', 'coord', 'one'] as const) : (['expr', 'one', 'one', 'coord', 'angles'] as const),
     );
     const names = rng.pick(TRI_NAMES);
     const nm: Record<V3, string> = { T: names[0], L: names[1], R: names[2] };
@@ -626,7 +656,7 @@ The point is in quadrant ${['I', 'II', 'III', 'IV'][quad - 1]}, so $c$ is ${sx >
       cmp = rng.sample(['T', 'L', 'R'] as V3[], 2) as [V3, V3];
     } else {
       // one angle given at T
-      const obtuse = rng.chance(0.65);
+      const obtuse = rng.chance(0.5);
       const t = obtuse ? rng.int(19, 26) * 5 : rng.pick([40, 50, 70, 80]);
       const l = (180 - t) / 2 + rng.pick([-4, 4]);
       ang = { T: t, L: l, R: 180 - t - l };
@@ -669,7 +699,7 @@ The figure only looks almost isosceles; it is not drawn to scale.`;
       params: v === 'expr' ? { v, exprs: exprs!, cmp } : { v, known, cmp },
       q: {
         format: 'qc',
-        figure: fb.build(),
+        figure: fb.build(v === 'one' || soft(ang.T, ang.L, ang.R)),
         quantityA: `$${sideName(s1)}$`,
         quantityB: `$${sideName(s2)}$`,
         answer,
@@ -720,8 +750,8 @@ The figure only looks almost isosceles; it is not drawn to scale.`;
 
 /* ================================================================== 4. Isosceles exterior angle, triangle inequality (QC) */
 
-type IneqForm = 'sum-vs-2z' | 'xy-vs-z' | 'z-vs-xy' | 'diff-vs-z' | 'sum-vs-2xy' | 'sum-vs-3z';
-type IsoQCParams = { v: 'iso-ext'; apexAngle: number; N: number } | { v: 'ineq'; form: IneqForm };
+type IneqForm = 'sum-vs-2z' | 'xy-vs-z' | 'z-vs-xy' | 'diff-vs-z' | 'sum-vs-2xy' | 'sum-vs-3z' | 'xy-vs-2z';
+type IsoQCParams = { v: 'iso-ext'; apexAngle: number; N: number } | { v: 'ineq'; form: IneqForm } | { v: 'range'; a: number; b: number; N: number };
 
 const INEQ: Record<IneqForm, { info: string; A: string; B: string; answer: QCChoice; why: string }> = {
   'sum-vs-2z': {
@@ -759,6 +789,13 @@ const INEQ: Record<IneqForm, { info: string; A: string; B: string; answer: QCCho
     answer: 'B',
     why: 'Subtract $x + y$ from both quantities: compare $z$ with $x + y$. Since $z < x + y$, Quantity B is greater. (B)',
   },
+  'xy-vs-2z': {
+    info: 'A triangle has sides of lengths $x$, $y$, and $z$.',
+    A: '$x + y$',
+    B: '$2z$',
+    answer: 'D',
+    why: 'Try two triangles. With sides $3, 3, 1$ ($z = 1$): $x + y = 6 > 2$, so Quantity A is greater. With sides $2, 2, 3$ ($z = 3$): $x + y = 4 < 6$, so Quantity B is greater. Both can happen, so nothing decides the comparison. (D)',
+  },
   'sum-vs-3z': {
     info: 'A triangle has sides of lengths $x$, $y$, and $z$.',
     A: '$x + y + z$',
@@ -774,9 +811,60 @@ const isoIneqQC: Template<IsoQCParams> = {
   format: 'qc',
   style: 'isosceles exterior angle or triangle inequality comparison',
   generate(rng, d) {
-    const v = rng.chance(d === 1 ? 0.6 : 0.5) ? 'iso-ext' : 'ineq';
+    const r = rng.next();
+    const v = r < (d === 1 ? 0.45 : d === 2 ? 0.4 : 0.35) ? 'iso-ext' : r < (d === 1 ? 0.8 : d === 2 ? 0.75 : 0.65) ? 'ineq' : 'range';
+    if (v === 'range') {
+      // two sides known, the third is z: z lies strictly between the difference and the sum
+      const a = rng.int(3, 12);
+      const b = rng.int(a + 2, a + 11);
+      const lo = b - a;
+      const hi = a + b;
+      const which = rng.pick(['A', 'D', 'D', 'B', 'B'] as const);
+      const N = which === 'A' ? Math.max(1, lo - rng.int(0, 2)) : which === 'B' ? hi + rng.int(0, 3) : rng.int(lo + 1, hi - 1);
+      const answer: QCChoice = N <= lo ? 'A' : N >= hi ? 'B' : 'D';
+      const [nT, nL, nR] = rng.pick(TRI_NAMES);
+      const fs = [0.2, 0.3, 0.4, 0.6, 0.7, 0.8].filter((f) => Math.abs(lo + (hi - lo) * f - a) >= 1 && Math.abs(lo + (hi - lo) * f - b) >= 1);
+      const c0 = lo + (hi - lo) * rng.pick(fs.length ? fs : [0.5]);
+      const Lp: Pt = [0, 0];
+      const Rp: Pt = [c0, 0];
+      const Tp = fromSides(Lp, Rp, b, a) ?? ([c0 / 2, a] as Pt);
+      const figure = new FigBuilder()
+        .pt(nT, Tp)
+        .pt(nL, Lp)
+        .pt(nR, Rp)
+        .poly(nT, nL, nR)
+        .side(nT, nL, nR, `$${b}$`)
+        .side(nT, nR, nL, `$${a}$`)
+        .side(nL, nR, nT, '$z$')
+        .build(true);
+      return {
+        params: { v, a, b, N },
+        q: {
+          format: 'qc',
+          info: `In triangle $${nT}${nL}${nR}$, $${nT}${nL} = ${b}$ and $${nT}${nR} = ${a}$.`,
+          figure,
+          quantityA: `$${nL}${nR}$`,
+          quantityB: `$${N}$`,
+          answer,
+          traps: qcTraps(answer, answer === 'D' ? { A: 'geo-tri-ineq-high', B: 'geo-tri-ineq-low' } : answer === 'A' ? { D: 'geo-tri-ineq-forgot', B: 'geo-tri-ineq-low' } : { D: 'geo-tri-ineq-forgot', A: 'geo-tri-ineq-high' }),
+          explanation: `Two sides are known and the third, $${nL}${nR}$, is free, so use the triangle inequality: the third side is longer than the difference of the other two and shorter than their sum.
+
+$$${b} - ${a} < ${nL}${nR} < ${b} + ${a}, \\quad\\text{so}\\quad ${lo} < ${nL}${nR} < ${hi}$$
+
+${
+            answer === 'A'
+              ? `Every possible $${nL}${nR}$ is greater than $${lo}$, and $${N} \\le ${lo}$, so Quantity A is greater. (A)`
+              : answer === 'B'
+                ? `Every possible $${nL}${nR}$ is less than $${hi}$, and $${N} \\ge ${hi}$, so Quantity B is greater. (B)`
+                : `$${N}$ lies inside that range. A third side of $${lo + 0.5}$ is allowed and is less than $${N}$; a third side of $${hi - 0.5}$ is allowed and is greater than $${N}$. Both can happen. (D)`
+          }
+
+The figure shows one possible triangle. It is not drawn to scale, so it does not fix the third side.`,
+        },
+      };
+    }
     if (v === 'ineq') {
-      const forms: IneqForm[] = d === 1 ? ['xy-vs-z', 'z-vs-xy', 'sum-vs-2z'] : d === 2 ? ['sum-vs-2z', 'diff-vs-z', 'sum-vs-2xy', 'z-vs-xy'] : ['sum-vs-2z', 'diff-vs-z', 'sum-vs-2xy', 'sum-vs-3z'];
+      const forms: IneqForm[] = d === 1 ? ['xy-vs-z', 'z-vs-xy', 'sum-vs-2z'] : d === 2 ? ['sum-vs-2z', 'diff-vs-z', 'sum-vs-2xy', 'z-vs-xy'] : ['sum-vs-2z', 'diff-vs-z', 'sum-vs-2xy', 'sum-vs-3z', 'xy-vs-2z'];
       const form = rng.pick(forms);
       const f = INEQ[form];
       const fig = new FigBuilder();
@@ -784,7 +872,7 @@ const isoIneqQC: Template<IsoQCParams> = {
       const p2 = fig.helper([4.4, 0]);
       const p3 = fig.helper([1.5, 2.6]);
       fig.poly(p1, p2, p3).side(p1, p2, p3, '$z$').side(p1, p3, p2, '$x$').side(p2, p3, p1, '$y$');
-      const fl = fig.build();
+      const fl = fig.build(true);
       const trapsMap: Partial<Record<QCChoice, string>> =
         f.answer === 'D' ? { B: 'geo-tri-ineq-assumed-longest' } : { D: 'geo-tri-ineq-forgot', ...(form === 'sum-vs-2z' || form === 'diff-vs-z' ? { C: 'geo-tri-ineq-endpoint' } : {}) };
       return {
@@ -844,6 +932,14 @@ Compare with $${N}$: ${QC_SAY[answer]}. (${answer})`,
       const A = dir(p.apexAngle);
       const beyond = add(A, sub(A, C));
       exp = qcFromSamples([[angleAt(A, beyond, B), p.N]]);
+    } else if (p.v === 'range') {
+      // build triangles with the two given sides and a third side that sweeps the open interval
+      const samples: [number, number][] = [];
+      for (let i = 1; i < 200; i++) {
+        const c = p.b - p.a + ((2 * p.a) * i) / 200;
+        if (fromSides([0, 0], [c, 0], p.b, p.a)) samples.push([c, p.N]);
+      }
+      exp = qcFromSamples(samples);
     } else {
       const rnd = mulberry(p.form.length * 31 + 7);
       const samples: [number, number][] = [];
@@ -855,7 +951,7 @@ Compare with $${N}$: ${QC_SAY[answer]}. (${answer})`,
         const y = dist(P[2], P[0]);
         if (p.form === 'diff-vs-z' && !(x > y)) continue;
         const [A, B] =
-          p.form === 'sum-vs-2z' ? [x + y + z, 2 * z] : p.form === 'xy-vs-z' ? [x + y, z] : p.form === 'z-vs-xy' ? [z, x + y] : p.form === 'diff-vs-z' ? [x - y, z] : p.form === 'sum-vs-2xy' ? [x + y + z, 2 * x + 2 * y] : [x + y + z, 3 * z];
+          p.form === 'sum-vs-2z' ? [x + y + z, 2 * z] : p.form === 'xy-vs-z' ? [x + y, z] : p.form === 'z-vs-xy' ? [z, x + y] : p.form === 'diff-vs-z' ? [x - y, z] : p.form === 'sum-vs-2xy' ? [x + y + z, 2 * x + 2 * y] : p.form === 'xy-vs-2z' ? [x + y, 2 * z] : [x + y + z, 3 * z];
         samples.push([A, B]);
       }
       exp = qcFromSamples(samples);
@@ -1054,10 +1150,10 @@ const thirdVertex: Template<VertexParams> = {
     const correct: Pt[] = xs.slice(0, nCorrect).map((x) => [x, s * h]);
     const wrongPool: { p: Pt; trap?: string }[] = [
       { p: [xs[nCorrect], -s * h], trap: 'geo-tri-wrong-side' },
-      { p: [xs[nCorrect + 1] ?? xa, s * (h + 1)] },
-      { p: [xs[nCorrect + 2] ?? xb, s * (h - 1)] },
+      { p: [xs[nCorrect + 1] ?? xa, s * K], trap: 'geo-tri-height-is-area' },
+      { p: [xs[nCorrect + 2] ?? xb, s * 2 * h], trap: 'geo-tri-height-double' },
+      { p: [h, xs[0]], trap: 'geo-tri-swapped-coords' },
       ...(h % 2 === 0 ? [{ p: [rng.pick([xa, xb, (xa + xb) / 2].filter(Number.isInteger)), (s * h) / 2] as Pt, trap: 'geo-tri-no-half' }] : []),
-      { p: [xs[nCorrect + 3] ?? xa + 1, s * 2 * h], trap: 'geo-tri-height-double' },
     ];
     const wrong = rng.shuffle(wrongPool).slice(0, 5 - nCorrect);
     const items: { p: Pt; ok: boolean; trap?: string }[] = [...correct.map((p) => ({ p, ok: true })), ...wrong.map((w) => ({ p: w.p, ok: false, trap: w.trap }))];

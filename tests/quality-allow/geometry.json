@@ -49,17 +49,5 @@
   },
   "geo.similarity.statements-mcm": {
     "artifacts.frac-1": "baseline"
-  },
-  "geo.triangles.iso-inequality-qc": {
-    "qc.d-share": "baseline"
-  },
-  "geo.triangles.side-angle-qc": {
-    "qc.d-share": "baseline"
-  },
-  "geo.triangles.third-side": {
-    "distractors.trapped": "baseline"
-  },
-  "geo.triangles.third-vertex": {
-    "distractors.trapped": "baseline"
   }
 }

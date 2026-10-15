@@ -88,6 +88,14 @@ export const shapesTraps: Record<string, Trap> = {
     label: 'Kept an isosceles triangle that cannot exist',
     fix: 'Check the triangle inequality for each case: sides $4, 4, 9$ fail because $4 + 4$ is not greater than $9$.',
   },
+  'geo-tri-equilateral-assumed': {
+    label: 'Assumed all three sides are equal',
+    fix: 'Isosceles means only two equal sides. The third side is either of the two given lengths, so the perimeter is $2a + b$ or $a + 2b$, not three equal sides.',
+  },
+  'geo-tri-forgot-third': {
+    label: 'Left the third side out of the perimeter',
+    fix: 'The perimeter adds all three sides. Here the third side repeats one of the two given lengths.',
+  },
   'geo-tri-ineq-endpoint': {
     label: 'Allowed the third side to equal the sum or the difference',
     fix: 'The third side must be STRICTLY between the difference and the sum of the other two sides; equal to either one gives a flat figure, not a triangle.',
@@ -143,6 +151,14 @@ export const shapesTraps: Record<string, Trap> = {
   'geo-tri-wrong-side': {
     label: 'Ignored which side of the axis the point must be on',
     fix: 'A point "above the $x$-axis" has a positive $y$-coordinate; the same height below the axis is not allowed.',
+  },
+  'geo-tri-swapped-coords': {
+    label: 'Swapped the $x$- and $y$-coordinates',
+    fix: 'The height of the triangle is the $y$-coordinate of $C$ (its distance from the $x$-axis). The $x$-coordinate only slides $C$ along a line parallel to the base.',
+  },
+  'geo-tri-height-is-area': {
+    label: 'Used the area as the height',
+    fix: 'From $\\frac{1}{2}(\\text{base})(\\text{height}) = K$ the height is $\\frac{2K}{\\text{base}}$, not $K$.',
   },
   'geo-tri-height-double': {
     label: 'Used half of the base',
