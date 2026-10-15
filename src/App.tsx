@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ExportReminder } from './components/ExportReminder';
 import { Dashboard } from './pages/Dashboard';
 import { History } from './pages/History';
@@ -23,6 +23,7 @@ export function App() {
   const route = useRoute();
   const theme = useProgress((s) => s.settings.theme);
   const motion = useProgress((s) => s.settings.motion ?? 'system');
+  const nav = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -37,6 +38,14 @@ export function App() {
   }, [motion]);
 
   const page = route[0] ?? '';
+
+  // On a phone the nav is one scrolling line: bring the current page to its middle.
+  useEffect(() => {
+    const n = nav.current;
+    const a = n?.querySelector('[aria-current]');
+    if (n && a) n.scrollLeft += a.getBoundingClientRect().left - n.getBoundingClientRect().left - (n.clientWidth - a.clientWidth) / 2;
+  }, [page]);
+
   let body;
   switch (page) {
     case 'practice':
@@ -66,9 +75,10 @@ export function App() {
       <header className="topbar">
         <div className="topbar-inner">
           <a className="brand" href={href()}>
-            <span className="brand-mark">Q</span> GRE Quant Trainer
+            <span className="brand-mark">Q</span>
+            <span className="brand-name">GRE Quant Trainer</span>
           </a>
-          <nav className="nav">
+          <nav className="nav" ref={nav}>
             {NAV.map(([p, label]) => (
               <a key={p} href={p ? href(p) : href()} className={page === p ? 'active' : undefined} aria-current={page === p ? 'page' : undefined}>
                 {label}

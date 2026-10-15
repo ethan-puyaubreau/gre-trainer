@@ -917,6 +917,46 @@ details summary {
   }
 }
 
+/* ---------------------------------------------------------------- small screens */
+@media (max-width: 640px) {
+  /* One-line header: the brand shrinks to its mark and the nav scrolls sideways. The header leaves with the page, so the
+     sticky exam bar and Check bar get the room (and no offset below a header has to be kept in sync). */
+  .topbar {
+    position: static;
+  }
+  .topbar-inner {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 6px 12px;
+  }
+  .brand {
+    flex: none;
+  }
+  .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .nav {
+    flex: 1;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+  .nav a {
+    flex: none;
+    white-space: nowrap;
+    padding: 9px 10px;
+  }
+}
+
 /* ---------------------------------------------------------------- motion off */
 /* The system preference applies unless the in-app setting forces motion on (data-motion on <html>). */
 @media (prefers-reduced-motion: reduce) {
