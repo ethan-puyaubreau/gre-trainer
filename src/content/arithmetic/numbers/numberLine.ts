@@ -232,7 +232,7 @@ const farthestClosest: Template<FarParams> = {
       vals.sort((x, y) => x.cmp(y));
       const dist = vals.map((v) => v.sub(c).abs().toNumber());
       const target = extremeIndex(dist, mode === 'far' ? 'max' : 'min');
-      if (target < 0) continue;
+      if (target < 0 || vals[target].eq(0)) continue; // 0 as the key would be a giveaway
       // Real slips: the greatest size, the greatest (or least) value, the biggest number on the same side as c (far);
       // the size closest to 0, the size closest to |c| on the other side of 0 (close).
       type Slip = 'maxAbs' | 'maxVal' | 'minVal' | 'sameSide' | 'minAbs' | 'mirror';

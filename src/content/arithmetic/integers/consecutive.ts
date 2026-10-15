@@ -146,7 +146,7 @@ Or: there are $\\lfloor ${b} / ${k} \\rfloor = ${Math.floor(b / k)}$ multiples o
       b = k * m2;
       answer = m2 - m1 - 1;
       traps.push({ value: answer + 2, trap: 'counted-endpoint' }, { value: answer + 1, trap: 'counted-endpoint' });
-      stem = `How many integers between ${a} and ${b} are multiples of ${k}?`;
+      stem = `How many integers between ${a} and ${b}, exclusive, are multiples of ${k}?`;
       explanation = `$${a} = ${k} \\cdot ${m1}$ and $${b} = ${k} \\cdot ${m2}$, but "between" excludes ${a} and ${b}. The multiples of ${k} strictly between them are $${k} \\cdot ${m1 + 1}, \\ldots, ${k} \\cdot ${m2 - 1}$: that is $${m2 - 1} - ${m1 + 1} + 1 = ${answer}$ multiples.
 
 Counting from ${a} to ${b} inclusive would give ${answer + 2}.`;

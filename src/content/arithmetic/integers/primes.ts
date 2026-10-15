@@ -472,7 +472,7 @@ Compare ${valA} with ${valB}: ${QC_WORDS[answer]}. (${answer})`;
 Compare ${valA} with ${k}: ${QC_WORDS[answer]}. (${answer})`;
       } else if (mode === 'count-k') {
         const comps = oddComposites(a + 1, b - 1);
-        quantityA = `The number of prime numbers between ${a} and ${b}`;
+        quantityA = `The number of prime numbers between ${a} and ${b}, exclusive`;
         quantityB = `$${k}$`;
         explanation = `The primes strictly between ${a} and ${b} are ${primeList(a, b)}: there are ${valA}.${
           comps.length ? ` Watch the odd numbers that are not prime: ${listAnd(comps)}.` : ''
