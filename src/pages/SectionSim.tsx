@@ -72,7 +72,7 @@ export function SectionSim() {
           question: q,
           correct: g.correct,
           timeMs: sec.timeSpent[i],
-          hinted: false,
+          hintLevel: 0,
           traps: g.traps,
           mode: 'section',
           response: sec.responses[i],

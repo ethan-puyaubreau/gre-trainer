@@ -3,7 +3,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Response } from '../engine/grade';
 import { createRng, randomSeed } from '../engine/rng';
 import type { Difficulty, Question } from '../engine/types';
-import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, type AttemptOutcome, type SkillState } from '../mastery/model';
+import { templatesBySkill } from '../content';
+import { applyAttempt, DEFAULT_PACE_SEC, newSkillState, requirementsFor, type AttemptInput, type AttemptOutcome, type SkillState } from '../mastery/model';
 import { scheduleRepair, type Remediation } from '../mastery/scheduler';
 import { dropWeakFlags } from './migrate';
 
@@ -65,7 +66,7 @@ interface Actions {
     question: Question;
     correct: boolean;
     timeMs: number;
-    hinted: boolean;
+    hintLevel: AttemptInput['hintLevel'];
     traps: string[];
     mode: Mode;
     response?: Response;
@@ -127,14 +128,24 @@ export const useProgress = create<ProgressData & Actions>()(
     (set, get) => ({
       ...initialData(),
 
-      recordAttempt({ question, correct, timeMs: rawMs, hinted, traps, mode, response }) {
+      recordAttempt({ question, correct, timeMs: rawMs, hintLevel, traps, mode, response }) {
         const timeMs = Math.min(rawMs, MAX_ATTEMPT_MS);
         const s = get();
         const prev = s.skills[question.skillId] ?? newSkillState();
         const at = Date.now();
         const outcome = applyAttempt(
           prev,
-          { templateId: question.templateId, correct, timeMs, hinted, at, timedSection: mode === 'section' },
+          {
+            templateId: question.templateId,
+            format: question.format,
+            difficulty: question.difficulty,
+            correct,
+            timeMs,
+            at,
+            hintLevel,
+            timedSection: mode === 'section',
+          },
+          requirementsFor(templatesBySkill.get(question.skillId) ?? []),
           s.settings.paceSec,
         );
         const seq = s.seq + 1;
@@ -153,7 +164,7 @@ export const useProgress = create<ProgressData & Actions>()(
           at,
           mode,
           traps,
-          hinted,
+          hinted: hintLevel > 0,
           response,
         };
         set({

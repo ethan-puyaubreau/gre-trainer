@@ -127,7 +127,7 @@ export function Practice({ route }: { route: string[] }) {
       question: current.question,
       correct: g.correct,
       timeMs,
-      hinted,
+      hintLevel: hinted ? 3 : 0,
       traps: g.traps,
       mode: 'practice',
       response,

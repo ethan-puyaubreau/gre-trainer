@@ -38,7 +38,7 @@ describe('recordAttempt', () => {
   it('caps a recorded time at 10 minutes', () => {
     useProgress.setState(initialData());
     const question = { id: 'arith.x#1#1', templateId: 'arith.x', skillId: 'arith.s' } as never;
-    const base = { question, correct: true, hinted: false, traps: [] as string[], mode: 'practice' as const };
+    const base = { question, correct: true, hintLevel: 0 as const, traps: [] as string[], mode: 'practice' as const };
     useProgress.getState().recordAttempt({ ...base, timeMs: 5 * 60 * 60 * 1000 });
     useProgress.getState().recordAttempt({ ...base, timeMs: 30_000 });
     expect(useProgress.getState().history.map((h) => h.timeMs)).toEqual([MAX_ATTEMPT_MS, 30_000]);

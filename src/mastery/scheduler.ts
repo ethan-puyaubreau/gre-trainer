@@ -71,7 +71,7 @@ export function pickTemplate(
   // Score: uncredited styles first, then least recently seen.
   const scored = pool.map((t) => ({
     t,
-    score: (state.styles.includes(t.id) ? 1000 : 0) + (recentIdx(t.id) + 1) * 10 + rng.next(),
+    score: (state.styles[t.id] ? 1000 : 0) + (recentIdx(t.id) + 1) * 10 + rng.next(),
   }));
   scored.sort((a, b) => a.score - b.score);
   return scored[0].t;

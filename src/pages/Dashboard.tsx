@@ -4,7 +4,7 @@ import { formatClock } from '../components/Timer';
 import { AREA_NAMES, AREAS, skillById, SKILLS, templatesBySkill, TRAPS } from '../content';
 import type { Skill } from '../engine/types';
 import { calibrate, MIN_PER_CELL, type Cell, type Row } from '../mastery/calibration';
-import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, progressToNext, type Level } from '../mastery/model';
+import { dayKey, isDue, LEVEL_NAMES, newSkillState, nextStep, progressToNext, requirementsFor, type Level } from '../mastery/model';
 import { reducedMotion } from '../motion';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
@@ -211,7 +211,7 @@ export function Dashboard() {
                       .map((s) => {
                         const st = states[s.id];
                         const lvl = st?.level ?? 0;
-                        const p = progressToNext(st ?? newSkillState());
+                        const p = progressToNext(st ?? newSkillState(), requirementsFor(templatesBySkill.get(s.id) ?? []), now);
                         const label = lvl === 4 ? LEVEL_NAMES[4] : `${LEVEL_NAMES[lvl]}, ${Math.round(100 * p)}% to ${LEVEL_NAMES[lvl + 1]}`;
                         return (
                           <button
@@ -401,7 +401,7 @@ function SkillDrawer({ skill, opener, onClose }: { skill: Skill; opener: RefObje
       <ul className="list-plain">
         {templates.map((t) => (
           <li key={t.id} className="row">
-            <span style={{ width: 18 }}>{st.styles.includes(t.id) ? '✓' : '·'}</span>
+            <span style={{ width: 18 }}>{st.styles[t.id] ? '✓' : '·'}</span>
             <span style={{ flex: 1 }}>{t.style}</span>
             <span className="chip">{{ qc: 'Comparison', mcs: 'Select one', mcm: 'Select all', ne: 'Numeric entry' }[t.format]}</span>
           </li>
