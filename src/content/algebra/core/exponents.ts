@@ -1,8 +1,8 @@
-import { flaggedChoices, textChoices } from '../../../engine/build';
+import { flaggedChoices, qcCompare, textChoices } from '../../../engine/build';
 import { Frac } from '../../../engine/frac';
 import { lin, num } from '../../../engine/tex';
 import type { QCChoice, QCQuestion, Template } from '../../../engine/types';
-import { N, V, add, allowedValues, close, div, evalEx, lx, mul, pow, powT, qcEnd, qcSamples, sameFunction, texEx, type Ex } from './util';
+import { N, V, add, allowedValues, close, div, evalEx, evalFrac, lx, mul, pow, powT, qcEnd, qcSamples, sameFunction, texEx, type Ex } from './util';
 
 /* ================================================================== 1. Solve an equation by writing every power with one base (NE) */
 
@@ -57,6 +57,7 @@ const solveExpNE: Template<SolveParams> = {
       x = new Frac(rhs, coef);
       const okDen = d === 3 ? x.d === 1 || x.d === 2 : x.d === 1;
       if (!okDen || x.n === 0 || Math.abs(x.toNumber()) > 12) continue;
+      if (x.d === 1 && Math.abs(x.n) === 1) continue; // x = 1 and x = -1 let the equation be checked by eye
       if (right.a === 0 && g ** (right.e * right.c) > 1000) continue;
       break;
     }
@@ -98,13 +99,21 @@ const solveExpNE: Template<SolveParams> = {
         prefix: '$x =$',
         answer: x,
         traps,
-        explanation: `Write every power with base ${g}${convLine ? `: ${convLine}` : ''}${rhsNote ? `, ${rhsNote}` : ''}.
+        explanation: `Exponents can be compared only when the bases match, so write every power with base ${g}${convLine ? `: ${convLine}` : ''}${rhsNote ? `, ${rhsNote}` : ''}.
 
 ${opText}, so the equation becomes $${g}^{${lExp}} = ${g}^{${rExp}}$. Equal powers of the same base have equal exponents:
 $$${lExp} = ${rExp}$$
 ${lA - rA === 1 ? 'so' : `so $${expTex(lA - rA, 0)} = ${num(rC - lC)}$ and`} $x = ${x.toTex()}${x.isInt() ? '' : ` = ${x.toDecimalString()}`}$.
 
-Setting the exponents equal before converting to one base is the classic mistake: different bases cannot be compared that way.`,
+Check: at $x = ${x.toTex()}$ both exponents equal $${num(x.mul(lA).add(lC))}$, so both sides equal $${powT(g, num(x.mul(lA).add(lC)))}$.${
+          traps.length
+            ? `
+
+Trap: equating the exponents as written, before the bases match, gives $x = ${traps[0].value.toTex()}$. At that value the exponents of base ${g} are $${num(traps[0].value.mul(lA).add(lC))}$ and $${num(traps[0].value.mul(rA).add(rC))}$, which differ.`
+            : ''
+        }
+
+Rule: make the bases equal first; only then set the exponents equal.`,
       },
     };
   },
@@ -125,10 +134,35 @@ Setting the exponents equal before converting to one base is the classic mistake
 interface EquivPowParams {
   kind: 'quotient' | 'solve-m' | 'given-k';
   target: Ex;
+  /** Variable names the options use: quotient [v, w]; solve-m [t]; given-k [k]. */
   vars: string[];
   options: Ex[];
   /** For 'solve-m': bases b1, b2 with b1^m = b2^t. For 'given-k': [g, B, c]. */
   nums: number[];
+}
+
+const NAME_PAIRS = [['x', 'y'], ['a', 'b'], ['m', 'n'], ['s', 't'], ['p', 'q'], ['u', 'v']];
+
+/** A wrong form: the expression, the named slip, and a clause saying what the student did. */
+interface WrongForm {
+  e: Ex;
+  trap: string;
+  why: string;
+}
+
+/** The first of the given points where the wrong form differs from the right one (exact values), as text. */
+function refute(wrong: Ex, right: Ex, points: Record<string, number>[], name: (env: Record<string, Frac>) => string): string {
+  for (const p of points) {
+    const env = Object.fromEntries(Object.entries(p).map(([k, x]) => [k, new Frac(x)]));
+    try {
+      const a = evalFrac(wrong, env);
+      const b = evalFrac(right, env);
+      if (!a.eq(b)) return `At ${name(env)} the choice gives $${a.toTex()}$ but the right value is $${b.toTex()}$.`;
+    } catch {
+      /* undefined at this point: try the next one */
+    }
+  }
+  return '';
 }
 
 const equivPowMCS: Template<EquivPowParams> = {
@@ -137,113 +171,139 @@ const equivPowMCS: Template<EquivPowParams> = {
   format: 'mcs',
   style: 'rewrite powers in another base',
   generate(rng, d) {
-    const kind = rng.pick(d === 1 ? (['quotient', 'given-k'] as const) : (['quotient', 'solve-m', 'given-k'] as const));
-    const wrongs: { e: Ex; trap?: string }[] = [];
-    let correct: Ex;
-    let target: Ex;
-    let vars: string[];
-    let stem: string;
-    let explanation: string;
-    let nums: number[] = [];
-    if (kind === 'quotient') {
-      const g = rng.pick([2, 3]);
-      const m = g === 2 ? rng.pick([2, 2, 3]) : 2;
-      const B = g ** m;
-      const v = rng.pick(['x', 'y']);
-      const w = v === 'x' ? 'y' : 'x';
-      const sigma = rng.sign();
-      // numerator exponent: w + s1 v, denominator: w + s2 v, s1 - s2 = sigma * m
-      const s2 = rng.pick(m === 2 ? [-1, 1] : [-1, 1, -2, 2].filter((s) => Math.abs(s + sigma * m) <= 2));
-      const s1 = s2 + sigma * m;
-      const sv = (s: number): Ex => (s === 1 ? V(v) : mul(N(s), V(v)));
-      const numE = s1 === 0 ? V(w) : add(V(w), sv(s1));
-      const denE = s2 === 0 ? V(w) : add(V(w), sv(s2));
-      target = div(pow(N(g), numE), pow(N(g), denE));
-      vars = ['x', 'y'];
-      const Bv = (s: number, name: string) => pow(N(B), s === 1 ? V(name) : mul(N(-1), V(name)));
-      correct = Bv(sigma, v);
-      wrongs.push({ e: Bv(-sigma, v), trap: 'alg-exponent-order' });
-      wrongs.push({ e: Bv(sigma, w), trap: 'alg-exponent-cancel' });
-      wrongs.push({ e: Bv(-sigma, w) });
-      wrongs.push({ e: pow(N(g), mul(V('x'), V('y'))), trap: 'alg-exponent-product' });
-      const diff = `(${texEx(numE)}) - (${texEx(denE)})`;
-      explanation = `Dividing powers of the same base subtracts the exponents: $${texEx(target)} = ${g}^{${diff}} = ${g}^{${sigma * m}${v}}$.
+    for (;;) {
+      const kind = rng.pick(d === 1 ? (['quotient', 'quotient', 'given-k'] as const) : d === 2 ? (['quotient', 'solve-m', 'given-k'] as const) : (['solve-m', 'quotient', 'given-k', 'solve-m'] as const));
+      const wrongs: WrongForm[] = [];
+      let correct: Ex;
+      let target: Ex;
+      let vars: string[];
+      let stem: string;
+      let method: string;
+      let rule: string;
+      let nums: number[] = [];
+      let points: Record<string, number>[];
+      let nameAt: (env: Record<string, Frac>) => string;
+      if (kind === 'quotient') {
+        // g^(w + s1 v) / g^(w + s2 v) = (g^m)^(sigma v)
+        const [g, m, sMax] = rng.pick(d === 1 ? [[2, 2, 3], [3, 2, 3]] : d === 2 ? [[2, 3, 3], [2, 2, 3], [3, 2, 3]] : [[2, 4, 4], [5, 2, 4], [3, 3, 4], [2, 3, 4]]);
+        const B = g ** m;
+        const [v, w] = rng.shuffle(rng.pick(NAME_PAIRS));
+        const sigma = rng.sign();
+        const s2opts = (d === 1 ? [-1, 1] : d === 2 ? (m === 3 ? [-2, -1, 1, 2] : [-2, 0, 2]) : [-2, -1, 0, 1, 2]).filter((s) => Math.abs(s + sigma * m) <= sMax);
+        if (!s2opts.length) continue;
+        const s2 = rng.pick(s2opts);
+        const s1 = s2 + sigma * m;
+        const sv = (s: number): Ex => (s === 1 ? V(v) : mul(N(s), V(v)));
+        const wFirst = rng.chance(0.5);
+        const mk = (s: number): Ex => (s === 0 ? V(w) : wFirst ? add(V(w), sv(s)) : add(sv(s), V(w)));
+        const numE = mk(s1);
+        const denE = mk(s2);
+        target = div(pow(N(g), numE), pow(N(g), denE));
+        vars = [v, w];
+        const Bv = (s: number, name: string): Ex => pow(N(B), s === 1 ? V(name) : mul(N(-1), V(name)));
+        correct = Bv(sigma, v);
+        wrongs.push({ e: Bv(-sigma, v), trap: 'alg-exponent-order', why: 'subtracting the exponents in the wrong order' });
+        wrongs.push({ e: Bv(sigma, w), trap: 'alg-exponent-cancel', why: `cancelling $${v}$ instead of $${w}$` });
+        wrongs.push({ e: pow(N(B), mul(N(sigma * m), V(v))), trap: 'alg-base-converted-twice', why: `writing $${g}^{${sigma * m}${v}}$ as $${B}^{${sigma * m}${v}}$ without dividing the exponent by ${m}` });
+        wrongs.push({ e: pow(N(g), mul(numE, denE)), trap: 'alg-exponent-product', why: 'multiplying the exponents instead of subtracting them' });
+        stem = `Which of the following is equal to $${texEx(target)}$ for all numbers $${v}$ and $${w}$?`;
+        method = `Dividing powers of the same base subtracts the exponents, numerator minus denominator: $${texEx(target)} = ${g}^{(${texEx(numE)}) - (${texEx(denE)})} = ${g}^{${sigma * m}${v}}$. Since $${g}^{${m}} = ${B}$, $${g}^{${sigma * m}${v}} = (${g}^{${m}})^{${sigma < 0 ? '-' : ''}${v}} = ${texEx(correct)}$.`;
+        rule = 'Subtract exponents in the order top minus bottom, then convert the base.';
+        points = [{ [v]: 1, [w]: 0 }, { [v]: 1, [w]: 1 }, { [v]: 2, [w]: 1 }, { [v]: 0, [w]: 1 }];
+        nameAt = (env) => `$${v} = ${env[v].toTex()}$, $${w} = ${env[w].toTex()}$`;
+      } else if (kind === 'solve-m') {
+        // b1^m = b2^t  ->  m = (e2/e1) t
+        const g = rng.pick(d === 2 ? [2, 3] : [2, 2, 3]);
+        const exps = g === 2 ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
+        let e1: number;
+        let e2: number;
+        do [e1, e2] = rng.sample(exps, 2);
+        while (d === 2 ? e2 % e1 !== 0 : e2 % e1 === 0);
+        const [vm, vt] = rng.pick([['m', 't'], ['a', 'b'], ['p', 'q'], ['r', 's']]);
+        const b1 = g ** e1;
+        const b2 = g ** e2;
+        nums = [b1, b2];
+        vars = [vt];
+        const ratio = new Frac(e2, e1);
+        const coefT = (c: Frac): Ex => (c.isInt() ? mul(N(c), V(vt)) : div(mul(N(c.n), V(vt)), N(c.d)));
+        target = coefT(ratio);
+        correct = coefT(ratio);
+        wrongs.push({ e: coefT(new Frac(e1, e2)), trap: 'alg-exponent-ratio-inverted', why: 'turning the ratio of the exponents upside down' });
+        wrongs.push({ e: lx(1, e2 - e1, vt), trap: 'alg-exponent-difference-added', why: `adding the difference ${e2 - e1} of the exponents instead of multiplying` });
+        wrongs.push({ e: V(vt), trap: 'alg-ignore-base', why: `equating the exponents $${vm}$ and $${vt}$ although the bases differ` });
+        wrongs.push({ e: mul(N(e2), V(vt)), trap: 'alg-exponent-unreduced', why: `forgetting to divide by ${e1}` });
+        wrongs.push({ e: mul(N(b2), V(vt)), trap: 'alg-ignore-base', why: `using the base ${b2} as the coefficient` });
+        wrongs.push({ e: mul(N(e1 + e2), V(vt)), trap: 'alg-exponent-difference-added', why: `adding the exponents ${e1} and ${e2}` });
+        stem = `If $${b1}^{${vm}} = ${b2}^{${vt}}$, then $${vm}$ equals which of the following?`;
+        method = `The bases differ, so write both sides with base ${g}: ${[e1 === 1 ? '' : `$${b1}^{${vm}} = ${g}^{${e1}${vm}}$`, e2 === 1 ? '' : `$${b2}^{${vt}} = ${g}^{${e2}${vt}}$`].filter(Boolean).join(' and ')}. Equal powers of ${g} have equal exponents${e1 === 1 ? '' : `: $${e1}${vm} = ${e2 === 1 ? '' : e2}${vt}$`}, so $${vm} = ${texEx(correct)}$.
 
-Since $${g}^{${m}} = ${B}$, $${g}^{${sigma * m}${v}} = (${g}^{${m}})^{${sigma < 0 ? '-' : ''}${v}} = ${texEx(correct)}$.
+Check with $${vt} = ${e1}$: $${powT(b2, e1)}$ and $${powT(b1, e2)}$ both equal $${num(g ** (e1 * e2))}$, so $${vm} = ${e2}$, as the formula gives.`;
+        rule = 'Rewrite both sides with one base first, then equate the exponents.';
+        points = [e1, 2 * e1, 3 * e1, e2].map((t) => ({ [vt]: t }));
+        nameAt = (env) => `$${vt} = ${env[vt].toTex()}$ (where $${vm} = ${env[vt].mul(ratio).toTex()}$)`;
+      } else {
+        const g = rng.pick(d === 1 ? [2, 3] : [2, 3, 5]);
+        const e = g === 2 ? rng.pick([2, 3]) : 2;
+        const B = g ** e;
+        const c = d === 1 ? 1 : d === 2 ? 2 : rng.pick([2, 3]);
+        const [vn, vk] = rng.pick([['n', 'k'], ['t', 'u'], ['m', 'p'], ['a', 'b']]);
+        nums = [g, B, c];
+        vars = [vk];
+        // B^(n + c) = g^(e c) * k^e  where k = g^n
+        const coef = g ** (e * c);
+        target = mul(N(coef), pow(V(vk), e));
+        correct = target;
+        wrongs.push({ e: mul(N(g ** c), pow(V(vk), e)), trap: 'alg-exponent-distribute', why: `multiplying only the $${vn}$ by ${e} and not the ${c}` });
+        wrongs.push({ e: add(pow(V(vk), e), N(coef)), trap: 'alg-exponent-add-as-sum', why: `turning a sum in the exponent into a sum of terms` });
+        wrongs.push({ e: mul(N(coef), V(vk)), trap: 'alg-power-base-mult', why: `writing $${B}^{${vn}}$ as $${g ** e}\\cdot ${g}^{${vn}}$` });
+        wrongs.push({ e: pow(V(vk), e * c), trap: 'alg-exponent-add-as-mult', why: `writing $${B}^{${vn} + ${c}}$ as $(${B}^{${vn}})^{${c}}$` });
+        if (c > 1) wrongs.push({ e: mul(N(B), pow(V(vk), e)), trap: 'alg-exponent-distribute', why: `using ${B} where ${B}^{${c}} belongs` });
+        stem = `If $${g}^{${vn}} = ${vk}$, which of the following is equal to $${B}^{${vn} + ${c}}$ in terms of $${vk}$?`;
+        method = `Write $${B}$ as $${g}^{${e}}$: $${B}^{${vn} + ${c}} = ${g}^{${e}(${vn} + ${c})} = ${g}^{${e}${vn}} \\cdot ${g}^{${e * c}} = (${g}^{${vn}})^{${e}} \\cdot ${num(coef)} = ${texEx(correct)}$.
 
-Subtract in the right order (numerator minus denominator); the other order gives $${texEx(wrongs[0].e)}$.`;
-      stem = `Which of the following is equal to $${texEx(target)}$ for all numbers $x$ and $y$?`;
-    } else if (kind === 'solve-m') {
-      const g = rng.pick([2, 3]);
-      const exps = g === 2 ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
-      let e1: number;
-      let e2: number;
-      do [e1, e2] = rng.sample(exps, 2);
-      while (e2 % e1 === 0 && rng.chance(0.7));
-      const b1 = g ** e1;
-      const b2 = g ** e2;
-      nums = [b1, b2];
-      vars = ['t'];
-      target = mul(N(new Frac(e2, e1)), V('t'));
-      const coefT = (c: Frac): Ex => (c.isInt() ? mul(N(c), V('t')) : div(mul(N(c.n), V('t')), N(c.d)));
-      correct = coefT(new Frac(e2, e1));
-      wrongs.push({ e: coefT(new Frac(e1, e2)), trap: 'alg-exponent-ratio-inverted' });
-      wrongs.push({ e: lx(1, e2 - e1, 't'), trap: 'alg-exponent-difference-added' });
-      wrongs.push({ e: V('t'), trap: 'alg-ignore-base' });
-      if (b2 % b1 === 0) wrongs.push({ e: mul(N(b2 / b1), V('t')), trap: 'alg-ignore-base' });
-      wrongs.push({ e: mul(N(e2), V('t')) }, { e: lx(1, 1, 't') }, { e: mul(N(e1 * e2), V('t')) });
-      wrongs.push({ e: mul(N(b2), V('t')) }, { e: pow(V('t'), e2) }, { e: lx(1, -1, 't') }, { e: mul(N(e1 + e2), V('t')) });
-      stem = `If $${b1}^{m} = ${b2}^{t}$, then $m$ equals which of the following?`;
-      explanation = `Write both sides with base ${g}: ${[e1 === 1 ? '' : `$${b1}^{m} = ${g}^{${e1}m}$`, e2 === 1 ? '' : `$${b2}^{t} = ${g}^{${e2}t}$`].filter(Boolean).join(' and ')}.
+Check with $${vn} = 1$: $${vk} = ${g}$ and $${B}^{${1 + c}} = ${num(B ** (1 + c))}$, while $${num(coef)} \\cdot ${g}^{${e}} = ${num(coef * g ** e)}$.`;
+        rule = 'Write the base as a power of the base you are given, then split the sum in the exponent into a product.';
+        points = [{ [vk]: g }, { [vk]: g * g }, { [vk]: 1 }];
+        nameAt = (env) => `$${vk} = ${env[vk].toTex()}$`;
+      }
+      // Four distinct wrong forms, none equivalent to the right one.
+      const kept: WrongForm[] = [];
+      const texts = new Set([texEx(correct)]);
+      for (const wf of wrongs) {
+        if (kept.length === 4) break;
+        if (texts.has(texEx(wf.e))) continue;
+        if (sameFunction(wf.e, correct, vars, rng, 0.5, 3)) continue;
+        if (kept.some((k) => sameFunction(k.e, wf.e, vars, rng, 0.5, 3))) continue;
+        texts.add(texEx(wf.e));
+        kept.push(wf);
+      }
+      if (kept.length < 4) continue;
+      const { choices, answer } = textChoices(
+        rng,
+        `$${texEx(correct)}$`,
+        kept.map((wf) => ({ text: `$${texEx(wf.e)}$`, trap: wf.trap })),
+      );
+      const all = [correct, ...kept.map((k) => k.e)];
+      const options = choices.map((c) => all.find((e) => `$${texEx(e)}$` === c.text)!);
+      const cited = kept[0];
+      const note = refute(cited.e, correct, points, nameAt);
+      return {
+        params: { kind, target, vars, options, nums },
+        q: {
+          format: 'mcs',
+          stem,
+          choices,
+          answer,
+          explanation: `${method}
 
-Equal powers of ${g} have equal exponents: $${e1 === 1 ? '' : e1}m = ${e2 === 1 ? '' : e2}t$, so $m = ${texEx(correct)}$.
+Trap: $${texEx(cited.e)}$ comes from ${cited.why}. ${note}
 
-Inverting the fraction gives $${texEx(wrongs[0].e)}$. Check with $t = ${e1}$: $${powT(b2, e1)} = ${powT(g, e1 * e2)} = ${powT(b1, e2)}$, so $m = ${e2}$.`;
-    } else {
-      const g = rng.pick([2, 3]);
-      const e = g === 2 ? rng.pick([2, 3]) : 2;
-      const B = g ** e;
-      const c = rng.pick(d === 1 ? [1] : [1, 2]);
-      nums = [g, B, c];
-      vars = ['k'];
-      // B^(n + c) = g^(e c) * k^e  where k = g^n
-      const coef = g ** (e * c);
-      target = mul(N(coef), pow(V('k'), e));
-      correct = target;
-      wrongs.push({ e: mul(N(g ** c), pow(V('k'), e)), trap: 'alg-exponent-distribute' });
-      wrongs.push({ e: add(pow(V('k'), e), N(coef)), trap: 'alg-exponent-add-as-sum' });
-      wrongs.push({ e: mul(N(coef), V('k')), trap: 'alg-power-base-mult' });
-      wrongs.push({ e: mul(N(B), pow(V('k'), e)) }, { e: pow(V('k'), e * (c + 1)) }, { e: mul(N(coef), pow(V('k'), e + 1)) });
-      stem = `If $${g}^{n} = k$, which of the following is equal to $${B}^{${c === 0 ? 'n' : `n + ${c}`}}$ in terms of $k$?`;
-      explanation = `Write $${B}$ as $${g}^{${e}}$: $${B}^{n + ${c}} = ${g}^{${e}(n + ${c})} = ${g}^{${e}n} \\cdot ${g}^{${e * c}} = (${g}^{n})^{${e}} \\cdot ${num(coef)} = ${texEx(correct)}$.
-
-Two slips to avoid: $${g}^{${e}(n + ${c})}$ is $${g}^{${e}n + ${e * c}}$, not $${g}^{${e}n + ${c}}$; and $${B}^{n}$ is $(${g}^{n})^{${e}}$, not $${B} \\cdot ${g}^{n}$.`;
+Rule: ${rule}`,
+        },
+      };
     }
-    // Keep 4 wrong choices that are really different from the answer and from each other.
-    const pickRng = rng;
-    const kept: { e: Ex; trap?: string }[] = [];
-    const texts = new Set([texEx(correct)]);
-    for (const w of wrongs) {
-      if (kept.length === 4) break;
-      if (texts.has(texEx(w.e))) continue;
-      if (sameFunction(w.e, correct, vars, pickRng, 0.5, 3)) continue;
-      if (kept.some((k) => sameFunction(k.e, w.e, vars, pickRng, 0.5, 3))) continue;
-      texts.add(texEx(w.e));
-      kept.push(w);
-    }
-    const { choices, answer } = textChoices(
-      rng,
-      `$${texEx(correct)}$`,
-      kept.map((w) => ({ text: `$${texEx(w.e)}$`, ...(w.trap ? { trap: w.trap } : {}) })),
-    );
-    const all = [correct, ...kept.map((k) => k.e)];
-    const options = choices.map((c) => all.find((e) => `$${texEx(e)}$` === c.text)!);
-    return {
-      params: { kind, target, vars, options, nums },
-      q: { format: 'mcs', stem, choices, answer, explanation },
-    };
   },
-  check(q, { kind, target, options, nums }, rng) {
+  check(q, { kind, target, vars, options, nums }, rng) {
     if (q.format !== 'mcs') return 'wrong format';
     if (options.some((o, i) => q.choices[i].text !== `$${texEx(o)}$`)) return 'choice text mismatch';
     const matches: number[] = [];
@@ -253,15 +313,15 @@ Two slips to avoid: $${g}^{${e}(n + ${c})}$ is $${g}^{${e}n + ${e * c}}$, not $$
         const s = 0.5 + 3 * rng.next();
         const s2 = -2 + 4 * rng.next();
         if (kind === 'quotient') {
-          ok = close(evalEx(o, { x: s, y: s2 }), evalEx(target, { x: s, y: s2 }), 1e-8);
+          ok = close(evalEx(o, { [vars[0]]: s, [vars[1]]: s2 }), evalEx(target, { [vars[0]]: s, [vars[1]]: s2 }), 1e-8);
         } else if (kind === 'solve-m') {
           // Solve b1^m = b2^t for m with logarithms, compare with the choice.
           const m = (s * Math.log(nums[1])) / Math.log(nums[0]);
-          ok = close(evalEx(o, { t: s }), m, 1e-9);
+          ok = close(evalEx(o, { [vars[0]]: s }), m, 1e-9);
         } else {
           const [g, B, c] = nums;
           const n = s2;
-          ok = close(evalEx(o, { k: Math.pow(g, n) }), Math.pow(B, n + c), 1e-9);
+          ok = close(evalEx(o, { [vars[0]]: Math.pow(g, n) }), Math.pow(B, n + c), 1e-9);
         }
       }
       if (ok) matches.push(i);
@@ -372,12 +432,33 @@ const casesQC: Template<CasesParams> = {
       }
       return `Divide both quantities by the positive number $${powTex(KB, Q)}$: compare $${KA.div(KB).toTex()}${P - Q === 0 ? '' : P - Q === 1 ? 'x' : `x^{${P - Q}}`}$ with 1.`;
     })();
-    const regionText =
+    // Two allowed values that give different relations, for a D answer.
+    let regionText =
       region === 'gt1'
         ? 'Here $x > 1$.'
         : region === 'lt1'
           ? 'Here $0 < x < 1$.'
           : 'The condition allows both $0 < x < 1$ and $x > 1$, so try one value of each kind.';
+    if (answer === 'D') {
+      // simplest values first, so the two cases shown are the easiest ones that disagree
+      const GT = [new Frac(2), new Frac(3), new Frac(3, 2), new Frac(5), new Frac(6, 5), new Frac(10), new Frac(11, 10), new Frac(100)];
+      const LT = [new Frac(1, 2), new Frac(1, 3), new Frac(2, 3), new Frac(1, 5), new Frac(5, 6), new Frac(1, 10), new Frac(9, 10), new Frac(1, 100)];
+      const pool = region === 'gt1' ? GT : region === 'lt1' ? LT : [GT[0], LT[0], GT[1], LT[1], GT[2], LT[2], GT[3], LT[3], ...GT.slice(4), ...LT.slice(4)];
+      const pairs = pool.flatMap((x1, i) => pool.map((x2, j) => ({ x1, x2, k: i + j }))).sort((a, b) => a.k - b.k);
+      const at = (x: Frac) => {
+        const a = KA.mul(x.pow(P));
+        const b = KB.mul(x.pow(Q));
+        return { a, b, rel: qcCompare(a, b) };
+      };
+      for (const { x1, x2 } of pairs) {
+          const r1 = at(x1);
+          const r2 = at(x2);
+          if (r1.rel === r2.rel) continue;
+          const word = (r: QCChoice) => (r === 'A' ? 'Quantity A is greater' : r === 'B' ? 'Quantity B is greater' : 'the quantities are equal');
+          regionText = `${region === 'pos-ne1' ? 'Both kinds of $x$ are allowed.' : ''} For $x = ${x1.toTex()}$: $A = ${r1.a.toTex()}$ and $B = ${r1.b.toTex()}$, so ${word(r1.rel)}. For $x = ${x2.toTex()}$: $A = ${r2.a.toTex()}$ and $B = ${r2.b.toTex()}$, so ${word(r2.rel)}. Two allowed values disagree.`.trim();
+          break;
+        }
+    }
     return {
       params: { region, c, dd, m, n, e, f, p, q: qq },
       q: {

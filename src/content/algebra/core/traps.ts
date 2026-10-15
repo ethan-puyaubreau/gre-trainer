@@ -86,6 +86,14 @@ export const coreAlgebraTraps: Record<string, Trap> = {
     label: 'Multiplied exponents when dividing',
     fix: 'Dividing powers of the same base subtracts the exponents; only a power of a power multiplies them.',
   },
+  'alg-base-converted-twice': {
+    label: 'Changed the base but kept the old exponent',
+    fix: '$2^{2x}$ is $(2^2)^x = 4^{x}$, not $4^{2x}$: when the base becomes $2^k$, the exponent is divided by $k$.',
+  },
+  'alg-exponent-unreduced': {
+    label: 'Left the coefficient undivided',
+    fix: 'From $4m = 6t$ divide both sides by 4: $m = \\frac{6}{4}t = \\frac{3}{2}t$, not $m = 6t$.',
+  },
   'alg-exponent-ratio-inverted': {
     label: 'Inverted the ratio of the exponents',
     fix: 'From $2^{3m} = 2^{4t}$ you get $3m = 4t$, so $m = \\frac{4t}{3}$. Check with a value: $t = 3$ gives $m = 4$.',
