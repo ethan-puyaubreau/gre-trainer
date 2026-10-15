@@ -217,6 +217,10 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Reversed the direction of the exponents',
     fix: 'If $10^x$ is a small percent of $10^y$, then $10^x$ is the smaller number, so $x < y$. Write the percent as a power of 10 first: $0.1\\% = 10^{-3}$.',
   },
+  'int-power-ten-factor': {
+    label: 'Gave the relation between the numbers instead of the exponents',
+    fix: 'The question links the exponents. If $10^x$ is 1 percent of $10^y$, then $10^x = 10^{y-2}$, so $x = y - 2$. It is not $y = 100x$.',
+  },
   'int-percent-not-divided': {
     label: 'Treated $q$ percent as $q$',
     fix: '$q$ percent means $\\frac{q}{100}$: 1 percent is $10^{-2}$, 0.1 percent is $10^{-3}$, and 10 percent is $10^{-1}$.',

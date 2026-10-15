@@ -2,6 +2,7 @@ import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build'
 import { Frac, frac } from '../../../engine/frac';
 import { range } from '../../../engine/math';
 import { num } from '../../../engine/tex';
+import { term } from '../../../engine/text';
 import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { QC_WORDS, expectMcm, expectMcsBy, expectNe, expectQc, listAnd } from './util';
 
@@ -437,11 +438,11 @@ const commonBaseQC: Template<CommonBaseParams> = {
         ? `That is exactly Quantity B. (C)`
         : `Compare $${valTex}$ with $${Btex}$: divide both by $${b}^{${m}}$ to get ${coef * b ** (e - m)} and ${k * b ** (g - m)}, so ${QC_WORDS[answer]}. (${answer})`;
     const slips: Partial<Record<BaseForm, string>> = {
-      'diff-over-b': `$${b}^{${n}} - ${b}^{${n - 1}}$ is not $${b}^{1}$: exponents subtract only when you divide powers.`,
-      'next-minus': `$${b}^{${n + 1}} - ${b}^{${n}}$ is not $${b}^{1}$: exponents subtract only when you divide powers.`,
-      double: `$${b}^{${n}} + ${b}^{${n}}$ is not $${b}^{${2 * n}}$: exponents add only when you multiply powers.`,
-      triple: `The sum is not $${b}^{${3 * n}}$: exponents add only when you multiply powers.`,
-      'power-of-power': `It is not $${b}^{${n + 2}}$: exponents multiply for a power of a power.`,
+      'diff-over-b': `Trap: $${b}^{${n}} - ${b}^{${n - 1}}$ is not $${b}$: exponents subtract only when you divide powers.`,
+      'next-minus': `Trap: $${b}^{${n + 1}} - ${b}^{${n}}$ is not $${b}$: exponents subtract only when you divide powers.`,
+      double: `Trap: $${b}^{${n}} + ${b}^{${n}}$ is not $${b}^{${2 * n}}$: exponents add only when you multiply powers.`,
+      triple: `Trap: the sum is not $${b}^{${3 * n}}$: exponents add only when you multiply powers.`,
+      'power-of-power': `Trap: it is not $${b}^{${n + 2}}$: exponents multiply for a power of a power.`,
     };
     return {
       params: { form, b, n, k, g },
@@ -605,9 +606,9 @@ Adding equal powers does not add (or multiply) the exponents: $${sumTex} \\ne ${
         if (base ** (q * c) > 1e12) continue;
         const P = base ** p;
         const Q = base ** q;
-        stem = `If $\\left(\\dfrac{1}{${P}}\\right)^{x} = ${Q}^{${c}}$, what is the value of $x$?`;
+        stem = `If $\\left(\\dfrac{1}{${P}}\\right)^{x} = ${c === 1 ? `${Q}` : `${Q}^{${c}}`}$, what is the value of $x$?`;
         traps.push({ value: -answer, trap: 'int-negative-exponent' });
-        explanation = `Write both sides with base ${base}: $\\frac{1}{${P}} = ${base}^{${-p}}$, so the left side is $${base}^{${-p}x}$, and the right side is $${base}^{${q * c}}$. Then $${-p}x = ${q * c}$ and $x = ${answer}$.
+        explanation = `Write both sides with base ${base}: $\\frac{1}{${P}} = ${base}^{${-p}}$, so the left side is $${base}^{${term(-p, 'x')}}$, and the right side is $${q * c === 1 ? `${base}` : `${base}^{${q * c}}`}$. Then $${term(-p, 'x')} = ${q * c}$ and $x = ${answer}$.
 
 $x$ is negative: a reciprocal base needs a negative exponent to give a number greater than 1.`;
       }
@@ -738,7 +739,7 @@ const productInterval: Template<ProductParams> = {
         }
       if (good.length !== 1) continue;
       // order by value
-      const order = nums.map((x, i) => ({ x, i })).sort((u, v) => val(u.x).cmp(val(v.x)));
+      const order = rng.shuffle(nums.map((x, i) => ({ x, i })));
       const sorted = order.map((o) => o.x);
       const [gi, gj] = good[0];
       const pairSet = new Set([order.findIndex((o) => o.i === gi), order.findIndex((o) => o.i === gj)]);
@@ -746,9 +747,12 @@ const productInterval: Template<ProductParams> = {
       const misread = (x: PairNum) => (x.tex.includes('^{-') && x.n > 0 ? frac(-x.n, x.d) : val(x));
       const items = sorted.map((x, idx) => {
         let trap: string | undefined;
-        if (!pairSet.has(idx) && !x.tex.includes('^') && x.n > 0) {
-          const fooled = sorted.some((y) => y !== x && y.tex.includes('^{-') && y.n > 0 && misread(y).mul(val(x)).gt(lo) && misread(y).mul(val(x)).lt(hi));
-          if (fooled) trap = 'int-negative-exponent';
+        if (!pairSet.has(idx)) {
+          if (!x.tex.includes('^') && x.n > 0) {
+            const fooled = sorted.some((y) => y !== x && y.tex.includes('^{-') && y.n > 0 && misread(y).mul(val(x)).gt(lo) && misread(y).mul(val(x)).lt(hi));
+            trap = fooled ? 'int-negative-exponent' : 'num-sign-rules';
+          } else if (x.tex.includes('^') && x.n < 0) trap = 'num-sign-rules';
+          else trap = 'num-product-range';
         }
         return { text: `$${x.tex}$`, correct: pairSet.has(idx), ...(trap ? { trap } : {}) };
       });
@@ -773,7 +777,9 @@ The product must be negative, so one factor is negative and the other positive, 
             negList.length
               ? ` ${listAnd(negList.map((x) => `$${x.tex}$`))} ${negList.length > 1 ? 'are' : 'is'} negative.`
               : ''
-          } Only $${x1.tex} \\times ${x2.tex} = ${val(x1).toTex()} \\times ${val(x2).toTex()} = ${prod.toTex()}$ lies between $-1$ and 0; every other pair has a positive product or a product of size at least 1.`,
+          } Only $${x1.tex} \\times ${x2.tex} = ${val(x1).toTex()} \\times ${val(x2).toTex()} = ${prod.toTex()}$ lies between $-1$ and 0; every other pair has a positive product or a product of size at least 1.
+
+Trap: a negative factor is not enough. The product must also be smaller than 1 in size, which needs a fraction with a large denominator.`,
         },
       };
     }
@@ -801,9 +807,11 @@ interface TenParams {
   offsets: number[];
 }
 
-const PCT_TEX: Record<number, string> = { [-3]: '0.001', [-2]: '0.01', 0: '1', 1: '10', 3: '1{,}000' };
-const PCT_TEXT: Record<number, string> = { [-3]: '0.001', [-2]: '0.01', 0: '1', 1: '10', 3: '1,000' };
+const PCT_TEX: Record<number, string> = { [-3]: '0.001', [-2]: '0.01', [-1]: '0.1', 0: '1', 1: '10', 3: '1{,}000', 4: '10{,}000' };
+const PCT_TEXT: Record<number, string> = { [-3]: '0.001', [-2]: '0.01', [-1]: '0.1', 0: '1', 1: '10', 3: '1,000', 4: '10,000' };
 const MULT = 999;
+/** 10^e without the exponent 1 or 0: p10(1) = "10", p10(0) = "1". */
+const p10 = (e: number) => (e === 1 ? '10' : e === 0 ? '1' : `10^{${e}}`);
 
 const powersOfTenPercent: Template<TenParams> = {
   id: 'arith.exponents.powers-of-ten-percent',
@@ -811,30 +819,39 @@ const powersOfTenPercent: Template<TenParams> = {
   format: 'mcs',
   style: 'powers of 10 combined with a percent: relation between exponents',
   generate(rng, diff) {
-    const t = rng.pick(diff === 1 ? [0, 1, -2] : diff === 2 ? [-2, 1, 3] : [-3, -2, 3]);
+    // Each level has its own percents, so the same wording never appears at two levels.
+    const t = rng.pick(diff === 1 ? [0, 1] : diff === 2 ? [-1, 3] : [-3, -2, 4]);
     const dir: 0 | 1 = rng.chance(0.5) ? 0 : 1;
-    // dir 0: 10^x = 10^(t-2) 10^y -> y = x + (2 - t);  dir 1: 10^y = 10^(t-2) 10^x -> y = x + (t - 2)
-    const dStar = dir === 0 ? 2 - t : t - 2;
-    const cands: { d: number; trap?: string }[] = [
-      { d: -dStar, trap: 'int-power-ten-direction' },
-      { d: dir === 0 ? -t : t, trap: 'int-percent-not-divided' },
-      ...[1, -1, 2, -2, 3, -3, 4, -4].map((k) => ({ d: dStar + k })),
+    const e = t - 2;
+    // dir 0: 10^x = 10^e 10^y -> y = x - e ;  dir 1: 10^y = 10^e 10^x -> y = x + e
+    const off = (ea: number) => (dir === 0 ? -ea : ea);
+    const dStar = off(e);
+    // every wrong relation is a real slip: the direction reversed, or the percent read as 10^t, 10^(t-1), 10^(t-3)...
+    const cands: { d: number; trap: string }[] = [
+      { d: off(-e), trap: 'int-power-ten-direction' },
+      { d: off(-t), trap: 'int-power-ten-direction' },
+      { d: off(1 - t), trap: 'int-power-ten-direction' },
+      { d: off(3 - t), trap: 'int-power-ten-direction' },
+      { d: off(t), trap: 'int-percent-not-divided' },
+      { d: off(t - 1), trap: 'int-percent-not-divided' },
+      { d: off(t - 3), trap: 'int-percent-not-divided' },
+      { d: off(t + 1), trap: 'int-percent-not-divided' },
+      { d: off(t - 4), trap: 'int-percent-not-divided' },
     ];
-    const pool: { d: number; trap?: string }[] = [];
+    const pool: { d: number; trap: string }[] = [];
     for (const cnd of cands) if (cnd.d !== dStar && !pool.some((x) => x.d === cnd.d)) pool.push(cnd);
-    // Half the time the last choice is the multiplicative look-alike "y = 10^k x"; the answer
-    // position among the additive choices is uniform.
-    const withMult = rng.chance(0.5);
+    // Half the time the last choice is the look-alike "y = 10^k x" (the relation between the numbers, not the exponents).
+    const withMult = pool.length < 4 || rng.chance(0.3);
     const slots = withMult ? 4 : 5;
-    const below = pool.filter((x) => x.d < dStar);
-    const above = pool.filter((x) => x.d > dStar);
+    const below = rng.shuffle(pool.filter((x) => x.d < dStar));
+    const above = rng.shuffle(pool.filter((x) => x.d > dStar));
     let target = rng.int(0, slots - 1);
     target = Math.max(Math.min(target, below.length), slots - 1 - above.length);
     const picked = [...below.slice(0, target), ...above.slice(0, slots - 1 - target)];
     const all: { d: number; ok: boolean; trap?: string }[] = [
       { d: dStar, ok: true },
       ...picked.map((x) => ({ ...x, ok: false })),
-      ...(withMult ? [{ d: MULT, ok: false }] : []),
+      ...(withMult ? [{ d: MULT, ok: false, trap: 'int-power-ten-factor' }] : []),
     ];
     const factor = 10 ** Math.max(1, Math.abs(dStar));
     const relTex = (d: number) => (d === MULT ? `y = ${num(factor)}x` : d === 0 ? 'y = x' : `y = x ${d > 0 ? '+' : '-'} ${Math.abs(d)}`);
@@ -843,18 +860,29 @@ const powersOfTenPercent: Template<TenParams> = {
     const answer = all.findIndex((x) => x.ok);
     const pctTex = PCT_TEX[t];
     const pct = PCT_TEXT[t];
+    const frame = rng.int(0, 1);
     const stem =
       dir === 0
-        ? `For integers $x$ and $y$, $10^{x}$ is equal to ${pct} percent of $10^{y}$. Which of the following must be true?`
-        : `For integers $x$ and $y$, ${pct} percent of $10^{x}$ is equal to $10^{y}$. Which of the following must be true?`;
-    const e = t - 2;
+        ? [
+            `For integers $x$ and $y$, $10^{x}$ is equal to ${pct} percent of $10^{y}$. Which of the following must be true?`,
+            `$x$ and $y$ are integers, and $10^{x}$ equals ${pct} percent of $10^{y}$. Which of the following relations must hold?`,
+          ][frame]
+        : [
+            `For integers $x$ and $y$, ${pct} percent of $10^{x}$ is equal to $10^{y}$. Which of the following must be true?`,
+            `$x$ and $y$ are integers, and ${pct} percent of $10^{x}$ equals $10^{y}$. Which of the following relations must hold?`,
+          ][frame];
     const eTex = (v: string) => (e === 0 ? v : `${v} ${e > 0 ? '+' : '-'} ${Math.abs(e)}`);
     const work =
       dir === 0
-        ? `So $10^{x} = 10^{${e}} \\cdot 10^{y} = 10^{${eTex('y')}}$, which means $x = ${eTex('y')}$, that is, $${relTex(dStar)}$.`
-        : `So $10^{y} = 10^{${e}} \\cdot 10^{x} = 10^{${eTex('x')}}$, which means $${relTex(dStar)}$.`;
+        ? `So $10^{x} = ${p10(e)} \\cdot 10^{y} = 10^{${eTex('y')}}$, which means $x = ${eTex('y')}$, that is, $${relTex(dStar)}$.`
+        : `So $10^{y} = ${p10(e)} \\cdot 10^{x} = 10^{${eTex('x')}}$, which means $${relTex(dStar)}$.`;
     const yEx = 5;
     const xEx = dir === 0 ? yEx + e : yEx - e;
+    const slips: string[] = [];
+    const dirTrap = all.find((x) => x.d === -dStar && x.trap === 'int-power-ten-direction');
+    if (dirTrap) slips.push(`$${relTex(dirTrap.d)}$ reverses the direction`);
+    if (all.some((x) => x.trap === 'int-percent-not-divided' || x.trap === 'int-power-ten-direction' && x.d !== -dStar)) slips.push(`reading ${pct} percent as $${p10(t)}$ (forgetting the division by 100) shifts the exponent`);
+    if (withMult) slips.push(`$${relTex(MULT)}$ relates the numbers, but the question is about the exponents`);
     return {
       params: { t, dir, offsets: all.map((x) => x.d) },
       q: {
@@ -862,13 +890,15 @@ const powersOfTenPercent: Template<TenParams> = {
         stem,
         choices,
         answer,
-        explanation: `${pct} percent is $\\frac{${pctTex}}{100} = 10^{${t}} \\cdot 10^{-2} = 10^{${e}}$. ${work}
+        explanation: `Turn the percent into a power of 10: ${pct} percent is $\\frac{${pctTex}}{100} = ${p10(e)}$. ${work}
 
-Check with numbers: if $x = ${xEx}$ and $y = ${yEx}$, then ${dir === 0 ? `${pct} percent of $10^{${yEx}}$ is $10^{${yEx + e}} = 10^{x}$` : `${pct} percent of $10^{${xEx}}$ is $10^{${xEx + e}} = 10^{y}$`}. ${
+Check with numbers: if $x = ${xEx}$ and $y = ${yEx}$, then ${dir === 0 ? `${pct} percent of $10^{${yEx}}$ is $${p10(yEx + e)} = 10^{x}$` : `${pct} percent of $10^{${xEx}}$ is $${p10(xEx + e)} = 10^{y}$`}. ${
           e < 0
-            ? `Since ${pct} percent is less than 100 percent, $10^{${dir === 0 ? 'x' : 'y'}}$ is the smaller power, so $${dir === 0 ? 'x < y' : 'y < x'}$.`
-            : `Since ${pct} percent is more than 100 percent, $10^{${dir === 0 ? 'x' : 'y'}}$ is the larger power, so $${dir === 0 ? 'x > y' : 'y > x'}$.`
-        }`,
+            ? `${pct} percent is less than 100 percent, so $10^{${dir === 0 ? 'x' : 'y'}}$ is the smaller power and $${dir === 0 ? 'x < y' : 'y < x'}$.`
+            : `${pct} percent is more than 100 percent, so $10^{${dir === 0 ? 'x' : 'y'}}$ is the larger power and $${dir === 0 ? 'x > y' : 'y > x'}$.`
+        }
+
+Trap: ${slips.slice(0, 2).join('; ')}.`,
       },
     };
   },

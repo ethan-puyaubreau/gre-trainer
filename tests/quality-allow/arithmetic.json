@@ -20,21 +20,7 @@
     "distractors.trapped": "baseline"
   },
   "arith.exponents.common-base-qc": {
-    "artifacts.exp-1": "baseline",
-    "qc.never-d": "baseline"
-  },
-  "arith.exponents.powers-of-ten-percent": {
-    "artifacts.exp-1": "baseline",
-    "distractors.trapped": "baseline",
-    "bank.size": "baseline",
-    "bank.difficulty": "baseline"
-  },
-  "arith.exponents.product-interval": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.exponents.same-base-equation": {
-    "artifacts.coef-1": "baseline",
-    "artifacts.exp-1": "baseline"
+    "qc.never-d": "Both quantities are fixed numbers (the exponent n is given), so D is impossible."
   },
   "arith.fractions.compare-mcs": {
     "distractors.trapped": "baseline"
