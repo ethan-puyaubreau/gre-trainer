@@ -7,11 +7,19 @@ import { isDue, newSkillState, type SkillState } from './model';
 
 export interface Remediation {
   skillId: string;
-  /** Template that was missed: the comeback uses a different one. */
+  /** Template that was missed. */
   missedTemplate: string;
-  /** Serve once the global attempt counter reaches this value. */
+  /** Stage 1 is served once the global attempt counter reaches this value; stage 2 does not use it. */
   dueSeq: number;
+  /**
+   * 1 = first comeback, a few questions later: the missed template again, with new numbers, one difficulty
+   * below the missed question. 2 = next-day comeback, once the skill's `dueAt` has passed: another style.
+   * Entries saved before stages existed have none and count as stage 1.
+   */
+  stage: 1 | 2;
 }
+
+const stageOf = (r: Remediation): 1 | 2 => r.stage ?? 1;
 
 export type PracticeScope =
   | { kind: 'smart'; areas?: Area[] }
@@ -84,20 +92,28 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
   const playable = input.skills.filter((s) => (input.templatesBySkill.get(s.id)?.length ?? 0) > 0 && inScope(s, scope));
   if (!playable.length) return null;
   const stateOf = (id: string) => input.states[id] ?? newSkillState();
-  const make = (skill: Skill, reason: Pick['reason'], avoid?: string, remediation?: Remediation): Pick => {
+  /**
+   * `same` forces a template (when it still exists), `avoid` keeps one out. The difficulty is the skill's own:
+   * a miss has already lowered it by one, which is the "one below the missed question" of a stage 1 comeback.
+   */
+  const make = (skill: Skill, reason: Pick['reason'], o: { same?: string; avoid?: string; remediation?: Remediation } = {}): Pick => {
     const st = stateOf(skill.id);
-    const t = pickTemplate(rng, input.templatesBySkill.get(skill.id)!, st, input.recentTemplates, avoid);
-    return { skillId: skill.id, templateId: t.id, difficulty: st.difficulty, reason, remediation };
+    const templates = input.templatesBySkill.get(skill.id)!;
+    const t = templates.find((x) => x.id === o.same) ?? pickTemplate(rng, templates, st, input.recentTemplates, o.avoid);
+    return { skillId: skill.id, templateId: t.id, difficulty: st.difficulty, reason, remediation: o.remediation };
   };
   const byId = new Map(playable.map((s) => [s.id, s]));
 
-  // 1. Repair queue: a missed skill comes back in another style.
+  // 1. Repair queue: a missed skill comes back, first on the same template, then the next day in another style.
   const repair = input.remediation
-    .filter((r) => r.dueSeq <= input.seq && byId.has(r.skillId))
+    .filter((r) => byId.has(r.skillId) && (stageOf(r) === 2 ? isDue(stateOf(r.skillId), input.now) : r.dueSeq <= input.seq))
     .sort((a, b) => a.dueSeq - b.dueSeq)[0];
-  if (repair) return make(byId.get(repair.skillId)!, 'repair', repair.missedTemplate, repair);
+  if (repair) {
+    const o = stageOf(repair) === 1 ? { same: repair.missedTemplate } : { avoid: repair.missedTemplate };
+    return make(byId.get(repair.skillId)!, 'repair', { ...o, remediation: repair });
+  }
 
-  if (scope.kind === 'skill') return make(playable[0], 'focus', input.recentTemplates.at(-1));
+  if (scope.kind === 'skill') return make(playable[0], 'focus', { avoid: input.recentTemplates.at(-1) });
 
   const notLast = (s: Skill) => playable.length === 1 || s.id !== input.lastSkill;
   const due = playable.filter((s) => isDue(stateOf(s.id), input.now) && notLast(s));
@@ -156,7 +172,7 @@ export function nextPick(rng: Rng, input: SchedulerInput, scope: PracticeScope):
   return make(rng.pick(any.length ? any : playable), 'review');
 }
 
-/** Remediation entry for a miss: comes back after 2 to 4 other questions. */
-export function scheduleRepair(rng: Rng, skillId: string, templateId: string, seq: number): Remediation {
-  return { skillId, missedTemplate: templateId, dueSeq: seq + rng.int(2, 4) };
+/** Remediation entry for a miss: stage 1 comes back after 2 to 4 other questions, stage 2 as soon as the skill is due again. */
+export function scheduleRepair(rng: Rng, skillId: string, templateId: string, seq: number, stage: 1 | 2 = 1): Remediation {
+  return { skillId, missedTemplate: templateId, dueSeq: stage === 1 ? seq + rng.int(2, 4) : seq, stage };
 }
