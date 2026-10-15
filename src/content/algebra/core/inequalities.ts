@@ -563,12 +563,15 @@ const rangeNE: Template<RangeParams> = {
 
 The ${wantWord} value is $${coef[0] === 1 ? paren(bx) : coef[0] === -1 ? `-${paren(bx)}` : `${coef[0]}(${num(bx)})`} ${coef[1] < 0 ? '-' : '+'} ${Math.abs(coef[1]) === 1 ? paren(by) : `${Math.abs(coef[1])}(${num(by)})`} = ${num(answer)}$.`;
       const naive = coef[0] * (want === 'max' ? x2 : x1) + coef[1] * (want === 'max' ? y2 : y1);
-      if (naive !== answer) {
-        traps.push({ value: frac(naive), trap: 'alg-range-subtract' });
-        explanation += `
+      // both coefficients push the same way: the naive method works, so there is nothing to learn here
+      if (naive === answer) return rangeNE.generate(rng, d);
+      const otherX = coef[0] * (bx === x1 ? x2 : x1) + coef[1] * by;
+      traps.push({ value: frac(naive), trap: 'alg-range-subtract' });
+      explanation += `
 
-Trap: taking the ${want === 'max' ? 'largest' : 'smallest'} value of both variables gives $${num(naive)}$, but a negative coefficient turns a larger variable into a smaller result.`;
-      }
+Check: switching $x$ to its other end gives $${num(otherX)}$, which is ${want === 'max' ? 'smaller' : 'larger'}.
+
+Trap: taking the ${want === 'max' ? 'largest' : 'smallest'} value of both variables gives $${num(naive)}$, but a negative coefficient turns a larger variable into a smaller result. Rule: pick the end of each variable by the sign of its coefficient.`;
     } else if (kind === 'product') {
       const corners = [x1 * y1, x1 * y2, x2 * y1, x2 * y2];
       answer = want === 'max' ? Math.max(...corners) : Math.min(...corners);
@@ -577,12 +580,14 @@ Trap: taking the ${want === 'max' ? 'largest' : 'smallest'} value of both variab
 
 The ${wantWord} is $${num(answer)}$.`;
       const naive = want === 'max' ? x2 * y2 : x1 * y1;
-      if (naive !== answer) {
-        traps.push({ value: frac(naive), trap: 'alg-range-product' });
-        explanation += `
+      // the two extreme endpoints already give the key: the signs never matter, so draw again
+      if (naive === answer) return rangeNE.generate(rng, d);
+      traps.push({ value: frac(naive), trap: 'alg-range-product' });
+      explanation += `
 
-Trap: multiplying the ${want === 'max' ? 'largest' : 'smallest'} endpoints gives $${num(naive)}$, but a product of two negative endpoints can be larger and a mixed-sign product smaller.`;
-      }
+Check: the four corners cover every sign combination of $x$ and $y$, so no other pair of values can do better.
+
+Trap: multiplying the ${want === 'max' ? 'largest' : 'smallest'} endpoints gives $${num(naive)}$, but a product of two negative endpoints can be larger and a mixed-sign product smaller. Rule: a product on a rectangle is extreme at a corner, so test all four.`;
     } else if (kind === 'square') {
       // x^2 on an interval that stays on one side of 0 ('away'), contains 0 ('zero-in'), or (x - h)^2 + c ('shift')
       const variant = rng.pick(d === 1 ? (['away', 'zero-in'] as const) : (['away', 'zero-in', 'shift', 'shift'] as const));
@@ -621,21 +626,21 @@ Trap: multiplying the ${want === 'max' ? 'largest' : 'smallest'} endpoints gives
 Check: a value inside the interval, such as $x = ${num(Math.round((lo + hi) / 2))}$, gives $${num(sq(Math.round((lo + hi) / 2)))}$, which is not larger.`;
         naive = sq(nearEnd);
         naiveWhy = `squaring the end nearer ${h === 0 ? '0' : `$x = ${h}$`}, which gives the smaller end value`;
-        if (naive === answer) naive = NaN;
+        if (naive === answer) return rangeNE.generate(rng, d);
       } else if (inside) {
         explanation = `A square is never negative, and $${base}$ can be 0 inside the interval (at $x = ${num(h)}$), so the least value is $${h === 0 ? '0^2 = 0' : `0 + ${c} = ${c}`}$, not the value at an endpoint.
 
 Check: the end values are $${sq(lo)}$ and $${sq(hi)}$, both larger.`;
         naive = Math.min(sq(lo), sq(hi));
         naiveWhy = 'taking the smaller end value';
-        if (naive === answer) naive = NaN;
+        if (naive === answer) return rangeNE.generate(rng, d);
       } else {
         explanation = `Here $${base}$ stays ${lo - h > 0 ? 'positive' : 'negative'} on the whole interval, so the square grows with the distance from 0 and the least value is at the end nearer 0: $${val(nearEnd)} = ${num(answer)}$.
 
 Check: the other end gives $${num(sq(farEnd))}$, which is larger.`;
         naive = h === 0 ? 0 : c;
         naiveWhy = 'assuming the least square is 0 even though 0 is not in the interval';
-        if (naive === answer) naive = NaN;
+        if (naive === answer) return rangeNE.generate(rng, d);
       }
       if (!Number.isNaN(naive)) {
         explanation += `\n\nTrap: ${naiveWhy} gives $${num(naive)}$, which is not the ${wantWord} value on this interval.`;
@@ -664,8 +669,17 @@ Check: the other end gives $${num(sq(farEnd))}$, which is larger.`;
       explanation = `The integers allowed are $x = ${num(ix1)}, \\ldots, ${num(ix2)}$ and $y = ${num(iy1)}, \\ldots, ${num(iy2)}$ (a strict inequality excludes its endpoint).
 
 To make $${expr}$ as ${want === 'max' ? 'large' : 'small'} as possible take $x = ${num(bx)}$ and $y = ${num(by)}$: the value is $${num(answer)}$.`;
-      const naive = coef[0] * pick(coef[0], x1, x2) + coef[1] * pick(coef[1], y1, y2);
-      if (naive !== answer) traps.push({ value: frac(naive), trap: 'alg-strict-endpoint' });
+      const nx = pick(coef[0], x1, x2);
+      const ny = pick(coef[1], y1, y2);
+      const naive = coef[0] * nx + coef[1] * ny;
+      // the strict signs do not move the key: the endpoint slip is not a slip here, so draw again
+      if (naive === answer) return rangeNE.generate(rng, d);
+      traps.push({ value: frac(naive), trap: 'alg-strict-endpoint' });
+      explanation += `
+
+Check: $x = ${num(bx)}$ and $y = ${num(by)}$ are both allowed integers, and moving either one further would leave its range.
+
+Trap: using $x = ${num(nx)}$ and $y = ${num(ny)}$ as they stand gives $${num(naive)}$, but a strict inequality excludes its endpoint. Rule: for integers, step in by 1 from every strict endpoint.`;
     }
     return {
       params: { kind, x: [x1, x2], y: [y1, y2], coef, want, strict },
