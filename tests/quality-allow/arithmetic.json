@@ -38,19 +38,6 @@
   "arith.number-line.tick-marks": {
     "bank.size": "baseline"
   },
-  "arith.order-of-operations.custom-operation": {
-    "artifacts.coef-1": "baseline",
-    "distractors.trapped": "baseline"
-  },
-  "arith.order-of-operations.evaluate-ne": {
-    "bank.size": "baseline"
-  },
-  "arith.order-of-operations.sign-select": {
-    "distractors.trapped": "baseline"
-  },
-  "arith.order-of-operations.substitute-qc": {
-    "qc.never-d": "baseline"
-  },
   "arith.percent.expression-mcs": {
     "bank.size": "baseline",
     "bank.difficulty": "baseline"

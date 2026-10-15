@@ -242,6 +242,10 @@ export const integerTraps: Record<string, Trap> = {
     label: 'Ignored the order of operations',
     fix: 'Parentheses, then exponents, then $\\times$ and $\\div$ from left to right, then $+$ and $-$ from left to right.',
   },
+  'int-misread-definition': {
+    label: 'Misread the definition of the operation',
+    fix: 'Apply the definition exactly as written: every term and every sign counts, and nothing is added or dropped.',
+  },
   'int-operation-swapped': {
     label: 'Swapped the inputs of the defined operation',
     fix: 'In $a \\star b$, the first number replaces $a$ and the second replaces $b$. Most defined operations are not symmetric.',

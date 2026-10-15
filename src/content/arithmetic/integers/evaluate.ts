@@ -1,7 +1,7 @@
-import { flaggedChoices, qcCompare } from '../../../engine/build';
+import { flaggedChoices, qcCompare, qcFromSamples } from '../../../engine/build';
 import { Frac, frac } from '../../../engine/frac';
 import type { Rng } from '../../../engine/rng';
-import type { Choice, QCQuestion, Template } from '../../../engine/types';
+import type { Choice, QCChoice, QCQuestion, Template } from '../../../engine/types';
 import { QC_WORDS, evalExpr, expectMcm, expectMcsBy, expectNe, expectQc, plainToTex, spreadChoices, substitute } from './util';
 
 /* Every expression below exists twice: a plain string (parsed by evalExpr in check(), and used for
@@ -67,11 +67,23 @@ function substPairs(n: number): SubstPair[] {
   ];
 }
 
+type SubstCond = 'fixed' | 'both' | 'r-any' | 's-neg';
+
 interface SubstParams {
   r: number;
   s: number;
   plainA: string;
   plainB: string;
+  cond: SubstCond;
+}
+
+const NONZERO = [-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6];
+/** The values r and s may take under each condition. */
+function substDomain(cond: SubstCond, r: number, s: number): { rs: number[]; ss: number[] } {
+  if (cond === 'both') return { rs: NONZERO, ss: NONZERO };
+  if (cond === 'r-any') return { rs: [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6], ss: [s] };
+  if (cond === 's-neg') return { rs: [r], ss: [-9, -8, -7, -6, -5, -4, -3, -2, -1] };
+  return { rs: [r], ss: [s] };
 }
 
 const substituteQC: Template<SubstParams> = {
@@ -91,6 +103,39 @@ const substituteQC: Template<SubstParams> = {
       const swap = rng.chance(0.5);
       const [EA, EB] = swap ? [pair.B, pair.A] : [pair.A, pair.B];
       const v = { r, s };
+      // Sometimes the values are not all given: then the relation may depend on them (answer D).
+      const cond: SubstCond = rng.chance(diff === 1 ? 0.12 : 0.3) ? rng.pick(['both', 'r-any', 's-neg'] as const) : 'fixed';
+      if (cond !== 'fixed') {
+        const dom = substDomain(cond, r, s);
+        const cases = dom.rs.flatMap((rr) => dom.ss.map((ss) => ({ r: rr, s: ss, rel: qcCompare(EA.f({ r: rr, s: ss }), EB.f({ r: rr, s: ss })) })));
+        if (new Set(cases.map((c) => c.rel)).size < 2) continue;
+        // two allowed cases that disagree: the smallest in absolute value
+        const sorted = [...cases].sort((x, y) => Math.abs(x.r) + Math.abs(x.s) - Math.abs(y.r) - Math.abs(y.s));
+        const c1 = sorted[0];
+        const c2 = sorted.find((c) => c.rel !== c1.rel)!;
+        const shown = (c: { r: number; s: number; rel: QCChoice }) =>
+          `$r = ${c.r}$ and $s = ${c.s}$ give $${EA.f({ r: c.r, s: c.s }).toTex()}$ and $${EB.f({ r: c.r, s: c.s }).toTex()}$, so ${QC_WORDS[c.rel]}`;
+        const info =
+          cond === 'both' ? '$r$ and $s$ are nonzero integers.' : cond === 'r-any' ? `$s = ${s}$ and $r$ is an integer.` : `$r = ${r}$ and $s$ is a negative integer.`;
+        return {
+          params: { r, s, plainA: EA.plain, plainB: EB.plain, cond },
+          q: {
+            format: 'qc',
+            info,
+            quantityA: `$${plainToTex(EA.plain)}$`,
+            quantityB: `$${plainToTex(EB.plain)}$`,
+            answer: 'D',
+            traps: { [c1.rel]: 'tested-one-value' },
+            explanation: `Not every value is given, so test values that the statement allows, with parentheses around the negative ones.
+
+${shown(c1)}; ${shown(c2)}.
+
+Two allowed values give different results, so the relationship cannot be determined. (D)
+
+Trap: testing one pair of values and stopping would suggest ${QC_WORDS[c1.rel]}. When values are not fixed, one test never settles a comparison.`,
+          },
+        };
+      }
       const a = EA.f(v);
       const b = EB.f(v);
       if (Math.abs(a.toNumber()) > 1e6 || Math.abs(b.toNumber()) > 1e6) continue;
@@ -113,7 +158,7 @@ const substituteQC: Template<SubstParams> = {
         return `$${plainToTex(e.plain)} = ${withNums} = ${e.f(v).toTex()}$`;
       };
       return {
-        params: { r, s, plainA: EA.plain, plainB: EB.plain },
+        params: { r, s, plainA: EA.plain, plainB: EB.plain, cond },
         q: {
           format: 'qc',
           info: `$r = ${r}$ and $s = ${s}$`,
@@ -133,8 +178,10 @@ ${QC_WORDS[answer][0].toUpperCase()}${QC_WORDS[answer].slice(1)}. (${answer})${
       };
     }
   },
-  check(q, { r, s, plainA, plainB }) {
-    return expectQc(q, qcCompare(evalExpr(substitute(plainA, { r, s })), evalExpr(substitute(plainB, { r, s }))));
+  check(q, { r, s, plainA, plainB, cond }) {
+    const dom = substDomain(cond, r, s);
+    const samples = dom.rs.flatMap((rr) => dom.ss.map((ss): [Frac, Frac] => [evalExpr(substitute(plainA, { r: rr, s: ss })), evalExpr(substitute(plainB, { r: rr, s: ss }))]));
+    return expectQc(q, qcFromSamples(samples));
   },
 };
 
@@ -144,17 +191,77 @@ interface OpDef {
   sym: string;
   plain: string;
   f: (a: number, b: number) => number;
+  /** Wrong values from misreading the definition (a term dropped, a sign or a power misread), each with its trap id. */
+  slips: (a: number, b: number) => { v: number; trap: string }[];
   /** b can be solved for (linear in b with nonzero coefficient) */
   solvable?: boolean;
 }
 
 const OPS: OpDef[] = [
-  { sym: '\\star', plain: 'a*b-a+b', f: (a, b) => a * b - a + b, solvable: true },
-  { sym: '\\diamond', plain: 'a^2-b', f: (a, b) => a * a - b, solvable: true },
-  { sym: '\\otimes', plain: '2*a-3*b', f: (a, b) => 2 * a - 3 * b, solvable: true },
-  { sym: '\\oplus', plain: 'a^2-a*b', f: (a, b) => a * a - a * b, solvable: true },
-  { sym: '\\odot', plain: '(a-b)^2+a', f: (a, b) => (a - b) ** 2 + a },
-  { sym: '\\#', plain: 'a*b+b^2', f: (a, b) => a * b + b * b },
+  {
+    sym: '\\star',
+    plain: 'a*b-a+b',
+    f: (a, b) => a * b - a + b,
+    solvable: true,
+    slips: (a, b) => [
+      { v: a * b - a - b, trap: 'int-misread-definition' },
+      { v: a * b + a + b, trap: 'int-misread-definition' },
+      { v: a * b - a, trap: 'int-misread-definition' },
+    ],
+  },
+  {
+    sym: '\\diamond',
+    plain: 'a^2-b',
+    f: (a, b) => a * a - b,
+    solvable: true,
+    slips: (a, b) => [
+      { v: 2 * a - b, trap: 'power-as-product' },
+      { v: a * a + b, trap: 'int-misread-definition' },
+      { v: -(a * a) - b, trap: 'int-negative-square' },
+    ],
+  },
+  {
+    sym: '\\otimes',
+    plain: '2*a-3*b',
+    f: (a, b) => 2 * a - 3 * b,
+    solvable: true,
+    slips: (a, b) => [
+      { v: 2 * a + 3 * b, trap: 'int-misread-definition' },
+      { v: 2 * (a - 3 * b), trap: 'int-misread-definition' },
+      { v: 2 * a - 3 + b, trap: 'int-misread-definition' },
+    ],
+  },
+  {
+    sym: '\\oplus',
+    plain: 'a^2-a*b',
+    f: (a, b) => a * a - a * b,
+    solvable: true,
+    slips: (a, b) => [
+      { v: 2 * a - a * b, trap: 'power-as-product' },
+      { v: a * a + a * b, trap: 'int-misread-definition' },
+      { v: a * a - b, trap: 'int-misread-definition' },
+    ],
+  },
+  {
+    sym: '\\odot',
+    plain: '(a-b)^2+a',
+    f: (a, b) => (a - b) ** 2 + a,
+    slips: (a, b) => [
+      { v: a * a - b * b + a, trap: 'int-distribute-power' },
+      { v: 2 * (a - b) + a, trap: 'power-as-product' },
+      { v: (a - b) ** 2 - a, trap: 'int-misread-definition' },
+    ],
+  },
+  {
+    sym: '\\#',
+    plain: 'a*b+b^2',
+    f: (a, b) => a * b + b * b,
+    slips: (a, b) => [
+      { v: a * b + 2 * b, trap: 'power-as-product' },
+      { v: a * b - b * b, trap: 'int-misread-definition' },
+      { v: a * a + b * b, trap: 'int-misread-definition' },
+    ],
+  },
 ];
 
 interface OpParams {
@@ -184,6 +291,7 @@ const customOperation: Template<OpParams> = {
       const z = rng.int(-4, 5) || 1;
       if (x === y) continue;
       if (x >= 0 && y >= 0) continue; // keep a negative input
+      if (kind === 'solve' && Math.abs(x) === 1) continue; // a coefficient of 1 would print as "1k"
       let answer: number;
       let expr: string;
       const traps: { v: number; trap?: string }[] = [];
@@ -197,6 +305,7 @@ const customOperation: Template<OpParams> = {
         expr = `${P(x)} ${op.sym} ${P(y)}`;
         traps.push({ v: app(y, x), trap: 'int-operation-swapped' });
         traps.push({ v: evalExpr(substitute(op.plain, { a: x, b: y }, false)).toNumber(), trap: 'int-no-parentheses' });
+        traps.push(...op.slips(x, y));
         work = `Replace $a$ with $${x}$ and $b$ with $${y}$: $${showApp(x, y)}$.`;
       } else if (kind === 'left') {
         const inner = app(x, y);
@@ -204,6 +313,8 @@ const customOperation: Template<OpParams> = {
         expr = `(${P(x)} ${op.sym} ${P(y)}) ${op.sym} ${P(z)}`;
         traps.push({ v: app(x, app(y, z)), trap: 'int-operation-grouping' });
         traps.push({ v: app(z, inner), trap: 'int-operation-swapped' });
+        traps.push({ v: app(app(y, x), z), trap: 'int-operation-swapped' });
+        traps.push(...op.slips(inner, z));
         work = `Inside the parentheses first: $${showApp(x, y)}$. Then $${showApp(inner, z)}$.`;
       } else if (kind === 'right') {
         const inner = app(y, z);
@@ -211,6 +322,8 @@ const customOperation: Template<OpParams> = {
         expr = `${P(x)} ${op.sym} (${P(y)} ${op.sym} ${P(z)})`;
         traps.push({ v: app(app(x, y), z), trap: 'int-operation-grouping' });
         traps.push({ v: app(inner, x), trap: 'int-operation-swapped' });
+        traps.push({ v: app(x, app(z, y)), trap: 'int-operation-swapped' });
+        traps.push(...op.slips(x, inner));
         work = `Inside the parentheses first: $${showApp(y, z)}$. Then $${showApp(x, inner)}$.`;
       } else {
         // x op k = target, solve for k (search over a small range: the definitions are linear in b)
@@ -221,8 +334,9 @@ const customOperation: Template<OpParams> = {
         answer = k;
         expr = '';
         traps.push({ v: Array.from({ length: 41 }, (_, i) => i - 20).find((t) => app(t, x) === target) ?? NaN, trap: 'int-operation-swapped' });
+        traps.push({ v: -k, trap: 'num-sign-rules' }, { v: target - x, trap: 'int-misread-definition' }, { v: target + x, trap: 'int-misread-definition' });
         work = `Replace $a$ with $${x}$ and $b$ with $k$: $${plainToTex(op.plain.replace(/a/g, P(x)).replace(/b/g, 'k'))} = ${target}$. Solving gives $k = ${k}$. Check: $${showApp(x, k)}$.`;
-        const { choices, answer: idx } = spreadChoices(rng, answer, [...traps, ...[-3, -2, -1, 1, 2, 3, 4, 5].map((d) => ({ v: k + d })), { v: -k }]);
+        const { choices, answer: idx } = spreadChoices(rng, answer, [...rng.shuffle(traps.filter((t) => Number.isFinite(t.v))), ...[-3, -2, -1, 1, 2, 3, 4, 5].map((d) => ({ v: k + d }))], undefined, 5, 'shuffled');
         return {
           params: { op: opIdx, kind, x, y: k, z: target, values: choices.map((c) => Number(c.text.slice(1, -1))) },
           q: {
@@ -236,12 +350,11 @@ The number before the symbol replaces $a$ and the number after it replaces $b$.`
           },
         };
       }
-      if (Math.abs(answer) > 400) continue;
+      if (Math.abs(answer) > 400 || answer === 0) continue;
       const fillers = [-6, -4, -3, -2, -1, 1, 2, 3, 4, 6].map((d) => ({ v: answer + d }));
       let built: ReturnType<typeof spreadChoices>;
       try {
-        const near = (v: number) => Number.isFinite(v) && Math.abs(v - answer) <= Math.max(40, 2 * Math.abs(answer));
-        built = spreadChoices(rng, answer, [...traps.filter((t) => near(t.v)), ...fillers]);
+        built = spreadChoices(rng, answer, [...rng.shuffle(traps.filter((t) => Number.isFinite(t.v) && Math.abs(t.v) <= 1000)), ...fillers], undefined, 5, 'shuffled');
       } catch {
         continue;
       }
@@ -294,7 +407,7 @@ interface Shape {
 const neg = (n: number) => (n < 0 ? `(${n})` : `${n}`);
 
 function evalShape(rng: Rng, diff: number): Shape | null {
-  const pick = rng.int(0, 2);
+  const pick = rng.int(0, diff === 3 ? 4 : 2);
   if (diff === 1) {
     if (pick === 0) {
       const [a, b, c, d] = [rng.int(5, 20), rng.int(2, 6), rng.int(2, 6), rng.int(1, 9)];
@@ -355,6 +468,31 @@ function evalShape(rng: Rng, diff: number): Shape | null {
       value,
       given: `x = ${x}`,
       steps: `-${x * x} + ${p}(${x ** 3}) - ${neg(q * x)} = -${x * x} + ${neg(p * x ** 3)} + ${-q * x} = ${value}`,
+    };
+  }
+  if (pick === 3) {
+    const x = -rng.int(1, 5);
+    const y = -rng.int(1, 4);
+    if (x === y) return null;
+    const value = -((x - y) ** 2) + x * y * y;
+    return {
+      plain: `-(x-y)^2+x*y^2`,
+      vars: { x, y },
+      value,
+      given: `x = ${x} \\text{ and } y = ${y}`,
+      steps: `-(${x - y})^{2} + ${neg(x)}(${y})^{2} = -${(x - y) ** 2} + ${neg(x)}(${y * y}) = -${(x - y) ** 2} + ${neg(x * y * y)} = ${value}`,
+    };
+  }
+  if (pick === 4) {
+    const x = -rng.int(1, 4);
+    const y = rng.int(2, 5);
+    const value = (x * x - y) ** 2 - x * y;
+    return {
+      plain: `(x^2-y)^2-x*y`,
+      vars: { x, y },
+      value,
+      given: `x = ${x} \\text{ and } y = ${y}`,
+      steps: `(${x * x} - ${y})^{2} - ${neg(x * y)} = ${(x * x - y) ** 2} - ${neg(x * y)} = ${value}`,
     };
   }
   if (pick === 1) {
@@ -496,6 +634,7 @@ const signSelect: Template<SignParams> = {
           const ok = (x: Frac) => (want === 'negative' ? x.sign() < 0 : x.sign() > 0);
           if (ok(evalExpr(substitute(e.plain, v, false)))) trap = 'int-no-parentheses';
           else if (ok(evalExpr(substitute(e.plain, v), { unaryTight: true }))) trap = 'int-negative-square';
+          else trap = 'num-sign-rules';
         }
         return { text: `$${plainToTex(e.plain)}$`, correct: correct[i], ...(trap ? { trap } : {}) };
       });
