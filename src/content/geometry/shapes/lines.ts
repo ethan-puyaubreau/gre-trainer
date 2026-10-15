@@ -291,7 +291,7 @@ const parallelAlgebra: Template<ParAlgParams> = {
         );
       }
       lines.push(
-        xwOk
+        xwOk && (ask !== 'x' || values.includes(xw))
           ? same
             ? `Trap: making the two angles add up to $180^\\circ$ gives $x = ${xw}$, but angles in matching positions are equal.`
             : `Trap: setting the two expressions equal gives $x = ${xw}$, but these angles are not in matching positions, so they are supplementary.`

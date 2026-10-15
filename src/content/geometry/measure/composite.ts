@@ -902,7 +902,7 @@ Area $= ${W * H} - ${w * h} = ${W * H - w * h}$.`;
       fig.pt('A', inner[0]).pt('B', inner[1]).pt('C', inner[2]).pt('D', inner[3]).hide('A', 'B', 'C', 'D');
       fig.seg('A', 'B', `$${W}$`).seg('B', 'C', `$${H}$`);
       const unit = rng.pick(['inches', 'centimeters']);
-      stem = `A rectangular picture ${W} ${unit} long and ${H} ${unit} wide is surrounded by a frame of uniform width ${plural(w, unit === 'inches' ? 'inch' : 'centimeter')}, shown shaded in the figure above. What is the area of the frame, in square ${unit}?`;
+      stem = `A rectangular picture ${W} ${unit} long and ${H} ${unit} wide is surrounded by a frame of uniform width ${(unit === 'inches' ? plural(w, 'inch', 'inches') : plural(w, 'centimeter'))}, shown shaded in the figure above. What is the area of the frame, in square ${unit}?`;
       suffix = `square ${unit}`;
       explanation = `With the frame, each dimension grows by ${w} on BOTH sides: the outer rectangle is $(${W} + ${2 * w})$ by $(${H} + ${2 * w})$, that is, ${W + 2 * w} by ${H + 2 * w}, with area $${(W + 2 * w) * (H + 2 * w)}$.
 

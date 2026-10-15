@@ -136,6 +136,11 @@ export function exChoices(
     const x = it.v.value();
     const t = it.v.tex();
     if (it.trap && ok(x) && (near(x, c) || t === ct)) throw new Redraw('a trap equals the answer');
+    // a float turned into a fraction with a huge denominator (88888889/500000...) cannot be a choice
+    if (it.v.data().some(([, den]) => den > 1000)) {
+      if (it.must) throw new Redraw('a trap cited in the explanation cannot be shown');
+      continue;
+    }
     if (!ok(x) || near(x, c) || kept.some((k) => near(k.x, x)) || t === ct || kept.some((k) => k.t === t)) {
       if (it.must) throw new Redraw('a trap cited in the explanation cannot be shown');
       continue;
