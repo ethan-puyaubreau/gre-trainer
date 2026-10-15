@@ -8,6 +8,7 @@ import { originDiameterTemplates, originDiameterTraps } from './origin-diameter'
 import { polygonArcTemplates, polygonArcTraps } from './polygon-arcs';
 import { polygonTemplates } from './polygons';
 import { regionQcTemplates, regionQcTraps } from './region-qc';
+import { ringTemplates, ringTraps } from './ring-mcs';
 import { solidTemplates } from './solids';
 import { tangentQcTemplates, tangentQcTraps } from './tangent-qc';
 import { trackTemplates, trackTraps } from './track-ne';
@@ -15,5 +16,5 @@ import { measureSkills as skills } from './skills';
 import { measureTraps as traps } from './traps';
 
 export const measureSkills: Skill[] = skills;
-export const measureTemplates: Template<any>[] = [...polygonTemplates, ...circleTemplates, ...compositeTemplates, ...solidTemplates, ...polygonArcTemplates, ...equalPerimeterTemplates, ...originDiameterTemplates, ...packingTemplates, ...insidePointsTemplates, ...tangentQcTemplates, ...regionQcTemplates, ...trackTemplates];
-export const measureTraps: Record<string, Trap> = { ...traps, ...polygonArcTraps, ...equalPerimeterTraps, ...originDiameterTraps, ...packingTraps, ...insidePointsTraps, ...tangentQcTraps, ...regionQcTraps, ...trackTraps };
+export const measureTemplates: Template<any>[] = [...polygonTemplates, ...circleTemplates, ...compositeTemplates, ...solidTemplates, ...polygonArcTemplates, ...equalPerimeterTemplates, ...originDiameterTemplates, ...packingTemplates, ...insidePointsTemplates, ...tangentQcTemplates, ...regionQcTemplates, ...trackTemplates, ...ringTemplates];
+export const measureTraps: Record<string, Trap> = { ...traps, ...polygonArcTraps, ...equalPerimeterTraps, ...originDiameterTraps, ...packingTraps, ...insidePointsTraps, ...tangentQcTraps, ...regionQcTraps, ...trackTraps, ...ringTraps };
