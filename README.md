@@ -82,6 +82,17 @@ npm run build      # type-check + production build into dist/
 
 Writing new question styles: see [CONTENT_GUIDE.md](CONTENT_GUIDE.md).
 
+Browser QA (welcome, practice, offline, widths, dark mode, two-browser QR transfer):
+
+```bash
+npm run build && npx vite preview --port 4173 &
+node scripts/qa/smoke.cjs
+```
+
+Working with Claude Code: [CLAUDE.md](CLAUDE.md) has the repo map and invariants; `.claude/` holds review agents
+(`content-reviewer`, `react-reviewer`, `silent-failure-hunter`), the `verify` and `browser-qa` skills, and a Stop hook
+that typechecks changed code.
+
 ## Deployment
 
 `.github/workflows/deploy.yml` runs the tests and the build on every pull request. On pushes to
