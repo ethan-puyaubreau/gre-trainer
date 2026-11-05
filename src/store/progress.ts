@@ -54,6 +54,8 @@ export interface Settings {
   dailyGoal?: number;
   /** The GRE date as YYYY-MM-DD, local (undefined = not set). */
   examDate?: string;
+  /** The welcome page was finished (undefined = not yet; anyone with answers skips it anyway). */
+  onboarded?: boolean;
 }
 
 export interface ProgressData {

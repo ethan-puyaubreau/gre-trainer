@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { SyncConflictBanner } from './components/AccountCard';
 import { ExportReminder } from './components/ExportReminder';
 import { Dashboard } from './pages/Dashboard';
 import { History } from './pages/History';
@@ -7,6 +8,7 @@ import { Preview } from './pages/Preview';
 import { SectionSim } from './pages/SectionSim';
 import { Settings } from './pages/Settings';
 import { Strategies } from './pages/Strategies';
+import { Welcome } from './pages/Welcome';
 import { href, useRoute } from './router';
 import { useProgress } from './store/progress';
 
@@ -24,6 +26,8 @@ export function App() {
   const theme = useProgress((s) => s.settings.theme);
   const motion = useProgress((s) => s.settings.motion ?? 'system');
   const nav = useRef<HTMLElement>(null);
+  // A first visit (nothing answered, welcome never finished) lands on the welcome page instead of an empty dashboard.
+  const newcomer = useProgress((s) => !s.settings.onboarded && s.history.length === 0 && s.sections.length === 0);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -63,22 +67,28 @@ export function App() {
     case 'settings':
       body = <Settings />;
       break;
+    case 'welcome':
+      body = <Welcome />;
+      break;
     case 'preview':
       body = <Preview route={route.slice(1)} />;
       break;
     default:
-      body = <Dashboard />;
+      body = newcomer ? <Welcome /> : <Dashboard />;
   }
 
   return (
     <div className="app">
+      <a className="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>
+        Skip to content
+      </a>
       <header className="topbar">
         <div className="topbar-inner">
           <a className="brand" href={href()}>
             <span className="brand-mark">Q</span>
             <span className="brand-name">GRE Quant Trainer</span>
           </a>
-          <nav className="nav" ref={nav}>
+          <nav className="nav" ref={nav} aria-label="Main">
             {NAV.map(([p, label]) => (
               <a key={p} href={p ? href(p) : href()} className={page === p ? 'active' : undefined} aria-current={page === p ? 'page' : undefined}>
                 {label}
@@ -87,8 +97,9 @@ export function App() {
           </nav>
         </div>
       </header>
+      <SyncConflictBanner />
       <ExportReminder />
-      <main>{body}</main>
+      <main id="main" tabIndex={-1}>{body}</main>
     </div>
   );
 }

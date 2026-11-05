@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AccountCard } from '../components/AccountCard';
 import { formatClock } from '../components/Timer';
 import { DEFAULT_DAILY_GOAL, isExamDate, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
@@ -44,6 +45,7 @@ export function Settings() {
   return (
     <div>
       <h1>Settings</h1>
+      <AccountCard />
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Pace</h3>
         <p className="muted small">

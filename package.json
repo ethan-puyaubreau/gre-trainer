@@ -12,6 +12,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
     "katex": "0.16.47",
     "react": "19.1.9",
     "react-dom": "19.1.9",

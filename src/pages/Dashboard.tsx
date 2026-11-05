@@ -160,6 +160,7 @@ export function Dashboard() {
 
   return (
     <div>
+      <h1 className="sr-only">Dashboard</h1>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="row dash-top" style={{ alignItems: 'flex-end' }}>
           <div style={{ flex: '1 1 260px' }}>

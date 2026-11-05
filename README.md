@@ -32,17 +32,21 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
 - **Strategy cards** for every skill, with the shortcuts.
 - **Difficulty check.** The dashboard shows your success rate and time per difficulty level, overall
   and per area, and lists the skills where harder questions went better than easier ones.
+- **Welcome page** for first-time visitors: what the app does, and a two-step plan (daily goal, exam date).
+- **Works offline** and installs as an app (PWA): after the first visit, every page works without a network.
 - **Progress** is kept in your browser's local storage. Export and import it as JSON from Settings.
+- **Optional account sync** (email sign-in, Supabase): when the build is given a Supabase project, Settings offers
+  to sign in and keep progress on every device. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ## Content
 
 | Area | Skills | Question styles | Named traps |
 |---|---|---|---|
-| Arithmetic | 17 | 95 | 111+ |
-| Algebra | 14 | 69 | 166+ |
-| Geometry | 9 | 46 | 141+ |
-| Data Analysis | 8 | 70 (7 data interpretation families) | 132+ |
-| **Total** | **48** | **280** | **550+** |
+| Arithmetic | 17 | 136 | 111+ |
+| Algebra | 14 | 112 | 166+ |
+| Geometry | 9 | 72 | 141+ |
+| Data Analysis | 8 | 85 (7 data interpretation families) | 132+ |
+| **Total** | **48** | **405** | **550+** |
 
 Each style generates 1,500 verified variants (500 seeds × 3 difficulty levels). Coverage follows
 the question patterns of ETS's *Official GRE Quantitative Reasoning Practice Questions* (Vol. 1,

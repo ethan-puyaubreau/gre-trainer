@@ -1,6 +1,7 @@
 import { DAY } from '../mastery/model';
 import { href } from '../router';
 import { useProgress } from '../store/progress';
+import { useSync } from '../sync/state';
 
 const MIN_ANSWERS = 50;
 const EVERY_DAYS = 14;
@@ -9,6 +10,8 @@ const EVERY_DAYS = 14;
 export function ExportReminder() {
   const answers = useProgress((s) => s.history.length);
   const lastExportAt = useProgress((s) => s.settings.lastExportAt);
+  const synced = useSync((s) => s.status === 'synced' || s.status === 'syncing');
+  if (synced) return null;
   if (answers < MIN_ANSWERS || (lastExportAt !== undefined && Date.now() - lastExportAt < EVERY_DAYS * DAY)) return null;
   return (
     <div style={{ width: '100%', maxWidth: 1100, margin: '0 auto', padding: '10px 16px 0', boxSizing: 'border-box' }}>
