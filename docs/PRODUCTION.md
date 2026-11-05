@@ -1,8 +1,8 @@
 # Going to production
 
-The app is a static site on GitHub Pages. Everything works without a backend; accounts are an optional layer.
+The app is a static site on GitHub Pages with no backend and no account: progress lives on the user's devices.
 
-## What ships by default
+## What ships
 
 - **Welcome page** (`src/pages/Welcome.tsx`): first-time visitors (no answers, welcome not finished) land there instead
   of an empty dashboard. It sets the daily goal and the exam date. Anyone with saved answers skips it.
@@ -10,69 +10,37 @@ The app is a static site on GitHub Pages. Everything works without a backend; ac
   production builds only. Pages are network first with the cached shell as a fallback; hashed assets are cache first.
   The first visit precaches the shell, its JS/CSS and the KaTeX woff2 fonts. Bump `CACHE` in `sw.js` only to force a full
   re-download; normal deploys need nothing (new hashes, network-first `index.html`).
+- **Profile transfer by QR code** (below).
 - **Accessibility**: skip link, labelled main nav, a heading on every page.
 
-## Optional: accounts and cross-device sync (Supabase)
+## Profile transfer by QR code
 
-Off unless the build gets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. With them, Settings shows an
-**Account & sync** card: passwordless email sign-in (magic link in the same browser, or the 6-digit code on any device),
-then one JSON document per user, synced a few seconds after each change and when the tab is hidden or shown again.
-The Supabase code is a lazy chunk: the default build never loads it.
+Settings → **Another device**, or `#/transfer`.
 
-### 1. Database
+1. The sending device packs the progress (`src/transfer/codec.ts`): the export with its history stored in columns
+   (template table, seeds, flags, time deltas), deflated with the browser's `CompressionStream`, base64url-encoded.
+2. The text is cut into frames of 900 characters, each shown as a QR code (level M, `uqr`) in a loop at 2, 4 or 7 codes
+   per second. Each frame is a link: `<site>#/receive/<id>.<i>.<n>.<chunk>`.
+3. The receiving device scans with its camera (`#/transfer/receive`): the browser's `BarcodeDetector` when it has one
+   (Chrome, Android), otherwise `jsQR` (Safari, Firefox), loaded only then. Frames can come in any order; repeats are
+   ignored; a frame of another transfer starts over. A phone's own camera app works too: any frame opens the receive page,
+   which keeps that frame and starts the scanner for the rest.
+4. Once every frame is in, the profile is decoded, validated like a file import, summarised, and imported only after
+   the user confirms. The sender keeps its copy.
 
-Run `supabase/migrations/20261105000000_gre_progress.sql` in the SQL editor (or `supabase db push`). It creates
-`public.gre_progress` with row level security: a signed-in user can read and write only their own row; anonymous
-users get nothing. `updated_at` is set by the server and used to detect concurrent changes.
+Sizes: a profile with 1,500 answers is 30 codes (about 8 s per loop at Normal speed; the end-to-end test receives it in
+about 16 s). The 4,000-answer maximum is about 64 codes. When the history is longer than 200 answers, the sender can
+choose **Quick**: every skill level, schedule and setting, and only the last 200 answers.
 
-**Shared project (e.g. an existing "Sentinel" project):** the table is prefixed so it can live next to other apps, but
-note that **`auth.users` is shared by every app of a project**: one email = one user for all of them, and the email
-templates and redirect allow-list are project-wide. If the other apps must not see GRE users, use a dedicated project
-(the free tier is enough: one row of < 2 MB per user). If you need another table name, set `VITE_SUPABASE_TABLE`.
+Privacy: the data goes from screen to camera. The frame links put the data after `#`, which browsers never send to the
+server, so even a link opened by a camera app does not leave the device.
 
-### 2. Auth settings (Dashboard → Authentication)
-
-- **URL configuration**: Site URL `https://ethan-puyaubreau.github.io/gre-trainer/`, and add the same URL to the
-  redirect allow-list (plus `http://localhost:5173/gre-trainer/` for development).
-- **Email provider**: enabled, "Confirm email" on.
-- **Email template "Magic Link"**: include the code so phone users can sign in on another device, e.g.
-  `<p><a href="{{ .ConfirmationURL }}">Sign in</a></p><p>Or type this code: <b>{{ .Token }}</b></p>`.
-- **SMTP**: the built-in sender is rate limited (a few emails per hour). Configure a real SMTP (Resend, Postmark, SES…)
-  before launch.
-- The app uses the PKCE flow: the link comes back as `?code=…`, which does not clash with the `#/` hash routes.
-
-### 3. GitHub secrets
-
-Repository → Settings → Secrets and variables → Actions → New repository secret:
-
-| Secret | Value |
-| --- | --- |
-| `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
-| `SUPABASE_ANON_KEY` | the project's **anon / publishable** key |
-
-`deploy.yml` passes them to the build. **Never** use the `service_role` / secret key here: whatever the build receives is
-public in the JavaScript bundle. The anon key is public by design; the RLS policies are what protect the data.
-
-### Sync rules
-
-`src/sync/decide.ts` (unit tested in `tests/sync.test.ts`):
-
-| This browser | Cloud | Result |
-| --- | --- | --- |
-| anything | no row | upload |
-| empty | has a row | download |
-| changed since last sync | unchanged | upload |
-| unchanged | changed | download |
-| changed | changed (or other account) | ask: keep this browser's or the account's |
-
-Signing out keeps the progress in the browser. "Delete cloud data" deletes the row (the auth user stays; delete it from
-the dashboard if asked to erase an account).
+Tests: `tests/transfer.test.ts` checks an exact round trip (including old-style ids and missing responses), the frame
+count of a full history, out-of-order reassembly and junk rejection.
 
 ## Launch checklist
 
 - [ ] `npm test` and `npm run build` green on `main` (CI does both).
-- [ ] Supabase: migration run, Site URL + redirect allow-list set, custom SMTP, magic-link template with `{{ .Token }}`.
-- [ ] Secrets `SUPABASE_URL` / `SUPABASE_ANON_KEY` added; check the Account card appears on the live site.
-- [ ] Sign in on two devices; answer on one, open the other: progress follows.
-- [ ] Lighthouse PWA/accessibility pass on the live URL; install the app on a phone and open it in airplane mode.
-- [ ] A privacy note (what is stored, how to delete it) linked from Settings if accounts are on, as required by GDPR for EU users.
+- [ ] On the live URL: Lighthouse PWA and accessibility pass; install the app on a phone and open it in airplane mode.
+- [ ] Transfer a real profile laptop → iPhone (Safari, jsQR path) and laptop → Android (Chrome, BarcodeDetector path).
+- [ ] Camera access needs HTTPS: GitHub Pages provides it; a custom domain must keep "Enforce HTTPS" on.

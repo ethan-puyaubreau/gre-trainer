@@ -35,8 +35,8 @@ Live site: https://ethan-puyaubreau.github.io/gre-trainer/
 - **Welcome page** for first-time visitors: what the app does, and a two-step plan (daily goal, exam date).
 - **Works offline** and installs as an app (PWA): after the first visit, every page works without a network.
 - **Progress** is kept in your browser's local storage. Export and import it as JSON from Settings.
-- **Optional account sync** (email sign-in, Supabase): when the build is given a Supabase project, Settings offers
-  to sign in and keep progress on every device. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
+- **Move progress by QR code**: the sending device shows a short animation of QR codes, the other one scans it with
+  its camera. No account, no server: the data goes from screen to camera. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ## Content
 

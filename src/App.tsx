@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { SyncConflictBanner } from './components/AccountCard';
 import { ExportReminder } from './components/ExportReminder';
 import { Dashboard } from './pages/Dashboard';
 import { History } from './pages/History';
@@ -8,6 +7,7 @@ import { Preview } from './pages/Preview';
 import { SectionSim } from './pages/SectionSim';
 import { Settings } from './pages/Settings';
 import { Strategies } from './pages/Strategies';
+import { Transfer } from './pages/Transfer';
 import { Welcome } from './pages/Welcome';
 import { href, useRoute } from './router';
 import { useProgress } from './store/progress';
@@ -67,6 +67,10 @@ export function App() {
     case 'settings':
       body = <Settings />;
       break;
+    case 'transfer':
+    case 'receive':
+      body = <Transfer route={route} />;
+      break;
     case 'welcome':
       body = <Welcome />;
       break;
@@ -97,7 +101,6 @@ export function App() {
           </nav>
         </div>
       </header>
-      <SyncConflictBanner />
       <ExportReminder />
       <main id="main" tabIndex={-1}>{body}</main>
     </div>

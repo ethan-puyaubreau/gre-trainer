@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { SKILLS, TEMPLATES } from '../content';
 import { DEFAULT_DAILY_GOAL, isExamDate } from '../mastery/habit';
 import { go, href } from '../router';
-import { cloudEnabled } from '../sync/config';
 import { useProgress } from '../store/progress';
 import '../fx-welcome.css';
 
@@ -110,13 +109,8 @@ export function Welcome() {
       </section>
 
       <p className="muted small welcome-foot">
-        Already practised on another device?{' '}
-        {cloudEnabled ? (
-          <a href={href('settings')}>Sign in to sync</a>
-        ) : (
-          <a href={href('settings')}>Import your progress file</a>
-        )}
-        . Your progress stays in this browser{cloudEnabled ? ' unless you sign in' : ''}; nothing is tracked.
+        Already practised on another device? <a href={href('transfer', 'receive')}>Scan its QR code</a> or{' '}
+        <a href={href('settings')}>import your progress file</a>. Your progress stays on your devices; nothing is tracked.
       </p>
     </div>
   );

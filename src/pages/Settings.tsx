@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccountCard } from '../components/AccountCard';
 import { formatClock } from '../components/Timer';
+import { href } from '../router';
 import { DEFAULT_DAILY_GOAL, isExamDate, MAX_DAILY_GOAL, MIN_DAILY_GOAL } from '../mastery/habit';
 import { DEFAULT_PACE_SEC } from '../mastery/model';
 import { exportProgress, isProgressData, NOT_AN_EXPORT, useProgress } from '../store/progress';
@@ -45,7 +45,6 @@ export function Settings() {
   return (
     <div>
       <h1>Settings</h1>
-      <AccountCard />
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Pace</h3>
         <p className="muted small">
@@ -181,6 +180,22 @@ export function Settings() {
             Your system asks for reduced motion, so animations are off. Choose On to see them anyway.
           </p>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }} id="transfer">
+        <h3 style={{ marginTop: 0 }}>Another device</h3>
+        <p className="muted small">
+          Copy your progress to a phone, tablet or another computer with QR codes: this screen shows them, the other device scans them with its camera. No
+          account and no server.
+        </p>
+        <div className="row">
+          <a className="btn btn-primary" href={href('transfer', 'send')}>
+            Send to another device
+          </a>
+          <a className="btn" href={href('transfer', 'receive')}>
+            Receive from another device
+          </a>
+        </div>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

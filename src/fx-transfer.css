@@ -1,0 +1,109 @@
+/* Profile transfer: QR animation on the sender, camera and progress on the receiver. */
+.transfer {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.transfer-pick {
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.transfer-pick:hover {
+  border-color: var(--accent-2);
+}
+.transfer-pick h3 {
+  margin-top: 0;
+}
+.transfer-send {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .transfer-send {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.transfer-qr-wrap {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.qr {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.transfer-counter {
+  color: #3a3349;
+  font-size: 14px;
+  text-align: center;
+  margin: 8px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.transfer-steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+.transfer-steps li + li {
+  margin-top: 8px;
+}
+.transfer-field {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+}
+.transfer-field legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding: 0;
+}
+.transfer-radio {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 14px;
+  margin: 6px 0;
+}
+.transfer-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.transfer-camera video {
+  width: 100%;
+  max-width: 560px;
+  border-radius: 8px;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.transfer-camera video.is-off {
+  display: none;
+}
+.transfer-status {
+  text-align: center;
+  font-size: 15px;
+  width: 100%;
+}
+.transfer-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.transfer-tiles i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--level-0);
+}
+.transfer-tiles i.on {
+  background: var(--good);
+}

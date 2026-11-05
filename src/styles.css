@@ -1119,7 +1119,7 @@ details summary {
   border-bottom: 1px solid var(--border);
 }
 
-/* ---------------------------------------------------------------- accessibility, account */
+/* ---------------------------------------------------------------- accessibility, forms */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1157,20 +1157,4 @@ main:focus {
   font: inherit;
   min-width: 0;
   flex: 1 1 220px;
-}
-.sync-conflict {
-  border: 1px solid var(--warn);
-  background: var(--warn-soft);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
-}
-.sync-banner {
-  width: 100%;
-  max-width: 1100px;
-  margin: 10px auto 0;
-  padding: 8px 16px;
-  box-sizing: border-box;
-  font-size: 14px;
-  color: var(--warn);
 }

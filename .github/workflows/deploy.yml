@@ -26,10 +26,6 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-        env:
-          # Optional cloud sync (docs/PRODUCTION.md). Unset secrets give the local-only build.
-          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
